@@ -1,0 +1,82 @@
+# Non-secret run configuration. Copy to config.yaml and edit.
+campaign:
+  keywords:                 # the "keywords array"
+    - "solar energy forecasting"
+    - "renewable grid analytics"
+  location: "United Kingdom" # the region to target
+  target_titles:            # POC job titles, priority order (from spec Module A)
+    - "VP of Sales"
+    - "CTO"
+    - "Chief Architect"
+    - "Director of Product"
+
+limits:
+  max_companies: 10         # cap discovery breadth (cost control)
+  max_leads: 10             # cap rows appended per run
+  per_call_delay_seconds: 1 # politeness delay between external API calls
+
+providers:                  # which concrete adapter each stage uses
+  discovery: tavily          # "tavily" (default, needs TAVILY_API_KEY) or "google_cse" (needs GOOGLE_CSE_KEY + GOOGLE_CSE_CX)
+  contacts: brightdata       # "brightdata" (default, needs BRIGHTDATA_API_KEY + BRIGHTDATA_LINKEDIN_DATASET_ID) or "proxycurl" (needs PROXYCURL_API_KEY)
+  email_finder: hunter
+  verifier: neverbounce
+  copywriter: template       # "template" (no API key) or "llm" (uses the llm: block below)
+
+verification:
+  # what to do with each NeverBounce outcome (spec Module B)
+  keep_statuses: ["valid", "catchall", "unknown"]  # "invalid" is always dropped
+  mark_risky_statuses: ["catchall", "unknown"]
+
+output:
+  xlsx_path: "../Quantra_Energy_Outbound_Campaign_Matrix.xlsx"  # relative to agent/
+  run_drafts_after: true    # invoke Campaign-to-Drafts tool as final step
+  signature_name: "[Your Name]"   # placeholder kept consistent with existing rows
+  signature_title: "CPO & Founder"
+
+# -----------------------------------------------------------------------------
+# Who is sending the emails. Only company_name is required — the rest sharpens
+# the generic template copywriter's commonality matching and (if you switch to
+# providers.copywriter: llm) gives the LLM real context instead of guessing.
+# Free-form narrative for the LLM lives in a separate file: sender_profile.md
+# (copy from sender_profile.example.md).
+# -----------------------------------------------------------------------------
+sender:
+  company_name: "Quantra Energy"
+  domain: "quantraenergy.com"
+  industry: "Energy & Renewables Analytics"
+  mission: "AI-driven intelligence for energy-sector decision-making"
+  value_propositions:
+    - "Renewable grid analytics — slots into workflows, cuts integration from months to days"
+    - "Energy-forecast error reduction of 20-35%, improving trading desk P&L"
+  technologies:
+    - "machine learning"
+    - "renewable forecasting"
+    - "grid optimization"
+    - "dispatch algorithms"
+  target_verticals: ["Grid operators", "Energy trading desks"]
+  case_studies:
+    - "Reduced forecast error 30% for a UK energy trader - £2M annual P&L uplift"
+  geographic_focus: "UK, Europe, India"
+  profile_path: "sender_profile.md"   # relative to this file
+
+# -----------------------------------------------------------------------------
+# LLM used by the copywriter ONLY when providers.copywriter above is "llm".
+# provider presets (see agent/providers/copywriter/llm_copywriter.py):
+#   anthropic | openai | gemini | ollama | github_copilot | openai_compatible
+# base_url/key_env only need setting to override a preset's default
+# (always required for "openai_compatible").
+# -----------------------------------------------------------------------------
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-5"
+  temperature: 0.7
+  max_tokens: 1200
+  # --- example: GitHub Copilot inference instead of Anthropic ---
+  # provider: "github_copilot"
+  # model: "gpt-4o"            # any chat model your Copilot plan exposes
+  # key_env: "COPILOT_API_KEY" # this is the default already; shown for clarity
+  # --- example: any OpenAI-compatible host (Groq, Together, ...) ---
+  # provider: "openai_compatible"
+  # model: "llama3-8b-8192"
+  # base_url: "https://api.groq.com/openai/v1"
+  # key_env: "GROQ_API_KEY"
