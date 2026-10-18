@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "@tanstack/react-router";
+import { Link, useParams } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
 import { Badge, Button, Card, Problem, Table, Td, Th, statusTone, usd, when, words } from "../components/ui";
 
@@ -32,6 +32,9 @@ export function LeadDetailPage() {
         title={company.name ?? company.domain}
         actions={
           <div className="flex gap-2">
+            <Link to="/leads/$companyId/journey" params={{ companyId }} className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-medium hover:bg-gray-50">
+              Journey
+            </Link>
             {company.status === "failed" && <Button onClick={() => retry.mutate()}>Retry</Button>}
             {company.status === "held" && <Button onClick={() => release.mutate()}>Release hold</Button>}
             {company.status === "disqualified" && <Button variant="secondary" onClick={() => requalify.mutate()}>Override and qualify</Button>}

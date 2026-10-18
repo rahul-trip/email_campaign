@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -24,6 +25,17 @@ class ImportRowView:
     resolution_confidence: float | None
     reason: str | None
     company_id: str | None
+
+
+@dataclass(frozen=True)
+class ImportOrigin:
+    """An input row that produced or joined a company, with the delivery it arrived in."""
+
+    row: ImportRowView
+    source: ImportSource
+    filename: str | None
+    created_by: str
+    received_at: datetime
 
 
 class ImportRepository(ScopedRepository):
@@ -111,6 +123,24 @@ class ImportRepository(ScopedRepository):
 
     def get_row(self, row_id: str) -> ImportRowView:
         return self._view(self._row(ImportRowRow, row_id))
+
+    def origins_for_company(self, company_id: str) -> list[ImportOrigin]:
+        """Every input row that led to the company, oldest first."""
+        stmt = (
+            select(ImportRowRow, ImportBatchRow)
+            .join(ImportBatchRow, ImportBatchRow.id == ImportRowRow.batch_id)
+            .where(
+                ImportRowRow.workspace_id == self._workspace_id,
+                ImportRowRow.company_id == company_id,
+            )
+            .order_by(ImportBatchRow.created_at, ImportRowRow.row_number)
+        )
+        return [
+            ImportOrigin(
+                self._view(row), batch.source, batch.filename, batch.created_by, batch.created_at
+            )
+            for row, batch in self._session.execute(stmt)
+        ]
 
     def rows_with_status(self, status: ImportRowStatus, limit: int = 200) -> list[ImportRowView]:
         stmt = (

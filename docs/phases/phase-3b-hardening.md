@@ -161,6 +161,12 @@ Each package is one PR. Each lists its gaps; the tests must exist before the pac
 
 ---
 
+### 3b.10 Lead journey page (added during the work)
+
+A read-only dashboard for one lead: how it arrived (import row, batch, who, when), the eight pipeline stages with their state, per-stage details and incidents, and the vendor calls and cost of each stage. `GET /api/companies/{id}/journey`, built by `services/journey.py` from rows that already exist, so there is no schema change. The page is `web/src/pages/LeadJourney.tsx`, linked from the leads table and the lead page.
+
+**Tests:** API tests for a new, held, failed, disqualified and waiting-for-review lead, the origin of an imported lead, per-stage cost adding up, and an unknown id; a Playwright step that opens a lead's journey and uses the stage tabs.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

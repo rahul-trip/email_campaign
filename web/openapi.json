@@ -7,6 +7,7 @@
           "edited_body": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -60,6 +61,40 @@
         "title": "Body_upload_targets_api_targets_upload_post",
         "type": "object"
       },
+      "CallOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "provider",
+          "operation",
+          "outcome",
+          "cost_micro_usd"
+        ],
+        "title": "CallOut",
+        "type": "object"
+      },
       "CampaignIn": {
         "additionalProperties": false,
         "properties": {
@@ -73,6 +108,7 @@
           "icp_description": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -89,11 +125,13 @@
             "type": "integer"
           },
           "name": {
+            "maxLength": 10000,
             "title": "Name",
             "type": "string"
           },
           "research_questions": {
             "items": {
+              "maxLength": 10000,
               "type": "string"
             },
             "maxItems": 3,
@@ -102,6 +140,7 @@
           },
           "target_titles": {
             "items": {
+              "maxLength": 10000,
               "type": "string"
             },
             "title": "Target Titles",
@@ -194,6 +233,7 @@
           "icp_description": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -218,6 +258,7 @@
           "name": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -230,6 +271,7 @@
             "anyOf": [
               {
                 "items": {
+                  "maxLength": 10000,
                   "type": "string"
                 },
                 "maxItems": 3,
@@ -245,6 +287,7 @@
             "anyOf": [
               {
                 "items": {
+                  "maxLength": 10000,
                   "type": "string"
                 },
                 "type": "array"
@@ -509,6 +552,7 @@
           "campaign_id": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -533,6 +577,7 @@
           "name": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -590,6 +635,7 @@
         "additionalProperties": false,
         "properties": {
           "domain": {
+            "maxLength": 10000,
             "title": "Domain",
             "type": "string"
           }
@@ -617,6 +663,7 @@
             "$ref": "#/components/schemas/ConsentBasis"
           },
           "evidence": {
+            "maxLength": 10000,
             "title": "Evidence",
             "type": "string"
           }
@@ -856,6 +903,40 @@
         "title": "EmailOut",
         "type": "object"
       },
+      "FactOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "FactOut",
+        "type": "object"
+      },
+      "ForgetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgetIn",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -880,6 +961,25 @@
         ],
         "title": "HoldReason",
         "type": "string"
+      },
+      "IncidentOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "text"
+        ],
+        "title": "IncidentOut",
+        "type": "object"
       },
       "IntakeOut": {
         "properties": {
@@ -912,6 +1012,46 @@
           "rows"
         ],
         "title": "IntakeOut",
+        "type": "object"
+      },
+      "JourneyOut": {
+        "properties": {
+          "company_id": {
+            "title": "Company Id",
+            "type": "string"
+          },
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
+          "next_step": {
+            "title": "Next Step",
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/OriginOut"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "total_cost_micro_usd": {
+            "title": "Total Cost Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "company_id",
+          "headline",
+          "next_step",
+          "origin",
+          "stages",
+          "total_cost_micro_usd"
+        ],
+        "title": "JourneyOut",
         "type": "object"
       },
       "LeadOut": {
@@ -954,6 +1094,7 @@
         "additionalProperties": false,
         "properties": {
           "password": {
+            "maxLength": 10000,
             "title": "Password",
             "type": "string"
           }
@@ -968,10 +1109,12 @@
         "additionalProperties": false,
         "properties": {
           "address": {
+            "maxLength": 10000,
             "title": "Address",
             "type": "string"
           },
           "credentials_ref": {
+            "maxLength": 10000,
             "title": "Credentials Ref",
             "type": "string"
           },
@@ -1201,6 +1344,52 @@
         "title": "NoteOut",
         "type": "object"
       },
+      "OriginOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "how": {
+            "title": "How",
+            "type": "string"
+          }
+        },
+        "required": [
+          "how",
+          "at",
+          "by",
+          "facts"
+        ],
+        "title": "OriginOut",
+        "type": "object"
+      },
       "PolicyIn": {
         "additionalProperties": false,
         "properties": {
@@ -1221,6 +1410,7 @@
           "footer_template": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1237,6 +1427,7 @@
           "reviewed_by": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1331,6 +1522,37 @@
         "title": "PolicyRule",
         "type": "string"
       },
+      "PrivacyOut": {
+        "properties": {
+          "drafts_deleted": {
+            "title": "Drafts Deleted",
+            "type": "integer"
+          },
+          "drafts_left": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Drafts Left",
+            "type": "array"
+          },
+          "found": {
+            "title": "Found",
+            "type": "boolean"
+          },
+          "messages_cancelled": {
+            "title": "Messages Cancelled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "found",
+          "messages_cancelled",
+          "drafts_deleted",
+          "drafts_left"
+        ],
+        "title": "PrivacyOut",
+        "type": "object"
+      },
       "Provenance": {
         "enum": [
           "operator_given",
@@ -1423,6 +1645,7 @@
         "additionalProperties": false,
         "properties": {
           "reason": {
+            "maxLength": 10000,
             "title": "Reason",
             "type": "string"
           }
@@ -1561,6 +1784,7 @@
         "properties": {
           "campaign": {
             "default": "default",
+            "maxLength": 10000,
             "title": "Campaign",
             "type": "string"
           },
@@ -1584,6 +1808,7 @@
           },
           "only": {
             "items": {
+              "maxLength": 10000,
               "type": "string"
             },
             "title": "Only",
@@ -1688,6 +1913,316 @@
         "title": "RunOut",
         "type": "object"
       },
+      "SenderProfileIn": {
+        "additionalProperties": false,
+        "description": "The sender profile. ``reviewed_at`` is accepted and ignored: only the server sets it.",
+        "properties": {
+          "case_studies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Studies"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "contact_info": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Info"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "geographic_focus": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geographic Focus"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Name"
+          },
+          "mission": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission"
+          },
+          "narrative": {
+            "anyOf": [
+              {
+                "maxLength": 8000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narrative"
+          },
+          "postal_address": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Address"
+          },
+          "registration_details": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Details"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "signature_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Name"
+          },
+          "signature_title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Title"
+          },
+          "target_verticals": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Verticals"
+          },
+          "technologies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technologies"
+          },
+          "value_propositions": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Propositions"
+          }
+        },
+        "title": "SenderProfileIn",
+        "type": "object"
+      },
+      "StageOut": {
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallOut"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "reached_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reached At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/StageState"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "state",
+          "reached_at",
+          "summary",
+          "facts",
+          "incidents",
+          "calls",
+          "cost_micro_usd"
+        ],
+        "title": "StageOut",
+        "type": "object"
+      },
+      "StageState": {
+        "enum": [
+          "done",
+          "current",
+          "waiting",
+          "held",
+          "failed",
+          "stopped",
+          "pending"
+        ],
+        "title": "StageState",
+        "type": "string"
+      },
       "StatusOut": {
         "properties": {
           "by_status": {
@@ -1728,6 +2263,7 @@
             "default": "manual"
           },
           "value": {
+            "maxLength": 10000,
             "title": "Value",
             "type": "string"
           }
@@ -1791,6 +2327,7 @@
           "campaign_id": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1802,6 +2339,7 @@
           "company": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1813,6 +2351,7 @@
           "country": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1824,6 +2363,7 @@
           "email": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1835,6 +2375,7 @@
           "linkedin": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1846,6 +2387,7 @@
           "notes": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1857,6 +2399,7 @@
           "person": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1881,6 +2424,7 @@
           "title": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -1897,6 +2441,7 @@
           "website": {
             "anyOf": [
               {
+                "maxLength": 10000,
                 "type": "string"
               },
               {
@@ -2112,6 +2657,63 @@
           "contact_id"
         ],
         "title": "WaterfallOut",
+        "type": "object"
+      },
+      "WorkspaceSettingsIn": {
+        "additionalProperties": false,
+        "description": "Only the settings an operator may change, each with its real type.",
+        "properties": {
+          "budget_per_prospect_micro_usd": {
+            "anyOf": [
+              {
+                "maximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Per Prospect Micro Usd"
+          },
+          "few_shot_examples": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Few Shot Examples"
+          },
+          "safe_to_send_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe To Send Only"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "title": "WorkspaceSettingsIn",
         "type": "object"
       }
     }
@@ -2410,6 +3012,48 @@
         ]
       }
     },
+    "/api/companies/{company_id}/journey": {
+      "get": {
+        "operationId": "journey_api_companies__company_id__journey_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Journey",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/{company_id}/release-hold": {
       "post": {
         "operationId": "release_hold_api_companies__company_id__release_hold_post",
@@ -2543,6 +3187,49 @@
         "summary": "Retry",
         "tags": [
           "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/suppress": {
+      "post": {
+        "description": "Never contact anyone at this company's domain again.",
+        "operationId": "suppress_company_api_companies__company_id__suppress_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suppress Company",
+        "tags": [
+          "privacy"
         ]
       }
     },
@@ -2690,6 +3377,49 @@
         ]
       }
     },
+    "/api/contacts/{contact_id}/suppress": {
+      "post": {
+        "description": "Never contact this person again; their unsent emails are cancelled.",
+        "operationId": "suppress_contact_api_contacts__contact_id__suppress_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suppress Contact",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",
@@ -2733,6 +3463,48 @@
         "summary": "Webhook",
         "tags": [
           "intake"
+        ]
+      }
+    },
+    "/api/privacy/forget": {
+      "post": {
+        "description": "Erase a person: suppress the address for good and remove what identifies them.",
+        "operationId": "forget_api_privacy_forget_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget",
+        "tags": [
+          "privacy"
         ]
       }
     },
@@ -3451,9 +4223,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Changes",
-                "type": "object"
+                "$ref": "#/components/schemas/SenderProfileIn"
               }
             }
           },
@@ -3585,9 +4355,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "title": "Changes",
-                "type": "object"
+                "$ref": "#/components/schemas/WorkspaceSettingsIn"
               }
             }
           },

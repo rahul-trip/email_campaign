@@ -12,6 +12,7 @@ from outbound.api.schemas import (
     ConsentOut,
     ContactOut,
     EmailOut,
+    JourneyOut,
     LeadOut,
     MessageOut,
     NoteOut,
@@ -63,6 +64,11 @@ def companies(
 @router.get("/companies/{company_id}", response_model=LeadOut)
 def company(company_id: str, svc: Annotated[Services, Depends(services)]) -> LeadOut:
     return _lead(svc.leads.detail(company_id))
+
+
+@router.get("/companies/{company_id}/journey", response_model=JourneyOut)
+def journey(company_id: str, svc: Annotated[Services, Depends(services)]) -> JourneyOut:
+    return JourneyOut.model_validate(svc.leads.journey(company_id))
 
 
 @router.get("/companies/{company_id}/timeline", response_model=list[TimelineOut])

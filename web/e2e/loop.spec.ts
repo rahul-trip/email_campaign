@@ -55,9 +55,28 @@ test("targets to review to draft, and an unapproved lead is never drafted", asyn
   await expect(page.getByRole("row", { name: /copy ready/ })).toHaveCount(1);
 
   // 6. The lead's page shows the waterfall of vendor calls and its timeline.
-  await page.getByRole("link", { name: /acme/ }).click();
+  await page.getByRole("link", { name: "acme.co.uk", exact: true }).click();
   await expect(page.getByText("Waterfall: every vendor call for this lead")).toBeVisible();
   await expect(page.getByText("Timeline")).toBeVisible();
+
+  // 7. The journey page tells the story: how it arrived, and the detail of every stage.
+  await page.getByRole("link", { name: "Journey" }).click();
+  await expect(page.getByText("How this lead arrived")).toBeVisible();
+  await expect(page.getByText("Added by an operator via the web app")).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(8);
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Draft and outreach");
+  await page.getByRole("tab", { name: /Email address/ }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("Vendor calls");
+  await page.getByRole("tab", { name: /Review/ }).click();
+  await expect(page.getByRole("tabpanel")).toContainText("changed by you");
+  await page.getByRole("tab", { name: /Review/ }).press("ArrowRight");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Draft and outreach");
+
+  // 8. The one still waiting for review says it is the operator's turn.
+  await page.getByRole("link", { name: "Leads", exact: true }).click();
+  await page.getByRole("link", { name: /Journey of beta/ }).click();
+  await expect(page.getByRole("status")).toContainText("Waiting for you");
+  await expect(page.getByRole("tab", { selected: true })).toContainText("Review");
 });
 
 test("a wrong password is refused and settings can be saved", async ({ page }) => {

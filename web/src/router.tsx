@@ -1,6 +1,7 @@
 import { Outlet, createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { Layout } from "./components/Layout";
 import { LeadDetailPage } from "./pages/LeadDetail";
+import { LeadJourneyPage } from "./pages/LeadJourney";
 import { LeadsPage } from "./pages/Leads";
 import { ReviewPage } from "./pages/Review";
 import { RunsPage } from "./pages/Runs";
@@ -20,11 +21,14 @@ const route = <P extends string>(path: P, component: () => React.JSX.Element) =>
 
 const leadDetail = createRoute({ getParentRoute: () => root, path: "/leads/$companyId", component: LeadDetailPage });
 
+const leadJourney = createRoute({ getParentRoute: () => root, path: "/leads/$companyId/journey", component: LeadJourneyPage });
+
 const routeTree = root.addChildren([
   route("/", ReviewPage),
   route("/targets", TargetsPage),
   route("/leads", LeadsPage),
   leadDetail,
+  leadJourney,
   route("/runs", RunsPage),
   route("/settings", SettingsPage),
 ]);

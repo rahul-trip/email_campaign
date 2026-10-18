@@ -651,3 +651,115 @@ def test_a_delivery_that_loses_the_race_to_the_same_event_is_a_duplicate(
     services.webhook._intake.run = raced  # type: ignore[method-assign,assignment]
     result = services.webhook.receive({"event_id": "evt-race", "website": "acme.com"})
     assert result.duplicate is True
+
+
+# ------------------------------------------------------------------ the lead journey
+
+
+def stage_states(journey: dict[str, object]) -> dict[str, str]:
+    stages = journey["stages"]
+    assert isinstance(stages, list)
+    return {s["key"]: s["state"] for s in stages}
+
+
+def test_the_journey_of_a_new_lead_starts_at_research(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "acme.com")
+    journey = api.get(f"/api/companies/{cid}/journey").json()
+    assert journey["headline"] == "New"
+    assert stage_states(journey) == {
+        "intake": "done",
+        "research": "current",
+        "qualification": "pending",
+        "people": "pending",
+        "email": "pending",
+        "copy": "pending",
+        "review": "pending",
+        "outreach": "pending",
+    }
+    assert journey["origin"]["how"] == "Added by an operator"
+
+
+def test_the_journey_says_how_an_imported_lead_arrived(api: Api) -> None:
+    api.post("/api/targets", json={"website": "https://www.acme.com", "country": "UK"})
+    cid = company_id(api, "acme.com")
+    origin = api.get(f"/api/companies/{cid}/journey").json()["origin"]
+    labels = {f["label"]: f["value"] for f in origin["facts"]}
+    assert origin["how"].startswith("Added by an operator via")
+    assert "website" in labels["As supplied"] and "acme.com" in labels["Matching"]
+    assert origin["by"] == "operator"
+
+
+def test_a_lead_in_review_shows_each_finished_stage_and_what_it_cost(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(
+        factory, ws, "acme.com", C.RESEARCHED, C.QUALIFIED, C.CONTACTS_FOUND, C.EMAIL_READY
+    )
+    with factory(ws) as uow:
+        contact = uow.contacts.add(cid, rank=1, source=ContactSource.SITE, full_name="Jane Doe")
+        uow.emails.add(
+            contact.id,
+            "jane@acme.com",
+            Provenance.API_DATABASE,
+            is_primary=True,
+            found_by="hunter",
+            status=EmailStatus.VALID,
+        )
+        uow.calls.record(
+            provider="hunter",
+            operation="find",
+            request_hash="h",
+            outcome=CallOutcome.HIT,
+            cost_micro_usd=24_500,
+            company_id=cid,
+        )
+        company = uow.companies.get(cid)
+        uow.companies.transition(
+            cid, C.COPY_READY, expected_version=company.row_version, reason="copy written"
+        )
+        uow.commit()
+    journey = api.get(f"/api/companies/{cid}/journey").json()
+    assert stage_states(journey)["email"] == "done"
+    assert stage_states(journey)["review"] == "waiting"
+    assert "review the email" in journey["next_step"]
+    by_key = {s["key"]: s for s in journey["stages"]}
+    assert by_key["people"]["facts"][0]["value"].startswith("Jane Doe")
+    assert "jane@acme.com" in by_key["email"]["facts"][0]["value"]
+    # The call was made while the lead was working towards the stage it was recorded in.
+    assert journey["total_cost_micro_usd"] == 24_500
+    assert sum(s["cost_micro_usd"] for s in journey["stages"]) == 24_500
+
+
+def test_a_held_lead_blocks_the_stage_that_held_it(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(
+        factory, ws, "acme.com", C.RESEARCHED, C.HELD, hold=HoldReason.COUNTRY_UNKNOWN
+    )
+    journey = api.get(f"/api/companies/{cid}/journey").json()
+    assert journey["headline"] == "Held: country unknown"
+    states = stage_states(journey)
+    assert (states["research"], states["qualification"], states["people"]) == (
+        "done",
+        "held",
+        "pending",
+    )
+    [incident] = {s["key"]: s for s in journey["stages"]}["qualification"]["incidents"]
+    assert "country unknown" in incident["text"]
+
+
+def test_failed_and_disqualified_leads_say_where_they_stopped(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    failed = seed_company(factory, ws, "a.com", C.FAILED, failed_stage="research")
+    out = seed_company(factory, ws, "b.com", C.RESEARCHED, C.DISQUALIFIED)
+    assert stage_states(api.get(f"/api/companies/{failed}/journey").json())["research"] == "failed"
+    stopped = api.get(f"/api/companies/{out}/journey").json()
+    assert stage_states(stopped)["qualification"] == "stopped"
+    assert "override" in stopped["next_step"]
+
+
+def test_the_journey_of_another_workspaces_lead_is_not_found(api: Api) -> None:
+    assert api.get("/api/companies/nope/journey").status_code == 404

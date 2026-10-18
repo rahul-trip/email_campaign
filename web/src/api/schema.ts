@@ -90,6 +90,23 @@ export interface paths {
         patch: operations["edit_company_api_companies__company_id__patch"];
         trace?: never;
     };
+    "/api/companies/{company_id}/journey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Journey */
+        get: operations["journey_api_companies__company_id__journey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/release-hold": {
         parameters: {
             query?: never;
@@ -135,6 +152,26 @@ export interface paths {
         put?: never;
         /** Retry */
         post: operations["retry_api_companies__company_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/suppress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suppress Company
+         * @description Never contact anyone at this company's domain again.
+         */
+        post: operations["suppress_company_api_companies__company_id__suppress_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -192,6 +229,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}/suppress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suppress Contact
+         * @description Never contact this person again; their unsent emails are cancelled.
+         */
+        post: operations["suppress_contact_api_contacts__contact_id__suppress_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -223,6 +280,26 @@ export interface paths {
          * @description Signed intake for other systems. Not behind the operator login: the signature is the key.
          */
         post: operations["webhook_api_intake_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/privacy/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forget
+         * @description Erase a person: suppress the address for good and remove what identifies them.
+         */
+        post: operations["forget_api_privacy_forget_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -655,6 +732,22 @@ export interface components {
              */
             preview?: boolean;
         };
+        /** CallOut */
+        CallOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Operation */
+            operation: string;
+            /** Outcome */
+            outcome: string;
+            /** Provider */
+            provider: string;
+        };
         /** CampaignIn */
         CampaignIn: {
             /** Cadence Days */
@@ -865,6 +958,18 @@ export interface components {
             /** Verified By */
             verified_by: string | null;
         };
+        /** FactOut */
+        FactOut: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** ForgetIn */
+        ForgetIn: {
+            /** Email */
+            email: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -875,6 +980,16 @@ export interface components {
          * @enum {string}
          */
         HoldReason: "catch_all_unverified" | "catch_all_resolving" | "consent_required" | "country_unknown" | "entity_unknown" | "needs_operator";
+        /** IncidentOut */
+        IncidentOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Text */
+            text: string;
+        };
         /** IntakeOut */
         IntakeOut: {
             /** Batch Id */
@@ -883,6 +998,20 @@ export interface components {
             rows: components["schemas"]["RowOut"][];
             /** Validate Only */
             validate_only: boolean;
+        };
+        /** JourneyOut */
+        JourneyOut: {
+            /** Company Id */
+            company_id: string;
+            /** Headline */
+            headline: string;
+            /** Next Step */
+            next_step: string;
+            origin: components["schemas"]["OriginOut"];
+            /** Stages */
+            stages: components["schemas"]["StageOut"][];
+            /** Total Cost Micro Usd */
+            total_cost_micro_usd: number;
         };
         /** LeadOut */
         LeadOut: {
@@ -980,6 +1109,17 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** OriginOut */
+        OriginOut: {
+            /** At */
+            at: string | null;
+            /** By */
+            by: string | null;
+            /** Facts */
+            facts: components["schemas"]["FactOut"][];
+            /** How */
+            how: string;
+        };
         /** PolicyIn */
         PolicyIn: {
             /** Allowed Provenance */
@@ -1016,6 +1156,17 @@ export interface components {
          * @enum {string}
          */
         PolicyRule: "allow" | "allow_with_footer" | "consent_required" | "block";
+        /** PrivacyOut */
+        PrivacyOut: {
+            /** Drafts Deleted */
+            drafts_deleted: number;
+            /** Drafts Left */
+            drafts_left: string[];
+            /** Found */
+            found: boolean;
+            /** Messages Cancelled */
+            messages_cancelled: number;
+        };
         /**
          * Provenance
          * @enum {string}
@@ -1135,6 +1286,71 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * SenderProfileIn
+         * @description The sender profile. ``reviewed_at`` is accepted and ignored: only the server sets it.
+         */
+        SenderProfileIn: {
+            /** Case Studies */
+            case_studies?: string[] | null;
+            /** Company Name */
+            company_name?: string | null;
+            /** Contact Info */
+            contact_info?: string | null;
+            /** Domain */
+            domain?: string | null;
+            /** Geographic Focus */
+            geographic_focus?: string | null;
+            /** Industry */
+            industry?: string | null;
+            /** Legal Name */
+            legal_name?: string | null;
+            /** Mission */
+            mission?: string | null;
+            /** Narrative */
+            narrative?: string | null;
+            /** Postal Address */
+            postal_address?: string | null;
+            /** Registration Details */
+            registration_details?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            /** Signature Name */
+            signature_name?: string | null;
+            /** Signature Title */
+            signature_title?: string | null;
+            /** Target Verticals */
+            target_verticals?: string[] | null;
+            /** Technologies */
+            technologies?: string[] | null;
+            /** Value Propositions */
+            value_propositions?: string[] | null;
+        };
+        /** StageOut */
+        StageOut: {
+            /** Calls */
+            calls: components["schemas"]["CallOut"][];
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Facts */
+            facts: components["schemas"]["FactOut"][];
+            /** Incidents */
+            incidents: components["schemas"]["IncidentOut"][];
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Reached At */
+            reached_at: string | null;
+            state: components["schemas"]["StageState"];
+            /** Summary */
+            summary: string;
+        };
+        /**
+         * StageState
+         * @enum {string}
+         */
+        StageState: "done" | "current" | "waiting" | "held" | "failed" | "stopped" | "pending";
         /** StatusOut */
         StatusOut: {
             /** By Status */
@@ -1275,6 +1491,20 @@ export interface components {
             outcome: string;
             /** Provider */
             provider: string;
+        };
+        /**
+         * WorkspaceSettingsIn
+         * @description Only the settings an operator may change, each with its real type.
+         */
+        WorkspaceSettingsIn: {
+            /** Budget Per Prospect Micro Usd */
+            budget_per_prospect_micro_usd?: number | null;
+            /** Few Shot Examples */
+            few_shot_examples?: number | null;
+            /** Safe To Send Only */
+            safe_to_send_only?: boolean | null;
+            /** Timezone */
+            timezone?: string | null;
         };
     };
     responses: never;
@@ -1458,6 +1688,37 @@ export interface operations {
             };
         };
     };
+    journey_api_companies__company_id__journey_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     release_hold_api_companies__company_id__release_hold_post: {
         parameters: {
             query?: never;
@@ -1542,6 +1803,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suppress_company_api_companies__company_id__suppress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyOut"];
                 };
             };
             /** @description Validation Error */
@@ -1652,6 +1944,37 @@ export interface operations {
             };
         };
     };
+    suppress_contact_api_contacts__contact_id__suppress_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -1692,6 +2015,39 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    forget_api_privacy_forget_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForgetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PrivacyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2243,9 +2599,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["SenderProfileIn"];
             };
         };
         responses: {
@@ -2357,9 +2711,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": components["schemas"]["WorkspaceSettingsIn"];
             };
         };
         responses: {

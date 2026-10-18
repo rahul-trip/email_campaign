@@ -65,6 +65,9 @@ export function LeadsPage() {
             <Th>Country</Th>
             <Th>Fit</Th>
             <Th>Why it stopped</Th>
+            <Th>
+              <span className="sr-only">Journey</span>
+            </Th>
           </tr>
         </thead>
         <tbody>
@@ -82,6 +85,11 @@ export function LeadsPage() {
               <Td>{c.country_code}</Td>
               <Td>{c.fit_score}</Td>
               <Td className="text-muted">{c.hold_reason ? words(c.hold_reason) : c.last_error}</Td>
+              <Td>
+                <Link to="/leads/$companyId/journey" params={{ companyId: c.id }} className="whitespace-nowrap text-brand hover:underline" aria-label={`Journey of ${c.name ?? c.domain}`}>
+                  Journey →
+                </Link>
+              </Td>
             </tr>
           ))}
         </tbody>

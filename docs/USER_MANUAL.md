@@ -159,6 +159,15 @@ Every company, newest first, 25 to a page. Search by name or domain; filter by s
 - **Field history:** only appears if the engine tried to change something you set. Your value is kept;
 - **Timeline:** everything that happened, in order.
 
+**A lead's journey** (the *Journey* link in the leads table, and the button on a lead's page) is a dashboard that tells the whole story of one company:
+
+- the **header** says what state the lead is in, **what happens next** (and whether the next move is yours), how many of the eight stages are finished, what has been spent on it, and how many people and emails there are;
+- the **stage bar** shows the eight stages: Intake, Research, Qualification, People, Email address, Copy, Review, and Draft and outreach. Green is done, blue is next up for the engine, amber is held or waiting for you, red is failed or stopped, grey is not reached. Click a stage (or use the arrow keys) to read it. The page opens on the stage that needs attention;
+- each **stage** shows a summary, its details (what the research found, the fit score and country policy, the people and their titles, each address and how it was verified, the email and its checks, your edits, the draft), any holds or failures that happened during it, and the vendor calls made to get there with their cost. A call is counted against the stage the lead was moving towards when it was made;
+- **How this lead arrived** shows whether it was typed in, imported from a file, sent by the webhook or found by search, who added it and when, exactly what was supplied, and how the website was matched.
+
+It only shows; to retry, release or edit, use the lead's page.
+
 ### 5.4 Runs
 
 - **Mode.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching your campaign's ideal-customer description), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it.

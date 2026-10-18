@@ -31,6 +31,7 @@ from outbound.domain.state_machines import (
     resume_status_for,
     retry_status_for,
 )
+from outbound.services.journey import Journey, JourneyData, build_journey
 
 EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 
@@ -123,6 +124,33 @@ class LeadService:
                 ]
             entities += [(EntityType.MESSAGE, m.id) for m in uow.messages.for_company(company_id)]
             return [_entry(row) for row in uow.events.for_entities(entities)]
+
+    def journey(self, company_id: str) -> Journey:
+        """How the lead arrived and what happened at each stage."""
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            people = [
+                (c, uow.emails.for_contact(c.id)) for c in uow.contacts.for_company(company_id)
+            ]
+            messages = uow.messages.for_company(company_id)
+            entities: list[tuple[EntityType, str]] = [(EntityType.COMPANY, company_id)]
+            for contact, emails in people:
+                entities.append((EntityType.CONTACT, contact.id))
+                entities += [(EntityType.CONTACT_EMAIL, e.id) for e in emails]
+            entities += [(EntityType.MESSAGE, m.id) for m in messages]
+            return build_journey(
+                JourneyData(
+                    company=company,
+                    campaign=uow.campaigns.get(company.campaign_id)
+                    if company.campaign_id
+                    else None,
+                    origins=uow.imports.origins_for_company(company_id),
+                    people=people,
+                    messages=messages,
+                    events=uow.events.for_entities(entities),
+                    calls=uow.calls.for_company(company_id),
+                )
+            )
 
     def waterfall(self, company_id: str) -> list[WaterfallStep]:
         with self._uow(self._workspace_id) as uow:

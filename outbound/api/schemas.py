@@ -16,6 +16,7 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
 
 
@@ -140,6 +141,52 @@ class WaterfallOut(Out):
     cost_micro_usd: int
     latency_ms: int | None
     contact_id: str | None
+
+
+class FactOut(Out):
+    label: str
+    value: str
+
+
+class CallOut(Out):
+    at: datetime
+    provider: str
+    operation: str
+    outcome: str
+    cost_micro_usd: int
+
+
+class IncidentOut(Out):
+    at: datetime
+    text: str
+
+
+class StageOut(Out):
+    key: str
+    label: str
+    state: StageState
+    reached_at: datetime | None
+    summary: str
+    facts: list[FactOut]
+    incidents: list[IncidentOut]
+    calls: list[CallOut]
+    cost_micro_usd: int
+
+
+class OriginOut(Out):
+    how: str
+    at: datetime | None
+    by: str | None
+    facts: list[FactOut]
+
+
+class JourneyOut(Out):
+    company_id: str
+    headline: str
+    next_step: str
+    origin: OriginOut
+    stages: list[StageOut]
+    total_cost_micro_usd: int
 
 
 class CompanyPatch(In):
