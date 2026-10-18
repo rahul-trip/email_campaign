@@ -21,11 +21,11 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from outbound.domain.enums import LegalEntityType
+from outbound.domain.names import read_profile_title
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
 from outbound.providers.llm_json import ask_json as ask
 from outbound.providers.ports import CompanyRegistry, LlmClient, SearchProvider
-from outbound.services.intake import read_profile_title
 from outbound.stages.research.facts import (
     CountryInference,
     best_registry_match,

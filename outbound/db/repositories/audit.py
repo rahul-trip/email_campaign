@@ -9,8 +9,9 @@ from typing import Any
 from sqlalchemy import func, select
 
 from outbound.db.models import ProviderCallRow, RunRow
-from outbound.db.repositories.base import ScopedRepository
+from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
+from outbound.domain.entities import ProviderCall
 from outbound.domain.enums import CallOutcome, RunKind, RunStatus
 from outbound.domain.state_machines import RUN
 
@@ -85,9 +86,6 @@ class RunRepository(ScopedRepository):
             .limit(limit)
         )
         return [self._view(row) for row in self._session.scalars(stmt)]
-
-    def live_cost(self, run_id: str) -> int:
-        return self.cost_of(run_id)
 
     @staticmethod
     def _view(row: RunRow) -> RunView:
@@ -191,7 +189,7 @@ class ProviderCallRepository(ScopedRepository):
         found = self._session.execute(stmt).first()
         return None if found is None else (found[0] or {})
 
-    def for_company(self, company_id: str) -> list[ProviderCallRow]:
+    def for_company(self, company_id: str) -> list[ProviderCall]:
         """Every provider call about this lead, oldest first (the waterfall inspector)."""
         stmt = (
             select(ProviderCallRow)
@@ -201,7 +199,7 @@ class ProviderCallRepository(ScopedRepository):
             )
             .order_by(ProviderCallRow.created_at, ProviderCallRow.id)
         )
-        return list(self._session.scalars(stmt))
+        return [snapshot(row, ProviderCall) for row in self._session.scalars(stmt)]
 
     def spend_since(self, provider: str, since: datetime) -> int:
         stmt = select(func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)).where(

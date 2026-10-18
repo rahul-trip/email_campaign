@@ -5,9 +5,10 @@ from __future__ import annotations
 from sqlalchemy import select
 
 from outbound.db.models import SuppressionRow
-from outbound.db.repositories.base import ScopedRepository
+from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.domain.actors import SYSTEM
 from outbound.domain.domains import registrable_domain
+from outbound.domain.entities import Suppression
 from outbound.domain.enums import EntityType, SuppressionKind, SuppressionReason
 from outbound.domain.hashing import hash_value
 
@@ -39,14 +40,14 @@ class SuppressionRepository(ScopedRepository):
         )
         return True
 
-    def entries(self) -> list[SuppressionRow]:
+    def entries(self) -> list[Suppression]:
         """The list as stored: hashes only, so the UI can show kind, reason and date."""
         stmt = (
             select(SuppressionRow)
             .where(SuppressionRow.workspace_id == self._workspace_id)
             .order_by(SuppressionRow.created_at.desc())
         )
-        return list(self._session.scalars(stmt))
+        return [snapshot(row, Suppression) for row in self._session.scalars(stmt)]
 
     def is_email_suppressed(self, email: str) -> bool:
         return self._exists(SuppressionKind.EMAIL, hash_value(email))

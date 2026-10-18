@@ -13,6 +13,7 @@ from typing import Any
 
 from outbound.domain.entities import CountryPolicy
 from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
     CompanySource,
     ContactStatus,
     EmailStatus,
@@ -167,7 +168,7 @@ def check_send(
         reasons.append("domain is suppressed")
     if policy_decision.outcome is not PolicyOutcome.ALLOW:
         reasons.append(f"country policy: {policy_decision.outcome.value}")
-    if contact_status not in (ContactStatus.CANDIDATE, ContactStatus.ACTIVE):
+    if contact_status not in WORKABLE_CONTACT_STATUSES:
         reasons.append(f"contact is {contact_status.value}")
     return SendVerdict(ok=not reasons, reasons=tuple(reasons))
 

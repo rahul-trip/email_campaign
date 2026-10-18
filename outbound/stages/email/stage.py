@@ -15,9 +15,15 @@ from typing import Any
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Contact, ContactEmail
-from outbound.domain.enums import CompanyStatus, ContactStatus, EmailStatus, HoldReason
+from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
+    CompanyStatus,
+    EmailStatus,
+    HoldReason,
+)
+from outbound.domain.names import display_name
 from outbound.domain.policies import PolicyOutcome
-from outbound.providers.metered import call_scope
+from outbound.metering.metered import call_scope
 from outbound.providers.ports import CatchAllResolver, EmailFinder, EmailVerifier
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.email.patterns import infer_pattern
@@ -26,7 +32,6 @@ from outbound.stages.policy import policy_decision_for
 
 MAX_CONTACTS = 3
 POLL_DELAY = timedelta(hours=6)  # asynchronous resolvers answer in a day or three
-_USABLE = (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
 
 
 @dataclass(frozen=True)
@@ -53,12 +58,12 @@ class EmailStage:
             lambda uow: [
                 (c, uow.emails.for_contact(c.id))
                 for c in uow.contacts.for_company(company.id)
-                if c.status in _USABLE
+                if c.status in WORKABLE_CONTACT_STATUSES
             ]
         )[:MAX_CONTACTS]
         target = Target(
             domain=company.domain,
-            name=company.name or company.domain.split(".")[0].title(),
+            name=display_name(company.name, company.domain),
             pattern=company.email_pattern,
             site_emails=tuple((company.research or {}).get("site_emails", ())),
             safe_to_send_only=bool(ctx.workspace.settings.get("safe_to_send_only", True)),

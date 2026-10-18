@@ -7,10 +7,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from outbound.db.models import EventRow, ProviderCallRow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
-from outbound.domain.entities import Company, Consent, Contact, ContactEmail, Message, Note
+from outbound.domain.entities import (
+    Company,
+    Consent,
+    Contact,
+    ContactEmail,
+    Event,
+    Message,
+    Note,
+    ProviderCall,
+)
 from outbound.domain.enums import (
     CompanyStatus,
     ConsentBasis,
@@ -215,13 +223,13 @@ class LeadService:
         return updated
 
 
-def _entry(row: EventRow) -> TimelineEntry:
+def _entry(row: Event) -> TimelineEntry:
     return TimelineEntry(
         row.created_at, row.entity_type, row.entity_id, row.type, row.actor, dict(row.data)
     )
 
 
-def _step(row: ProviderCallRow) -> WaterfallStep:
+def _step(row: ProviderCall) -> WaterfallStep:
     return WaterfallStep(
         row.created_at,
         row.provider,

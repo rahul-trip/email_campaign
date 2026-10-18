@@ -42,7 +42,7 @@ class Worker:
                 run_id=claimed.id,
             )
         except Exception as error:
-            log.error("run_failed", run_id=claimed.id, error=f"{type(error).__name__}: {error}")
+            log.exception("run_failed", run_id=claimed.id)
             self._fail(claimed.id, error)
         return True
 

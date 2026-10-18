@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, Query
 from outbound.api.deps import Services, services
 from outbound.api.schemas import CostOut, QualityOut, RunIn, RunOut, StatusOut
 from outbound.db.types import utcnow
-from outbound.domain.enums import MessageState
 from outbound.services.runs import RunRequest
 
 router = APIRouter(prefix="/api", tags=["runs"])
@@ -44,14 +43,11 @@ def cancel(run_id: str, svc: Annotated[Services, Depends(services)]) -> RunOut:
 
 @router.get("/status", response_model=StatusOut)
 def status(svc: Annotated[Services, Depends(services)]) -> StatusOut:
-    with svc.container.uow(svc.workspace_id) as uow:
-        counts = uow.companies.count_by_status()
-        held = uow.reports.company_counts()[1]
-        waiting = len(uow.messages.in_state(MessageState.GENERATED, 1000))
+    report = svc.reports.status()
     return StatusOut(
-        by_status={s.value: n for s, n in counts.items()},
-        held={r.value: n for r, n in held.items()},
-        waiting_for_review=waiting,
+        by_status={s.value: n for s, n in report.by_status.items()},
+        held={r.value: n for r, n in report.held.items()},
+        waiting_for_review=report.waiting_for_review,
     )
 
 

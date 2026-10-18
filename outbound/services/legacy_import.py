@@ -8,7 +8,6 @@ changes nothing: the second run finds every company already there and marks the 
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +30,7 @@ from outbound.domain.enums import (
     NoteSource,
     Provenance,
 )
+from outbound.domain.names import split_name, split_person
 
 COLUMNS = (
     "Organization URL",
@@ -95,23 +95,6 @@ def split_organisation(cell: str) -> tuple[str, str]:
         elif line:
             name_parts.append(line)
     return " ".join(name_parts), url
-
-
-def split_person(cell: str) -> tuple[str, str]:
-    """``"Jack Kelly\\n(Co-Founder)"`` becomes (name, title)."""
-    lines = [line.strip() for line in cell.splitlines() if line.strip()]
-    if not lines:
-        return "", ""
-    title = " ".join(lines[1:])
-    match = re.fullmatch(r"\((.*)\)", title)
-    return lines[0], (match.group(1).strip() if match else title)
-
-
-def split_name(full_name: str) -> tuple[str | None, str | None]:
-    parts = full_name.split()
-    if not parts:
-        return None, None
-    return parts[0], " ".join(parts[1:]) or None
 
 
 def import_legacy_xlsx(

@@ -8,9 +8,8 @@ import pytest
 
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CallOutcome, CompanySource
-from outbound.providers.budget import BudgetPolicy
-from outbound.providers.errors import BudgetExceeded, ProviderError
-from outbound.providers.metered import (
+from outbound.metering.budget import BudgetPolicy
+from outbound.metering.metered import (
     Meter,
     MeteredFinder,
     MeteredLlm,
@@ -20,6 +19,7 @@ from outbound.providers.metered import (
     call_scope,
     request_hash,
 )
+from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.ports import (
     FinderResult,
     LlmResult,

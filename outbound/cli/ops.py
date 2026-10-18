@@ -15,7 +15,6 @@ from outbound.db.types import utcnow
 from outbound.domain.enums import (
     CompanyStatus,
     HoldReason,
-    MessageState,
 )
 from outbound.domain.money import format_usd
 from outbound.pipeline import NotConfigured, Pipeline, assemble, execute_run, real_providers
@@ -134,11 +133,10 @@ def register(app: typer.Typer) -> None:
         """Where every lead is, what is held and why, and what failed."""
         container = build_container(settings_for(database_url))
         workspace_id = workspace_id_or_exit(container, workspace)
+        report = ReportService(container.uow, workspace_id).status()
         with container.uow(workspace_id) as uow:
-            counts = uow.companies.count_by_status()
-            held = uow.reports.company_counts()[1]
             failed = uow.companies.due(CompanyStatus.FAILED, 20, utcnow() + LONG_AGO)
-            waiting = len(uow.messages.in_state(MessageState.GENERATED))
+        counts, held, waiting = report.by_status, report.held, report.waiting_for_review
         for company_status in CompanyStatus:
             if counts.get(company_status):
                 typer.echo(f"{company_status.value:<14}{counts[company_status]}")

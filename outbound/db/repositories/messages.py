@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from outbound.db.models import CompanyRow, MessageRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
@@ -89,6 +89,14 @@ class MessageRepository(ScopedRepository):
             .order_by(MessageRow.step, MessageRow.id)
         )
         return [snapshot(row, Message) for row in self._session.scalars(stmt)]
+
+    def count_in_state(self, state: MessageState) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(MessageRow)
+            .where(MessageRow.workspace_id == self._workspace_id, MessageRow.state == state)
+        )
+        return int(self._session.scalar(stmt) or 0)
 
     def drafted_in_mailbox(self, limit: int) -> list[Message]:
         """Drafts the engine saved in a mailbox, newest first. Messages imported from the old

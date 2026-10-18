@@ -10,12 +10,9 @@ from __future__ import annotations
 from outbound.db.uow import UnitOfWork
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Contact
-from outbound.domain.enums import CompanyStatus, ContactStatus
+from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, CompanyStatus
 from outbound.domain.ranking import RankedContact, rank_contacts
 from outbound.stages.base import StageContext, StageFailure, StageResult
-
-MAX_ACTIVE_CONTACTS = 3
-_USABLE = (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
 
 
 class ContactsStage:
@@ -29,7 +26,7 @@ class ContactsStage:
         usable = [
             c
             for c in ctx.read(lambda uow: uow.contacts.for_company(company_id))
-            if c.status in _USABLE
+            if c.status in WORKABLE_CONTACT_STATUSES
         ]
         if not usable:
             raise StageFailure("no decision-maker was found on the site or in a public search")
@@ -37,7 +34,7 @@ class ContactsStage:
         ranked = rank_contacts(usable, wanted)
         return StageResult(
             CompanyStatus.CONTACTS_FOUND,
-            reason=f"{min(len(ranked), MAX_ACTIVE_CONTACTS)} contact(s) ranked",
+            reason=f"{len(ranked)} contact(s) ranked",
             write=lambda uow: _save_ranking(uow, ranked),
         )
 

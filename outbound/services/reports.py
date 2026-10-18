@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.enums import CallOutcome, HoldReason
+from outbound.domain.enums import CallOutcome, CompanyStatus, HoldReason, MessageState
 
 CATCH_ALL_HOLDS = (HoldReason.CATCH_ALL_RESOLVING, HoldReason.CATCH_ALL_UNVERIFIED)
 QUALITY_TARGET = 0.8  # the Phase 2 gate: 8 of the first 10 sent without edits
@@ -60,10 +60,26 @@ class CostReport:
         return self.total // self.prospects if self.prospects else None
 
 
+@dataclass(frozen=True)
+class StatusReport:
+    by_status: dict[CompanyStatus, int]
+    held: dict[HoldReason, int]
+    waiting_for_review: int
+
+
 class ReportService:
     def __init__(self, uow_factory: UnitOfWorkFactory, workspace_id: str) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
+
+    def status(self) -> StatusReport:
+        """Where every lead is, why some are held, and how many emails await review."""
+        with self._uow(self._workspace_id) as uow:
+            return StatusReport(
+                by_status=uow.companies.count_by_status(),
+                held=uow.reports.company_counts()[1],
+                waiting_for_review=uow.messages.count_in_state(MessageState.GENERATED),
+            )
 
     def quality(self) -> QualityReport:
         with self._uow(self._workspace_id) as uow:

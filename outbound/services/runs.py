@@ -68,7 +68,7 @@ class RunService:
                     run.status,
                     run.params,
                     run.counts,
-                    uow.runs.live_cost(run_id),
+                    uow.runs.cost_of(run_id),
                     run.started_at,
                     run.finished_at,
                     run.created_at,

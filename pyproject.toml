@@ -43,6 +43,7 @@ dev = [
     "pre-commit>=3.8",
     "types-openpyxl>=3.1",
     "datasette>=0.65",  # read-only database viewer for Phases 1 and 2
+    "import-linter>=2.15",
 ]
 # Dependencies of the legacy agent/ package; deleted together with it in Phase 2.
 legacy = [
@@ -70,11 +71,17 @@ target-version = "py312"
 extend-exclude = ["agent", "web", "docs", "test_keys.py"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF", "S", "BLE", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"outbound.db.models".msg = "ORM rows stay inside outbound/db: repositories return entities."
 
 [tool.ruff.lint.per-file-ignores]
+"outbound/db/**" = ["TID251"]  # the database layer is where the models live
 "outbound/db/migrations/versions/*" = ["E501"]  # frozen revisions hold long SQL strings
 "tests/api/conftest.py" = ["F811"]  # fixtures imported from tests/db are used by name
+"tests/*" = ["S101", "S104", "S105", "S106", "S311", "S608", "BLE001", "TID251"]  # asserts, fake secrets, test-only SQL on fixed table names
+"scripts/*" = ["S101", "S105", "S106", "S311", "S603", "BLE001", "TID251"]  # dev tools: fake passwords, running pytest
 
 [tool.mypy]
 files = ["outbound", "tests", "scripts"]
@@ -91,3 +98,39 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "outbound.domain.*"
 strict = true
+
+[tool.importlinter]
+root_package = "outbound"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: imports only point down"
+type = "layers"
+# Highest first. A module may import from the layers below it, never from the ones above.
+layers = [
+    "outbound.cli",
+    "outbound.api | outbound.worker",
+    "outbound.pipeline",
+    "outbound.services",
+    "outbound.runner",
+    "outbound.stages",
+    "outbound.metering",
+    "outbound.db | outbound.providers",
+    "outbound.domain",
+]
+exhaustive = false
+
+[[tool.importlinter.contracts]]
+name = "The domain does no I/O and imports nothing from the other layers"
+type = "forbidden"
+source_modules = ["outbound.domain"]
+forbidden_modules = [
+    "outbound.db", "outbound.providers", "outbound.metering", "outbound.stages",
+    "outbound.runner", "outbound.services", "outbound.api", "outbound.cli",
+    "sqlalchemy", "httpx", "requests",
+]
+
+[[tool.importlinter.contracts]]
+name = "Providers and the database do not depend on each other"
+type = "independence"
+modules = ["outbound.providers", "outbound.db"]

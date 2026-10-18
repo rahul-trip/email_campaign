@@ -15,7 +15,7 @@ from typing import Protocol
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import RunKind, RunStatus
 from outbound.logging import get_logger
-from outbound.providers.metered import call_scope
+from outbound.metering.metered import call_scope
 from outbound.runner.runner import Runner, RunReport
 
 log = get_logger(__name__)
@@ -68,8 +68,8 @@ class Tick:
             try:
                 with call_scope(run_id=run_id):
                     results[job.name] = job.run()
-            except Exception as error:  # one broken job must not stop the others
-                log.error("job_failed", job=job.name, error=f"{type(error).__name__}: {error}")
+            except Exception:  # one broken job must not stop the others
+                log.exception("job_failed", job=job.name)
                 results[job.name] = {"failed": 1}
                 status = RunStatus.FAILED
         with self._uow(self._workspace_id) as uow:

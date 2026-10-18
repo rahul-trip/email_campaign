@@ -22,7 +22,7 @@ from typing import Any
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CallOutcome
-from outbound.providers.budget import BudgetPolicy, check_budget
+from outbound.metering.budget import BudgetPolicy, check_budget
 from outbound.providers.errors import BudgetExceeded
 from outbound.providers.ports import (
     CatchAllResolver,

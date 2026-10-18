@@ -16,6 +16,7 @@ from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.models import EventRow
 from outbound.db.types import utcnow
 from outbound.domain.actors import is_operator
+from outbound.domain.entities import Event
 from outbound.domain.enums import EntityType
 
 
@@ -61,7 +62,7 @@ class EventRepository:
             )
         )
 
-    def for_entities(self, entities: list[tuple[EntityType, str]]) -> list[EventRow]:
+    def for_entities(self, entities: list[tuple[EntityType, str]]) -> list[Event]:
         """The history of several rows together, oldest first (for one lead's timeline)."""
         if not entities:
             return []
@@ -78,9 +79,9 @@ class EventRepository:
             )
             .order_by(EventRow.created_at, EventRow.id)
         )
-        return list(self._session.scalars(stmt))
+        return [snapshot(row, Event) for row in self._session.scalars(stmt)]
 
-    def for_entity(self, entity_type: EntityType, entity_id: str) -> list[EventRow]:
+    def for_entity(self, entity_type: EntityType, entity_id: str) -> list[Event]:
         stmt = (
             select(EventRow)
             .where(
@@ -90,7 +91,7 @@ class EventRepository:
             )
             .order_by(EventRow.created_at, EventRow.id)
         )
-        return list(self._session.scalars(stmt))
+        return [snapshot(row, Event) for row in self._session.scalars(stmt)]
 
 
 class ScopedRepository:

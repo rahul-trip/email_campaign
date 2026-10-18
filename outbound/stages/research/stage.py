@@ -6,6 +6,7 @@ from typing import Any
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.enums import CompanyStatus, ContactSource, LegalEntityType
+from outbound.domain.names import display_name
 from outbound.stages.base import StageContext, StageResult
 from outbound.stages.research.graph import (
     Person,
@@ -39,7 +40,7 @@ class ResearchStage:
             self._graph,
             ResearchInput(
                 domain=company.domain,
-                company_name=company.name or company.domain.split(".")[0].title(),
+                company_name=display_name(company.name, company.domain),
                 country_code=company.country_code,
                 notes="\n".join(n.body for n in notes),
                 icp=icp,

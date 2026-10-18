@@ -58,6 +58,9 @@ class ContactStatus(StrEnum):
     FORGOTTEN = "forgotten"
 
 
+WORKABLE_CONTACT_STATUSES = (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
+
+
 class ContactSource(StrEnum):
     OPERATOR = "operator"
     SITE = "site"

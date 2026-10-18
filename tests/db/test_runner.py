@@ -23,8 +23,8 @@ from outbound.domain.enums import (
     Provenance,
     RunStatus,
 )
-from outbound.providers.budget import BudgetPolicy
-from outbound.providers.metered import Meter, MeteredVerifier
+from outbound.metering.budget import BudgetPolicy
+from outbound.metering.metered import Meter, MeteredVerifier
 from outbound.providers.ports import VerificationResult, VerificationStatus
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Outcome, Runner
@@ -798,3 +798,25 @@ def test_a_tick_with_nothing_to_do_is_quiet(factory: UnitOfWorkFactory, ws: str)
     assert report.pipeline is not None
     with factory(ws) as uow:
         assert uow.session.scalars(select(EventRow)).first() is None
+
+
+def test_every_log_line_in_a_run_carries_the_run_workspace_and_lead(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from structlog.contextvars import get_contextvars
+
+    cid = add_company(factory, ws, "acme.com")
+    seen: dict[str, object] = {}
+
+    def look(ctx: StageContext) -> None:
+        seen.update(get_contextvars())
+
+    stage = FakeStage("research", C.NEW, C.RESEARCHED, action=look)
+    report = make_runner(factory, ws, [stage]).run_pipeline()
+    assert seen == {
+        "run_id": report.run_id,
+        "workspace_id": ws,
+        "company_id": cid,
+        "stage": "research",
+    }
+    assert get_contextvars() == {}  # and nothing leaks out after the run

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Company, Contact
-from outbound.domain.enums import ContactStatus, Provenance
+from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, Provenance
 from outbound.domain.policies import PolicyDecision, decide_country_policy
 
 
@@ -25,9 +25,7 @@ def policy_decision_for(
 ) -> PolicyDecision:
     policy = uow.policies.get(company.country_code) if company.country_code else None
     contacts = [
-        c
-        for c in uow.contacts.for_company(company.id)
-        if c.status in (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
+        c for c in uow.contacts.for_company(company.id) if c.status in WORKABLE_CONTACT_STATUSES
     ]
     consented = any(uow.consents.has_active(c.id) for c in contacts)
     if email_provenance is None:  # not told which address: use the one the company will send to

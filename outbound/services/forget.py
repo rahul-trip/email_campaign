@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from outbound.db.uow import UnitOfWork
 from outbound.domain.actors import OPERATOR
 from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     ContactStatus,
     EntityType,
@@ -23,7 +24,6 @@ from outbound.domain.hashing import normalise
 from outbound.domain.state_machines import COMPANY
 
 _UNSENT = (MessageState.GENERATED, MessageState.APPROVED, MessageState.DRAFTED)
-_STILL_WORKABLE = (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
 
 
 @dataclass(frozen=True)
@@ -61,7 +61,7 @@ def suppress_if_nobody_left(
     others = [
         c
         for c in uow.contacts.for_company(company_id)
-        if c.id != leaving and c.status in _STILL_WORKABLE
+        if c.id != leaving and c.status in WORKABLE_CONTACT_STATUSES
     ]
     if not others and COMPANY.allows(company.status, CompanyStatus.SUPPRESSED):
         uow.companies.transition(

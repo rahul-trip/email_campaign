@@ -11,18 +11,22 @@ from datetime import datetime
 from typing import Any
 
 from outbound.domain.enums import (
+    CallOutcome,
     CompanySource,
     CompanyStatus,
     ConsentBasis,
     ContactSource,
     ContactStatus,
     EmailStatus,
+    EntityType,
     HoldReason,
     LegalEntityType,
     MessageState,
     NoteSource,
     PolicyRule,
     Provenance,
+    SuppressionKind,
+    SuppressionReason,
 )
 
 
@@ -187,3 +191,42 @@ class Campaign:
         object.__setattr__(self, "target_titles", tuple(self.target_titles))
         object.__setattr__(self, "research_questions", tuple(self.research_questions))
         object.__setattr__(self, "cadence_days", tuple(self.cadence_days))
+
+
+@dataclass(frozen=True)
+class Event:
+    """One line of history: a status change, a field change, a decision."""
+
+    id: str
+    entity_type: EntityType
+    entity_id: str
+    type: str
+    actor: str
+    data: dict[str, Any]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ProviderCall:
+    """One vendor call as recorded in the ledger (the response itself is not exposed)."""
+
+    id: str
+    provider: str
+    operation: str
+    outcome: CallOutcome
+    cost_micro_usd: int
+    latency_ms: int | None
+    run_id: str | None
+    company_id: str | None
+    contact_id: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class Suppression:
+    """A do-not-contact entry. Only the hash of the value is ever held."""
+
+    kind: SuppressionKind
+    reason: SuppressionReason
+    value_hash: str
+    created_at: datetime

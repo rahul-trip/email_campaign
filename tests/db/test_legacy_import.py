@@ -16,13 +16,12 @@ from outbound.domain.enums import (
     MessageState,
     Provenance,
 )
+from outbound.domain.names import split_name, split_person
 from outbound.services.legacy_import import (
     COLUMNS,
     LegacyWorkbookError,
     import_legacy_xlsx,
-    split_name,
     split_organisation,
-    split_person,
 )
 
 REAL_WORKBOOK = Path(__file__).parents[2] / "Quantra_Energy_Outbound_Campaign_Matrix.xlsx"

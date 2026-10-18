@@ -58,8 +58,8 @@ class CatchAllPoller:
             counts["checked"] += 1
             try:
                 released = self._poll_company(company.id, moment)
-            except Exception as error:  # one bad lead must not stop the rest
-                log.error("catch_all_poll_failed", company_id=company.id, error=str(error))
+            except Exception:  # one bad lead must not stop the rest
+                log.exception("catch_all_poll_failed", company_id=company.id)
                 counts["errors"] += 1
                 continue
             counts["released" if released else "still_waiting"] += 1

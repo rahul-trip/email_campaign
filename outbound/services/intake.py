@@ -43,15 +43,14 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.domain.errors import InvalidInput
+from outbound.domain.names import read_profile_title, split_name, split_person
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import SearchHit, SearchProvider
-from outbound.services.legacy_import import split_name, split_person
 
 log = get_logger(__name__)
 
 CONFIDENCE_THRESHOLD = 0.8
-DEFAULT_PRIORITY = 5
 
 # Loose header matching: lower-case, letters and digits only, then look up the meaning.
 _HEADERS = {
@@ -259,17 +258,6 @@ class DomainResolver:
                 company=company,
             )
         return Resolution(None, note="could not identify a company from that LinkedIn profile")
-
-
-def read_profile_title(title: str) -> tuple[str, str, str]:
-    """``"Jane Doe - CTO - Acme Energy | LinkedIn"`` becomes (name, title, company)."""
-    body = re.sub(r"\s*[|\-\u2013]\s*LinkedIn\s*$", "", title.strip(), flags=re.IGNORECASE)
-    parts = [p.strip() for p in re.split(r"\s+[-\u2013]\s+", body) if p.strip()]
-    if len(parts) >= 3:
-        return parts[0], parts[1], parts[-1]
-    if len(parts) == 2:
-        return parts[0], "", parts[1]
-    return (parts[0] if parts else ""), "", ""
 
 
 # --------------------------------------------------------------------------- the report

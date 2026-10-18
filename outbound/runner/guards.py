@@ -14,7 +14,7 @@ from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Company
 from outbound.domain.enums import HoldReason
 from outbound.domain.policies import PolicyOutcome
-from outbound.providers.budget import BudgetPolicy
+from outbound.metering.budget import BudgetPolicy
 from outbound.stages.base import Stage
 from outbound.stages.policy import policy_decision_for
 

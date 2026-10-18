@@ -14,8 +14,8 @@ from outbound.config import Settings
 from outbound.domain.entities import Workspace
 from outbound.domain.enums import CompanySource, ImportRowStatus, ImportSource
 from outbound.domain.errors import ConfigurationError
-from outbound.providers.budget import BudgetPolicy
-from outbound.providers.metered import (
+from outbound.metering.budget import BudgetPolicy
+from outbound.metering.metered import (
     Meter,
     MeteredFinder,
     MeteredLlm,

@@ -31,8 +31,8 @@ from outbound.domain.enums import (
 )
 from outbound.domain.errors import ConfigurationError
 from outbound.domain.state_machines import STAGE_INPUT_STATUS, retry_status_for
-from outbound.logging import get_logger
-from outbound.providers.metered import call_scope
+from outbound.logging import bind, get_logger, unbind
+from outbound.metering.metered import call_scope
 from outbound.runner.guards import Guards, Refusal, RefusalKind
 from outbound.stages.base import Reader, Stage, StageContext, StageResult
 
@@ -105,6 +105,7 @@ class Runner:
             uow.commit()
         report = RunReport(run_id)
         status = RunStatus.SUCCEEDED
+        bind(run_id=run_id, workspace_id=self._workspace_id)  # on every log line until we leave
         try:
             for stage in self._stages:
                 if only and stage.name not in only:
@@ -116,6 +117,8 @@ class Runner:
         except BaseException:
             self._finish(run_id, RunStatus.FAILED, report)
             raise
+        finally:
+            unbind("run_id", "workspace_id")
         self._finish(run_id, status, report)
         report.status = status
         return report
@@ -147,6 +150,7 @@ class Runner:
         # with this lead must not stop the run for the others.
         company: Company | None = None
         result: StageResult | None = None
+        bind(company_id=company_id, stage=stage.name)
         try:
             with self._uow(self._workspace_id) as uow:
                 company = uow.companies.get(company_id)
@@ -174,6 +178,8 @@ class Runner:
                 log.exception("lead_unreadable", stage=stage.name, company_id=company_id)
                 return Outcome.SKIPPED
             return self._record_failure(stage, company, error)
+        finally:
+            unbind("company_id", "stage")
 
     @staticmethod
     def _undo(result: StageResult | None) -> None:
@@ -254,7 +260,7 @@ class Runner:
 
     def _record_failure(self, stage: Stage, company: Company, error: Exception) -> Outcome:
         message = f"{type(error).__name__}: {error}"[:MAX_ERROR_LENGTH]
-        log.error("stage_failed", stage=stage.name, company_id=company.id, error=message)
+        log.exception("stage_failed", error=message)
         try:
             with self._uow(self._workspace_id) as uow:
                 current = uow.companies.get(company.id)

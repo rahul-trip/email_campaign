@@ -4,15 +4,13 @@ from __future__ import annotations
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Contact, ContactEmail
-from outbound.domain.enums import CompanyStatus, ContactStatus, MessageState
+from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, CompanyStatus, MessageState
 from outbound.domain.footer import MissingProfileField, render_footer
 from outbound.domain.policies import is_safe_email_status
 from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.copy.graph import CopyInput, CopyOutput, run_copy
 from outbound.stages.policy import policy_decision_for
-
-_USABLE = (ContactStatus.CANDIDATE, ContactStatus.ACTIVE)
 
 
 class CopyStage:
@@ -95,7 +93,7 @@ def _chosen_address(
     uow: UnitOfWork, company_id: str, safe_only: bool
 ) -> tuple[Contact, ContactEmail] | None:
     for contact in uow.contacts.for_company(company_id):
-        if contact.status not in _USABLE:
+        if contact.status not in WORKABLE_CONTACT_STATUSES:
             continue
         for address in uow.emails.for_contact(contact.id):
             if address.is_primary and is_safe_email_status(
