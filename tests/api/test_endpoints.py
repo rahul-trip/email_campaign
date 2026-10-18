@@ -814,4 +814,23 @@ def test_a_person_added_with_consent_ends_the_consent_hold(
     assert added.status_code == 201
     assert added.json()["emails"][0]["email"] == "asha@tatapower.com"
     assert api.post(f"/api/companies/{cid}/release-hold", json={}).json()["status"] == "researched"
-    assert api.post("/api/companies/nope/people", json={"full_name": "Sam"}).status_code == 404
+    assert api.post("/api/companies/nope/people", json={"full_name": "Sam Lee"}).status_code == 404
+
+
+def test_a_person_can_be_corrected_through_the_api(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "acme.com", C.RESEARCHED)
+    with factory(ws) as uow:
+        person = uow.contacts.add(cid, rank=1, source=ContactSource.OPERATOR, full_name="sonal")
+        uow.commit()
+    refused = api.patch(f"/api/contacts/{person.id}", json={"full_name": "sonal"})
+    assert refused.status_code == 422 and "first and a last name" in refused.json()["detail"]
+    fixed = api.patch(
+        f"/api/contacts/{person.id}",
+        json={"full_name": "Sonal Mishra", "email": "sonal@acme.com"},
+    )
+    assert fixed.status_code == 200
+    assert fixed.json()["full_name"] == "Sonal Mishra"
+    assert fixed.json()["emails"][0]["email"] == "sonal@acme.com"
+    assert api.patch("/api/contacts/nope", json={"full_name": "A B"}).status_code == 404

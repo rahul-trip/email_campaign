@@ -97,7 +97,13 @@ export function LeadDetailPage() {
             <div className="grid gap-4 lg:grid-cols-2">
               <Card tour="lead-people" title="People and addresses">
                 {contacts.map((contact) => (
-                  <Person key={contact.id} contact={contact} onChanged={refresh} onSuppress={() => suppressPerson.mutate(contact.id)} />
+                  <Person
+                    key={contact.id}
+                    contact={contact}
+                    onChanged={refresh}
+                    onSuppress={() => suppressPerson.mutate(contact.id)}
+                    retryAfterEdit={company.status === "failed" && company.failed_stage === "email" ? () => ok(client.POST("/api/companies/{company_id}/retry", path)) : undefined}
+                  />
                 ))}
                 {contacts.length === 0 && <p className="text-sm text-muted">No people yet.</p>}
                 {notes.map((note) => (
@@ -277,7 +283,8 @@ function HoldPanel({
   );
 }
 
-function Person({ contact, onChanged, onSuppress }: { contact: Contact; onChanged: () => void; onSuppress: () => void }) {
+function Person({ contact, onChanged, onSuppress, retryAfterEdit }: { contact: Contact; onChanged: () => void; onSuppress: () => void; retryAfterEdit?: () => Promise<unknown> }) {
+  const [editing, setEditing] = useState(false);
   return (
     <div className="mb-3 text-sm">
       <p className="font-medium">
@@ -293,8 +300,21 @@ function Person({ contact, onChanged, onSuppress }: { contact: Contact; onChange
           </span>
         </p>
       ))}
+      {editing && (
+        <EditPerson
+          contact={contact}
+          retryAfterEdit={retryAfterEdit}
+          onSaved={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
       {contact.status !== "forgotten" && (
         <div className="ml-3 mt-1 flex flex-wrap items-start gap-2">
+          <Button variant="ghost" onClick={() => setEditing(!editing)}>
+            {editing ? "Close" : "Edit"}
+          </Button>
           <ConsentForm contactId={contact.id} onSaved={onChanged} />
           <Button
             variant="ghost"
@@ -307,6 +327,49 @@ function Person({ contact, onChanged, onSuppress }: { contact: Contact; onChange
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Correct a person. If the lead failed because this person's name was incomplete, it is retried. */
+function EditPerson({ contact, retryAfterEdit, onSaved }: { contact: Contact; retryAfterEdit?: () => Promise<unknown>; onSaved: () => void }) {
+  const [name, setName] = useState(contact.full_name ?? "");
+  const [title, setTitle] = useState(contact.title ?? "");
+  const [email, setEmail] = useState("");
+  const hasAddress = contact.emails.some((e) => e.email);
+  const save = useMutation({
+    mutationFn: async () => {
+      await ok(
+        client.PATCH("/api/contacts/{contact_id}", {
+          params: { path: { contact_id: contact.id } },
+          body: { full_name: name, title, email: hasAddress ? undefined : email.trim() || undefined },
+        }),
+      );
+      if (retryAfterEdit) await retryAfterEdit();
+    },
+    onSuccess: onSaved,
+  });
+  return (
+    <div className="my-2 ml-3 space-y-2 rounded-md border border-line p-2">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Field label="First and last name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <Field label="Job title">
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </Field>
+        {!hasAddress && (
+          <Field label="Work email" hint="Optional; blank means it is looked up.">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <Button disabled={!name.trim() || save.isPending} onClick={() => save.mutate()}>
+          {retryAfterEdit ? "Save and retry the email step" : "Save"}
+        </Button>
+        <SaveNote mutation={save} />
+      </div>
     </div>
   );
 }
@@ -451,7 +514,9 @@ function AddPersonPanel({ company, onAdded }: { company: Company; onAdded: () =>
       onAdded();
     },
   });
-  const ready = name.trim() !== "" && (!consented || evidence.trim() !== "");
+  // The address finder needs a first and a last name unless the work email is given.
+  const needsFullName = name.trim().split(/\s+/).length < 2 && email.trim() === "";
+  const ready = name.trim() !== "" && !needsFullName && (!consented || evidence.trim() !== "");
   return (
     <Card tour="lead-add-person" title="Add a person">
       <div id="add-person" className="space-y-3">
@@ -459,7 +524,7 @@ function AddPersonPanel({ company, onAdded }: { company: Company; onAdded: () =>
           Someone you know at {company.name ?? company.domain}. They are tried first when an email is written{heldForConsent ? ", and the consent below is what this lead is waiting for" : ""}.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Person's name">
+          <Field label="Person's name" hint={needsFullName && name.trim() !== "" ? "First and last name, or give their work email, so the address can be found." : undefined}>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Job title (optional)">

@@ -38,9 +38,13 @@ test("a consent hold is ended by adding the person who consented, not by releasi
   await expect(page.getByText("Held: consent required")).toBeVisible();
 
   // Add the person who consented: the hold is released as part of it.
-  await page.getByLabel("Person's name").fill("Asha Rao");
+  // One word is not enough for the address finder, so the form says so and will not save it.
+  await page.getByLabel("Person's name").fill("sonal");
+  await expect(page.getByText("First and last name, or give their work email")).toBeVisible();
   await page.getByLabel("This person has given consent to be contacted").check();
   await page.getByLabel("Evidence").fill("Asked for a demo at the 2026 grid summit");
+  await expect(page.getByRole("button", { name: "Add person and release the hold" })).toBeDisabled();
+  await page.getByLabel("Person's name").fill("Asha Rao");;
   await page.getByRole("button", { name: "Add person and release the hold" }).click();
   await expect(page.getByText("Held: consent required")).toBeHidden();
 

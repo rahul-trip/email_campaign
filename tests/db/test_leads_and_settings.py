@@ -192,6 +192,15 @@ def test_releasing_a_hold_resumes_where_the_hold_came_from(
     assert (released.status, released.hold_reason) == (C.RESEARCHED, None)
 
 
+def make_person(factory: UnitOfWorkFactory, ws: str, company_id: str) -> str:
+    with factory(ws) as uow:
+        contact = uow.contacts.add(
+            company_id, rank=1, source=ContactSource.OPERATOR, full_name="A B"
+        )
+        uow.commit()
+        return contact.id
+
+
 def india_lead_held_for_consent(factory: UnitOfWorkFactory, ws: str) -> Company:
     """The real case: a lead in a consent-required country, held before any person was found."""
     with factory(ws) as uow:
@@ -264,13 +273,50 @@ def test_adding_a_person_refuses_bad_input_and_blocked_addresses(
     with pytest.raises(InvalidInput, match="not an email"):
         service.add_person(company.id, full_name="Sam", email="sam-at-acme")
     with pytest.raises(InvalidInput, match="evidence"):
-        service.add_person(company.id, full_name="Sam", consent_basis=ConsentBasis.EXPRESS)
+        service.add_person(company.id, full_name="Sam Lee", consent_basis=ConsentBasis.EXPRESS)
     with factory(ws) as uow:
         uow.suppressions.add(SuppressionKind.DOMAIN, "acme.com", SuppressionReason.OPT_OUT)
         uow.commit()
     with pytest.raises(InvalidInput, match="do-not-contact"):
-        service.add_person(company.id, full_name="Sam", email="sam@acme.com")
+        service.add_person(company.id, full_name="Sam Lee", email="sam@acme.com")
     assert leads(factory, ws).detail(company.id).contacts == []  # nothing half-saved
+
+
+def test_a_one_word_name_needs_an_email_or_it_could_never_be_looked_up(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    service = leads(factory, ws)
+    with pytest.raises(InvalidInput, match="first and a last name"):
+        service.add_person(company.id, full_name="sonal")
+    # With their own address the finder is not needed, so one name is enough.
+    added = service.add_person(company.id, full_name="sonal", email="sonal@acme.com")
+    assert added.contact.first_name == "sonal" and len(added.emails) == 1
+
+
+def test_a_person_with_a_one_word_name_can_be_corrected(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    with factory(ws) as uow:  # as saved by an older version: one word, no address
+        person = uow.contacts.add(
+            company.id, rank=1, source=ContactSource.OPERATOR, full_name="sonal", first_name="sonal"
+        )
+        uow.commit()
+    service = leads(factory, ws)
+    with pytest.raises(InvalidInput, match="first and a last name"):
+        service.update_person(person.id, full_name="sonal")
+    fixed = service.update_person(person.id, full_name="Sonal  Mishra", title="Director")
+    assert (fixed.contact.first_name, fixed.contact.last_name, fixed.contact.title) == (
+        "Sonal",
+        "Mishra",
+        "Director",
+    )
+    assert "full_name" in fixed.contact.manual_fields  # the engine will not overwrite it
+    with_address = service.update_person(person.id, email="Sonal@acme.com")
+    assert [e.email for e in with_address.emails] == ["sonal@acme.com"]
+    with pytest.raises(InvalidInput, match="already has an address"):
+        service.update_person(person.id, email="other@acme.com")
 
 
 def test_a_person_cannot_be_added_to_another_workspaces_lead(
@@ -279,6 +325,9 @@ def test_a_person_cannot_be_added_to_another_workspaces_lead(
     company = make(factory, other_ws, "acme.com")
     with pytest.raises(NotFound):
         leads(factory, ws).add_person(company.id, full_name="Sam Lee")
+    person = make_person(factory, other_ws, company.id)
+    with pytest.raises(NotFound):
+        leads(factory, ws).update_person(person, full_name="Sam Lee")
 
 
 def test_a_hold_with_no_default_needs_the_operator_to_choose(

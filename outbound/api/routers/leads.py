@@ -17,6 +17,7 @@ from outbound.api.schemas import (
     MessageOut,
     NoteOut,
     PersonIn,
+    PersonPatch,
     ReleaseIn,
     TimelineOut,
     WaterfallOut,
@@ -113,6 +114,18 @@ def add_person(
     )
     return ContactOut.model_validate(
         {**added.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in added.emails]}
+    )
+
+
+@router.patch("/contacts/{contact_id}", response_model=ContactOut)
+def edit_person(
+    contact_id: str, body: PersonPatch, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    updated = svc.leads.update_person(
+        contact_id, full_name=body.full_name, title=body.title, email=body.email
+    )
+    return ContactOut.model_validate(
+        {**updated.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in updated.emails]}
     )
 
 

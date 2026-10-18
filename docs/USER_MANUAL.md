@@ -175,8 +175,8 @@ Every company, newest first, 25 to a page. Search by name or domain; filter by s
 - the status, hold reason, country, fit score, and the last error if it failed;
 - buttons that appear when they apply: **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
 - for a **held** lead, a panel that says why and offers **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume;
-- **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
-- **Add a person:** someone you know at the company (name, optional title and work email). They are tried first when an email is written. Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
+- **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Edit** (correct the name or title, or give a work email if they have none; on a lead whose email step failed for lack of a full name it also retries that step), **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
+- **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). The address finder cannot search on one word, so a one-word name without an email is refused. They are tried first when an email is written. Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
 - **Edit this lead:** name, country, priority and campaign. What you save is marked as yours and kept. If someone else changed the lead meanwhile, you are asked to reload;
 - **Suppress this domain** at the bottom, for everyone at the company;
 - **Emails:** each email written, its state, and how much you edited it;
@@ -382,7 +382,7 @@ Honest list of what is not there yet, so nothing surprises you.
 
 | Limit | Workaround |
 |---|---|
-| **Adding an email address to a person who already exists** is not possible; adding the same website again only adds your notes | Use **Add a person** on the lead page for a new person with an address |
+| **Changing the address of a person who already has one** is not possible | Add the person again with the right address, and suppress the old one if needed |
 | The **Mailboxes** screen records a mailbox and checks its DNS. Drafting and the Sent sync use the mailbox login in `.env`, not this list | Keep the two the same |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
@@ -427,6 +427,7 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | The web app will not start: "The web app needs a login" | `OPERATOR_PASSWORD_HASH` or `SESSION_SECRET` is missing in `.env` |
 | Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web && npm ci && npm run build` |
 | Something failed in the browser and the message ends "Reference: …" | Search the logs for that reference (see 13a); the line with `unhandled_error` has the cause |
+| A lead fails with "has no first and last name" | A person was saved with one word. Open the lead, press **Edit** on the person, give both names (or a work email) and **Save and retry the email step** |
 | A button fails with "The server has no such endpoint" (or, on an older version, "Method Not Allowed") | The page is newer than the running server. Stop `uv run outbound serve` and `uv run outbound worker` and start them again. Do this after every update |
 | **Start run** does nothing | The worker is not running: `uv run outbound worker` |
 | "not configured" when running | A needed vendor key is missing; the message names it |

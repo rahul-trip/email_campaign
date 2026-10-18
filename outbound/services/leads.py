@@ -47,6 +47,10 @@ EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 _POLICY_HOLDS = frozenset(
     {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
 )
+_NEEDS_A_NAME = (
+    "Give both a first and a last name, or the person's work email: the finder that looks up"
+    " their address needs one or the other."
+)
 _HOW_TO_FIX = {
     HoldReason.COUNTRY_UNKNOWN: "Set the country under Edit this lead, then release it.",
     HoldReason.CONSENT_REQUIRED: (
@@ -271,9 +275,10 @@ class LeadService:
         name = " ".join(full_name.split())
         if not name:
             raise InvalidInput("give the person's name")
-        address = (email or "").strip().lower() or None
-        if address and ("@" not in address or " " in address):
-            raise InvalidInput(f"{email!r} is not an email address")
+        address = _clean_address(email)
+        first, last = split_name(name)
+        if not address and not (first and last):
+            raise InvalidInput(_NEEDS_A_NAME)
         if consent_basis is not None and not (consent_evidence or "").strip():
             raise InvalidInput("say where the consent came from: the evidence is kept with it")
         with self._uow(self._workspace_id) as uow:
@@ -282,7 +287,6 @@ class LeadService:
                 raise InvalidInput("that address or its domain is on the do-not-contact list")
             if address and uow.emails.by_address(address) is not None:
                 raise InvalidInput("that address already belongs to another person")
-            first, last = split_name(name)
             contact = uow.contacts.add(
                 company_id,
                 rank=1,
@@ -305,6 +309,49 @@ class LeadService:
                 uow.consents.add(contact.id, consent_basis, (consent_evidence or "").strip(), actor)
             uow.commit()
             return ContactWithEmails(contact, emails)
+
+    def update_person(
+        self,
+        contact_id: str,
+        *,
+        full_name: str | None = None,
+        title: str | None = None,
+        email: str | None = None,
+        actor: str = OPERATOR,
+    ) -> ContactWithEmails:
+        """Correct a person: their name or title, and an address if they have none yet.
+
+        The values become yours (the engine will not overwrite them). A lead whose email step
+        failed because the name was incomplete can then be retried.
+        """
+        address = _clean_address(email)
+        with self._uow(self._workspace_id) as uow:
+            contact = uow.contacts.get(contact_id)  # NotFound for another workspace's person
+            held = uow.emails.for_contact(contact_id)
+            name = " ".join(
+                (full_name if full_name is not None else contact.full_name or "").split()
+            )
+            first, last = split_name(name)
+            if not name:
+                raise InvalidInput("give the person's name")
+            if not (held or address) and not (first and last):
+                raise InvalidInput(_NEEDS_A_NAME)
+            changes: dict[str, Any] = {"full_name": name, "first_name": first, "last_name": last}
+            if title is not None:
+                changes["title"] = title.strip() or None
+            updated = uow.contacts.update_fields(contact_id, changes, actor=actor)
+            if address and not any(e.email == address for e in held):
+                if held:
+                    raise InvalidInput("this person already has an address; it cannot be changed")
+                if uow.suppressions.blocks(address):
+                    raise InvalidInput("that address or its domain is on the do-not-contact list")
+                if uow.emails.by_address(address) is not None:
+                    raise InvalidInput("that address already belongs to another person")
+                uow.emails.add(
+                    contact_id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor
+                )
+            uow.commit()
+            return ContactWithEmails(updated, uow.emails.for_contact(contact_id))
 
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
@@ -343,6 +390,13 @@ class LeadService:
         )
         uow.commit()
         return updated
+
+
+def _clean_address(email: str | None) -> str | None:
+    address = (email or "").strip().lower() or None
+    if address and ("@" not in address or " " in address):
+        raise InvalidInput(f"{email!r} is not an email address")
+    return address
 
 
 def _entry(row: Event) -> TimelineEntry:

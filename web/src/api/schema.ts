@@ -229,6 +229,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Person */
+        patch: operations["edit_person_api_contacts__contact_id__patch"];
+        trace?: never;
+    };
     "/api/contacts/{contact_id}/consents": {
         parameters: {
             query?: never;
@@ -1149,6 +1166,15 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** PersonPatch */
+        PersonPatch: {
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name?: string | null;
+            /** Title */
+            title?: string | null;
+        };
         /** PolicyIn */
         PolicyIn: {
             /** Allowed Provenance */
@@ -1960,6 +1986,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaterfallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_person_api_contacts__contact_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
                 };
             };
             /** @description Validation Error */

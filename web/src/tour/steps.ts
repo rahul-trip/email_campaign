@@ -164,7 +164,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-add-person",
         title: "Add a person",
-        body: "Add someone you know at the company. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on. Releasing a consent hold without consent only holds it again.",
+        body: "Add someone you know at the company, with a first and last name (or their work email) so the address can be found. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on. Releasing a consent hold without consent only holds it again.",
       },
       {
         target: "lead-edit",

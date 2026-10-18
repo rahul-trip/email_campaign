@@ -118,6 +118,7 @@ class Waterfall:
         if not (first and last):
             outcome.problems.append(
                 f"{contact.full_name or 'a contact'} has no first and last name"
+                " (edit the person on the lead page, or give their work email)"
             )
             return outcome
 
