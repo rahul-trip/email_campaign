@@ -13,6 +13,33 @@ client.use({
   },
 });
 
+/**
+ * Raised on any 401 from an ordinary request, so the app can show the sign-in form. The sign-in
+ * attempt and the "who am I" check are left out: they are how the app finds out, and reacting to
+ * them would loop.
+ */
+export const SIGNED_OUT = "outbound:signed-out";
+client.use({
+  onResponse({ response, request }) {
+    const asking = request.url.endsWith("/api/auth/login") || request.url.endsWith("/api/auth/me");
+    if (response.status === 401 && !asking) window.dispatchEvent(new Event(SIGNED_OUT));
+    return undefined;
+  },
+});
+
+/** openapi-typescript types an uploaded file as a string; the serializer below sends the real File. */
+export const asUpload = (file: File) => file as unknown as string;
+
+/** Send a body with a file in it as multipart form data. */
+export function multipart(body: Record<string, unknown>): FormData {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(body)) {
+    if (value === undefined || value === null) continue;
+    data.append(key, value instanceof Blob ? value : String(value));
+  }
+  return data;
+}
+
 /** An error answer in the server's problem-details shape. */
 export class ApiProblem extends Error {
   constructor(

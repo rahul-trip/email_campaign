@@ -2,6 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 const PASSWORD = "e2e-password-123";
 
+// The tour opens by itself on a first visit and would sit over the page; tour.spec.ts covers it.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("outbound.tour", "done"));
+});
+
 async function signIn(page: Page) {
   await page.goto("/");
   await page.getByLabel("Password").fill(PASSWORD);
@@ -77,6 +82,13 @@ test("targets to review to draft, and an unapproved lead is never drafted", asyn
   await page.getByRole("link", { name: /Journey of beta/ }).click();
   await expect(page.getByRole("status")).toContainText("Waiting for you");
   await expect(page.getByRole("tab", { selected: true })).toContainText("Review");
+
+  // 9. The operator can edit a lead; the value becomes theirs.
+  await page.getByRole("link", { name: "Open lead to act on it" }).click();
+  await page.getByLabel("Name").fill("Beta Holdings");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByRole("heading", { name: "Beta Holdings" })).toBeVisible();
+  await expect(page.getByText(/set by you:.*name/)).toBeVisible();
 });
 
 test("a wrong password is refused and settings can be saved", async ({ page }) => {

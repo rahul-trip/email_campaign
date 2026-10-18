@@ -104,4 +104,5 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 
 - One branch per task, named `phase-N/<task>`. Keep PRs small.
 - Never commit `.env` files, `data/private/`, `*.db`, or the bake-off contact list.
+- **The product tour is part of the UI.** A PR that adds or changes a screen, a button or a flow in `web/` updates `web/src/tour/steps.ts` (add or edit the section or step, and mark the element with `tour="name"`) and the "Guided tour" part of `docs/USER_MANUAL.md`. `web/e2e/tour.spec.ts` fails when a step points at a missing element.
 - Close a phase by filling in its **Gate record** and updating the status table in `docs/phases/README.md`.

@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
-import { client, ok } from "../api/client";
+import { useEffect, useState, type ReactNode } from "react";
+import { SIGNED_OUT, client, ok } from "../api/client";
+import { TourProvider, useTour } from "../tour/Tour";
 import { Button, Card, Field, Input, Problem } from "./ui";
 
 function Login({ onDone }: { onDone: () => void }) {
@@ -41,6 +42,15 @@ const links = [
   { to: "/settings", label: "Settings" },
 ] as const;
 
+function TourButton() {
+  const { start } = useTour();
+  return (
+    <Button variant="ghost" onClick={start}>
+      Tour
+    </Button>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => ok(client.GET("/api/auth/me")) });
@@ -55,14 +65,22 @@ export function Layout({ children }: { children: ReactNode }) {
     onSuccess: () => queryClient.clear(),
   });
 
+  // Any request answered 401 means the session ended: show the sign-in form again.
+  useEffect(() => {
+    const signedOut = () => void queryClient.invalidateQueries({ queryKey: ["me"] });
+    window.addEventListener(SIGNED_OUT, signedOut);
+    return () => window.removeEventListener(SIGNED_OUT, signedOut);
+  }, [queryClient]);
+
   if (me.isPending) return <p className="p-6 text-sm text-muted">Loading…</p>;
   if (me.isError) return <Login onDone={() => queryClient.invalidateQueries({ queryKey: ["me"] })} />;
 
   const waiting = status.data?.waiting_for_review ?? 0;
   return (
+    <TourProvider autoStart>
     <div className="min-h-screen">
       <header className="border-b border-line bg-panel">
-        <nav className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2" aria-label="Main">
+        <nav data-tour="nav" className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2" aria-label="Main">
           <strong className="mr-4 text-brand">Outbound</strong>
           {links.map((link) => (
             <Link
@@ -79,6 +97,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
           ))}
           <span className="flex-1" />
+          <TourButton />
           <Button variant="ghost" onClick={() => logout.mutate()}>
             Sign out
           </Button>
@@ -86,5 +105,6 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto max-w-7xl px-4 py-5">{children}</main>
     </div>
+    </TourProvider>
   );
 }

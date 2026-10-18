@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { UseQueryResult } from "@tanstack/react-query";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { ApiProblem } from "../api/client";
 
 const cx = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -28,9 +29,10 @@ export function Button({
   );
 }
 
-export function Card({ title, actions, children, className }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+/** ``tour`` names the card for the guided tour (see src/tour/steps.ts). */
+export function Card({ title, actions, children, className, tour }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; tour?: string }) {
   return (
-    <section className={cx("rounded-lg border border-line bg-panel p-4", className)}>
+    <section data-tour={tour} className={cx("rounded-lg border border-line bg-panel p-4", className)}>
       {(title || actions) && (
         <header className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">{title}</h2>
@@ -93,6 +95,76 @@ export function Problem({ error }: { error: unknown }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** Loading and error handling for a query, so no page shows a blank screen while it waits or fails. */
+export function QueryState<T>({ query, children }: { query: UseQueryResult<T>; children: (data: T) => ReactNode }) {
+  if (query.isPending)
+    return (
+      <p role="status" className="py-6 text-center text-sm text-muted">
+        Loading…
+      </p>
+    );
+  if (query.isError)
+    return (
+      <div className="space-y-2">
+        <Problem error={query.error} />
+        <Button variant="secondary" onClick={() => void query.refetch()}>
+          Try again
+        </Button>
+      </div>
+    );
+  return <>{children(query.data)}</>;
+}
+
+/** Tabs that follow the ARIA pattern: arrow keys, Home and End move between them. */
+export function Tabs<T extends string>({
+  label,
+  tabs,
+  value,
+  onChange,
+  children,
+  tour,
+}: {
+  label: string;
+  tour?: string;
+  tabs: readonly (readonly [T, string])[];
+  value: T;
+  onChange: (id: T) => void;
+  children: ReactNode;
+}) {
+  const move = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const target =
+      event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
+    if (target < 0) return;
+    event.preventDefault();
+    onChange(tabs[target][0]);
+    document.getElementById(`tab-${tabs[target][0]}`)?.focus();
+  };
+  return (
+    <div className="space-y-4">
+      <div role="tablist" aria-label={label} data-tour={tour} className="flex flex-wrap gap-1">
+        {tabs.map(([id, text], index) => (
+          <button
+            key={id}
+            id={`tab-${id}`}
+            role="tab"
+            aria-selected={value === id}
+            aria-controls={`panel-${id}`}
+            tabIndex={value === id ? 0 : -1}
+            onClick={() => onChange(id)}
+            onKeyDown={(event) => move(event, index)}
+            className={cx("rounded-md px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand", value === id ? "bg-brand text-white" : "bg-white hover:bg-gray-100")}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${value}`} aria-labelledby={`tab-${value}`}>
+        {children}
+      </div>
     </div>
   );
 }

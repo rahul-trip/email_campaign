@@ -65,6 +65,27 @@ uv run outbound worker     # does the work you start from the browser
 - The web app listens only on your own computer. Five wrong passwords in a minute locks sign-in for a minute. A sign-in lasts 12 hours.
 - First time only: `uv run outbound db upgrade` and `uv run outbound seed` create the database, a default workspace, a default campaign and the country rules.
 
+### 3.1 The guided tour
+
+The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, Targets, Runs, Review, Leads, a lead's journey, acting on a lead, Settings), dimming the page and outlining the part it is explaining.
+
+Every step has three buttons:
+
+1. **Next** goes to the next step. On the last step it says **Finish**.
+2. **Skip section** leaves the rest of the section you are in and jumps to the first step of the next one, opening that screen for you. On the last section it ends the tour.
+3. **End tour** closes it. Pressing Escape does the same.
+
+The tour opens once per browser; ending or finishing it is remembered, and it will not come back by itself. To see it again, press **Tour** at the top of any page.
+
+The two sections about a single lead open your most recent lead. If you have none yet, they say so; add a target and start a run, then take the tour again.
+
+**For whoever changes the app:** the tour is data, not code. Its text and the element each step points at are in `web/src/tour/steps.ts`; the player is `web/src/tour/Tour.tsx`.
+
+- New screen: add a section to `steps.ts` (in the order a person would meet it) and a `place` for it.
+- New feature or changed screen: add or edit a step. Give the element `tour="name"` (on a `Card`) or `data-tour="name"`, and use the same name as the step's `target`.
+- Removed or renamed element: change or delete the step. `web/e2e/tour.spec.ts` walks every step against a real lead and fails if a step points at something that no longer exists, so a forgotten step shows up in the checks.
+- Keep this section of the manual in step with the sections in `steps.ts`.
+
 ---
 
 ## 4. A first email, start to finish
@@ -152,8 +173,11 @@ Every company, newest first, 25 to a page. Search by name or domain; filter by s
 **A lead's page** shows:
 
 - the status, hold reason, country, fit score, and the last error if it failed;
-- buttons that appear when they apply: **Retry** (failed), **Release hold** (held), **Override and qualify** (disqualified);
-- **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it;
+- buttons that appear when they apply: **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
+- for a **held** lead, a panel that says why and offers **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume;
+- **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
+- **Edit this lead:** name, country, priority and campaign. What you save is marked as yours and kept. If someone else changed the lead meanwhile, you are asked to reload;
+- **Suppress this domain** at the bottom, for everyone at the company;
 - **Emails:** each email written, its state, and how much you edited it;
 - **Waterfall:** every vendor call made for this company: when, which vendor, what, the result and the cost. *cache hit* means a stored answer was reused at no cost;
 - **Field history:** only appears if the engine tried to change something you set. Your value is kept;
@@ -181,6 +205,8 @@ Run states: *queued* (waiting for the worker), *running*, *succeeded*, *failed* 
 The per-prospect budget is shown under the form. When a company has used its budget, no more paid calls are made for it.
 
 ### 5.5 Settings
+
+Until you press **Confirm and save** on the sender profile, a notice says it is not confirmed and no emails are written. A blank per-prospect budget means no limit; 0 means no paid calls. **Do not contact** also has **Forget an address**, which erases a person on request (see section 10).
 
 | Tab | What it holds |
 |---|---|

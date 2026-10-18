@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { client, ok } from "../api/client";
-import { Badge, Card, Empty, Input, Select, Table, Td, Th, statusTone, words } from "../components/ui";
+import { Badge, Card, Empty, Input, Problem, Select, Table, Td, Th, statusTone, words } from "../components/ui";
 
 const STATUSES = ["new", "researched", "qualified", "disqualified", "contacts_found", "email_ready", "held", "copy_ready", "approved", "in_sequence", "replied", "completed", "rejected", "suppressed", "failed"] as const;
 const HOLDS = ["catch_all_resolving", "catch_all_unverified", "consent_required", "country_unknown", "entity_unknown", "needs_operator"] as const;
@@ -36,7 +36,7 @@ export function LeadsPage() {
     setOffset(0);
   };
   return (
-    <Card title={`Leads (${total})`}>
+    <Card tour="leads-list" title={`Leads (${total})`}>
       <div className="mb-3 flex flex-wrap gap-2">
         <Input aria-label="Search" placeholder="Search name or domain" value={text} onChange={(e) => reset(() => setText(e.target.value))} className="max-w-xs" />
         <Select aria-label="Status" value={status} onChange={(e) => reset(() => setStatus(e.target.value))} className="max-w-48">
@@ -56,6 +56,8 @@ export function LeadsPage() {
           ))}
         </Select>
       </div>
+      {leads.isPending && <p role="status" className="text-sm text-muted">Loading…</p>}
+      {leads.isError && <Problem error={leads.error} />}
       {leads.data?.items.length === 0 && <Empty>No leads match.</Empty>}
       <Table>
         <thead>
@@ -71,7 +73,7 @@ export function LeadsPage() {
           </tr>
         </thead>
         <tbody>
-          {leads.data?.items.map((c) => (
+          {leads.data?.items.map((c, index) => (
             <tr key={c.id}>
               <Td>
                 <Link to="/leads/$companyId" params={{ companyId: c.id }} className="font-medium text-brand hover:underline">
@@ -86,7 +88,7 @@ export function LeadsPage() {
               <Td>{c.fit_score}</Td>
               <Td className="text-muted">{c.hold_reason ? words(c.hold_reason) : c.last_error}</Td>
               <Td>
-                <Link to="/leads/$companyId/journey" params={{ companyId: c.id }} className="whitespace-nowrap text-brand hover:underline" aria-label={`Journey of ${c.name ?? c.domain}`}>
+                <Link data-tour={index === 0 ? "leads-journey" : undefined} to="/leads/$companyId/journey" params={{ companyId: c.id }} className="whitespace-nowrap text-brand hover:underline" aria-label={`Journey of ${c.name ?? c.domain}`}>
                   Journey →
                 </Link>
               </Td>

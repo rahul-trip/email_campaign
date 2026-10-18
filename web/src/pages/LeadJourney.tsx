@@ -48,7 +48,7 @@ export function LeadJourneyPage() {
         </Link>
       </div>
 
-      <Card>
+      <Card tour="journey-header">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">{company.name ?? company.domain}</h1>
@@ -87,7 +87,7 @@ export function LeadJourneyPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <StagePanel stage={selected} />
         <div className="space-y-4">
-          <Card title="How this lead arrived">
+          <Card tour="journey-origin" title="How this lead arrived">
             <p className="text-sm font-medium">{trail.origin.how}</p>
             <p className="mt-0.5 text-xs text-muted">
               {when(trail.origin.at)}
@@ -120,7 +120,7 @@ function Stepper({ stages, selected, onPick }: { stages: Stage[]; selected: stri
     document.getElementById(`tab-${next.key}`)?.focus();
   };
   return (
-    <nav aria-label="Stages" className="overflow-x-auto rounded-lg border border-line bg-panel p-3">
+    <nav aria-label="Stages" data-tour="journey-stages" className="overflow-x-auto rounded-lg border border-line bg-panel p-3">
       <ol role="tablist" aria-label="Lead stages" className="flex min-w-[44rem] items-start">
         {stages.map((stage, index) => {
           const look = LOOK[stage.state];
@@ -159,6 +159,7 @@ function StagePanel({ stage }: { stage: Stage }) {
   return (
     <div id="stage-panel" role="tabpanel" aria-labelledby={`tab-${stage.key}`}>
       <Card
+        tour="journey-stage"
         title={
           <span className="flex items-center gap-2">
             {stage.label} <Badge tone={look.tone}>{look.label}</Badge>

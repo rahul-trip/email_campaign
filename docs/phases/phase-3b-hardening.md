@@ -167,6 +167,12 @@ A read-only dashboard for one lead: how it arrived (import row, batch, who, when
 
 **Tests:** API tests for a new, held, failed, disqualified and waiting-for-review lead, the origin of an imported lead, per-stage cost adding up, and an unknown id; a Playwright step that opens a lead's journey and uses the stage tabs.
 
+### 3b.11 Guided tour (added during the work)
+
+A first-visit tour of every screen with **Next**, **Skip section** (jumps to the next screen) and **End tour**, restartable from the **Tour** button. The text and targets are data in `web/src/tour/steps.ts`; the player is `web/src/tour/Tour.tsx`. Anchors are `data-tour` attributes (`Card tour="..."`). Updating it is a standing rule for UI changes (CLAUDE.md, working conventions).
+
+**Tests:** `web/e2e/tour.spec.ts`: opens on a first visit and End tour closes it for good; Skip section opens the next screen at its first step; a walk of every step against a real lead that fails when a target is missing (checked by renaming one).
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok } from "../api/client";
-import { Badge, Button, Card, Empty, Field, Input, Problem, Select, Table, Td, Th, statusTone, usd, when } from "../components/ui";
+import { Badge, Button, Card, Empty, Field, Input, Problem, QueryState, Select, Table, Td, Th, statusTone, usd, when } from "../components/ui";
 
 export function RunsPage() {
   const queryClient = useQueryClient();
@@ -15,7 +15,8 @@ export function RunsPage() {
     refetchInterval: (query) => (query.state.data?.some((r) => r.status === "queued" || r.status === "running") ? 2000 : false),
   });
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
-  const budget = Number(settings.data?.budget_per_prospect_micro_usd ?? 0);
+  const ceiling = settings.data?.budget_per_prospect_micro_usd;
+  const budget = ceiling == null ? "no limit" : usd(Number(ceiling), 2);
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const start = useMutation({ mutationFn: () => ok(client.POST("/api/runs", { body: { mode, limit, discover } })), onSuccess: refresh });
@@ -26,7 +27,7 @@ export function RunsPage() {
 
   return (
     <div className="space-y-4">
-      <Card title="Start a run">
+      <Card tour="start-run" title="Start a run">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Mode" hint="Discovery also searches for new companies">
             <Select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
@@ -48,13 +49,16 @@ export function RunsPage() {
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Runs are queued and executed by the worker process (<code>outbound worker</code>). Per-prospect budget: {usd(budget, 2)}.
+          Runs are queued and executed by the worker process (<code>outbound worker</code>). Per-prospect budget: {budget}.
         </p>
         <Problem error={start.error ?? cancel.error} />
       </Card>
 
-      <Card title="Recent runs">
-        {runs.data?.length === 0 && <Empty>No runs yet.</Empty>}
+      <Card tour="recent-runs" title="Recent runs">
+        <QueryState query={runs}>
+          {(rows) => (
+            <>
+        {rows.length === 0 && <Empty>No runs yet.</Empty>}
         <Table>
           <thead>
             <tr>
@@ -66,7 +70,7 @@ export function RunsPage() {
             </tr>
           </thead>
           <tbody>
-            {runs.data?.map((run) => (
+            {rows.map((run) => (
               <tr key={run.id}>
                 <Td>{when(run.started_at ?? run.created_at)}</Td>
                 <Td>
@@ -89,6 +93,9 @@ export function RunsPage() {
             ))}
           </tbody>
         </Table>
+            </>
+          )}
+        </QueryState>
       </Card>
     </div>
   );

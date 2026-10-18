@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { client, ok, type Schemas } from "../api/client";
-import { Badge, Button, Card, Empty, Field, Input, Problem, Select, Table, Td, Th, Textarea, statusTone, words } from "../components/ui";
+import { asUpload, client, multipart, ok, type Schemas } from "../api/client";
+import { Badge, Button, Card, Empty, Field, Input, Problem, QueryState, Select, Table, Td, Th, Textarea, statusTone, words } from "../components/ui";
 
 type Report = Schemas["IntakeOut"];
 
@@ -59,7 +59,7 @@ function QuickAdd({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
     add.mutate();
   };
   return (
-    <Card title="Add a target">
+    <Card tour="add-target" title="Add a target">
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <Field label="Company name">
           <Input value={form.company ?? ""} onChange={set("company")} />
@@ -119,14 +119,13 @@ function Upload({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
   const [campaign, setCampaign] = useState("");
   const send = useMutation({
     mutationFn: async (preview: boolean) => {
-      const data = new FormData();
-      data.append("file", file as File);
-      data.append("preview", String(preview));
-      if (campaign) data.append("campaign_id", campaign);
-      const response = await fetch("/api/targets/upload", { method: "POST", body: data, headers: { "X-Requested-With": "outbound" } });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.detail ?? "Upload failed");
-      return { report: body as Report, preview };
+      const report = await ok(
+        client.POST("/api/targets/upload", {
+          body: { file: asUpload(file as File), preview, campaign_id: campaign || undefined },
+          bodySerializer: multipart,
+        }),
+      );
+      return { report, preview };
     },
     onSuccess: ({ preview }) => {
       if (!preview) {
@@ -136,7 +135,7 @@ function Upload({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
     },
   });
   return (
-    <Card title="Upload a CSV or Excel file">
+    <Card tour="upload-targets" title="Upload a CSV or Excel file">
       <div className="flex flex-wrap items-end gap-3">
         <Field label="File">
           <input aria-label="Targets file" type="file" accept=".csv,.xlsx" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -177,10 +176,13 @@ function Waiting() {
     },
   });
   return (
-    <Card title={`Waiting for your confirmation (${rows.data?.length ?? 0})`}>
-      {rows.data?.length === 0 && <Empty>Nothing is waiting.</Empty>}
+    <Card tour="waiting-targets" title={`Waiting for your confirmation (${rows.data?.length ?? 0})`}>
+      <QueryState query={rows}>
+        {(waiting) => (
+          <>
+      {waiting.length === 0 && <Empty>Nothing is waiting.</Empty>}
       <ul className="space-y-3">
-        {rows.data?.map((row) => (
+        {waiting.map((row) => (
           <li key={row.id} className="rounded-md border border-line p-3 text-sm">
             <p className="font-medium">{Object.values(row.raw).filter(Boolean).join(" · ")}</p>
             <p className="text-muted">{row.reason}</p>
@@ -199,6 +201,9 @@ function Waiting() {
           </li>
         ))}
       </ul>
+          </>
+        )}
+      </QueryState>
       <Problem error={confirm.error} />
     </Card>
   );

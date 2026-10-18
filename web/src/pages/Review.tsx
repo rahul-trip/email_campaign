@@ -62,7 +62,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-      <Card title={`To ${item.contact.full_name ?? "unknown"} <${item.contact.emails[0]?.email ?? "?"}>`}>
+      <Card tour="review-editor" title={`To ${item.contact.full_name ?? "unknown"} <${item.contact.emails[0]?.email ?? "?"}>`}>
         <p className="mb-2 text-sm text-muted">
           Subject: <strong className="text-ink">{item.message.subject}</strong> · {item.contact.title ?? "role unknown"}
         </p>
@@ -111,7 +111,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
             </p>
           ))}
         </Card>
-        <Card title="Checks">
+        <Card tour="review-checks" title="Checks">
           <div className="flex flex-wrap gap-1.5">
             <Badge tone={item.flagged ? "red" : "green"}>{item.flagged ? "flagged by linter" : "linter passed"}</Badge>
             {company.country_code && <Badge>{company.country_code}</Badge>}
@@ -138,14 +138,16 @@ export function ReviewPage() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-      <Card title={`Waiting (${items.length})`} className="h-fit">
-        {queue.isPending && <p className="text-sm text-muted">Loading…</p>}
+      <Card tour="review-queue" title={`Waiting (${items.length})`} className="h-fit">
+        {queue.isPending && <p role="status" className="text-sm text-muted">Loading…</p>}
+        {queue.isError && <Problem error={queue.error} />}
         {queue.isSuccess && items.length === 0 && <Empty>Nothing to review. Add targets and start a run.</Empty>}
         <ul className="space-y-1">
           {items.map((item) => (
             <li key={item.message.id}>
               <button
                 onClick={() => setSelected(item.message.id)}
+                aria-current={current?.message.id === item.message.id ? "true" : undefined}
                 className={`w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-gray-100 ${current?.message.id === item.message.id ? "bg-gray-100" : ""}`}
               >
                 <span className="block font-medium">{item.company.name ?? item.company.domain}</span>
