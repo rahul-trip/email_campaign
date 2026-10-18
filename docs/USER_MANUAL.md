@@ -178,6 +178,7 @@ Every company, newest first, 25 to a page. Search by name or domain; filter by s
 - **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Edit** (correct the name or title, or give a work email if they have none; on a lead whose email step failed for lack of a full name it also retries that step), **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). The address finder cannot search on one word, so a one-word name without an email is refused. They are tried first when an email is written. Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
 - **Edit this lead:** name, country, priority and campaign. What you save is marked as yours and kept. If someone else changed the lead meanwhile, you are asked to reload;
+- **Delete this lead** (a red card near the bottom): removes the lead for good, with its people, addresses, emails, notes and history, and any draft waiting in your mailbox. To stop a mis-click you must type the lead's domain before the button works, and the server checks it again. You can tick *Also never contact this domain again* so it cannot be added back by mistake; otherwise it can be added again as a fresh lead. A lead that has already been emailed **cannot** be deleted, because the record of mail that left must stay: use *Suppress* to stop contact instead. Money already spent stays in the cost totals, and one line records that the lead was deleted, when and by whom, with no personal detail. A run that is working on the lead at that moment simply skips it;
 - **Suppress this domain** at the bottom, for everyone at the company;
 - **Emails:** each email written, its state, and how much you edited it;
 - **Waterfall:** every vendor call made for this company: when, which vendor, what, the result and the cost. *cache hit* means a stored answer was reused at no cost;
@@ -359,6 +360,8 @@ Everything in the browser can also be done from the terminal. Run from the proje
 | `uv run outbound status` | Counts by status, holds and their reasons, failures |
 | `uv run outbound report quality` | How many sent emails went out unedited, how many were flagged, holds by reason |
 | `uv run outbound report cost --days 30` | Spend per vendor and per company |
+| `uv run outbound delete-lead acme.com [--suppress] [--yes]` | Permanently deletes a lead (asks you to type the domain; `--suppress` also blocks the domain) |
+| `uv run outbound forget EMAIL` / `suppress VALUE` | Erases a person on request / stops all contact with an address or domain |
 | `uv run outbound auth hash-password` | Makes the value for `OPERATOR_PASSWORD_HASH` |
 
 Message IDs in `review` can be shortened to their first characters, as long as they are unique.

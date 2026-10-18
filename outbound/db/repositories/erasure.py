@@ -6,9 +6,11 @@ column that could identify the person is emptied. Required text columns get a pl
 
 from __future__ import annotations
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
-from sqlalchemy import String, cast, func, select, update
+from sqlalchemy import CursorResult, String, delete, func, select, update
+from sqlalchemy import cast as sql_cast
 
 from outbound.db.models import (
     CompanyRow,
@@ -26,6 +28,16 @@ from outbound.db.repositories.base import ScopedRepository
 from outbound.domain.enums import EntityType
 
 ERASED = "[erased]"
+
+
+@dataclass(frozen=True)
+class DeletedLead:
+    contacts: int
+    emails: int
+    messages: int
+    events: int
+
+
 MIN_NAME_LENGTH = 5  # shorter "names" would match far too much ordinary text
 
 
@@ -103,6 +115,91 @@ class ErasureRepository(ScopedRepository):
         self._scrub_events(contact_id, email_ids, message_ids)
         self._session.flush()
 
+    def delete_company(self, company_id: str, *, actor: str, note: dict[str, Any]) -> DeletedLead:
+        """Remove a lead and everything that hangs off it, in dependency order.
+
+        The cost ledger keeps its rows (spend is real) but loses the link to the lead and the
+        stored vendor answers. The operator's import row keeps its place but loses its text,
+        which can hold names and addresses. Every event about the lead and its people is deleted
+        except one, written here, that says it happened.
+        """
+        ws = self._workspace_id
+        company = self._row(CompanyRow, company_id)
+        contact_ids = list(
+            self._session.scalars(
+                select(ContactRow.id).where(
+                    ContactRow.workspace_id == ws, ContactRow.company_id == company_id
+                )
+            )
+        )
+        email_ids = list(
+            self._session.scalars(
+                select(ContactEmailRow.id).where(
+                    ContactEmailRow.workspace_id == ws,
+                    ContactEmailRow.contact_id.in_(contact_ids),
+                )
+            )
+        )
+        message_ids = list(
+            self._session.scalars(
+                select(MessageRow.id).where(
+                    MessageRow.workspace_id == ws, MessageRow.company_id == company_id
+                )
+            )
+        )
+
+        def run(statement: Any) -> int:
+            return int(cast(CursorResult[Any], self._session.execute(statement)).rowcount or 0)
+
+        run(
+            delete(InboundMessageRow).where(
+                InboundMessageRow.workspace_id == ws,
+                (InboundMessageRow.company_id == company_id)
+                | InboundMessageRow.contact_id.in_(contact_ids)
+                | InboundMessageRow.message_id.in_(message_ids),
+            )
+        )
+        run(
+            update(ProviderCallRow)
+            .where(
+                ProviderCallRow.workspace_id == ws,
+                (ProviderCallRow.company_id == company_id)
+                | ProviderCallRow.contact_id.in_(contact_ids),
+            )
+            .values(company_id=None, contact_id=None, response=None)
+        )
+        run(
+            update(ImportRowRow)
+            .where(ImportRowRow.workspace_id == ws, ImportRowRow.company_id == company_id)
+            .values(company_id=None, raw={"erased": True})
+        )
+        messages = run(delete(MessageRow).where(MessageRow.id.in_(message_ids)))
+        run(delete(ConsentRow).where(ConsentRow.contact_id.in_(contact_ids)))
+        emails = run(delete(ContactEmailRow).where(ContactEmailRow.id.in_(email_ids)))
+        run(delete(NoteRow).where(NoteRow.workspace_id == ws, NoteRow.company_id == company_id))
+        contacts = run(delete(ContactRow).where(ContactRow.id.in_(contact_ids)))
+        events = 0
+        for entity_type, ids in (
+            (EntityType.COMPANY, [company_id]),
+            (EntityType.CONTACT, contact_ids),
+            (EntityType.CONTACT_EMAIL, email_ids),
+            (EntityType.MESSAGE, message_ids),
+        ):
+            if ids:
+                events += run(
+                    delete(EventRow).where(
+                        EventRow.workspace_id == ws,
+                        EventRow.entity_type == entity_type,
+                        EventRow.entity_id.in_(ids),
+                    )
+                )
+        self._session.delete(company)
+        self._session.flush()
+        # The one thing left behind: that it happened, when, by whom, and how much went with it.
+        self._events.append(EntityType.COMPANY, company_id, "lead_deleted", actor, note)
+        self._session.flush()
+        return DeletedLead(contacts, emails, messages, events)
+
     def _scrub_provider_calls(self, contact_id: str, needles: list[str]) -> None:
         """Blank cached vendor answers about the person.
 
@@ -110,7 +207,7 @@ class ErasureRepository(ScopedRepository):
         reply that merely *mentions* the person (a team page, a research summary) has no such
         link, so those are found by their text.
         """
-        text = func.lower(cast(ProviderCallRow.response, String))
+        text = func.lower(sql_cast(ProviderCallRow.response, String))
         matches: Any = ProviderCallRow.contact_id == contact_id
         for needle in needles:
             matches = matches | text.contains(needle.lower(), autoescape=True)
@@ -151,7 +248,7 @@ class ErasureRepository(ScopedRepository):
     def _scrub_import_rows(self, address: str | None) -> None:
         if not address:
             return
-        raw_text = func.lower(cast(ImportRowRow.raw, String))
+        raw_text = func.lower(sql_cast(ImportRowRow.raw, String))
         self._session.execute(
             update(ImportRowRow)
             .where(

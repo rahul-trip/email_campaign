@@ -172,6 +172,11 @@ export const SECTIONS: Section[] = [
         body: "Change the name, country, priority or campaign. What you set is marked as yours and kept.",
       },
       {
+        target: "lead-delete",
+        title: "Delete a lead",
+        body: "Removes the lead and everything about it for good. You must type its domain to confirm, and a lead that has been emailed cannot be deleted (suppress it instead). You can also block the domain so it is never added again.",
+      },
+      {
         target: "lead-suppress",
         title: "Do not contact",
         body: "Suppress the whole domain. Their unsent emails are cancelled.",

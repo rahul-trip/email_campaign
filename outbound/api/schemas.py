@@ -330,6 +330,20 @@ class SenderProfileIn(In):
 # ------------------------------------------------------------------ privacy
 
 
+class DeleteLeadIn(In):
+    confirm_domain: str = Field(min_length=1, max_length=255)
+    also_suppress_domain: bool = False
+
+
+class DeleteLeadOut(Out):
+    domain: str
+    contacts_removed: int
+    messages_removed: int
+    drafts_deleted: int
+    drafts_left: list[str]
+    domain_suppressed: bool
+
+
 class ForgetIn(In):
     email: str = Field(min_length=3, max_length=320)
 

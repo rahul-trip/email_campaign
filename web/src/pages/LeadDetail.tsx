@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { Badge, Button, Card, Field, Input, Problem, QueryState, SaveNote, Select, Table, Td, Th, Textarea, statusTone, usd, when, words } from "../components/ui";
@@ -205,6 +205,8 @@ export function LeadDetailPage() {
               </QueryState>
             </Card>
 
+            <DeletePanel company={company} />
+
             <Card tour="lead-suppress" title="Do not contact">
               <p className="mb-2 text-sm text-muted">
                 This adds everyone at {company.domain} to the do-not-contact list and cancels their unsent emails. It cannot be undone from here.
@@ -223,6 +225,55 @@ export function LeadDetailPage() {
         );
       }}
     </QueryState>
+  );
+}
+
+/**
+ * Permanent deletion. The domain has to be typed, so a stray click cannot do it, and the server
+ * checks it again. A lead we have already emailed is refused (suppress it instead).
+ */
+function DeletePanel({ company }: { company: Company }) {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [typed, setTyped] = useState("");
+  const [block, setBlock] = useState(false);
+  const matches = typed.trim().toLowerCase() === company.domain;
+  const remove = useMutation({
+    mutationFn: () =>
+      ok(
+        client.POST("/api/companies/{company_id}/delete", {
+          params: { path: { company_id: company.id } },
+          body: { confirm_domain: typed.trim(), also_suppress_domain: block },
+        }),
+      ),
+    onSuccess: (result) => {
+      for (const key of ["companies", "status", "review", "lead", "journey", "timeline", "waterfall"]) void queryClient.invalidateQueries({ queryKey: [key] });
+      if (result.drafts_left.length > 0) window.alert(`The lead is deleted, but ${result.drafts_left.length} draft(s) could not be removed from your mailbox. Delete them by hand from the Drafts folder.`);
+      void navigate({ to: "/leads" });
+    },
+  });
+  return (
+    <Card tour="lead-delete" title="Delete this lead" className="border-red-200">
+      <div className="space-y-3 text-sm">
+        <p className="text-muted">
+          Permanently removes {company.name ?? company.domain}: its people, addresses, emails, notes and history, and any draft waiting in your mailbox. Money already spent stays in the cost totals. <strong>This cannot be undone.</strong> A lead that has been emailed cannot be deleted; suppress it instead.
+        </p>
+        <Field label={`Type ${company.domain} to confirm`}>
+          <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={company.domain} autoComplete="off" />
+        </Field>
+        <label className="flex items-start gap-2">
+          <input type="checkbox" className="mt-1" checked={block} onChange={(e) => setBlock(e.target.checked)} />
+          <span>
+            Also never contact {company.domain} again
+            <span className="block text-xs text-muted">Puts the domain on the do-not-contact list, so it cannot be added again by mistake.</span>
+          </span>
+        </label>
+        <Problem error={remove.error} />
+        <Button variant="danger" disabled={!matches || remove.isPending} onClick={() => remove.mutate()}>
+          {remove.isPending ? "Deleting…" : "Delete this lead permanently"}
+        </Button>
+      </div>
+    </Card>
   );
 }
 
