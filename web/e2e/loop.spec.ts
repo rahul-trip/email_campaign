@@ -101,6 +101,30 @@ test("a wrong password is refused and settings can be saved", async ({ page }) =
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByLabel("Legal name").fill("Quantra Energy Ltd");
-  await page.getByRole("button", { name: "Save" }).click();
-  await expect(page.getByText("Saved.")).toBeVisible();
+  await page.getByRole("button", { name: "Confirm and save" }).click();
+  await expect(page.getByText("Saved and confirmed.")).toBeVisible();
+
+  // A list box keeps the new line you just typed, and saving says so.
+  const props = page.getByLabel("Value propositions (one per line)");
+  await props.fill("First point");
+  await props.press("End");
+  await props.press("Enter");
+  await props.pressSequentially("Second point");
+  await expect(props).toHaveValue("First point\nSecond point");
+  await page.getByRole("button", { name: "Confirm and save" }).click();
+  await expect(page.getByText("Saved and confirmed.")).toBeVisible();
+  await expect(props).toHaveValue("First point\nSecond point");
+
+  // Saving a campaign says it worked.
+  await page.getByRole("tab", { name: "Campaigns" }).click();
+  await page.getByRole("button", { name: "Save campaign" }).first().click();
+  await expect(page.getByText("Campaign saved.")).toBeVisible();
+
+  // Adding a mailbox says so, empties the form and lists it.
+  await page.getByRole("tab", { name: "Mailboxes" }).click();
+  await page.getByLabel("Address").fill("sam@quantraenergy.com");
+  await page.getByRole("button", { name: "Add mailbox" }).click();
+  await expect(page.getByText("Mailbox added.")).toBeVisible();
+  await expect(page.getByLabel("Address")).toHaveValue("");
+  await expect(page.getByText("sam@quantraenergy.com")).toBeVisible();
 });

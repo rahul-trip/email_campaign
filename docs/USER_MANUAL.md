@@ -206,6 +206,8 @@ The per-prospect budget is shown under the form. When a company has used its bud
 
 ### 5.5 Settings
 
+Every Save button shows what happened next to it: *Saving…*, then a green tick (for example *Campaign saved.*), or the error. In the boxes marked *one per line* press Enter for a new line; blank lines are dropped when you save. The **Mailboxes** tab explains that drafts use the login in `.env`, and shows the SPF, DKIM and DMARC result after **Check DNS**.
+
 Until you press **Confirm and save** on the sender profile, a notice says it is not confirmed and no emails are written. A blank per-prospect budget means no limit; 0 means no paid calls. **Do not contact** also has **Forget an address**, which erases a person on request (see section 10).
 
 | Tab | What it holds |

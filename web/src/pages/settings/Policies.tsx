@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../../api/client";
-import { Button, Card, Field, Input, Problem, Select, Table, Td, Th, Textarea, words } from "../../components/ui";
+import { Button, Card, Field, Input, Problem, SaveNote, Select, Table, Td, Th, Textarea, words } from "../../components/ui";
 import { useSave } from "./shared";
 
 const RULES = ["allow", "allow_with_footer", "consent_required", "block"] as const;
@@ -45,7 +45,7 @@ function PolicyRow({ policy }: { policy: Schemas["PolicyOut"] }) {
         <Button variant="secondary" onClick={() => save.mutate(undefined)}>
           Save
         </Button>
-        <Problem error={save.error} />
+        <SaveNote mutation={save} done="Saved as a new version." />
       </Td>
     </tr>
   );
@@ -74,7 +74,7 @@ export function Policies() {
         </thead>
         <tbody>
           {policies.data?.map((p) => (
-            <PolicyRow key={`${p.country_code}-${p.version}`} policy={p} />
+            <PolicyRow key={p.country_code} policy={p} />
           ))}
         </tbody>
       </Table>

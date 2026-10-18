@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { client, ok } from "../../api/client";
-import { Button, Card, Field, Input, Problem, QueryState, Textarea, when } from "../../components/ui";
+import { Button, Card, Field, Input, QueryState, SaveNote, Textarea, when } from "../../components/ui";
 import { lines, useSave } from "./shared";
 
 const SCALARS: [string, string, string?][] = [
@@ -27,12 +27,20 @@ const LISTS: [string, string][] = [
 export function SenderProfile() {
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
   const [draft, setDraft] = useState<Record<string, unknown>>({});
+  // The one-per-line boxes keep exactly what was typed. Splitting into lines on every keystroke
+  // would drop the empty line a new Enter makes, so Enter would seem to do nothing.
+  const [typed, setTyped] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (profile.data) setDraft(profile.data as Record<string, unknown>);
+    const loaded = profile.data as Record<string, unknown> | undefined;
+    if (!loaded) return;
+    setDraft(loaded);
+    setTyped(Object.fromEntries(LISTS.map(([key]) => [key, ((loaded[key] as string[] | undefined) ?? []).join("\n")])));
   }, [profile.data]);
-  const save = useSave("sender", () => ok(client.PUT("/api/settings/sender-profile", { body: draft })));
+  const save = useSave("sender", () => {
+    const listed = Object.fromEntries(LISTS.map(([key]) => [key, lines(typed[key] ?? "")]));
+    return ok(client.PUT("/api/settings/sender-profile", { body: { ...draft, ...listed } }));
+  });
   const text = (key: string) => String(draft[key] ?? "");
-  const list = (key: string) => ((draft[key] as string[] | undefined) ?? []).join("\n");
   return (
     <QueryState query={profile}>
       {(saved) => {
@@ -54,7 +62,7 @@ export function SenderProfile() {
         ))}
         {LISTS.map(([key, label]) => (
           <Field key={key} label={label}>
-            <Textarea rows={4} value={list(key)} onChange={(e) => setDraft({ ...draft, [key]: lines(e.target.value) })} />
+            <Textarea rows={4} value={typed[key] ?? ""} onChange={(e) => setTyped({ ...typed, [key]: e.target.value })} />
           </Field>
         ))}
         <div className="sm:col-span-2">
@@ -63,8 +71,9 @@ export function SenderProfile() {
           </Field>
         </div>
       </div>
-      <Problem error={save.error} />
-      {save.isSuccess && <p className="mt-2 text-sm text-green-700">Saved.</p>}
+      <div className="mt-3 flex items-center gap-3">
+        <SaveNote mutation={save} done="Saved and confirmed." />
+      </div>
     </Card>
         );
       }}

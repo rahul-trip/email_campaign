@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { client, ok } from "../../api/client";
-import { Button, Card, Field, Input, Problem } from "../../components/ui";
+import { Button, Card, Field, Input, SaveNote } from "../../components/ui";
 import { useSave } from "./shared";
 
 export function Limits() {
@@ -42,8 +42,9 @@ export function Limits() {
         </label>
       </div>
       <p className="mt-3 text-xs text-muted">Automatic sending is off, and cannot be switched on until the later send phase.</p>
-      <Problem error={save.error} />
-      {save.isSuccess && <p className="mt-2 text-sm text-green-700">Saved.</p>}
+      <div className="mt-3">
+        <SaveNote mutation={save} />
+      </div>
     </Card>
   );
 }

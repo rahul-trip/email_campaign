@@ -1,4 +1,5 @@
-import type { UseQueryResult } from "@tanstack/react-query";
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { ApiProblem } from "../api/client";
 
@@ -97,6 +98,29 @@ export function Problem({ error }: { error: unknown }) {
       )}
     </div>
   );
+}
+
+/**
+ * What happened to the last save, next to the Save button: "Saving…", then a green "Saved" that
+ * fades after a few seconds, or the error. Without it a save looks like a button that does nothing.
+ */
+export function SaveNote({ mutation, done = "Saved." }: { mutation: Pick<UseMutationResult<unknown, Error, never>, "isPending" | "isSuccess" | "error" | "submittedAt">; done?: string }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!mutation.isSuccess) return;
+    setShown(true);
+    const timer = window.setTimeout(() => setShown(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [mutation.isSuccess, mutation.submittedAt]);
+  if (mutation.isPending) return <span role="status" className="text-sm text-muted">Saving…</span>;
+  if (mutation.error) return <Problem error={mutation.error} />;
+  if (mutation.isSuccess && shown)
+    return (
+      <span role="status" className="text-sm font-medium text-green-700">
+        ✓ {done}
+      </span>
+    );
+  return null;
 }
 
 /** Loading and error handling for a query, so no page shows a blank screen while it waits or fails. */

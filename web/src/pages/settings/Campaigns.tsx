@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../../api/client";
-import { Button, Card, Field, Input, Problem, Textarea } from "../../components/ui";
+import { Button, Card, Field, Input, QueryState, SaveNote, Textarea } from "../../components/ui";
 import { lines } from "./shared";
 
 function CampaignForm({ campaign, onSaved }: { campaign?: Schemas["CampaignOut"]; onSaved: () => void }) {
@@ -25,7 +25,18 @@ function CampaignForm({ campaign, onSaved }: { campaign?: Schemas["CampaignOut"]
         ? ok(client.PATCH("/api/settings/campaigns/{campaign_id}", { params: { path: { campaign_id: campaign.id } }, body }))
         : ok(client.POST("/api/settings/campaigns", { body }));
     },
-    onSuccess: onSaved,
+    onSuccess: () => {
+      if (!campaign) {
+        // A new campaign: clear the form so the next one starts blank.
+        setName("");
+        setTitles("");
+        setIcp("");
+        setMinFit(60);
+        setQuestions("");
+        setCadence("0, 3, 8");
+      }
+      onSaved();
+    },
   });
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -49,13 +60,11 @@ function CampaignForm({ campaign, onSaved }: { campaign?: Schemas["CampaignOut"]
       <Field label="Follow-up days after the first email" hint="Comma separated, for example 0, 3, 8">
         <Input value={cadence} onChange={(e) => setCadence(e.target.value)} />
       </Field>
-      <div className="flex items-end">
+      <div className="flex items-end gap-3">
         <Button onClick={() => save.mutate()} disabled={!name.trim() || save.isPending}>
           {campaign ? "Save campaign" : "Create campaign"}
         </Button>
-      </div>
-      <div className="sm:col-span-2">
-        <Problem error={save.error} />
+        <SaveNote mutation={save} done={campaign ? "Campaign saved." : "Campaign created."} />
       </div>
     </div>
   );
@@ -67,13 +76,19 @@ export function Campaigns() {
   const saved = () => void queryClient.invalidateQueries({ queryKey: ["campaigns"] });
   return (
     <div className="space-y-4">
-      {campaigns.data?.map((c) => (
-        <Card key={c.id} title={c.name}>
-          <CampaignForm campaign={c} onSaved={saved} />
-        </Card>
-      ))}
+      <QueryState query={campaigns}>
+        {(all) => (
+          <>
+            {all.map((c) => (
+              <Card key={c.id} title={c.name} className="mb-4">
+                <CampaignForm campaign={c} onSaved={saved} />
+              </Card>
+            ))}
+          </>
+        )}
+      </QueryState>
       <Card title="New campaign">
-        <CampaignForm key={campaigns.data?.length} onSaved={saved} />
+        <CampaignForm onSaved={saved} />
       </Card>
     </div>
   );
