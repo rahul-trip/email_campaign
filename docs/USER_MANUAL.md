@@ -377,15 +377,12 @@ Honest list of what is not there yet, so nothing surprises you.
 
 | Limit | Workaround |
 |---|---|
-| **Editing a saved target** (its country, name or priority) has no screen, although the system supports it. This matters most for a *country unknown* hold | Add the target again with the country filled in. This does **not** change an existing company, so for an existing one ask for the screen to be added |
-| **Recording consent** for a person has no screen | Not available from the browser yet |
 | **Adding an email address or person to a company that already exists** is not possible: adding the same website again only adds your notes | Fill in everything when you first add a company |
-| **Releasing a *needs operator* hold** from the browser fails with "no default" | Fix the underlying policy under Country policies; resuming at a chosen step is not offered on screen yet |
-| **Removing a person's data on request** (the "forget" action) is built but has no command or screen | Phase 4 |
 | The **Mailboxes** screen records a mailbox and checks its DNS. Drafting and the Sent sync use the mailbox login in `.env`, not this list | Keep the two the same |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
-| Some vendors have not been exercised live: ZeroBounce, OrbiSearch, Scrubby, Companies House and the mailbox | Test each with a few of your own addresses first |
+| Scrubby (catch-all resolver) has not worked live: its configured address did not answer. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | Confirm Scrubby's API address in your Scrubby account. Run `uv run python -m scripts.live_check` to re-check any vendor |
+| Follow-up and Sent-sync behaviour with a real mailbox is not yet exercised by a real send | Try it with a few of your own addresses first |
 | One workspace, one login | Phase 6 |
 
 ---

@@ -179,6 +179,23 @@ A first-visit tour of every screen with **Next**, **Skip section** (jumps to the
 - **[PLAN.md](../PLAN.md):** the lifecycle table (new `held` exits, `copy_ready` → `email_ready` for a rewrite), the deliver row, and the worker's tick.
 - **[USER_MANUAL.md](../USER_MANUAL.md):** remove each "Known limits" row as it is fixed; add Forget, Suppress, Rewrite, Record consent, Edit, the Setup card, Reports, backups.
 
+## 5b. Outcome (the Phase 3b pull request)
+
+**Fixed, each with a regression test:** the file-disclosure bug in the web route (`GET /..%2f..%2f.env` returned the `.env`), security headers and limits, typed errors with no detail in a 500, a login-protected API document; compliance (no seeded claims, sender-profile confirmation gate, stricter UK and country evidence, fenced web text in prompts); forget and suppress from the CLI, API and screens, with erasure checked by scanning every text column; no silent loops (held leads hold, over-budget leads can still be drafted, unsafe deliveries hold), migration 0002; one metered path, timeouts, typed settings, a worker that survives errors; layer rules enforced by import-linter and ruff; tests blocked from the network; web: edit, consent, release choice, suppress, forget, accessible tabs, shared loading and error states, sign-out on 401, typed upload; the lead journey page; the guided tour; secret scanning, dependency audit, Dependabot; langgraph 0.3 to 1.x to clear advisories.
+
+**Live check (2026-10-19, `scripts/live_check.py`, a few cents):**
+
+| Vendor | Result |
+|---|---|
+| LLM | answers |
+| Tavily | search, `site:` search and page extract work |
+| Mailbox (IMAP) | login, save a draft, find it, delete it: all work |
+| Hunter, ZeroBounce, OrbiSearch, MyEmailVerifier verifiers | each returned *valid* for the operator's own address |
+| Companies House | works (name search returns matches). The key was in `.env` under the wrong name, `COMPANIES_HOUSE`; the variable the app reads is `COMPANIES_HOUSE_API_KEY` |
+| Scrubby | **fails**: `api.scrubby.io` accepts the connection but never answers (read timeout). The base URL is a guess from partial docs; confirm it in the Scrubby account |
+
+**Still open or deferred** (not in this PR): one run at a time and stale-run recovery (B2, B3), live budget read (B4), model pricing and the cost of failed replies (B5), worker auto-tick (B7), adding a person to an existing company (C4), setup check and Reports pages (C6, C7), research quality (D1 to D4), retention purge (A6), backups (E3), the bake-off with 30 contacts (E5), deleting `agent/` (E4), long functions, magic numbers into settings, a salted suppression hash, composite foreign keys before Phase 6, typed models for the JSON columns. One advisory (nltk via textstat) has no fix yet and is ignored in CI with the reason written beside it.
+
 ## 6. Decisions needed from you
 
 1. **May I commit and push Phases 0–3 now** (3b.1)? Everything else is safer after that.
