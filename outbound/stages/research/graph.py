@@ -284,7 +284,7 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         )
         return {"fit_facts": ask(deps.llm, prompts.FIT_SYSTEM_PROMPT, user, FitFacts)}
 
-    graph: StateGraph = StateGraph(ResearchState)
+    graph = StateGraph(ResearchState)
     graph.add_node("pages", pages_node)
     graph.add_node(SITE, site_node)
     graph.add_node(LEGAL, legal_node)

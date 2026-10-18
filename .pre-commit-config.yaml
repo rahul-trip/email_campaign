@@ -17,3 +17,15 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: gitleaks
+        name: gitleaks (no secrets in the commit)
+        entry: gitleaks git --pre-commit --staged --redact --no-banner
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: lint-imports
+        name: import layers
+        entry: uv run lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false

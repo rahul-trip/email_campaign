@@ -38,7 +38,8 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 - **New code** lives in `outbound/`, with scripts in `scripts/` and tests in `tests/`:
   - `domain/`: enums, state machines, policies, entities, ranking, copy linter, footer, edit distance. No I/O.
   - `db/`: models, the frozen migration, repositories (including reports) and the unit of work.
-  - `providers/`: ports, a shared HTTP client, adapters (finders, verifiers, resolvers, Tavily, LLM, Companies House, IMAP), the registry, and the meter (`metered.py`, `budget.py`, `pricing.py`).
+  - `providers/`: ports, a shared HTTP client, adapters (finders, verifiers, resolvers, Tavily, LLM, Companies House, IMAP), the registry, and `pricing.py`.
+  - `metering/`: the meter (`metered.py`, `budget.py`): cache, budget guard, call, ledger row. Sits between `db`/`providers` and `stages`.
   - `stages/`: research (LangGraph), gate, contacts, email (waterfall, catch-all poller), copy (LangGraph), deliver, Sent sync.
   - `runner/`: the status runner, guards and the tick. `pipeline.py` assembles everything with metered providers.
   - `services/`: intake, review, reports, forget, seed, legacy import. `prompts/`: every model instruction.
@@ -54,9 +55,9 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 
 ## Architecture rules (binding)
 
-1. **Layers:** `domain` → `db` / `providers` → `stages` → `runner` → `services` → `cli` / `api`. Imports only point down this list. `outbound/domain` has no I/O and imports nothing from the other layers.
+1. **Layers:** `domain` → `db` / `providers` → `metering` → `stages` → `runner` → `services` → `pipeline` → `cli` / `api` / `worker`. Imports only point down this list. `outbound/domain` has no I/O and imports nothing from the other layers. `uv run lint-imports` checks this (CI too), and ruff bans importing `outbound.db.models` outside `outbound/db`: repositories return entities, not ORM rows.
 2. **Vendor JSON never gets past an adapter.** Adapters map responses into the Pydantic models defined in `outbound/providers/ports.py`.
-3. **Every paid call goes through the meter** (`outbound/providers/metered.py`: cache, then budget guard, then call, then a `provider_calls` row committed in its own transaction). Stages receive `Metered*` wrappers from `outbound/pipeline.py`; never call a vendor directly from a stage.
+3. **Every paid call goes through the meter** (`outbound/metering/metered.py`: cache, then budget guard, then call, then a `provider_calls` row committed in its own transaction). Stages receive `Metered*` wrappers from `outbound/pipeline.py`; never call a vendor directly from a stage.
 4. **Status changes only through the state machines** in `outbound/domain/state_machines.py`. Every transition writes an `events` row in the same transaction.
 5. **No database transaction stays open across a network call.** A stage reads what it needs, does the network work, and returns a `StageResult`; the runner makes one short write that checks `row_version`.
 6. **Every query is scoped by `workspace_id`.** No exceptions, including in scripts.
@@ -75,7 +76,7 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
   - Money is integer micro-USD.
   - Closed value sets are `StrEnum`s in code and `TEXT` columns with a `CHECK` constraint in SQL.
 - Logging uses structlog JSON, binding `run_id`, `workspace_id` and `company_id`. Never log secrets or full email bodies at INFO level.
-- Errors use typed exceptions (`ProviderError`, `BudgetExceeded`, `IllegalTransition`, `ConcurrencyConflict`). Retry with tenacity only on 429 and 5xx responses. Every HTTP call has a timeout.
+- Errors use typed exceptions (`ProviderError`, `BudgetExceeded`, `IllegalTransition`, `ConcurrencyConflict`). Retry with tenacity only on network errors, 429 (honouring `Retry-After`, capped at a minute), 5xx, and a 202 "still processing" from a verifier; never on other 4xx. All of this is in the shared `HttpClient`, so adapters do not retry. Every HTTP call has a timeout.
 - **Do not over-engineer.** The following are out unless a phase document explicitly calls for them:
   - Celery, Redis, or any queue (the companies table is the queue);
   - an event bus or CQRS;
@@ -93,6 +94,8 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
   - `uv run pytest` runs the new suite and the legacy `agent/` suite together.
   - `uv run ruff check . && uv run ruff format --check .`
   - `uv run mypy` (checks `outbound`, `tests` and `scripts`).
+  - `uv run lint-imports` checks the layer contracts.
+  - Security: ruff's `S` rules run with the lint. `gitleaks` runs as a pre-commit hook (`uv run pre-commit install`) and in CI over the whole history; CI also runs `pip-audit` and `npm audit`, and Dependabot proposes updates weekly. `.gitleaks.toml` holds the one allowlisted placeholder file. Never add a `# nosec`/`noqa: S` without a reason in the comment.
   - `uv run outbound db upgrade` builds the database; `uv run outbound seed` adds the defaults.
   - `uv run --with pgserver python -m scripts.pg_tests tests -q` runs the suite on a throwaway Postgres, with no Docker.
   - Web: `cd web && npm run typecheck && npm run build`; `npm run gen:api` after any API change (CI fails on a stale client); `npx playwright test` runs the browser loop against `scripts/e2e_server.py` (real app and worker, fake vendors).

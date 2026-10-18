@@ -136,7 +136,7 @@ def build_copy_graph(llm: LlmClient, inp: CopyInput):  # type: ignore[no-untyped
             return "__end__"
         return "actor"
 
-    graph: StateGraph = StateGraph(CopyState)
+    graph = StateGraph(CopyState)
     graph.add_node("actor", actor)
     graph.add_node("assemble", assemble)
     graph.add_node("critic", critic)

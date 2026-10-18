@@ -23,7 +23,7 @@ dependencies = [
     "tldextract>=5.1",
     "uuid-utils>=0.9",
     "openpyxl>=3.1",
-    "langgraph>=0.2,<0.4",
+    "langgraph>=1.0.10,<2",
     "textstat>=0.7.13",
     "fastapi>=0.115",
     "uvicorn>=0.30",
@@ -48,8 +48,8 @@ dev = [
 ]
 # Dependencies of the legacy agent/ package; deleted together with it in Phase 2.
 legacy = [
-    "langgraph>=0.2,<0.4",
-    "langchain-core>=0.3",
+    "langgraph>=1.0.10,<2",
+    "langchain-core>=1.2.22",
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "requests>=2.31",

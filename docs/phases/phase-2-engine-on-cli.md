@@ -28,7 +28,7 @@
 
 ### 2.1 Metered calls and the budget — done
 
-As built: `providers/metered.py` holds a `Meter` plus one wrapper per port (`MeteredFinder`, `MeteredVerifier`, `MeteredResolver`, `MeteredSearch`, `MeteredRegistry`, `MeteredLlm`). Prices are in `providers/pricing.py` (the bake-off script now imports them). Tests: `tests/db/test_metered.py` (24, SQLite and Postgres).
+As built (moved to `outbound/metering/` in Phase 3b): `metering/metered.py` holds a `Meter` plus one wrapper per port (`MeteredFinder`, `MeteredVerifier`, `MeteredResolver`, `MeteredSearch`, `MeteredRegistry`, `MeteredLlm`). Prices are in `providers/pricing.py` (the bake-off script now imports them). Tests: `tests/db/test_metered.py` (24, SQLite and Postgres).
 
 Differences from the text below:
 - The wrappers implement the same port as the thing they wrap, so a stage never sees the ledger. There is no generic `Metered(...)` call site.
@@ -37,7 +37,7 @@ Differences from the text below:
 - The LLM is not cached unless a task opts in with `ttl` (identical prompts normally want different drafts).
 - Monthly caps and TTLs are constructor arguments; wiring them from settings happens with the runner in 2.3.
 
-- [x] `providers/metered.py` — a `Metered` wrapper around any port method. For each call it:
+- [x] `metering/metered.py` — a `Metered` wrapper around any port method. For each call it:
   1. Computes `request_hash`.
   2. Looks up a successful `provider_calls` row within the TTL. If found, records a `cache_hit` and returns that response.
   3. Calls the `BudgetGuard`.
