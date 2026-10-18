@@ -18,7 +18,7 @@ from outbound.api import errors
 from outbound.api.auth import LoginThrottle, Sessions, require_csrf_header, require_operator
 from outbound.api.deps import Services
 from outbound.api.errors import ApiError
-from outbound.api.routers import auth, leads, review, runs, settings, targets, webhook
+from outbound.api.routers import auth, leads, privacy, review, runs, settings, targets, webhook
 from outbound.bootstrap import Container
 from outbound.domain.errors import ConfigurationError
 
@@ -66,7 +66,7 @@ def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastA
     guarded = [Depends(require_operator), Depends(require_csrf_header)]
     app.include_router(auth.router, dependencies=[Depends(require_csrf_header)])
     app.include_router(webhook.router)  # signed, so no login
-    for router in (targets, review, leads, runs, settings):
+    for router in (targets, review, leads, runs, settings, privacy):
         app.include_router(router.router, dependencies=guarded)
 
     @app.get("/api/health")
@@ -110,6 +110,7 @@ def create_app_from_container(container: Container) -> FastAPI:
     """Build the app for a real run: one workspace, search only if a Tavily key is set."""
     from outbound.api.deps import build_services
     from outbound.pipeline import metered_search_or_none
+    from outbound.providers.registry import build_mailbox_if_configured
 
     config = container.settings
     if not config.operator_password_hash or not config.session_secret.get_secret_value():
@@ -127,6 +128,9 @@ def create_app_from_container(container: Container) -> FastAPI:
         )
     return create_app(
         build_services(
-            container, workspace.id, search=metered_search_or_none(container, workspace.id)
+            container,
+            workspace.id,
+            search=metered_search_or_none(container, workspace.id),
+            mailbox=build_mailbox_if_configured(config),
         )
     )

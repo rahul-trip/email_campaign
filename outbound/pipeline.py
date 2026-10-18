@@ -37,7 +37,7 @@ from outbound.providers.registry import (
     build_company_registry,
     build_finder_chain,
     build_llm,
-    build_mailbox,
+    build_mailbox_if_configured,
     build_resolver,
     build_search,
     build_verifier,
@@ -100,9 +100,7 @@ def real_providers(settings: Settings) -> Providers:
             resolver = build_resolver(settings)
         except ProviderError:
             resolver = None  # no resolver configured: catch-alls stay unverified
-        mailbox: Mailbox | None = None
-        if settings.imap_host and settings.email_address:
-            mailbox = build_mailbox(settings)
+        mailbox = build_mailbox_if_configured(settings)
         return Providers(
             search=build_search(settings),
             llm=build_llm(settings),

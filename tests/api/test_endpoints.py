@@ -21,6 +21,7 @@ from outbound.domain.enums import (
     ContactSource,
     EmailStatus,
     HoldReason,
+    MessageState,
     Provenance,
 )
 from outbound.services.dns_check import TxtLookup
@@ -492,3 +493,108 @@ def test_a_webhook_payload_needs_an_event_id_and_targets(
     too_many = {"event_id": "e", "targets": [{"website": f"a{i}.com"} for i in range(201)]}
     big = anonymous.post("/api/intake/webhook", **signed(too_many))  # type: ignore[arg-type]
     assert big.json()["code"] == "bad_targets"
+
+
+# ------------------------------------------------------------------ privacy
+
+
+def seeded_person(factory: UnitOfWorkFactory, ws: str, domain: str = "acme.com") -> tuple[str, str]:
+    """A company with one person who has a drafted email. Returns (company id, contact id)."""
+    company_id, message_id = seed_review(factory, ws, domain)
+    with factory(ws) as uow:
+        message = uow.messages.get(message_id)
+        approved = uow.messages.transition(
+            message_id, MessageState.APPROVED, expected_version=message.row_version
+        )
+        uow.messages.transition(
+            message_id,
+            MessageState.DRAFTED,
+            expected_version=approved.row_version,
+            set_fields={"remote_draft_id": f"<{message_id}@q>"},
+        )
+        uow.commit()
+        return company_id, message.contact_id
+
+
+def test_a_person_can_be_suppressed_from_the_lead_page(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company_id, contact_id = seeded_person(factory, ws)
+    body = api.post(f"/api/contacts/{contact_id}/suppress").json()
+    assert body["found"] is True and body["messages_cancelled"] == 1
+    assert len(body["drafts_left"]) == 1  # no mailbox here, so the operator is told to delete it
+    lead = api.get(f"/api/companies/{company_id}").json()
+    assert lead["company"]["status"] == "suppressed"
+    assert lead["contacts"][0]["status"] == "opted_out"
+    assert lead["messages"][0]["state"] == "cancelled"
+
+
+def test_a_whole_company_can_be_suppressed(api: Api, factory: UnitOfWorkFactory, ws: str) -> None:
+    company_id, _ = seeded_person(factory, ws)
+    assert api.post(f"/api/companies/{company_id}/suppress").status_code == 200
+    assert api.get(f"/api/companies/{company_id}").json()["company"]["status"] == "suppressed"
+    again = api.post("/api/targets", json={"website": "acme.com"}).json()
+    assert again["rows"][0]["status"] == "rejected"  # the domain is on the list now
+
+
+def test_an_erasure_request_removes_the_person_and_suppresses_the_address(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company_id, _ = seeded_person(factory, ws)
+    body = api.post("/api/privacy/forget", json={"email": "JANE@acme.com"}).json()
+    assert body["found"] is True
+    lead = api.get(f"/api/companies/{company_id}").json()
+    assert lead["contacts"][0]["full_name"] is None
+    assert lead["contacts"][0]["emails"][0]["email"] is None
+    assert (
+        api.post("/api/targets", json={"email": "jane@acme.com"}).json()["rows"][0]["status"]
+        == "rejected"
+    )
+
+
+def test_an_erasure_request_for_a_stranger_still_works(api: Api) -> None:
+    body = api.post("/api/privacy/forget", json={"email": "stranger@nowhere.com"}).json()
+    assert body["found"] is False
+    assert api.post("/api/privacy/forget", json={"email": "x"}).status_code == 422
+
+
+def test_privacy_actions_need_a_login_and_an_existing_target(
+    api: Api, anonymous: TestClient
+) -> None:
+    fresh = TestClient(anonymous.app)
+    assert (
+        fresh.post("/api/privacy/forget", json={"email": "a@b.com"}, headers=HEADERS).status_code
+        == 401
+    )
+    assert api.post("/api/contacts/nope/suppress").status_code == 404
+    assert api.post("/api/companies/nope/suppress").status_code == 404
+
+
+def test_a_campaign_or_person_from_another_workspace_is_refused(
+    api: Api, factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    with factory(other_ws) as uow:
+        foreign = uow.campaigns.create("theirs", ["CTO"])
+        company = uow.companies.create(domain="theirs.com", source=CompanySource.MANUAL)
+        contact = uow.contacts.add(company.id, rank=1, source=ContactSource.SITE)
+        uow.commit()
+    assert (
+        api.post(
+            "/api/targets", json={"website": "mine.com", "campaign_id": foreign.id}
+        ).status_code
+        == 404
+    )
+    assert api.post(f"/api/contacts/{contact.id}/suppress").status_code == 404
+    assert (
+        api.post(
+            f"/api/contacts/{contact.id}/consents", json={"basis": "express", "evidence": "x"}
+        ).status_code
+        == 404
+    )
+    api.post("/api/targets", json={"website": "mine.com"})
+    mine = api.get("/api/companies").json()["items"][0]
+    stolen = api.patch(
+        f"/api/companies/{mine['id']}",
+        json={"row_version": mine["row_version"], "campaign_id": foreign.id},
+    )
+    assert stolen.status_code == 404

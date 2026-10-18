@@ -232,6 +232,20 @@ class RejectIn(In):
     reason: str
 
 
+# ------------------------------------------------------------------ privacy
+
+
+class ForgetIn(In):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class PrivacyOut(Out):
+    found: bool
+    messages_cancelled: int
+    drafts_deleted: int
+    drafts_left: list[str]
+
+
 # ------------------------------------------------------------------ runs and reports
 
 

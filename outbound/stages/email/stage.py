@@ -17,6 +17,7 @@ from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Contact, ContactEmail
 from outbound.domain.enums import CompanyStatus, ContactStatus, EmailStatus, HoldReason
 from outbound.domain.policies import PolicyOutcome
+from outbound.providers.metered import call_scope
 from outbound.providers.ports import CatchAllResolver, EmailFinder, EmailVerifier
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.email.patterns import infer_pattern
@@ -69,7 +70,10 @@ class EmailStage:
         chosen_contact: Contact | None = None
         pending = False
         for contact, emails in people:
-            outcome = self._waterfall.run(contact, emails, target)
+            # Every paid call is recorded against the person it was for, so erasing the person
+            # can find and clear it.
+            with call_scope(contact_id=contact.id):
+                outcome = self._waterfall.run(contact, emails, target)
             records.extend(outcome.records)
             problems.extend(outcome.problems)
             unverified = unverified or outcome.catch_all_unverified
@@ -103,7 +107,7 @@ class EmailStage:
                 updates["email_pattern"] = learned
             return StageResult(
                 CompanyStatus.EMAIL_READY,
-                reason=f"{chosen.email} {chosen.status.value}",
+                reason=f"address chosen ({chosen.status.value})",
                 company_updates=updates,
                 write=write,
             )

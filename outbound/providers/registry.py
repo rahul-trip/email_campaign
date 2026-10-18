@@ -171,6 +171,13 @@ def build_company_registry(
     return CompaniesHouse(key, client=client) if key else None
 
 
+def build_mailbox_if_configured(settings: Settings) -> Mailbox | None:
+    """The IMAP mailbox, or None when no login is set (drafts then cannot be saved or deleted)."""
+    if settings.imap_host and settings.email_address:
+        return build_mailbox(settings)
+    return None
+
+
 def build_mailbox(settings: Settings) -> Mailbox:
     return ImapMailbox(
         host=settings.imap_host,

@@ -134,6 +134,8 @@ class LeadService:
         if unknown:
             raise LeadError(f"cannot change {sorted(unknown)}")
         with self._uow(self._workspace_id) as uow:
+            if changes.get("campaign_id"):
+                uow.campaigns.get(str(changes["campaign_id"]))  # must be one of ours
             updated = uow.companies.update_fields(
                 company_id, changes, actor=actor, expected_version=expected_version
             )
@@ -188,6 +190,7 @@ class LeadService:
         if not evidence.strip():
             raise LeadError("say where the consent came from: the evidence is kept with it")
         with self._uow(self._workspace_id) as uow:
+            uow.contacts.get(contact_id)  # NotFound unless the person is in this workspace
             consent = uow.consents.add(contact_id, basis, evidence.strip(), actor)
             uow.commit()
             return consent

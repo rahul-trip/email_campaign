@@ -341,6 +341,8 @@ class IntakeService:
 
         report = IntakeReport(None, validate_only=validate_only)
         with self._uow(self._workspace_id) as uow:
+            if campaign_id:
+                uow.campaigns.get(campaign_id)  # NotFound unless it is one of ours
             batch_id = uow.imports.create_batch(
                 source, actor, campaign_id=campaign_id, filename=filename
             )

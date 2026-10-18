@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from outbound.bootstrap import Container
-from outbound.providers.ports import SearchProvider
+from outbound.providers.ports import Mailbox, SearchProvider
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
+from outbound.services.privacy import PrivacyService
 from outbound.services.reports import ReportService
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunService
@@ -28,6 +29,7 @@ class Services:
     settings: SettingsService
     reports: ReportService
     webhook: WebhookService
+    privacy: PrivacyService
 
 
 def build_services(
@@ -35,6 +37,7 @@ def build_services(
     workspace_id: str,
     *,
     search: SearchProvider | None = None,
+    mailbox: Mailbox | None = None,
     settings_service: SettingsService | None = None,
 ) -> Services:
     uow = container.uow
@@ -49,6 +52,7 @@ def build_services(
         settings=settings_service or SettingsService(uow, workspace_id),
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),
+        privacy=PrivacyService(uow, workspace_id, mailbox),
     )
 
 
