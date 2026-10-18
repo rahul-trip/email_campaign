@@ -387,12 +387,41 @@ Honest list of what is not there yet, so nothing surprises you.
 
 ---
 
+## 13a. Reading the logs
+
+The web app and the worker write one line per event to the terminal they run in (standard error). In a terminal the lines are coloured and easy to read; when the output goes to a file or a service manager they are JSON, one object per line, so any log tool can read them. Two settings in `.env`:
+
+| Setting | Values | Default |
+|---|---|---|
+| `LOG_LEVEL` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | `INFO` |
+| `LOG_FORMAT` | `auto` (readable on a terminal, JSON otherwise), `json`, `console` | `auto` |
+| `ENVIRONMENT` | any label, such as `production`; printed on every line | `development` |
+
+Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `version` and `environment`, plus the details of that event. The events worth knowing:
+
+| Event | Tells you |
+|---|---|
+| `http_request` | method, route, status, `duration_ms`, `request_id`, `client_ip`. The query string is never logged. Warnings are 4xx answers, errors are 5xx |
+| `login_failed`, `login_throttled`, `login_succeeded` | who tried (their address, never the password) |
+| `run_started`, `run_finished` | the stages, then status, duration, cost and the outcome counts per stage |
+| `stage_done`, `guard_refused`, `stage_failed` | one lead at one stage: `company_id`, `stage`, where it went and why |
+| `provider_call` | vendor, call, outcome, `cost_micro_usd`, `latency_ms`; `provider_call_blocked` when a budget stopped it; `provider_retry` for each retry with the reason |
+| `privacy_action` | a forget or suppress: what was done and counts. The address itself is never logged |
+| `unhandled_error` | a bug, with the full traceback |
+
+**Following one request.** When something goes wrong in the browser the message ends with a *Reference*. That is the `request_id`: search the logs for it to see everything that request did. The same id is in the `X-Request-ID` response header, and you may send your own (8 to 64 letters, digits, `.`, `_`, `-`) to follow a request across systems.
+
+**What is never logged:** passwords, API keys, tokens and cookies (their values are replaced by `[redacted]`), the text of emails (only its length), and email addresses (shown as `j***@acme.com`). Keys inside a URL are masked too.
+
+---
+
 ## 14. Troubleshooting
 
 | Symptom | Likely cause and fix |
 |---|---|
 | The web app will not start: "The web app needs a login" | `OPERATOR_PASSWORD_HASH` or `SESSION_SECRET` is missing in `.env` |
 | Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web && npm ci && npm run build` |
+| Something failed in the browser and the message ends "Reference: …" | Search the logs for that reference (see 13a); the line with `unhandled_error` has the cause |
 | **Start run** does nothing | The worker is not running: `uv run outbound worker` |
 | "not configured" when running | A needed vendor key is missing; the message names it |
 | Everything is held for *country unknown* | The sites are not revealing a country. Give the country when adding targets |

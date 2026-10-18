@@ -9,8 +9,10 @@ import typer
 from outbound.bootstrap import build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
 from outbound.domain.errors import ConfigurationError
+from outbound.logging import get_logger
 from outbound.services import defaults
 
+log = get_logger(__name__)
 auth_app = typer.Typer(no_args_is_help=True, help="Operator login.")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
@@ -55,7 +57,18 @@ def register(app: typer.Typer) -> None:
         except ConfigurationError as error:
             typer.echo(str(error), err=True)
             raise typer.Exit(1) from error
-        uvicorn.run(api, host=bind_host, port=port or config.api_port)
+        log.info(
+            "service_started",
+            role="api",
+            host=bind_host,
+            port=port or config.api_port,
+            database=container.engine.url.render_as_string(hide_password=True),
+            log_level=config.log_level,
+        )
+        # log_config=None keeps our logging setup; the access line is replaced by the middleware.
+        uvicorn.run(
+            api, host=bind_host, port=port or config.api_port, log_config=None, access_log=False
+        )
 
     @app.command()
     def worker(
@@ -74,6 +87,13 @@ def register(app: typer.Typer) -> None:
         except NotConfigured as error:
             typer.echo(f"not configured: {error}", err=True)
             raise typer.Exit(1) from error
+        log.info(
+            "service_started",
+            role="worker",
+            workspace_id=workspace_id,
+            poll_seconds=poll_seconds,
+            database=container.engine.url.render_as_string(hide_password=True),
+        )
         typer.echo("worker ready; waiting for queued runs (Ctrl-C to stop)")
         try:
             Worker(container, workspace_id, pipeline).run_forever(poll_seconds=poll_seconds)

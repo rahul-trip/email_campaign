@@ -6,7 +6,7 @@ The provider chain below is PROVISIONAL until the Phase 0 bake-off has run. Chan
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     )
 
     database_url: str = "sqlite:///outbound.db"
+
+    # --- logging ---
+    log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR or CRITICAL
+    log_format: Literal["auto", "json", "console"] = "auto"  # auto: console on a terminal
+    environment: str = "development"  # printed on every log line, e.g. production
 
     # --- provider keys (blank means "not configured") ---
     hunter_api_key: SecretStr = SecretStr("")
@@ -77,6 +82,13 @@ class Settings(BaseSettings):
     finder_chain: Annotated[list[str], NoDecode] = ["hunter", "zerobounce"]
     verifier: str = "myemailverifier"
     catch_all_resolver: str = "scrubby"
+
+    @field_validator("log_level")
+    @classmethod
+    def _known_log_level(cls, value: str) -> str:
+        from outbound.logging import normalise_level
+
+        return normalise_level(value)
 
     @field_validator("finder_chain", mode="before")
     @classmethod

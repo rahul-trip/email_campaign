@@ -22,6 +22,7 @@ from typing import Any
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CallOutcome
+from outbound.logging import get_logger
 from outbound.metering.budget import BudgetPolicy, check_budget
 from outbound.providers.errors import BudgetExceeded
 from outbound.providers.ports import (
@@ -49,6 +50,8 @@ FINDER_TTL = timedelta(days=90)
 VERIFIER_TTL = timedelta(days=90)
 RESOLVER_TTL = timedelta(days=90)
 SEARCH_TTL = timedelta(days=30)
+
+log = get_logger(__name__)
 
 
 # --------------------------------------------------------------------------- who the call is for
@@ -162,7 +165,8 @@ class Meter:
                 contact_id=scope.contact_id,
             )
             uow.commit()
-            return result
+        log.debug("provider_call", provider=provider, operation=operation, outcome="cache_hit")
+        return result
 
     def record(
         self,
@@ -190,6 +194,15 @@ class Meter:
                 contact_id=scope.contact_id,
             )
             uow.commit()
+        emit = log.warning if outcome is CallOutcome.ERROR else log.info
+        emit(
+            "provider_call",
+            provider=provider,
+            operation=operation,
+            outcome=outcome.value,
+            cost_micro_usd=cost,
+            latency_ms=latency_ms,
+        )
 
     def call[T](
         self,
@@ -259,6 +272,13 @@ class Meter:
                 contact_id=scope.contact_id,
             )
             uow.commit()
+        log.warning(
+            "provider_call_blocked",
+            provider=provider,
+            operation=operation,
+            outcome=CallOutcome.BLOCKED_BY_CAP.value,
+            reason=reason,
+        )
         raise BudgetExceeded(provider, reason)
 
 

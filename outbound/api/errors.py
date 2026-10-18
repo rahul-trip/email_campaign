@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from outbound.api.request_log import request_id_for
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import IllegalTransition
@@ -64,9 +65,20 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def _unexpected(request: Request, error: Exception) -> JSONResponse:
-        # A bug: say nothing about it to the client, and keep the details in the log.
-        log.exception("unhandled_error", path=request.url.path)
-        return problem(500, "internal_error", "Something went wrong. It has been logged.")
+        # A bug: say nothing about it to the client, and keep the details in the log. The
+        # reference lets the operator quote it and lets us find that request's lines.
+        reference = request_id_for(request)
+        route = getattr(request.scope.get("route"), "path", request.url.path[:200])
+        log.exception(
+            "unhandled_error",
+            request_id=reference,
+            method=request.method,
+            path=route,
+            error_type=type(error).__name__,
+        )
+        response = problem(500, "internal_error", f"Something went wrong. Reference: {reference}.")
+        response.headers["X-Request-ID"] = reference
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, error: RequestValidationError) -> JSONResponse:

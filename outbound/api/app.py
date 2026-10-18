@@ -18,6 +18,7 @@ from outbound.api import errors
 from outbound.api.auth import LoginThrottle, Sessions, require_csrf_header, require_operator
 from outbound.api.deps import Services
 from outbound.api.errors import ApiError
+from outbound.api.request_log import log_requests
 from outbound.api.routers import auth, leads, privacy, review, runs, settings, targets, webhook
 from outbound.bootstrap import Container
 from outbound.domain.errors import ConfigurationError
@@ -62,6 +63,9 @@ def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastA
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    # Added last, so it is outermost: the request id exists before anything else runs.
+    app.middleware("http")(log_requests)
 
     guarded = [Depends(require_operator), Depends(require_csrf_header)]
     app.include_router(auth.router, dependencies=[Depends(require_csrf_header)])

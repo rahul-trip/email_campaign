@@ -9,6 +9,7 @@ answer is already in the ledger.
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass, field
@@ -105,7 +106,13 @@ class Runner:
             uow.commit()
         report = RunReport(run_id)
         status = RunStatus.SUCCEEDED
+        started = time.monotonic()
         bind(run_id=run_id, workspace_id=self._workspace_id)  # on every log line until we leave
+        log.info(
+            "run_started",
+            stages=[s.name for s in self._stages if not only or s.name in only],
+            limit_per_stage=limit,
+        )
         try:
             for stage in self._stages:
                 if only and stage.name not in only:
@@ -116,12 +123,29 @@ class Runner:
                     break
         except BaseException:
             self._finish(run_id, RunStatus.FAILED, report)
+            log.error(
+                "run_finished", status=RunStatus.FAILED.value, **self._summary(report, started)
+            )
             raise
         finally:
             unbind("run_id", "workspace_id")
         self._finish(run_id, status, report)
         report.status = status
+        log.info(
+            "run_finished",
+            run_id=run_id,
+            status=status.value,
+            **self._summary(report, started),
+        )
         return report
+
+    @staticmethod
+    def _summary(report: RunReport, started: float) -> dict[str, Any]:
+        return {
+            "duration_ms": int((time.monotonic() - started) * 1000),
+            "cost_micro_usd": report.cost_micro_usd,
+            "outcomes": report.to_json(),
+        }
 
     def _run_stage(self, stage: Stage, run_id: str, limit: int) -> Counter[str]:
         counts: Counter[str] = Counter()
@@ -217,6 +241,7 @@ class Runner:
             stage=stage.name,
             company_id=company.id,
             to_status=result.to_status.value,
+            reason=result.reason,
         )
         return Outcome.HELD if result.to_status is CompanyStatus.HELD else Outcome.ADVANCED
 
@@ -255,7 +280,14 @@ class Runner:
                 uow.commit()
         except ConcurrencyConflict:
             return Outcome.SKIPPED
-        log.info("guard_refused", stage=stage.name, company_id=company.id, kind=refusal.kind.value)
+        log.info(
+            "guard_refused",
+            stage=stage.name,
+            company_id=company.id,
+            kind=refusal.kind.value,
+            reason=refusal.reason,
+            outcome=outcome.value,
+        )
         return outcome
 
     def _record_failure(self, stage: Stage, company: Company, error: Exception) -> Outcome:

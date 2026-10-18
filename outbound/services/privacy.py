@@ -51,6 +51,8 @@ class PrivacyService:
             outcome = forget_email(uow, email, actor=actor)
             uow.commit()
         deleted, left = self._delete_drafts(outcome.remote_draft_ids)
+        # The address itself is deliberately not logged: erasure must not leave it in the logs.
+        self._log("forget", actor, outcome.found, outcome.messages_cancelled, deleted, left)
         return PrivacyResult(outcome.found, outcome.messages_cancelled, deleted, left)
 
     def suppress_contact(self, contact_id: str, *, actor: str = OPERATOR) -> PrivacyResult:
@@ -76,6 +78,7 @@ class PrivacyService:
             )
             uow.commit()
         deleted, left = self._delete_drafts(tuple(draft_ids))
+        self._log("suppress_contact", actor, True, cancelled, deleted, left, contact_id=contact_id)
         return PrivacyResult(True, cancelled, deleted, left)
 
     def suppress_company(self, company_id: str, *, actor: str = OPERATOR) -> PrivacyResult:
@@ -97,6 +100,7 @@ class PrivacyService:
                 )
             uow.commit()
         deleted, left = self._delete_drafts(tuple(draft_ids))
+        self._log("suppress_company", actor, True, cancelled, deleted, left, company_id=company_id)
         return PrivacyResult(True, cancelled, deleted, left)
 
     def suppress_value(self, value: str, *, actor: str = OPERATOR) -> PrivacyResult:
@@ -131,6 +135,29 @@ class PrivacyService:
 
     # ------------------------------------------------------------------ helpers
 
+    def _log(
+        self,
+        action: str,
+        actor: str,
+        found: bool,
+        cancelled: int,
+        deleted: int,
+        left: tuple[str, ...],
+        **ids: str,
+    ) -> None:
+        emit = log.warning if left else log.info  # a draft we could not remove needs a person
+        emit(
+            "privacy_action",
+            action=action,
+            actor=actor,
+            workspace_id=self._workspace_id,
+            found=found,
+            messages_cancelled=cancelled,
+            drafts_deleted=deleted,
+            drafts_left=len(left),
+            **ids,
+        )
+
     @staticmethod
     def _stop_everyone(uow: UnitOfWork, company_id: str, actor: str) -> tuple[int, list[str]]:
         cancelled, draft_ids = 0, []
@@ -149,6 +176,8 @@ class PrivacyService:
             try:
                 deleted += self._mailbox.delete_draft(draft_id) > 0
             except ProviderError as error:
-                log.warning("draft_delete_failed", error=str(error))
+                log.warning(
+                    "draft_delete_failed", remote_draft_id=draft_id, reason=str(error)[:200]
+                )
                 left.append(draft_id)
         return deleted, tuple(left)

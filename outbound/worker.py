@@ -32,7 +32,7 @@ class Worker:
             uow.commit()
         if claimed is None:
             return False
-        log.info("run_started", run_id=claimed.id)
+        log.info("run_claimed", run_id=claimed.id, params=claimed.params)
         try:
             execute_run(
                 self._pipeline,
@@ -42,7 +42,7 @@ class Worker:
                 run_id=claimed.id,
             )
         except Exception as error:
-            log.exception("run_failed", run_id=claimed.id)
+            log.exception("run_failed", run_id=claimed.id, error_type=type(error).__name__)
             self._fail(claimed.id, error)
         return True
 
@@ -52,8 +52,8 @@ class Worker:
         while not stop():
             try:
                 worked = self.run_once()
-            except Exception:  # a database hiccup must not end the worker for good
-                log.exception("worker_error")
+            except Exception as error:  # a database hiccup must not end the worker for good
+                log.exception("worker_error", error_type=type(error).__name__)
                 worked = False
             if not worked:
                 time.sleep(poll_seconds)

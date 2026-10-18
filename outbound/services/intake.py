@@ -428,7 +428,9 @@ class IntakeService:
                 return self._resolver.by_linkedin(slug, country)
             return self._resolver.by_name(target.company, country)
         except ProviderError as error:
-            log.warning("intake_search_failed", error=str(error))
+            log.warning(
+                "intake_search_failed", error_type=type(error).__name__, reason=str(error)[:200]
+            )
             return Resolution(None, note=f"search failed: {error}")
 
     # ------------------------------------------------------------------ deciding (writes)

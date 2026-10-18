@@ -7,7 +7,6 @@ never the URL, because several vendors take the API key as a query parameter.
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 import httpx
@@ -20,10 +19,10 @@ from tenacity import (
 )
 from tenacity.wait import wait_base
 
+from outbound.logging import get_logger
 from outbound.providers.errors import ProviderAuthError, ProviderError, RateLimited
 
-# httpx logs every request URL at INFO, and some vendors take the API key in the query string.
-logging.getLogger("httpx").setLevel(logging.WARNING)
+log = get_logger(__name__)
 
 DEFAULT_TIMEOUT_SECONDS = 30.0  # real-time verifiers can take 20s or more on slow servers
 DEFAULT_ATTEMPTS = 3
@@ -103,9 +102,23 @@ class HttpClient:
             retry=retry_if_exception(_is_retryable),
             stop=stop_after_attempt(self._attempts),
             wait=_honouring_retry_after(self._wait),
+            before_sleep=lambda state: self._log_retry(state, method, path),
             reraise=True,
         )
         return retrying(self._once, method, path, **kwargs)
+
+    def _log_retry(self, state: RetryCallState, method: str, path: str) -> None:
+        error = state.outcome.exception() if state.outcome else None
+        log.warning(
+            "provider_retry",
+            provider=self._provider,
+            request=f"{method} {path}",
+            attempt=state.attempt_number,
+            max_attempts=self._attempts,
+            wait_seconds=round(state.next_action.sleep, 1) if state.next_action else None,
+            reason=str(error)[:200],
+            status_code=getattr(error, "status_code", None),
+        )
 
     def _once(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self._base_url}/{path.lstrip('/')}"
