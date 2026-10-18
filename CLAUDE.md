@@ -1,0 +1,107 @@
+# CLAUDE.md
+
+Instructions for anyone (human or AI agent) changing code in this repository.
+
+## What this is
+
+This repository is an outbound B2B email engine. It takes target companies, either from the operator or from search, and runs each through the same pipeline:
+
+1. research the company;
+2. find and verify a decision-maker's email through a pay-as-you-go waterfall;
+3. write a short personalised email;
+4. once a human approves it, place it as a draft in the mailbox.
+
+Later phases add follow-ups, reply handling, automatic sending and multiple workspaces.
+
+## Source of truth — read these before changing code
+
+| Document | Use it for |
+|---|---|
+| [docs/PLAN.md](docs/PLAN.md) | Decisions, architecture, stages, compliance, providers |
+| [docs/SCHEMA.md](docs/SCHEMA.md) | The data model: every table, column, constraint and relationship |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | How the operator uses the app. Update it when a screen, command, status or message changes |
+| [docs/phases/](docs/phases/README.md) | What to build now: one document per phase, with tasks, files and a gate |
+
+- Work on the current phase only; the phase status table in `docs/phases/README.md` says which one that is.
+- A PR that changes behaviour updates `docs/PLAN.md`.
+- A PR that changes data adds an Alembic migration and updates `docs/SCHEMA.md`.
+- The team reviews in the Claude Doc ["Outbound Engine: End-to-End Plan"](https://claude.ai/code/artifact/4cea76e3-1e09-442e-a719-22299ed78ece). The repo files are what you build from.
+- `docs/archive/` contains superseded specs and history. Do not build from it.
+
+## Current state (2026-10-18)
+
+- **Phase 0:** code complete. Most vendor keys are now in the root `.env`; the gate waits on the 30 known contacts and the bake-off run (see `docs/phases/phase-0-fix-and-bakeoff.md`).
+- **Phase 1:** code complete and verified on SQLite and on PostgreSQL 16.2. Its CI workflow has not run yet. See `docs/phases/phase-1-schema-and-persistence.md`.
+- **Phase 2 (engine on the CLI):** code complete and verified with fake vendors on SQLite and PostgreSQL 16.2 (1,163 tests). The gate (8 of 10 first emails sent unedited, a zero-cost rerun) waits on live keys and a real run. See `docs/phases/phase-2-engine-on-cli.md`, "Closing the phase".
+- **Phase 3b (hardening) is next:** `docs/phases/phase-3b-hardening.md` lists the gaps found after Phase 3 and the order to fix them.
+- **Phase 3 (API and web app):** code complete. FastAPI (`outbound/api/`), a worker (`outbound/worker.py`), and the React app in `web/`. Browser test: `cd web && npx playwright test`. See `docs/phases/phase-3-api-and-web-app.md`, "How to run it".
+- **New code** lives in `outbound/`, with scripts in `scripts/` and tests in `tests/`:
+  - `domain/`: enums, state machines, policies, entities, ranking, copy linter, footer, edit distance. No I/O.
+  - `db/`: models, the frozen migration, repositories (including reports) and the unit of work.
+  - `providers/`: ports, a shared HTTP client, adapters (finders, verifiers, resolvers, Tavily, LLM, Companies House, IMAP), the registry, and the meter (`metered.py`, `budget.py`, `pricing.py`).
+  - `stages/`: research (LangGraph), gate, contacts, email (waterfall, catch-all poller), copy (LangGraph), deliver, Sent sync.
+  - `runner/`: the status runner, guards and the tick. `pipeline.py` assembles everything with metered providers.
+  - `services/`: intake, review, reports, forget, seed, legacy import. `prompts/`: every model instruction.
+  - `api/`: FastAPI app, auth, routers, schemas. `cli/`: `db`, `seed`, `targets`, `run`, `tick`, `retry`, `status`, `review`, `report`, `serve`, `worker`, `auth`, `import-legacy-xlsx`.
+  - `web/`: the React app. The generated client (`web/src/api/schema.ts`) must be regenerated with `npm run gen:api` whenever the API changes.
+- **`agent/`** is the legacy pipeline. Do not touch it. Its reusable parts are ported into `outbound/`, and it is deleted (with the `legacy` dependency group) after the first live run.
+- **Environment:** `uv sync` builds `.venv` on Python 3.12 with the dev tools and the `legacy` dependency group. `.venv` is not tracked in git.
+- **Secrets:** the root `.env` holds real vendor keys and must never be committed. `outbound/config.py` reads it through pydantic-settings (`agent/.env` is still read as a fallback but no longer exists). `test_keys.py` in the root is the operator's own key smoke test; it is untracked and excluded from linting.
+- **Provider chain** in `outbound/config.py` is **provisional** until the bake-off picks one.
+- **Two facts from reading the vendors' docs:**
+  - OrbiSearch has no finder API, so it can only verify.
+  - Scrubby's public docs are partial, so its adapter must be confirmed with a live key.
+
+## Architecture rules (binding)
+
+1. **Layers:** `domain` → `db` / `providers` → `stages` → `runner` → `services` → `cli` / `api`. Imports only point down this list. `outbound/domain` has no I/O and imports nothing from the other layers.
+2. **Vendor JSON never gets past an adapter.** Adapters map responses into the Pydantic models defined in `outbound/providers/ports.py`.
+3. **Every paid call goes through the meter** (`outbound/providers/metered.py`: cache, then budget guard, then call, then a `provider_calls` row committed in its own transaction). Stages receive `Metered*` wrappers from `outbound/pipeline.py`; never call a vendor directly from a stage.
+4. **Status changes only through the state machines** in `outbound/domain/state_machines.py`. Every transition writes an `events` row in the same transaction.
+5. **No database transaction stays open across a network call.** A stage reads what it needs, does the network work, and returns a `StageResult`; the runner makes one short write that checks `row_version`.
+6. **Every query is scoped by `workspace_id`.** No exceptions, including in scripts.
+7. **Operator input wins.** The engine never overwrites a field listed in `manual_fields`; it records its own value as an event instead.
+8. **Safety gates are server-side.** Suppression, country policy and safe-to-send are checked again right before every draft or send.
+9. **LangGraph only inside Stage 2 (Research) and Stage 6 (Copy)**, as stateless subgraphs with no checkpointer. The outer flow is the plain Python runner, which routes on company status.
+10. **The schema only changes through Alembic,** and the same PR updates `docs/SCHEMA.md`. `CHECK` value lists must equal the matching enums in `outbound/domain/enums.py`.
+
+## Code standards
+
+- Python 3.12, managed with `uv`. Type every public function. `ruff` handles both lint and format; `mypy` runs strict on `outbound/domain`.
+- Design patterns are listed in `docs/PLAN.md` §5: ports and adapters, chain of responsibility for the waterfall, the `Metered` decorator, repository plus unit of work, state machine, policy objects, and constructor injection wired in `outbound/bootstrap.py`.
+- Value conventions:
+  - IDs are UUIDv7 strings.
+  - Times are UTC.
+  - Money is integer micro-USD.
+  - Closed value sets are `StrEnum`s in code and `TEXT` columns with a `CHECK` constraint in SQL.
+- Logging uses structlog JSON, binding `run_id`, `workspace_id` and `company_id`. Never log secrets or full email bodies at INFO level.
+- Errors use typed exceptions (`ProviderError`, `BudgetExceeded`, `IllegalTransition`, `ConcurrencyConflict`). Retry with tenacity only on 429 and 5xx responses. Every HTTP call has a timeout.
+- **Do not over-engineer.** The following are out unless a phase document explicitly calls for them:
+  - Celery, Redis, or any queue (the companies table is the queue);
+  - an event bus or CQRS;
+  - microservices or a plugin framework;
+  - generic base-repository hierarchies;
+  - speculative abstractions.
+
+## Testing
+
+- No test calls the network. Use fakes for ports and recorded responses for adapters.
+- Database tests run on SQLite by default, and on Postgres when `TEST_DATABASE_URL` is set (CI does this).
+- Each phase document lists the tests that must exist before its gate is checked.
+- Commands (from the repo root):
+  - `uv sync` to build the environment.
+  - `uv run pytest` runs the new suite and the legacy `agent/` suite together.
+  - `uv run ruff check . && uv run ruff format --check .`
+  - `uv run mypy` (checks `outbound`, `tests` and `scripts`).
+  - `uv run outbound db upgrade` builds the database; `uv run outbound seed` adds the defaults.
+  - `uv run --with pgserver python -m scripts.pg_tests tests -q` runs the suite on a throwaway Postgres, with no Docker.
+  - Web: `cd web && npm run typecheck && npm run build`; `npm run gen:api` after any API change (CI fails on a stale client); `npx playwright test` runs the browser loop against `scripts/e2e_server.py` (real app and worker, fake vendors).
+- Adapter tests use fixtures built from vendor documentation, not live recordings; see `tests/providers/fixtures/README.md`.
+- Shared fakes live in `tests/stages/fakes.py` (vendors one by one) and `tests/stages/world.py` (a whole fake outside world for end-to-end and browser tests).
+- Tests clear provider environment variables automatically, so an exported key never changes a result.
+
+## Working conventions
+
+- One branch per task, named `phase-N/<task>`. Keep PRs small.
+- Never commit `.env` files, `data/private/`, `*.db`, or the bake-off contact list.
+- Close a phase by filling in its **Gate record** and updating the status table in `docs/phases/README.md`.

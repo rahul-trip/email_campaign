@@ -1,0 +1,40 @@
+# Environments and secrets
+.venv/
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.db-*
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Private data: bake-off contact lists, reports, anything with real people in it
+data/private/
+
+# Web app
+node_modules/
+web/dist/
+
+# Logs
+logs/
+*.log
+
+# OS and editors
+.DS_Store
+.idea/
+
+# Browser test output
+web/test-results/
+web/playwright-report/
+test_keys.py

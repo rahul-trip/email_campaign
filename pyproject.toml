@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["outbound"]
+
+[project]
+name = "outbound"
+version = "0.0.1"
+description = "Outbound B2B email engine"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "httpx>=0.27",
+    "tenacity>=8.2",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "typer>=0.12",
+    "structlog>=24.1",
+    "tldextract>=5.1",
+    "uuid-utils>=0.9",
+    "openpyxl>=3.1",
+    "langgraph>=0.2,<0.4",
+    "textstat>=0.7.13",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "argon2-cffi>=23.1",
+    "itsdangerous>=2.2",
+    "python-multipart>=0.0.9",
+    "dnspython>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "psycopg[binary]>=3.2",  # lets the database tests run against Postgres in CI
+    "pre-commit>=3.8",
+    "types-openpyxl>=3.1",
+    "datasette>=0.65",  # read-only database viewer for Phases 1 and 2
+]
+# Dependencies of the legacy agent/ package; deleted together with it in Phase 2.
+legacy = [
+    "langgraph>=0.2,<0.4",
+    "langchain-core>=0.3",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+outbound = "outbound.cli.main:app"
+
+[tool.uv]
+default-groups = ["dev", "legacy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "agent"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["agent", "web", "docs", "test_keys.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"outbound/db/migrations/versions/*" = ["E501"]  # frozen revisions hold long SQL strings
+"tests/api/conftest.py" = ["F811"]  # fixtures imported from tests/db are used by name
+
+[tool.mypy]
+files = ["outbound", "tests", "scripts"]
+python_version = "3.12"
+disallow_untyped_defs = true
+warn_unused_ignores = true
+no_implicit_optional = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pgserver", "textstat"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "outbound.domain.*"
+strict = true
