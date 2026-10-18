@@ -59,7 +59,7 @@ As built: `outbound/api/` (app factory, auth, problem-details errors, schemas, r
 - [x] **Writes are version-checked.** Every write accepts the `row_version` it read; a stale version returns HTTP 409.
 - [x] **Authentication.** One local operator login: an Argon2 password hash comes from the environment and is held in a session cookie. There are no user tables until Phase 6. The app binds to localhost by default.
 - [x] **Intake webhook.**
-  - Requests carry an HMAC-SHA256 signature over the raw body, using the secret named by `settings.intake_webhook_secret_ref`, plus a timestamp header with a 5-minute window.
+  - Requests carry an HMAC-SHA256 signature over the raw body, using the secret in the `INTAKE_WEBHOOK_SECRET` environment setting, plus a timestamp header with a 5-minute window.
   - Each request creates a `webhook` import batch, and intake processes it like any other batch.
   - Requests are idempotent on the sender's event id, which is stored in `import_rows.raw`.
 - [x] **Errors.** Problem-details responses (RFC 9457) with stable error codes.
@@ -74,7 +74,7 @@ Differences from the text below:
 - **Components are small hand-written ones in the shadcn style** (`web/src/components/ui.tsx`), not the shadcn CLI. There are no Radix primitives yet; add them when a dialog or menu is needed.
 - **TanStack Router is code-based** (`web/src/router.tsx`), not file-based, which keeps the build to Vite and one plugin.
 - **Discovery of the worker:** a run is `queued` by the API and executed by `outbound worker`; the Runs screen polls every two seconds while anything is queued or running.
-- The webhook secret is read from the environment variable named by `settings.intake_webhook_secret_ref` (default `INTAKE_WEBHOOK_SECRET`). A repeated event id is answered with `{"duplicate": true}` and changes nothing; a request older than five minutes is rejected.
+- The webhook secret is the `INTAKE_WEBHOOK_SECRET` environment setting (an earlier design let a workspace setting name the variable; that was removed because it let a setting point at any secret). A repeated event id is answered with `{"duplicate": true}` and changes nothing; a request older than five minutes is rejected.
 - Also added beyond the list below: `requalify` (override a disqualification), recording consent for a contact, and `/api/status`, `/api/reports/*` for the dashboards.
 
 - [x] Set up `web/`:

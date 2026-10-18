@@ -1,29 +1,41 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from fastapi import APIRouter, Request
+from starlette.concurrency import run_in_threadpool
 
 from outbound.api.deps import services
 from outbound.api.errors import ApiError
 from outbound.services.webhook import WebhookError, verify
 
 router = APIRouter(prefix="/api/intake", tags=["intake"])
-DEFAULT_SECRET_REF = "INTAKE_WEBHOOK_SECRET"
+MAX_BODY_BYTES = 1_000_000
+
+
+async def _read_body(request: Request) -> bytes:
+    """The raw body, refusing anything over the cap before it is all in memory."""
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+        raise ApiError(413, "body_too_large", "The request body is larger than 1 MB.")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_BODY_BYTES:
+            raise ApiError(413, "body_too_large", "The request body is larger than 1 MB.")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 @router.post("/webhook")
 async def webhook(request: Request) -> dict[str, Any]:
     """Signed intake for other systems. Not behind the operator login: the signature is the key."""
-    svc = services(request)
-    body = await request.body()
-    settings = svc.settings.workspace_settings()
-    secret = os.environ.get(settings.get("intake_webhook_secret_ref") or DEFAULT_SECRET_REF, "")
+    body = await _read_body(request)
     try:
         verify(
-            secret,
+            request.app.state.webhook_secret,
             body,
             request.headers.get("x-signature"),
             request.headers.get("x-timestamp"),
@@ -34,7 +46,8 @@ async def webhook(request: Request) -> dict[str, Any]:
             raise WebhookError(422, "bad_json", "The body is not valid JSON.") from None
         if not isinstance(payload, dict):
             raise WebhookError(422, "bad_json", "The body must be a JSON object.")
-        result = svc.webhook.receive(payload)
+        # Intake searches and writes, so it must not run on the event loop.
+        result = await run_in_threadpool(services(request).webhook.receive, payload)
     except WebhookError as error:
         raise ApiError(error.status, error.code, error.detail) from None
     if result.duplicate or result.report is None:

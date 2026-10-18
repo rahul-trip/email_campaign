@@ -24,7 +24,7 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.services.dns_check import TxtLookup
-from tests.api.conftest import HEADERS, PASSWORD, Api
+from tests.api.conftest import HEADERS, PASSWORD, WEBHOOK_SECRET, Api
 
 C = CompanyStatus
 FOOTER = 'Quantra Inc, 1 Main St. Reply "unsubscribe" and we will stop.'
@@ -416,7 +416,7 @@ def test_a_mailbox_dns_check_is_run_from_the_settings_screen(
 # ------------------------------------------------------------------ the signed webhook
 
 
-SECRET = "whsec-test-secret"
+SECRET = WEBHOOK_SECRET
 
 
 def signed(
@@ -432,8 +432,8 @@ def signed(
 
 
 @pytest.fixture
-def secret(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("INTAKE_WEBHOOK_SECRET", SECRET)
+def secret() -> None:
+    """The test app is built with the webhook secret already set (see conftest)."""
 
 
 def test_a_signed_webhook_creates_targets_without_a_login(
@@ -475,13 +475,11 @@ def test_an_old_signed_request_is_not_replayable(anonymous: TestClient, secret: 
     assert response.status_code == 401 and response.json()["code"] == "stale_timestamp"
 
 
-def test_missing_headers_and_a_missing_secret_are_refused(
-    anonymous: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv("INTAKE_WEBHOOK_SECRET", raising=False)
+def test_missing_headers_and_a_missing_secret_are_refused(anonymous: TestClient) -> None:
+    anonymous.app.state.webhook_secret = ""  # type: ignore[attr-defined]
     off = anonymous.post("/api/intake/webhook", **signed({"event_id": "e", "website": "a.com"}))  # type: ignore[arg-type]
     assert off.status_code == 503 and off.json()["code"] == "webhook_disabled"
-    monkeypatch.setenv("INTAKE_WEBHOOK_SECRET", SECRET)
+    anonymous.app.state.webhook_secret = SECRET  # type: ignore[attr-defined]
     bare = anonymous.post("/api/intake/webhook", content=b"{}")
     assert bare.status_code == 401
 

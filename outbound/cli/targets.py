@@ -11,6 +11,7 @@ from outbound.bootstrap import Container, build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
 from outbound.db.errors import NotFound
 from outbound.domain.enums import ImportRowStatus, ImportSource
+from outbound.domain.errors import InvalidInput
 from outbound.providers.metered import Meter, MeteredSearch
 from outbound.providers.ports import SearchProvider
 from outbound.providers.registry import build_search
@@ -88,7 +89,7 @@ def import_file(
     workspace_id = workspace_id_or_exit(container, workspace)
     try:
         rows = load_rows(path)
-    except ValueError as error:
+    except InvalidInput as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
     report = _service(container, workspace_id, allow_personal_domain=allow_personal_domain).run(
@@ -177,7 +178,7 @@ def confirm(
     workspace_id = workspace_id_or_exit(container, workspace)
     try:
         outcome = IntakeService(container.uow, workspace_id, None).confirm(row_id, domain)
-    except (ValueError, NotFound) as error:
+    except (InvalidInput, NotFound) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
     typer.echo(f"{outcome.status.value} {outcome.domain or ''} {outcome.reason or ''}".strip())

@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     operator_password_hash: str = ""  # an Argon2 hash: `uv run outbound auth hash-password`
     session_secret: SecretStr = SecretStr("")  # signs the session cookie; any long random string
     session_hours: int = 12
+    intake_webhook_secret: SecretStr = SecretStr("")  # blank disables the webhook
     cookie_secure: bool = False  # set true when served over https
     api_host: str = "127.0.0.1"
     api_port: int = 8000

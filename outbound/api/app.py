@@ -6,32 +6,62 @@ process executes them, so the app stays responsive and a long run survives a pag
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from outbound.api import errors
 from outbound.api.auth import LoginThrottle, Sessions, require_csrf_header, require_operator
 from outbound.api.deps import Services
+from outbound.api.errors import ApiError
 from outbound.api.routers import auth, leads, review, runs, settings, targets, webhook
 from outbound.bootstrap import Container
+from outbound.domain.errors import ConfigurationError
 
 WEB_DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
+SECURITY_HEADERS = {
+    # Everything the page loads comes from this server; nothing may frame it (an invisible
+    # frame over the Approve button would be click-jacking); nothing is guessed from content.
+    "Content-Security-Policy": (
+        "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
+        "object-src 'none'; base-uri 'none'; form-action 'self'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+
+
 def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastAPI:
     config = services.container.settings
+    # The built-in docs page loads scripts from a CDN, which the content policy forbids, and
+    # the API document is served below behind the login instead.
     app = FastAPI(
-        title="Outbound", version="0.3.0", docs_url="/api/docs", openapi_url="/openapi.json"
+        title="Outbound", version="0.3.0", docs_url=None, redoc_url=None, openapi_url=None
     )
     app.state.services = services
     app.state.password_hash = config.operator_password_hash
     app.state.sessions = Sessions(config.session_secret.get_secret_value(), config.session_hours)
     app.state.throttle = LoginThrottle()
     app.state.cookie_secure = config.cookie_secure
+    app.state.webhook_secret = config.intake_webhook_secret.get_secret_value()
     errors.install(app)
+
+    @app.middleware("http")
+    async def secure_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     guarded = [Depends(require_operator), Depends(require_csrf_header)]
     app.include_router(auth.router, dependencies=[Depends(require_csrf_header)])
@@ -43,15 +73,37 @@ def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastA
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/openapi.json", include_in_schema=False, dependencies=[Depends(require_operator)])
+    def api_document() -> dict[str, Any]:
+        return app.openapi()
+
     if web_dist is not None and (web_dist / "index.html").exists():
-        app.mount("/assets", StaticFiles(directory=web_dist / "assets"), name="assets")
+        root = web_dist.resolve()
+        app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")
 
         @app.get("/{path:path}", include_in_schema=False)
         def spa(path: str) -> FileResponse:
-            candidate = web_dist / path
-            return FileResponse(candidate if candidate.is_file() else web_dist / "index.html")
+            if path == "api" or path.startswith("api/"):
+                raise ApiError(404, "not_found", "No such endpoint.")
+            return FileResponse(_file_inside(root, path) or root / "index.html")
 
     return app
+
+
+def _file_inside(root: Path, requested: str) -> Path | None:
+    """The file at ``requested`` under ``root``, or None.
+
+    The path comes from the URL and may contain ``..`` or encoded separators, so it is resolved
+    and must still be inside ``root``. Hidden files (``.env`` and the like) are never served.
+    """
+    try:
+        candidate = (root / requested).resolve()
+        relative = candidate.relative_to(root)
+    except (ValueError, OSError):  # outside the root, or an invalid name such as a NUL byte
+        return None
+    if any(part.startswith(".") for part in relative.parts) or not candidate.is_file():
+        return None
+    return candidate
 
 
 def create_app_from_container(container: Container) -> FastAPI:
@@ -61,7 +113,7 @@ def create_app_from_container(container: Container) -> FastAPI:
 
     config = container.settings
     if not config.operator_password_hash or not config.session_secret.get_secret_value():
-        raise RuntimeError(
+        raise ConfigurationError(
             "The web app needs a login. Add two lines to .env:\n"
             "  OPERATOR_PASSWORD_HASH=<output of: uv run outbound auth hash-password>\n"
             "  SESSION_SECRET=<any random string of 32+ characters, for example the output of\n"
@@ -70,7 +122,9 @@ def create_app_from_container(container: Container) -> FastAPI:
     with container.uow.admin() as admin:
         workspace = admin.workspaces.by_name(config.workspace_name)
     if workspace is None:
-        raise RuntimeError(f"no workspace named {config.workspace_name!r}: run `outbound seed`")
+        raise ConfigurationError(
+            f"no workspace named {config.workspace_name!r}: run `outbound seed`"
+        )
     return create_app(
         build_services(
             container, workspace.id, search=metered_search_or_none(container, workspace.id)

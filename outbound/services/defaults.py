@@ -82,7 +82,6 @@ def default_workspace_settings() -> dict[str, Any]:
         "breaker": {"hard_per_100": 3, "hard_per_24h": 2},
         "catch_all_resolver": "scrubby",
         "reply_webhook_url": None,
-        "intake_webhook_secret_ref": None,
         "few_shot_examples": 5,
         "timezone": "UTC",
     }

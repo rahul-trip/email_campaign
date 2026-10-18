@@ -30,6 +30,7 @@ from tests.db.conftest import (  # noqa: F401  (fixtures used by name)
 )
 
 PASSWORD = "correct horse battery staple"
+WEBHOOK_SECRET = "whsec-test-secret"
 HEADERS = {"X-Requested-With": "outbound"}
 
 
@@ -58,6 +59,7 @@ def container(engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path) -> Con
         _env_file=None,
         operator_password_hash=hash_password(PASSWORD),
         session_secret=SecretStr("s" * 40),
+        intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
     return Container(settings, engine, factory)
 

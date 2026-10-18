@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from outbound.domain.copy_lint import LintIssue, LintReport, lint
 from outbound.prompts import copy as prompts
@@ -55,6 +55,12 @@ class Snippets(BaseModel):
     value: str
     ask: str
     subject: str
+
+    @field_validator("subject")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        """A subject is a single line: newlines would make delivery fail, or inject headers."""
+        return " ".join(value.split())
 
 
 class _Specificity(BaseModel):

@@ -15,9 +15,15 @@ def test_the_api_needs_a_login(anonymous: TestClient) -> None:
         assert response.json()["code"] == "unauthenticated"
 
 
-def test_health_and_docs_are_open(anonymous: TestClient) -> None:
-    assert anonymous.get("/api/health").json() == {"status": "ok"}
-    assert anonymous.get("/openapi.json").status_code == 200
+def test_only_health_is_open_and_the_api_document_needs_a_login(
+    anonymous: TestClient, api: Api
+) -> None:
+    fresh = TestClient(anonymous.app)  # no session cookie
+    assert fresh.get("/api/health").json() == {"status": "ok"}
+    assert fresh.get("/api/openapi.json").status_code == 401
+    assert fresh.get("/openapi.json").status_code == 404
+    assert fresh.get("/api/docs").status_code == 404
+    assert api.get("/api/openapi.json").json()["info"]["title"] == "Outbound"
 
 
 def test_a_wrong_password_is_refused(anonymous: TestClient) -> None:

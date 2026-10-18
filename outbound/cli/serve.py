@@ -8,9 +8,11 @@ import typer
 
 from outbound.bootstrap import build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
+from outbound.domain.errors import ConfigurationError
 from outbound.services import defaults
 
 auth_app = typer.Typer(no_args_is_help=True, help="Operator login.")
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
 def register(app: typer.Typer) -> None:
@@ -39,13 +41,21 @@ def register(app: typer.Typer) -> None:
         from outbound.api.app import create_app_from_container
 
         container = build_container(settings_for(database_url))
+        config = container.settings
+        bind_host = host or config.api_host
+        if bind_host not in LOOPBACK and not config.cookie_secure:
+            typer.echo(
+                f"Refusing to listen on {bind_host}: the login cookie would travel unencrypted. "
+                "Serve it behind https and set COOKIE_SECURE=true, or use 127.0.0.1.",
+                err=True,
+            )
+            raise typer.Exit(1)
         try:
             api = create_app_from_container(container)
-        except RuntimeError as error:
+        except ConfigurationError as error:
             typer.echo(str(error), err=True)
             raise typer.Exit(1) from error
-        config = container.settings
-        uvicorn.run(api, host=host or config.api_host, port=port or config.api_port)
+        uvicorn.run(api, host=bind_host, port=port or config.api_port)
 
     @app.command()
     def worker(

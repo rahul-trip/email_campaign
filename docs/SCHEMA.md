@@ -90,7 +90,7 @@ CREATE TABLE workspaces (
   sender_profile  JSON NOT NULL,  -- legal name, postal address, registration no., narrative, value props, signature
   settings        JSON NOT NULL,  -- send_enabled (false), safe_to_send_only (true), budget_per_prospect_micro_usd,
                                   -- breaker {hard_per_100: 3, hard_per_24h: 2}, catch_all_resolver,
-                                  -- reply_webhook_url, intake_webhook_secret_ref, few_shot_examples (5), timezone
+                                  -- reply_webhook_url, few_shot_examples (5), timezone
   created_at      TIMESTAMP NOT NULL,
   updated_at      TIMESTAMP NOT NULL
 );
@@ -364,4 +364,4 @@ Phases 2 and 3 added no tables or columns. They did fix how some columns are use
 | `import_batches.filename` | For webhook batches, `webhook:{event_id}`; a second request with the same event id is answered as a duplicate and creates nothing |
 | `runs.status` | `queued` (made by the API), `running` (claimed by the worker), then `succeeded`, `failed` or `cancelled`. A run cancelled while running stays `cancelled` when it finishes. `runs.counts` is `{stage: {outcome: n}}`, or `{"error": ...}` for a run that failed outright |
 | `mailboxes.dns_check` | `{domain, ok, spf, dkim, dmarc}`, each check `{name, ok, detail, record}` |
-| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_micro_usd`, `few_shot_examples`, `timezone`. `send_enabled` cannot be switched on before Phase 5. `intake_webhook_secret_ref` names the environment variable holding the webhook secret (default `INTAKE_WEBHOOK_SECRET`) |
+| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_micro_usd`, `few_shot_examples`, `timezone`. `send_enabled` cannot be switched on before Phase 5. The webhook secret is not stored here: it is the environment setting `INTAKE_WEBHOOK_SECRET` |

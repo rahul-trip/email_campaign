@@ -42,6 +42,7 @@ from outbound.domain.enums import (
     NoteSource,
     Provenance,
 )
+from outbound.domain.errors import InvalidInput
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import SearchHit, SearchProvider
@@ -152,7 +153,7 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
         return _load_xlsx(path)
     if path.suffix.lower() in {".csv", ".txt"}:
         return _load_csv(path)
-    raise ValueError(f"{path.name}: expected a .csv or .xlsx file")
+    raise InvalidInput(f"{path.name}: expected a .csv or .xlsx file")
 
 
 def _load_csv(path: Path) -> list[dict[str, Any]]:
@@ -174,7 +175,7 @@ def _load_xlsx(path: Path) -> list[dict[str, Any]]:
     workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
     try:
         if not workbook.worksheets:
-            raise ValueError(f"{path.name} has no worksheet")
+            raise InvalidInput(f"{path.name} has no worksheet")
         rows = workbook.worksheets[0].iter_rows(values_only=True)
         header = [str(cell).strip() if cell is not None else "" for cell in next(rows, ())]
         return [
@@ -385,11 +386,11 @@ class IntakeService:
         """The operator says which website a waiting row means; the row is then processed."""
         resolved = registrable_domain(domain)
         if resolved is None:
-            raise ValueError(f"{domain!r} is not a usable domain")
+            raise InvalidInput(f"{domain!r} is not a usable domain")
         with self._uow(self._workspace_id) as uow:
             row = uow.imports.get_row(row_id)
             if row.status is not ImportRowStatus.NEEDS_CONFIRMATION:
-                raise ValueError(f"row is {row.status.value}, not waiting for confirmation")
+                raise InvalidInput(f"row is {row.status.value}, not waiting for confirmation")
             target = parse_target(row.raw)
             decision = self._decide(
                 uow,

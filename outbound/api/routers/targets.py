@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from outbound.api.deps import Services, services
 from outbound.api.schemas import (
@@ -17,6 +18,7 @@ from outbound.api.schemas import (
     WaitingRowOut,
 )
 from outbound.domain.enums import ImportSource
+from outbound.domain.errors import InvalidInput
 from outbound.services.intake import IntakeReport, load_rows
 
 router = APIRouter(prefix="/api", tags=["targets"])
@@ -53,21 +55,35 @@ async def upload_targets(
     """Read a CSV or XLSX. ``preview`` (the default) checks it and saves nothing."""
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
-        raise ValueError("the file is larger than 2 MB")
+        raise InvalidInput("the file is larger than 2 MB")
     suffix = Path(file.filename or "targets.csv").suffix.lower()
+    # Parsing and intake do blocking work (files, searches, the database), so they run in a
+    # worker thread and the server keeps answering other requests meanwhile.
+    report = await run_in_threadpool(
+        _import, svc, data, suffix, campaign_id, file.filename, preview
+    )
+    return _out(report)
+
+
+def _import(
+    svc: Services,
+    data: bytes,
+    suffix: str,
+    campaign_id: str | None,
+    filename: str | None,
+    preview: bool,
+) -> IntakeReport:
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / f"upload{suffix}"
         path.write_bytes(data)
         rows = load_rows(path)
-    source = ImportSource.XLSX if suffix.startswith(".xls") else ImportSource.CSV
-    report = svc.intake.run(
+    return svc.intake.run(
         rows,
-        source=source,
+        source=ImportSource.XLSX if suffix.startswith(".xls") else ImportSource.CSV,
         campaign_id=campaign_id,
-        filename=file.filename,
+        filename=filename,
         validate_only=preview,
     )
-    return _out(report)
 
 
 @router.get("/targets/waiting", response_model=list[WaitingRowOut])

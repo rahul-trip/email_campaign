@@ -9,12 +9,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from outbound.db.errors import ConcurrencyConflict, NotFound
+from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import IllegalTransition
+from outbound.logging import get_logger
 from outbound.services.leads import LeadError
 from outbound.services.review import ReviewError
 from outbound.services.settings import SettingsError
 
 PROBLEM = "application/problem+json"
+log = get_logger(__name__)
 
 
 class ApiError(Exception):
@@ -55,9 +58,15 @@ def install(app: FastAPI) -> None:
         return problem(409, "action_not_allowed", str(error))
 
     @app.exception_handler(SettingsError)
-    @app.exception_handler(ValueError)
+    @app.exception_handler(InvalidInput)
     async def _invalid(request: Request, error: Exception) -> JSONResponse:
         return problem(422, "invalid_request", str(error))
+
+    @app.exception_handler(Exception)
+    async def _unexpected(request: Request, error: Exception) -> JSONResponse:
+        # A bug: say nothing about it to the client, and keep the details in the log.
+        log.exception("unhandled_error", path=request.url.path)
+        return problem(500, "internal_error", "Something went wrong. It has been logged.")
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, error: RequestValidationError) -> JSONResponse:
