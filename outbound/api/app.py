@@ -81,6 +81,22 @@ def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastA
     def api_document() -> dict[str, Any]:
         return app.openapi()
 
+    @app.api_route(
+        "/api/{path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        include_in_schema=False,
+    )
+    def no_such_endpoint(path: str) -> None:
+        # Last in line, so only paths no router claimed get here. The usual cause is a page newer
+        # than the running server (the app was updated but the server was not restarted); without
+        # this, a POST would fall through to the page route and answer "Method Not Allowed".
+        raise ApiError(
+            404,
+            "no_such_endpoint",
+            "The server has no such endpoint. If the app was just updated, restart it: stop "
+            "`uv run outbound serve` and `uv run outbound worker` and start them again.",
+        )
+
     if web_dist is not None and (web_dist / "index.html").exists():
         root = web_dist.resolve()
         app.mount("/assets", StaticFiles(directory=root / "assets"), name="assets")

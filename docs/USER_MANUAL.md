@@ -427,6 +427,7 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | The web app will not start: "The web app needs a login" | `OPERATOR_PASSWORD_HASH` or `SESSION_SECRET` is missing in `.env` |
 | Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web && npm ci && npm run build` |
 | Something failed in the browser and the message ends "Reference: …" | Search the logs for that reference (see 13a); the line with `unhandled_error` has the cause |
+| A button fails with "The server has no such endpoint" (or, on an older version, "Method Not Allowed") | The page is newer than the running server. Stop `uv run outbound serve` and `uv run outbound worker` and start them again. Do this after every update |
 | **Start run** does nothing | The worker is not running: `uv run outbound worker` |
 | "not configured" when running | A needed vendor key is missing; the message names it |
 | Everything is held for *country unknown* | The sites are not revealing a country. Give the country when adding targets |

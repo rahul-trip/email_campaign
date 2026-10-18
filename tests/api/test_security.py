@@ -189,3 +189,24 @@ def test_serve_refuses_to_listen_on_the_network_without_secure_cookies(
     result = CliRunner().invoke(cli_app, ["serve", "--host", "0.0.0.0", "--database-url", url])
     assert result.exit_code == 1
     assert "unencrypted" in result.output
+
+
+def test_an_unknown_api_path_is_a_clear_json_404_for_any_method(
+    served: Callable[..., TestClient],
+) -> None:
+    """A page newer than the running server calls endpoints the server has never heard of.
+
+    That must read as "no such endpoint, restart the server", not as the bare
+    "Method Not Allowed" the page-serving route would give a POST.
+    """
+    client = served()
+    client.post(
+        "/api/auth/login", json={"password": PASSWORD}, headers={"X-Requested-With": "outbound"}
+    )
+    for method in ("get", "post", "put", "patch", "delete"):
+        response = getattr(client, method)(
+            "/api/companies/abc/not-a-feature", headers={"X-Requested-With": "outbound"}
+        )
+        assert response.status_code == 404, method
+        body = response.json()
+        assert body["code"] == "no_such_endpoint" and "restart" in body["detail"], method
