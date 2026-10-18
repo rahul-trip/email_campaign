@@ -228,7 +228,10 @@ def test_one_sent_mail_that_fits_two_drafts_settles_neither(
             follow_up.id, MessageState.APPROVED, expected_version=follow_up.row_version
         )
         follow_up = uow.messages.transition(
-            follow_up.id, MessageState.DRAFTED, expected_version=follow_up.row_version
+            follow_up.id,
+            MessageState.DRAFTED,
+            expected_version=follow_up.row_version,
+            set_fields={"remote_draft_id": "<follow-up@q>"},
         )
         uow.commit()
     counts = run(factory, ws, SentFolder([sent_mail("<s1@x>")]))

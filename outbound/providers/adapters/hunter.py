@@ -54,7 +54,7 @@ class HunterFinder:
             "last_name": person.last_name,
         }
         try:
-            payload = self._http.get_json("/email-finder", params)
+            payload = self._http.get_object("/email-finder", params)
         except ProviderError as exc:
             if exc.status_code == _CLAIMED:
                 return FinderResult(
@@ -81,7 +81,7 @@ class HunterVerifier:
 
     def verify(self, email: str) -> VerificationResult:
         try:
-            payload = self._http.get_json("/email-verifier", {"email": email})
+            payload = self._http.get_object("/email-verifier", {"email": email})
         except ProviderError as exc:
             if exc.status_code == _CLAIMED:
                 return VerificationResult(

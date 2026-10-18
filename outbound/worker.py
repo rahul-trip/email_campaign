@@ -50,7 +50,12 @@ class Worker:
         self, *, poll_seconds: float = 2.0, stop: Callable[[], bool] = lambda: False
     ) -> None:
         while not stop():
-            if not self.run_once():
+            try:
+                worked = self.run_once()
+            except Exception:  # a database hiccup must not end the worker for good
+                log.exception("worker_error")
+                worked = False
+            if not worked:
                 time.sleep(poll_seconds)
 
     def _fail(self, run_id: str, error: Exception) -> None:

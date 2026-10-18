@@ -185,6 +185,7 @@ def build_mailbox(settings: Settings) -> Mailbox:
         password=_key(settings.email_password),
         port=settings.imap_port,
         use_ssl=settings.imap_use_ssl,
+        timeout=settings.imap_timeout_seconds,
         from_name=settings.from_name,
         drafts_folder=settings.drafts_folder,
         sent_folder=settings.sent_folder,

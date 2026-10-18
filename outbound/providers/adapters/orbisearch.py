@@ -33,7 +33,7 @@ class OrbiSearchVerifier:
         self._http = HttpClient(self.name, BASE_URL, headers={"X-API-Key": key}, client=client)
 
     def verify(self, email: str) -> VerificationResult:
-        payload = self._http.get_json(
+        payload = self._http.get_object(
             "/verify", {"email": email, "timeout": _VENDOR_TIMEOUT_SECONDS}
         )
         status = str(payload.get("status") or "unknown").lower()

@@ -73,6 +73,7 @@ class ImapMailbox:
         drafts_folder: str = "Drafts",
         sent_folder: str = "Sent",
         inbox_folder: str = "INBOX",
+        timeout: float = 30.0,
         connect: Callable[[], imaplib.IMAP4] | None = None,
     ) -> None:
         if not host or not address or not password:
@@ -88,9 +89,9 @@ class ImapMailbox:
         if connect is not None:
             self._connect = connect
         elif use_ssl:
-            self._connect = lambda: imaplib.IMAP4_SSL(host, port)
+            self._connect = lambda: imaplib.IMAP4_SSL(host, port, timeout=timeout)
         else:
-            self._connect = lambda: imaplib.IMAP4(host, port)
+            self._connect = lambda: imaplib.IMAP4(host, port, timeout=timeout)
 
     # ------------------------------------------------------------------ the port
 

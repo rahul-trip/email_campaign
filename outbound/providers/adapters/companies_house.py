@@ -30,7 +30,7 @@ class CompaniesHouse:
         )
 
     def search(self, company_name: str, *, max_results: int = 5) -> list[RegistryEntry]:
-        payload = self._http.get_json(
+        payload = self._http.get_object(
             "/search/companies",
             {"q": company_name, "items_per_page": max(1, min(max_results, _MAX_RESULTS))},
         )

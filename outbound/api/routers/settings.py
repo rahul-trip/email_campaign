@@ -13,8 +13,10 @@ from outbound.api.schemas import (
     MailboxOut,
     PolicyIn,
     PolicyOut,
+    SenderProfileIn,
     SuppressionIn,
     SuppressionOut,
+    WorkspaceSettingsIn,
 )
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -27,8 +29,9 @@ def sender_profile(svc: Annotated[Services, Depends(services)]) -> dict[str, Any
 
 @router.put("/sender-profile")
 def update_sender_profile(
-    changes: dict[str, Any], svc: Annotated[Services, Depends(services)]
+    body: SenderProfileIn, svc: Annotated[Services, Depends(services)]
 ) -> dict[str, Any]:
+    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     return svc.settings.update_sender_profile(changes)
 
 
@@ -39,8 +42,13 @@ def workspace_settings(svc: Annotated[Services, Depends(services)]) -> dict[str,
 
 @router.put("/workspace")
 def update_workspace_settings(
-    changes: dict[str, Any], svc: Annotated[Services, Depends(services)]
+    body: WorkspaceSettingsIn, svc: Annotated[Services, Depends(services)]
 ) -> dict[str, Any]:
+    changes = body.model_dump(exclude_unset=True)
+    # Only the budget may be null (it means "no ceiling"); a null anywhere else means "unchanged".
+    for name in ("safe_to_send_only", "few_shot_examples", "timezone"):
+        if changes.get(name, "") is None:
+            changes.pop(name)
     return svc.settings.update_workspace_settings(changes)
 
 

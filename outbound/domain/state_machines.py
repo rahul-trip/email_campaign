@@ -15,6 +15,7 @@ from outbound.domain.enums import (
     EmailStatus,
     HoldReason,
     MessageState,
+    RunStatus,
 )
 
 
@@ -159,6 +160,19 @@ EMAIL = StateMachine(
         E.INVALID: _row(),  # never retried
     },
     EmailStatus,
+)
+
+R = RunStatus
+RUN = StateMachine(
+    "run",
+    {
+        R.QUEUED: _row(R.RUNNING, R.CANCELLED),
+        R.RUNNING: _row(R.SUCCEEDED, R.FAILED, R.CANCELLED),
+        R.SUCCEEDED: _row(),
+        R.FAILED: _row(),
+        R.CANCELLED: _row(),
+    },
+    RunStatus,
 )
 
 K = ContactStatus

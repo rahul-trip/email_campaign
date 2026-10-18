@@ -12,6 +12,7 @@ from outbound.db.models import ProviderCallRow, RunRow
 from outbound.db.repositories.base import ScopedRepository
 from outbound.db.types import utcnow
 from outbound.domain.enums import CallOutcome, RunKind, RunStatus
+from outbound.domain.state_machines import RUN
 
 _REUSABLE = (CallOutcome.HIT, CallOutcome.MISS)  # a successful answer, including "nothing found"
 
@@ -58,7 +59,7 @@ class RunRepository(ScopedRepository):
 
     def mark_running(self, run_id: str) -> None:
         row = self._row(RunRow, run_id)
-        if row.status is RunStatus.QUEUED:
+        if RUN.allows(row.status, RunStatus.RUNNING):
             row.status = RunStatus.RUNNING
             row.started_at = utcnow()
             self._session.flush()
@@ -66,7 +67,7 @@ class RunRepository(ScopedRepository):
     def cancel(self, run_id: str) -> RunStatus:
         """Stop a queued run now, or ask a running one to stop between leads."""
         row = self._row(RunRow, run_id)
-        if row.status in (RunStatus.QUEUED, RunStatus.RUNNING):
+        if RUN.allows(row.status, RunStatus.CANCELLED):
             if row.status is RunStatus.QUEUED:
                 row.finished_at = utcnow()
             row.status = RunStatus.CANCELLED
@@ -116,7 +117,9 @@ class RunRepository(ScopedRepository):
 
     def finish(self, run_id: str, status: RunStatus, counts: dict[str, Any] | None = None) -> None:
         row = self._row(RunRow, run_id)
-        if row.status is not RunStatus.CANCELLED:  # a cancel request stays cancelled
+        # A run that is already over (including one the operator cancelled) keeps its status:
+        # "succeeded" never turns into "failed" because a later error was reported.
+        if RUN.allows(row.status, status):
             row.status = status
         row.counts = counts
         row.finished_at = utcnow()

@@ -434,8 +434,10 @@ class IntakeService:
             return Resolution(None, note="no search provider is configured (TAVILY_API_KEY)")
         try:
             if anchor is ImportAnchor.LINKEDIN_URL:
-                assert target.linkedin_slug is not None
-                return self._resolver.by_linkedin(target.linkedin_slug, country)
+                slug = target.linkedin_slug
+                if slug is None:
+                    raise InvalidInput("that LinkedIn address is not a profile")
+                return self._resolver.by_linkedin(slug, country)
             return self._resolver.by_name(target.company, country)
         except ProviderError as error:
             log.warning("intake_search_failed", error=str(error))

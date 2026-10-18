@@ -55,7 +55,7 @@ class SentSync:
         with self._uow(self._workspace_id) as uow:
             drafts = [
                 (m, uow.emails.get(m.contact_email_id).email)
-                for m in uow.messages.in_state(MessageState.DRAFTED, 500)
+                for m in uow.messages.drafted_in_mailbox(500)
             ]
         counts = {"drafts": len(drafts), "matched": 0, "ambiguous": 0, "waiting": 0}
         if not drafts:
@@ -87,7 +87,7 @@ class SentSync:
             current = uow.messages.get(message.id)
             if current.state is not MessageState.DRAFTED:
                 return
-            if uow.session.execute(_taken(sent.rfc_message_id, self._workspace_id)).first():
+            if uow.messages.rfc_id_taken(sent.rfc_message_id):
                 return  # that sent mail is already recorded against another message
             uow.messages.transition(
                 message.id,
@@ -127,14 +127,4 @@ def _fits(message: Message, address: str | None, sent: SentMessage) -> bool:
         sent.to_address.lower() == address.lower()
         and normal_subject(sent.subject) == normal_subject(message.subject)
         and sent.sent_at >= message.updated_at - CLOCK_SKEW
-    )
-
-
-def _taken(rfc_message_id: str, workspace_id: str):  # type: ignore[no-untyped-def]
-    from sqlalchemy import select
-
-    from outbound.db.models import MessageRow
-
-    return select(MessageRow.id).where(
-        MessageRow.workspace_id == workspace_id, MessageRow.rfc_message_id == rfc_message_id
     )

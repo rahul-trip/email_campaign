@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 from tenacity import (
+    RetryCallState,
     Retrying,
     retry_if_exception,
     stop_after_attempt,
@@ -34,6 +35,23 @@ def require_api_key(provider: str, api_key: str) -> str:
     if not api_key or not api_key.strip():
         raise ProviderAuthError(provider, "API key is not set")
     return api_key.strip()
+
+
+MAX_RETRY_AFTER_SECONDS = 60.0
+
+
+def _honouring_retry_after(base: wait_base) -> wait_base:
+    """After a 429, wait as long as the vendor asked (up to a minute); else the usual back-off."""
+
+    class _Wait(wait_base):
+        def __call__(self, retry_state: RetryCallState) -> float:
+            outcome = retry_state.outcome
+            error = outcome.exception() if outcome is not None else None
+            if isinstance(error, RateLimited) and error.retry_after is not None:
+                return min(error.retry_after, MAX_RETRY_AFTER_SECONDS)
+            return base(retry_state)
+
+    return _Wait()
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -65,11 +83,26 @@ class HttpClient:
     def post_json(self, path: str, body: dict[str, Any] | None = None) -> Any:
         return self._request("POST", path, json=body)
 
+    def get_object(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Like ``get_json`` but the answer must be a JSON object, as every adapter assumes."""
+        return self._object("GET", path, self._request("GET", path, params=params))
+
+    def post_object(self, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self._object("POST", path, self._request("POST", path, json=body))
+
+    def _object(self, method: str, path: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ProviderError(
+                self._provider,
+                f"{method} {path}: expected a JSON object, got {type(payload).__name__}",
+            )
+        return payload
+
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         retrying = Retrying(
             retry=retry_if_exception(_is_retryable),
             stop=stop_after_attempt(self._attempts),
-            wait=self._wait,
+            wait=_honouring_retry_after(self._wait),
             reraise=True,
         )
         return retrying(self._once, method, path, **kwargs)

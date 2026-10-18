@@ -33,7 +33,7 @@ class EnrichleyResolver:
         self._http = HttpClient(self.name, BASE_URL, headers={"X-Api-Key": key}, client=client)
 
     def submit(self, email: str) -> ResolutionTicket:
-        payload = self._http.post_json("/validate-single-email", {"email": email})
+        payload = self._http.post_object("/validate-single-email", {"email": email})
         raw = str(payload.get("result") or "unknown")
         result = ResolutionResult(
             email=email,

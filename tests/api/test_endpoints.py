@@ -20,6 +20,7 @@ from outbound.domain.enums import (
     CompanyStatus,
     ContactSource,
     EmailStatus,
+    EntityType,
     HoldReason,
     MessageState,
     Provenance,
@@ -345,7 +346,45 @@ def test_the_sender_profile_and_workspace_settings_can_be_edited(api: Api) -> No
     assert api.put("/api/settings/sender-profile", json={"nope": 1}).status_code == 422
     assert api.put("/api/settings/workspace", json={"few_shot_examples": 2}).status_code == 200
     blocked = api.put("/api/settings/workspace", json={"send_enabled": True})
-    assert blocked.status_code == 422 and "Phase 5" in blocked.json()["detail"]
+    assert blocked.status_code == 422  # not a setting an operator can change at all
+    assert "send_enabled" in {e["field"] for e in blocked.json()["errors"]}
+
+
+def test_settings_are_checked_for_type_and_size(api: Api) -> None:
+    url = "/api/settings/workspace"
+    assert api.put(url, json={"budget_per_prospect_micro_usd": "lots"}).status_code == 422
+    assert api.put(url, json={"budget_per_prospect_micro_usd": -5}).status_code == 422
+    assert api.put(url, json={"few_shot_examples": 99}).status_code == 422
+    assert (
+        api.put("/api/settings/sender-profile", json={"narrative": "x" * 20_000}).status_code == 422
+    )
+    assert (
+        api.put(
+            "/api/settings/sender-profile", json={"value_propositions": "not a list"}
+        ).status_code
+        == 422
+    )
+
+
+def test_a_null_means_no_budget_ceiling_but_is_ignored_for_everything_else(api: Api) -> None:
+    url = "/api/settings/workspace"
+    api.put(url, json={"budget_per_prospect_micro_usd": 250_000, "few_shot_examples": 3})
+    after = api.put(
+        url, json={"budget_per_prospect_micro_usd": None, "few_shot_examples": None}
+    ).json()
+    assert after["budget_per_prospect_micro_usd"] is None  # cleared: no ceiling
+    assert after["few_shot_examples"] == 3  # a null here would have crashed the writer
+
+
+def test_changes_to_safety_settings_are_recorded_in_the_audit_trail(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    api.put("/api/settings/workspace", json={"safe_to_send_only": False})
+    api.put("/api/settings/sender-profile", json={"legal_name": "Quantra"})
+    with factory(ws) as uow:
+        events = {e.type: e.data for e in uow.events.for_entity(EntityType.WORKSPACE, ws)}
+    assert events["settings_changed"] == {"safe_to_send_only": False}
+    assert events["sender_profile_reviewed"] == {"fields": ["legal_name"]}
 
 
 def test_campaigns_can_be_created_listed_and_changed(api: Api) -> None:

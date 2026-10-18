@@ -6,11 +6,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from outbound.db.errors import NotFound
 from outbound.db.repositories.workspaces import MailboxView
-from outbound.db.uow import UnitOfWorkFactory
+from outbound.db.uow import AdminUnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
-from outbound.domain.entities import Campaign, CountryPolicy
+from outbound.domain.entities import Campaign, CountryPolicy, Workspace
 from outbound.domain.enums import (
+    EntityType,
     PolicyRule,
     Provenance,
     SuppressionKind,
@@ -74,8 +76,7 @@ class SettingsService:
         if unknown:
             raise SettingsError(f"unknown sender profile field(s): {sorted(unknown)}")
         with self._uow.admin() as admin:
-            workspace = admin.workspaces.get(self._workspace_id)
-            assert workspace is not None
+            workspace = self._workspace(admin)
             merged = {
                 **workspace.sender_profile,
                 **changes,
@@ -83,6 +84,7 @@ class SettingsService:
             }
             admin.workspaces.set_sender_profile(self._workspace_id, merged)
             admin.commit()
+        self._record_change("sender_profile_reviewed", {"fields": sorted(changes)})
         return merged
 
     def workspace_settings(self) -> dict[str, Any]:
@@ -97,12 +99,26 @@ class SettingsService:
         if unknown:
             raise SettingsError(f"cannot change setting(s): {sorted(unknown)}")
         with self._uow.admin() as admin:
-            workspace = admin.workspaces.get(self._workspace_id)
-            assert workspace is not None
+            workspace = self._workspace(admin)
             merged = {**workspace.settings, **changes}
             admin.workspaces.set_settings(self._workspace_id, merged)
             admin.commit()
+        self._record_change("settings_changed", changes)
         return merged
+
+    def _workspace(self, admin: AdminUnitOfWork) -> Workspace:
+        workspace = admin.workspaces.get(self._workspace_id)
+        if workspace is None:
+            raise NotFound(f"workspace {self._workspace_id}")
+        return workspace
+
+    def _record_change(self, kind: str, detail: dict[str, Any]) -> None:
+        """Settings such as the safe-to-send safeguard and the budget are safety controls, so
+        who changed them to what is part of the audit trail (the sender profile: only which
+        fields, since it holds free text)."""
+        with self._uow(self._workspace_id) as uow:
+            uow.events.append(EntityType.WORKSPACE, self._workspace_id, kind, OPERATOR, detail)
+            uow.commit()
 
     # ------------------------------------------------------------------ campaigns
 

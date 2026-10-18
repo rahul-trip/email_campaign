@@ -32,7 +32,7 @@ class MyEmailVerifierVerifier:
         self._http = HttpClient(self.name, BASE_URL, client=client)
 
     def verify(self, email: str) -> VerificationResult:
-        payload = self._http.get_json(
+        payload = self._http.get_object(
             "/validate_single.php", {"apikey": self._api_key, "email": email}
         )
         raw = str(payload.get("Status") or "unknown").strip()

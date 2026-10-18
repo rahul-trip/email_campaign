@@ -64,7 +64,7 @@ class TavilySearch:
 
     def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
         try:
-            payload = self._http.post_json(path, body)
+            payload = self._http.post_object(path, body)
         except ProviderError as exc:
             if exc.status_code in _LIMIT_STATUSES:
                 raise BudgetExceeded(

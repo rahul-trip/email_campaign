@@ -90,6 +90,28 @@ class MessageRepository(ScopedRepository):
         )
         return [snapshot(row, Message) for row in self._session.scalars(stmt)]
 
+    def drafted_in_mailbox(self, limit: int) -> list[Message]:
+        """Drafts the engine saved in a mailbox, newest first. Messages imported from the old
+        workbook are 'drafted' too but have no mailbox draft, and can never match a sent mail."""
+        stmt = (
+            select(MessageRow)
+            .where(
+                MessageRow.workspace_id == self._workspace_id,
+                MessageRow.state == MessageState.DRAFTED,
+                MessageRow.remote_draft_id.is_not(None),
+            )
+            .order_by(MessageRow.updated_at.desc(), MessageRow.id.desc())
+            .limit(limit)
+        )
+        return [snapshot(row, Message) for row in self._session.scalars(stmt)]
+
+    def rfc_id_taken(self, rfc_message_id: str) -> bool:
+        stmt = select(MessageRow.id).where(
+            MessageRow.workspace_id == self._workspace_id,
+            MessageRow.rfc_message_id == rfc_message_id,
+        )
+        return self._session.scalars(stmt).first() is not None
+
     def edited_examples(self, campaign_id: str, limit: int) -> list[Message]:
         """The most recent emails in a campaign that the operator changed before sending."""
         stmt = (

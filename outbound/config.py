@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     drafts_folder: str = "INBOX.Drafts"
     sent_folder: str = "INBOX.Sent"
     inbox_folder: str = "INBOX"
+    imap_timeout_seconds: float = 30.0  # a hung mail server must not freeze a run
 
     # --- language model: any OpenAI-compatible endpoint (see providers/adapters/llm.py) ---
     # anthropic, openai, gemini, ollama, github_copilot or openai_compatible

@@ -38,11 +38,11 @@ class ScrubbyResolver:
         self._http = HttpClient(self.name, base_url, headers={"x-api-key": key}, client=client)
 
     def submit(self, email: str) -> ResolutionTicket:
-        self._http.post_json("/add_email", {"email": email})
+        self._http.post_object("/add_email", {"email": email})
         return ResolutionTicket(ref=email, email=email, provider=self.name)
 
     def poll(self, ticket: ResolutionTicket) -> ResolutionResult | None:
-        payload = self._http.get_json(f"/fetch_email/{quote(ticket.ref, safe='@')}")
+        payload = self._http.get_object(f"/fetch_email/{quote(ticket.ref, safe='@')}")
         raw = str(payload.get("status") or "pending").strip().lower()
         if raw in _PENDING:
             return None

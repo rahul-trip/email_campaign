@@ -24,7 +24,8 @@ class Out(BaseModel):
 
 
 class In(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # Nothing legitimate is longer than this; it keeps one request from being enormous.
+    model_config = ConfigDict(extra="forbid", str_max_length=10_000)
 
 
 # ------------------------------------------------------------------ auth
@@ -230,6 +231,38 @@ class ApproveIn(In):
 
 class RejectIn(In):
     reason: str
+
+
+class WorkspaceSettingsIn(In):
+    """Only the settings an operator may change, each with its real type."""
+
+    safe_to_send_only: bool | None = None
+    # null means "no ceiling"; 0 means "no paid calls at all". The screen sends null when blank.
+    budget_per_prospect_micro_usd: int | None = Field(default=None, ge=0, le=100_000_000)
+    few_shot_examples: int | None = Field(default=None, ge=0, le=20)
+    timezone: str | None = Field(default=None, max_length=64)
+
+
+class SenderProfileIn(In):
+    """The sender profile. ``reviewed_at`` is accepted and ignored: only the server sets it."""
+
+    company_name: str | None = Field(default=None, max_length=200)
+    domain: str | None = Field(default=None, max_length=200)
+    industry: str | None = Field(default=None, max_length=200)
+    mission: str | None = Field(default=None, max_length=1000)
+    geographic_focus: str | None = Field(default=None, max_length=500)
+    signature_name: str | None = Field(default=None, max_length=200)
+    signature_title: str | None = Field(default=None, max_length=200)
+    legal_name: str | None = Field(default=None, max_length=300)
+    postal_address: str | None = Field(default=None, max_length=500)
+    registration_details: str | None = Field(default=None, max_length=500)
+    contact_info: str | None = Field(default=None, max_length=500)
+    narrative: str | None = Field(default=None, max_length=8000)
+    value_propositions: list[str] | None = Field(default=None, max_length=30)
+    technologies: list[str] | None = Field(default=None, max_length=30)
+    target_verticals: list[str] | None = Field(default=None, max_length=30)
+    case_studies: list[str] | None = Field(default=None, max_length=30)
+    reviewed_at: str | None = None
 
 
 # ------------------------------------------------------------------ privacy

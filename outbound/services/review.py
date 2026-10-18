@@ -94,11 +94,12 @@ class ReviewService:
             if expected_version is not None and message.row_version != expected_version:
                 raise ConcurrencyConflict("the message changed since you opened it")
             fields: dict[str, object] = {}
-            if edited_body is not None and edited_body.strip() != message.generated_body.strip():
-                self._check_footer(message, edited_body)
+            edited = edited_body.strip() if edited_body is not None else None
+            if edited is not None and edited != message.generated_body.strip():
+                self._check_footer(message, edited)
                 fields = {
-                    "final_body": edited_body.strip(),
-                    "edit_distance": edit_distance(message.generated_body, edited_body),
+                    "final_body": edited,
+                    "edit_distance": edit_distance(message.generated_body, edited),
                 }
             approved = uow.messages.transition(
                 message.id,

@@ -71,7 +71,8 @@ class CopyStage:
             self._llm,
             CopyInput(
                 sender=sender,
-                first_name=contact.first_name or (contact.full_name or "there").split()[0],
+                first_name=contact.first_name
+                or next(iter((contact.full_name or "").split()), "there"),
                 title=contact.title or "",
                 company_name=company.name or company.domain,
                 research=company.research or {},

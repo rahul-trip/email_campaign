@@ -12,9 +12,7 @@ from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, worksp
 from outbound.db.errors import NotFound
 from outbound.domain.enums import ImportRowStatus, ImportSource
 from outbound.domain.errors import InvalidInput
-from outbound.providers.metered import Meter, MeteredSearch
-from outbound.providers.ports import SearchProvider
-from outbound.providers.registry import build_search
+from outbound.pipeline import metered_search_or_none
 from outbound.services import defaults
 from outbound.services.intake import IntakeReport, IntakeService, load_rows
 
@@ -28,21 +26,13 @@ Personal = Annotated[
 ]
 
 
-def _search(container: Container, workspace_id: str) -> SearchProvider | None:
-    """Tavily behind the meter (cached, capped, costed), or None when no key is set."""
-    if not container.settings.tavily_api_key.get_secret_value():
-        return None
-    meter = Meter(container.uow, workspace_id)
-    return MeteredSearch(build_search(container.settings), meter)
-
-
 def _service(
     container: Container, workspace_id: str, *, allow_personal_domain: bool
 ) -> IntakeService:
     return IntakeService(
         container.uow,
         workspace_id,
-        _search(container, workspace_id),
+        metered_search_or_none(container, workspace_id),
         allow_personal_domain=allow_personal_domain,
     )
 

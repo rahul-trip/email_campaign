@@ -13,6 +13,7 @@ from outbound.bootstrap import Container
 from outbound.config import Settings
 from outbound.domain.entities import Workspace
 from outbound.domain.enums import CompanySource, ImportRowStatus, ImportSource
+from outbound.domain.errors import ConfigurationError
 from outbound.providers.budget import BudgetPolicy
 from outbound.providers.metered import (
     Meter,
@@ -114,23 +115,37 @@ def real_providers(settings: Settings) -> Providers:
         raise NotConfigured(str(error)) from None
 
 
+def _workspace(container: Container, workspace_id: str) -> Workspace:
+    with container.uow.admin() as admin:
+        workspace = admin.workspaces.get(workspace_id)
+    if workspace is None:
+        raise ConfigurationError(f"workspace {workspace_id} does not exist")
+    return workspace
+
+
+def build_meter(container: Container, workspace_id: str) -> Meter:
+    """The one way to get a meter: with the configured prices, monthly caps and the workspace's
+    per-prospect ceiling, so no path to a paid vendor can skip a cap."""
+    workspace = _workspace(container, workspace_id)
+    settings = container.settings
+    return Meter(
+        container.uow,
+        workspace_id,
+        prices={**DEFAULT_PRICES, **settings.provider_prices},
+        budget=BudgetPolicy.from_workspace_settings(
+            workspace.settings, settings.monthly_caps_micro_usd
+        ),
+    )
+
+
 def assemble(container: Container, workspace_id: str, providers: Providers) -> Pipeline:
     settings = container.settings
     uow = container.uow
-    with uow.admin() as admin:
-        workspace: Workspace | None = admin.workspaces.get(workspace_id)
-    if workspace is None:
-        raise LookupError(f"workspace {workspace_id} does not exist")
-
+    workspace = _workspace(container, workspace_id)
     budget = BudgetPolicy.from_workspace_settings(
         workspace.settings, settings.monthly_caps_micro_usd
     )
-    meter = Meter(
-        uow,
-        workspace_id,
-        prices={**DEFAULT_PRICES, **settings.provider_prices},
-        budget=budget,
-    )
+    meter = build_meter(container, workspace_id)
     llm_prices = {**DEFAULT_LLM_PRICES, **settings.llm_prices}
     search = MeteredSearch(providers.search, meter)
     llm = MeteredLlm(providers.llm, meter, prices=llm_prices)
@@ -206,9 +221,4 @@ def metered_search_or_none(container: Container, workspace_id: str) -> SearchPro
     """Tavily behind the meter, or None when no key is set (name targets then wait for you)."""
     if not container.settings.tavily_api_key.get_secret_value():
         return None
-    meter = Meter(
-        container.uow,
-        workspace_id,
-        prices={**DEFAULT_PRICES, **container.settings.provider_prices},
-    )
-    return MeteredSearch(build_search(container.settings), meter)
+    return MeteredSearch(build_search(container.settings), build_meter(container, workspace_id))

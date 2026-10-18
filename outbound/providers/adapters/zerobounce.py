@@ -59,7 +59,7 @@ class _ZeroBounceBase:
         self._http = HttpClient(self.name, base_url, client=client)
 
     def _get(self, path: str, params: dict[str, Any]) -> dict[str, Any]:
-        payload = self._http.get_json(path, {**params, "api_key": self._api_key})
+        payload = self._http.get_object(path, {**params, "api_key": self._api_key})
         if not isinstance(payload, dict):
             raise ProviderError(self.name, f"GET {path}: unexpected response shape")
         _check_error(self.name, payload)

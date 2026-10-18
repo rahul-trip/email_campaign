@@ -102,7 +102,7 @@ class OpenAiCompatibleLlm:
         }
         if json_mode and self._json_mode:
             body["response_format"] = {"type": "json_object"}
-        payload = self._http.post_json("/chat/completions", body)
+        payload = self._http.post_object("/chat/completions", body)
         return self._parse(payload)
 
     def _parse(self, payload: Any) -> LlmResult:
