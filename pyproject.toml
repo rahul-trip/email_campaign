@@ -44,6 +44,7 @@ dev = [
     "types-openpyxl>=3.1",
     "datasette>=0.65",  # read-only database viewer for Phases 1 and 2
     "import-linter>=2.15",
+    "pytest-socket>=0.8.1",
 ]
 # Dependencies of the legacy agent/ package; deleted together with it in Phase 2.
 legacy = [
@@ -63,7 +64,9 @@ default-groups = ["dev", "legacy"]
 [tool.pytest.ini_options]
 testpaths = ["tests", "agent"]
 pythonpath = ["."]
-addopts = "-ra"
+# No test may use the network. Local connections (the throwaway Postgres, the test server) are
+# allowed; anything else raises at once instead of quietly calling a vendor.
+addopts = "-ra --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,localhost"
 
 [tool.ruff]
 line-length = 100

@@ -67,8 +67,9 @@ def container(engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path) -> Con
 @pytest.fixture
 def make_app(container: Container, ws: str) -> Callable[..., tuple[FastAPI, Services]]:
     def build(dns_lookup: TxtLookup | None = None) -> tuple[FastAPI, Services]:
-        settings_service = (
-            SettingsService(container.uow, ws, dns_lookup=dns_lookup) if dns_lookup else None
+        # Never the real resolver: tests make no network calls.
+        settings_service = SettingsService(
+            container.uow, ws, dns_lookup=dns_lookup or (lambda name: [])
         )
         services = build_services(container, ws, settings_service=settings_service)
         return create_app(services, web_dist=None), services

@@ -15,44 +15,16 @@ def no_retry_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(http_module, "_DEFAULT_WAIT", wait_none())
 
 
-_PROVIDER_ENV = (
-    "DATABASE_URL",
-    "HUNTER_API_KEY",
-    "ZEROBOUNCE_API_KEY",
-    "ORBISEARCH_API_KEY",
-    "MYEMAILVERIFIER_API_KEY",
-    "ENRICHLEY_API_KEY",
-    "SCRUBBY_API_KEY",
-    "SCRUBBY_BASE_URL",
-    "TAVILY_API_KEY",
-    "IMAP_HOST",
-    "IMAP_PORT",
-    "IMAP_USE_SSL",
-    "EMAIL_ADDRESS",
-    "EMAIL_PASSWORD",
-    "FROM_NAME",
-    "DRAFTS_FOLDER",
-    "SENT_FOLDER",
-    "INBOX_FOLDER",
-    "COMPANIES_HOUSE_API_KEY",
-    "LLM_PROVIDER",
-    "LLM_MODEL",
-    "LLM_BASE_URL",
-    "LLM_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "GEMINI_API_KEY",
-    "COPILOT_API_KEY",
-    "FINDER_CHAIN",
-    "VERIFIER",
-    "CATCH_ALL_RESOLVER",
-)
+# Every setting can come from the environment, so every one is cleared: a developer's exported
+# value can never change a test. Built from the Settings class, so a new setting is covered
+# the day it is added.
+_SETTING_ENV = tuple(name.upper() for name in Settings.model_fields)
 
 
 @pytest.fixture(autouse=True)
 def clean_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """A developer's exported keys must never change what a test sees."""
-    for name in _PROVIDER_ENV:
+    for name in _SETTING_ENV:
         monkeypatch.delenv(name, raising=False)
 
 
