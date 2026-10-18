@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
-from outbound.db.errors import ConcurrencyConflict
+from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
@@ -198,12 +198,24 @@ class Runner:
             return Outcome.SKIPPED
         except Exception as error:
             self._undo(result)
+            if isinstance(error, NotFound) and not self._exists(company_id):
+                # The operator deleted the lead while this stage was working on it.
+                log.info("lead_gone_during_run", stage=stage.name, company_id=company_id)
+                return Outcome.SKIPPED
             if company is None:  # the lead could not even be loaded
                 log.exception("lead_unreadable", stage=stage.name, company_id=company_id)
                 return Outcome.SKIPPED
             return self._record_failure(stage, company, error)
         finally:
             unbind("company_id", "stage")
+
+    def _exists(self, company_id: str) -> bool:
+        with self._uow(self._workspace_id) as uow:
+            try:
+                uow.companies.get(company_id)
+            except NotFound:
+                return False
+        return True
 
     @staticmethod
     def _undo(result: StageResult | None) -> None:
@@ -305,7 +317,7 @@ class Runner:
                     self._defer(uow, current, message)
                     outcome = Outcome.DEFERRED
                 uow.commit()
-        except ConcurrencyConflict:
+        except (ConcurrencyConflict, NotFound):
             return Outcome.SKIPPED
         return outcome
 

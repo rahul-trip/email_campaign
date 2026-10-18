@@ -228,3 +228,30 @@ def test_a_set_up_database_without_the_workspace_says_to_seed(url: str) -> None:
     assert run("db", "upgrade", url=url)[0] == 0
     code, out = run("status", url=url)
     assert code == 1 and "outbound seed" in out
+
+
+# ------------------------------------------------------------------ delete-lead
+
+
+def _seeded_with_acme(url: str) -> None:
+    assert run("db", "upgrade", url=url)[0] == 0
+    assert run("seed", url=url)[0] == 0
+    assert run("targets", "add", "--website", "acme.com", "--country", "UK", url=url)[0] == 0
+
+
+def test_delete_lead_asks_for_the_domain_and_deletes_only_when_it_matches(url: str) -> None:
+    _seeded_with_acme(url)
+    wrong = runner.invoke(app, ["delete-lead", "acme.com", "--database-url", url], input="acme\n")
+    assert wrong.exit_code == 1 and "nothing was deleted" in wrong.output
+    right = runner.invoke(
+        app, ["delete-lead", "acme.com", "--database-url", url], input="acme.com\n"
+    )
+    assert right.exit_code == 0 and "deleted acme.com" in right.output
+    code, out = run("delete-lead", "acme.com", "--yes", url=url)
+    assert code == 1 and "no lead with the domain" in out
+
+
+def test_delete_lead_can_also_block_the_domain(url: str) -> None:
+    _seeded_with_acme(url)
+    code, out = run("delete-lead", "acme.com", "--yes", "--suppress", url=url)
+    assert code == 0 and "do-not-contact" in out

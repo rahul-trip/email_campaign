@@ -16,6 +16,7 @@ from outbound.domain.domains import registrable_domain
 from outbound.domain.enums import (
     CompanyStatus,
     ContactStatus,
+    MessageState,
     SuppressionKind,
     SuppressionReason,
 )
@@ -25,6 +26,7 @@ from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import Mailbox
 from outbound.services.forget import forget_email, stop_contact, suppress_if_nobody_left
+from outbound.services.leads import LeadError
 
 log = get_logger(__name__)
 
@@ -35,6 +37,16 @@ class PrivacyResult:
     messages_cancelled: int = 0
     drafts_deleted: int = 0
     drafts_left: tuple[str, ...] = ()  # Message-IDs the operator must delete from the mailbox
+
+
+@dataclass(frozen=True)
+class DeleteResult:
+    domain: str
+    contacts_removed: int
+    messages_removed: int
+    drafts_deleted: int
+    drafts_left: tuple[str, ...]
+    domain_suppressed: bool
 
 
 class PrivacyService:
@@ -132,6 +144,72 @@ class PrivacyService:
         if target[0] == "contact":
             return self.suppress_contact(target[1], actor=actor)
         return self.suppress_company(target[1], actor=actor)
+
+    def delete_lead(
+        self,
+        company_id: str,
+        *,
+        confirm_domain: str,
+        also_suppress_domain: bool = False,
+        actor: str = OPERATOR,
+    ) -> DeleteResult:
+        """Permanently remove a lead: its people, addresses, emails, notes and history.
+
+        Three safeguards. The caller must type the lead's domain, so a wrong click cannot do it.
+        A lead we have already emailed cannot be deleted, because the record of mail that left
+        must stay (suppress it instead). Drafts waiting in the mailbox are deleted with it.
+        Optionally the domain is also put on the do-not-contact list, so it is never added again.
+        """
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)  # NotFound for another workspace's lead
+            if confirm_domain.strip().lower() != company.domain:
+                raise InvalidInput(f"type the domain, {company.domain}, to confirm the deletion")
+            messages = uow.messages.for_company(company_id)
+            if any(m.state in (MessageState.SENT, MessageState.BOUNCED) for m in messages):
+                raise LeadError(
+                    "An email was sent to this lead, and the record of mail that has left must "
+                    "stay. Use Suppress to stop all contact instead."
+                )
+            draft_ids = tuple(
+                m.remote_draft_id
+                for m in messages
+                if m.state is MessageState.DRAFTED and m.remote_draft_id
+            )
+            contacts = uow.contacts.for_company(company_id)
+            gone = uow.erasure.delete_company(
+                company_id,
+                actor=actor,
+                note={
+                    "domain": company.domain,
+                    "status_was": company.status.value,
+                    "contacts": len(contacts),
+                    "messages": len(messages),
+                    "domain_suppressed": also_suppress_domain,
+                },
+            )
+            if also_suppress_domain:
+                uow.suppressions.add(
+                    SuppressionKind.DOMAIN, company.domain, SuppressionReason.MANUAL, actor=actor
+                )
+            uow.commit()
+        deleted, left = self._delete_drafts(draft_ids)
+        log.warning(  # a permanent action: worth a line that stands out
+            "lead_deleted",
+            actor=actor,
+            workspace_id=self._workspace_id,
+            company_id=company_id,
+            domain=company.domain,
+            status_was=company.status.value,
+            contacts_removed=gone.contacts,
+            messages_removed=gone.messages,
+            events_removed=gone.events,
+            drafts_deleted=deleted,
+            drafts_left=len(left),
+            domain_suppressed=also_suppress_domain,
+        )
+        return DeleteResult(
+            company.domain, gone.contacts, gone.messages, deleted, left, also_suppress_domain
+        )
 
     # ------------------------------------------------------------------ helpers
 

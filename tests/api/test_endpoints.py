@@ -834,3 +834,63 @@ def test_a_person_can_be_corrected_through_the_api(
     assert fixed.json()["full_name"] == "Sonal Mishra"
     assert fixed.json()["emails"][0]["email"] == "sonal@acme.com"
     assert api.patch("/api/contacts/nope", json={"full_name": "A B"}).status_code == 404
+
+
+def test_a_lead_is_deleted_only_with_its_domain_typed_and_is_then_gone(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "acme.com", C.RESEARCHED)
+    with factory(ws) as uow:
+        person = uow.contacts.add(cid, rank=1, source=ContactSource.OPERATOR, full_name="Sam Lee")
+        uow.emails.add(person.id, "sam@acme.com", Provenance.OPERATOR_GIVEN, is_primary=True)
+        uow.commit()
+    wrong = api.post(f"/api/companies/{cid}/delete", json={"confirm_domain": "beta.com"})
+    assert wrong.status_code == 422 and "acme.com" in wrong.json()["detail"]
+    assert api.get(f"/api/companies/{cid}").status_code == 200  # still there
+
+    done = api.post(
+        f"/api/companies/{cid}/delete",
+        json={"confirm_domain": "ACME.com", "also_suppress_domain": True},
+    )
+    assert done.status_code == 200
+    assert done.json() == {
+        "domain": "acme.com",
+        "contacts_removed": 1,
+        "messages_removed": 0,
+        "drafts_deleted": 0,
+        "drafts_left": [],
+        "domain_suppressed": True,
+    }
+    assert api.get(f"/api/companies/{cid}").status_code == 404
+    assert api.get("/api/companies").json()["total"] == 0
+    assert (
+        api.post(f"/api/companies/{cid}/delete", json={"confirm_domain": "acme.com"}).status_code
+        == 404
+    )
+
+
+def test_a_lead_that_was_emailed_cannot_be_deleted_through_the_api(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "sent.com", C.RESEARCHED)
+    with factory(ws) as uow:
+        person = uow.contacts.add(cid, rank=1, source=ContactSource.OPERATOR, full_name="A B")
+        address = uow.emails.add(
+            person.id, "a@sent.com", Provenance.OPERATOR_GIVEN, is_primary=True
+        )
+        message = uow.messages.create(
+            company_id=cid,
+            contact_id=person.id,
+            contact_email_id=address.id,
+            step=0,
+            subject="hello",
+            generated_body="hi",
+            state=MessageState.APPROVED,
+        )
+        message = uow.messages.transition(
+            message.id, MessageState.SENT, expected_version=message.row_version
+        )
+        uow.commit()
+    response = api.post(f"/api/companies/{cid}/delete", json={"confirm_domain": "sent.com"})
+    assert response.status_code == 409 and "Suppress" in response.json()["detail"]
+    assert api.get(f"/api/companies/{cid}").status_code == 200

@@ -840,6 +840,68 @@
         "title": "CostOut",
         "type": "object"
       },
+      "DeleteLeadIn": {
+        "additionalProperties": false,
+        "properties": {
+          "also_suppress_domain": {
+            "default": false,
+            "title": "Also Suppress Domain",
+            "type": "boolean"
+          },
+          "confirm_domain": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Confirm Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_domain"
+        ],
+        "title": "DeleteLeadIn",
+        "type": "object"
+      },
+      "DeleteLeadOut": {
+        "properties": {
+          "contacts_removed": {
+            "title": "Contacts Removed",
+            "type": "integer"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "domain_suppressed": {
+            "title": "Domain Suppressed",
+            "type": "boolean"
+          },
+          "drafts_deleted": {
+            "title": "Drafts Deleted",
+            "type": "integer"
+          },
+          "drafts_left": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Drafts Left",
+            "type": "array"
+          },
+          "messages_removed": {
+            "title": "Messages Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "domain",
+          "contacts_removed",
+          "messages_removed",
+          "drafts_deleted",
+          "drafts_left",
+          "domain_suppressed"
+        ],
+        "title": "DeleteLeadOut",
+        "type": "object"
+      },
       "EmailOut": {
         "properties": {
           "email": {
@@ -3114,6 +3176,59 @@
         "summary": "Edit Company",
         "tags": [
           "targets"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/delete": {
+      "post": {
+        "description": "Permanently delete a lead. The body must repeat the lead's domain to confirm.",
+        "operationId": "delete_lead_api_companies__company_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteLeadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteLeadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Lead",
+        "tags": [
+          "privacy"
         ]
       }
     },

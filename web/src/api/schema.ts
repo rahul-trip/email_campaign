@@ -90,6 +90,26 @@ export interface paths {
         patch: operations["edit_company_api_companies__company_id__patch"];
         trace?: never;
     };
+    "/api/companies/{company_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Lead
+         * @description Permanently delete a lead. The body must repeat the lead's domain to confirm.
+         */
+        post: operations["delete_lead_api_companies__company_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/journey": {
         parameters: {
             query?: never;
@@ -976,6 +996,31 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** DeleteLeadIn */
+        DeleteLeadIn: {
+            /**
+             * Also Suppress Domain
+             * @default false
+             */
+            also_suppress_domain?: boolean;
+            /** Confirm Domain */
+            confirm_domain: string;
+        };
+        /** DeleteLeadOut */
+        DeleteLeadOut: {
+            /** Contacts Removed */
+            contacts_removed: number;
+            /** Domain */
+            domain: string;
+            /** Domain Suppressed */
+            domain_suppressed: boolean;
+            /** Drafts Deleted */
+            drafts_deleted: number;
+            /** Drafts Left */
+            drafts_left: string[];
+            /** Messages Removed */
+            messages_removed: number;
+        };
         /** EmailOut */
         EmailOut: {
             /** Email */
@@ -1730,6 +1775,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_lead_api_companies__company_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteLeadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteLeadOut"];
                 };
             };
             /** @description Validation Error */

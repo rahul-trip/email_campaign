@@ -8,6 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 async function startRunAndWait(page: Page) {
   await page.getByRole("link", { name: "Runs" }).click();
+  await page.waitForLoadState("networkidle"); // the list of earlier runs must be on screen to count it
   const before = await page.locator("tbody tr").count();
   await page.getByRole("button", { name: "Start run" }).click();
   await expect(page.locator("tbody tr")).toHaveCount(before + 1);
