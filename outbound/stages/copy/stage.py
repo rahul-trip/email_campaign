@@ -19,6 +19,7 @@ class CopyStage:
     name = "copy"
     input_status = CompanyStatus.EMAIL_READY
     guard_policy = True
+    spends = True
 
     def __init__(self, llm: LlmClient, *, examples: int | None = None) -> None:
         self._llm = llm

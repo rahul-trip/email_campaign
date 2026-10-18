@@ -50,7 +50,9 @@ events          → any row by (entity_type, entity_id)   — the only polymorph
 | One contact per LinkedIn profile | Partial unique index on `(workspace_id, linkedin_url)` where `linkedin_url` is not null |
 | Each email address belongs to one contact | `UNIQUE (workspace_id, email)` on `contact_emails` |
 | One primary email per contact | Partial unique index on `contact_id` where `is_primary` |
-| One message per touch per contact | `UNIQUE (company_id, contact_id, step)` on `messages` |
+| One *live* message per touch per contact | Partial unique index `ux_messages_live_touch` on `(company_id, contact_id, step)` where `state NOT IN ('cancelled','rejected')`. A cancelled or rejected message does not block a new one (migration 0002) |
+| One batch per webhook event | Partial unique index `ux_import_batches_webhook` on `(workspace_id, source, filename)` where `source = 'webhook'` (migration 0002) |
+| Workspace names are unique | `UNIQUE (name)` on `workspaces` (migration 0002) |
 | A sent or received message is stored once | Unique `rfc_message_id` per workspace |
 | One suppression per value | `UNIQUE (workspace_id, kind, value_hash)` |
 | One policy per country | `UNIQUE (workspace_id, country_code)` |
@@ -269,8 +271,9 @@ CREATE TABLE messages (
   scheduled_for     TIMESTAMP,
   sent_at           TIMESTAMP,
   row_version       INTEGER NOT NULL DEFAULT 1,
-  UNIQUE (company_id, contact_id, step)
+  -- one live message per touch: see ux_messages_live_touch below
 );
+CREATE UNIQUE INDEX ux_messages_live_touch ON messages (company_id, contact_id, step) WHERE state NOT IN ('cancelled', 'rejected');
 CREATE UNIQUE INDEX ux_messages_rfc ON messages (workspace_id, rfc_message_id) WHERE rfc_message_id IS NOT NULL;
 
 CREATE TABLE inbound_messages (
@@ -351,7 +354,7 @@ A message may be drafted or sent only when **all** of the following hold:
 
 ## 7. Value conventions the code relies on
 
-Phases 2 and 3 added no tables or columns. They did fix how some columns are used; these conventions are part of the schema contract.
+Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3. They did fix how some columns are used; these conventions are part of the schema contract.
 
 | Column | Convention |
 |---|---|

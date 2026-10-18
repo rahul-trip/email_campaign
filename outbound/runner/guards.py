@@ -48,7 +48,7 @@ class Guards:
                 return Refusal(RefusalKind.HOLD, "; ".join(decision.reasons), decision.hold_reason)
 
         ceiling = self._budget.per_prospect
-        if ceiling is not None:
+        if ceiling is not None and stage.spends:
             spent = uow.calls.spend_on_company(company.id)
             if spent >= ceiling:
                 return Refusal(

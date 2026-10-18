@@ -17,6 +17,7 @@ from outbound.domain.enums import (
     ContactStatus,
     EmailStatus,
     EntityType,
+    HoldReason,
     MessageState,
     Provenance,
     SuppressionKind,
@@ -330,8 +331,10 @@ def test_a_suppression_added_after_approval_stops_the_draft(
     box = FakeMailbox()
     report = deliver(factory, ws, box)
     assert box.appends == 0
-    assert report.count("deliver", Outcome.DEFERRED) == 1
-    assert message(factory, ws, mid).state is MessageState.APPROVED
+    assert report.count("deliver", Outcome.HELD) == 1
+    held = company(factory, ws, _cid)
+    assert (held.status, held.hold_reason) == (C.HELD, HoldReason.NEEDS_OPERATOR)
+    assert message(factory, ws, mid).state is MessageState.CANCELLED  # the approval is withdrawn
 
 
 def test_a_domain_suppressed_after_approval_ends_the_lead_without_a_draft(
@@ -368,12 +371,14 @@ def test_a_policy_changed_to_block_between_approval_and_delivery_never_drafts(
 def test_a_policy_that_now_needs_consent_for_this_address_never_drafts(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
-    cid, _mid = approved(factory, ws, country="CA", provenance=Provenance.PATTERN_INFERRED)
+    cid, mid = approved(factory, ws, country="CA", provenance=Provenance.PATTERN_INFERRED)
     box = FakeMailbox()
     report = deliver(factory, ws, box)
     assert box.appends == 0
-    assert report.count("deliver", Outcome.DEFERRED) == 1
-    assert company(factory, ws, cid).status is C.APPROVED
+    assert report.count("deliver", Outcome.HELD) == 1
+    held = company(factory, ws, cid)
+    assert (held.status, held.hold_reason) == (C.HELD, HoldReason.CONSENT_REQUIRED)
+    assert message(factory, ws, mid).state is MessageState.CANCELLED
 
 
 def test_a_contact_who_opted_out_after_approval_blocks_the_draft(

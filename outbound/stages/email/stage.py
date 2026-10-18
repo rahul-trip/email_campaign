@@ -41,6 +41,7 @@ class EmailStage:
     name = "email"
     input_status = CompanyStatus.CONTACTS_FOUND
     guard_policy = True
+    spends = True
 
     def __init__(self, deps: EmailDeps) -> None:
         self._waterfall = Waterfall(deps.finders, deps.verifier, deps.resolver)
@@ -61,6 +62,7 @@ class EmailStage:
             pattern=company.email_pattern,
             site_emails=tuple((company.research or {}).get("site_emails", ())),
             safe_to_send_only=bool(ctx.workspace.settings.get("safe_to_send_only", True)),
+            is_blocked=lambda address: ctx.read(lambda uow: uow.suppressions.blocks(address)),
         )
 
         records: list[Record] = []

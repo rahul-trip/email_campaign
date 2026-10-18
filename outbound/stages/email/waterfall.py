@@ -82,6 +82,9 @@ class Target:
     pattern: str | None = None
     site_emails: Sequence[str] = ()
     safe_to_send_only: bool = True
+    # True for an address that must never be contacted (the do-not-contact list). Checked
+    # before an address is verified, so no money is spent on it and it is never chosen.
+    is_blocked: Callable[[str], bool] = lambda address: False
 
 
 class Waterfall:
@@ -98,6 +101,7 @@ class Waterfall:
     def run(self, contact: Contact, emails: Sequence[ContactEmail], target: Target) -> Outcome:
         outcome = Outcome()
         tried: set[str] = set()
+        blocked = target.is_blocked
 
         # Addresses we already hold for this person come first; none of them is retried if bad.
         for held in emails:
@@ -128,7 +132,7 @@ class Waterfall:
                 candidates.append((built, Provenance.PATTERN_INFERRED, None))
 
         for address, provenance, found_by in candidates:
-            if address in tried:
+            if address in tried or blocked(address):
                 continue
             tried.add(address)
             if self._check(address, provenance, found_by, contact, outcome):
@@ -151,7 +155,7 @@ class Waterfall:
             if not found.email:
                 continue
             address = found.email.lower()
-            if address in tried:
+            if address in tried or blocked(address):
                 continue
             tried.add(address)
             provenance = (
@@ -170,6 +174,9 @@ class Waterfall:
     def _reuse(self, held: ContactEmail, contact: Contact, target: Target, out: Outcome) -> bool:
         """Use an address we already have. True when the search is over."""
         if held.email is None or held.status is EmailStatus.INVALID:
+            return False
+        if target.is_blocked(held.email):
+            out.problems.append("an address we hold is on the do-not-contact list")
             return False
         if is_safe_email_status(held.status, safe_to_send_only=target.safe_to_send_only):
             out.verdict = Verdict.READY

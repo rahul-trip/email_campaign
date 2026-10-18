@@ -174,13 +174,13 @@ Schema v1 has 17 tables in five areas. The company row is the lead. See [SCHEMA.
 |---|---|---|
 | `new` | Passed intake with a confirmed domain | `researched`, `failed` |
 | `researched` | People, country, legal entity, answers and fit score saved | `qualified`, `disqualified`, `held` |
-| `qualified` | Passed the fit gate and the country policy | `contacts_found`, `failed` |
+| `qualified` | Passed the fit gate and the country policy | `contacts_found`, `held`, `failed` |
 | `disqualified` | Fit below the campaign minimum. Manual leads bypass this gate, but the score is still recorded | `qualified` on operator override |
 | `contacts_found` | 2–3 people ranked against the target titles | `email_ready`, `held`, `failed` |
-| `email_ready` | The top usable contact has a safe-to-send email | `copy_ready` |
+| `email_ready` | The top usable contact has a safe-to-send email | `copy_ready`, `held` |
 | `held` | Waiting on someone; `hold_reason` says why | The status it was held from |
 | `copy_ready` | Touch 1 passed the linter or was flagged for review | `approved`, `rejected` |
-| `approved` | An operator approved touch 1 | `in_sequence` |
+| `approved` | An operator approved touch 1 | `in_sequence`, `held` |
 | `in_sequence` | Touch 1 drafted or sent; follow-ups scheduled | `replied`, `completed`, `contacts_found`, `suppressed` |
 | `replied` / `completed` / `rejected` / `suppressed` | Final states | — |
 | `failed` | A stage error; `failed_stage` and `last_error` are stored | That stage's input status, on retry |
@@ -192,6 +192,7 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 - **Releasing a hold** resumes at the stage that held it, fixed by `hold_reason`: `catch_all_resolving` and `catch_all_unverified` go back to `contacts_found`; `consent_required`, `country_unknown` and `entity_unknown` go back to `researched`; `needs_operator` has no default, so the operator chooses.
 - **A retry after `failed`** restores the input status of the stage that failed. Only research, gate, contacts, email and copy can fail a lead. Deliver and sync leave the lead where it is and try again an hour later.
 - **Back-off.** A failed lead waits 15 minutes times the number of attempts so far before `outbound tick` retries it, and is retried automatically at most 3 times. The operator can retry at once from the CLI or the lead page.
+- **A hold can start at `qualified`, `email_ready` and `approved` too.** If the country rules change after approval, or delivery finds the email is no longer safe (an opt-out, a bounce, a suppressed address), the lead is held with the reason and its approved email is withdrawn; once released it is checked again and gets a fresh first email. Nothing is retried silently.
 - **Guards before every stage.** A suppressed domain, or a country that now blocks, moves the lead to `suppressed`. A policy that now needs a person holds the lead where the lifecycle allows a hold, and otherwise defers it. A lead that has used its per-prospect budget fails with that reason.
 
 **Message state:** `generated → approved | rejected → drafted → sent → bounced`. A message can become `cancelled` at any point before it is sent. In Phases 2–4, `sent` is set by the Sent-folder sync.

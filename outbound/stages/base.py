@@ -59,11 +59,15 @@ class StageResult:
     company_updates: Mapping[str, Any] = field(default_factory=dict)
     next_action_at: datetime | Unset | None = UNSET
     write: Callable[[UnitOfWork], None] | None = None
+    # Takes back an outside effect (such as a saved mailbox draft) if the database write above
+    # does not happen, so the two cannot disagree.
+    undo: Callable[[], None] | None = None
 
 
 class Stage(Protocol):
     name: str  # also the ``failed_stage`` value, so it must be a key of STAGE_INPUT_STATUS to fail
     input_status: CompanyStatus
     guard_policy: bool  # re-check the country policy before running (every stage after the gate)
+    spends: bool  # makes paid calls, so the per-prospect budget applies; free stages ignore it
 
     def handle(self, ctx: StageContext) -> StageResult: ...

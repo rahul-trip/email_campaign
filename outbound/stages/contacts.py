@@ -22,6 +22,7 @@ class ContactsStage:
     name = "contacts"
     input_status = CompanyStatus.QUALIFIED
     guard_policy = True
+    spends = False
 
     def handle(self, ctx: StageContext) -> StageResult:
         company_id = ctx.company.id

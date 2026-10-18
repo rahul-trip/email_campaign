@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Message
-from outbound.domain.enums import CompanyStatus, MessageState
+from outbound.domain.enums import CompanyStatus, HoldReason, MessageState
 from outbound.domain.policies import check_send
 from outbound.providers.ports import Mailbox, OutgoingDraft
 from outbound.stages.base import StageContext, StageFailure, StageResult
@@ -25,9 +25,10 @@ def draft_message_id(message: Message, mailbox_address: str) -> str:
 
 
 class DeliverStage:
-    name = "deliver"  # not a stage that can fail a lead: an error leaves it approved and retries
+    name = "deliver"  # cannot fail a lead: a mailbox error leaves it approved and retries
     input_status = CompanyStatus.APPROVED
     guard_policy = True
+    spends = False
 
     def __init__(self, mailbox: Mailbox) -> None:
         self._mailbox = mailbox
@@ -57,14 +58,22 @@ class DeliverStage:
                 policy_decision=decision,
                 safe_to_send_only=safe_only,
             )
-            return message, address, verdict
+            return message, address, verdict, decision.hold_reason
 
         loaded = ctx.read(load)
         if loaded is None:
             raise StageFailure("the company is approved but has no approved message")
-        message, address, verdict = loaded
+        message, address, verdict, hold_reason = loaded
         if not verdict.ok or not address.email:
-            raise StageFailure("not safe to send: " + "; ".join(verdict.reasons or ("no address",)))
+            # The lead was fine when approved and is not now (an opt-out, a bounce, a changed
+            # rule). Never draft it; hold it with the reason, and withdraw the approved email.
+            reasons = "; ".join(verdict.reasons or ("no address",))
+            return StageResult(
+                CompanyStatus.HELD,
+                reason=f"not safe to send: {reasons}",
+                hold_reason=hold_reason or HoldReason.NEEDS_OPERATOR,
+                write=lambda uow: _withdraw(uow, message),
+            )
 
         remote_id = draft_message_id(message, self._mailbox.address)
         if not self._mailbox.draft_exists(remote_id):
@@ -85,4 +94,19 @@ class DeliverStage:
                 set_fields={"remote_draft_id": remote_id},
             )
 
-        return StageResult(CompanyStatus.IN_SEQUENCE, reason="draft saved", write=write)
+        return StageResult(
+            CompanyStatus.IN_SEQUENCE,
+            reason="draft saved",
+            write=write,
+            undo=lambda: _ignore(self._mailbox.delete_draft(remote_id)),
+        )
+
+
+def _ignore(_: object) -> None:
+    """Adapts ``delete_draft`` (which reports a count) to the ``undo`` hook."""
+
+
+def _withdraw(uow: UnitOfWork, message: Message) -> None:
+    uow.messages.transition(
+        message.id, MessageState.CANCELLED, expected_version=message.row_version
+    )

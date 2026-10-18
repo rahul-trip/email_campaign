@@ -259,3 +259,28 @@ def test_nothing_is_written_until_the_operator_has_reviewed_the_profile(
         after.last_error or ""
     )
     assert llm.calls == []  # not a single model call is spent on an email that cannot be sent
+
+
+def test_a_lead_released_after_its_email_was_withdrawn_gets_a_fresh_first_email(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    set_profile(factory, ws)
+    cid = lead(factory, ws)
+    with factory(ws) as uow:  # the earlier first email was cancelled when the lead was put on hold
+        contact = uow.contacts.for_company(cid)[0]
+        address = uow.emails.for_contact(contact.id)[0]
+        uow.messages.create(
+            company_id=cid,
+            contact_id=contact.id,
+            contact_email_id=address.id,
+            step=0,
+            subject="old",
+            generated_body="old",
+            state=MessageState.CANCELLED,
+        )
+        uow.commit()
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    assert company(factory, ws, cid).status is C.COPY_READY
+    with factory(ws) as uow:
+        states = sorted(m.state.value for m in uow.messages.for_company(cid))
+    assert states == ["cancelled", "generated"]

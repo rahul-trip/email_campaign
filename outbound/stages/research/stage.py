@@ -20,6 +20,7 @@ class ResearchStage:
     name = "research"
     input_status = CompanyStatus.NEW
     guard_policy = False
+    spends = True
 
     def __init__(self, deps: ResearchDeps) -> None:
         self._graph = build_research_graph(deps)

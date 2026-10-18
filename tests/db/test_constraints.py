@@ -22,6 +22,8 @@ from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.enums import (
     CompanySource,
     ContactSource,
+    ImportSource,
+    MessageState,
     PolicyRule,
     Provenance,
     SuppressionKind,
@@ -246,3 +248,70 @@ def test_deleting_a_company_removes_its_contacts_and_their_addresses(
         raw_update(uow.session, "DELETE FROM companies WHERE id = :id", id=company_id)
         for table in ("contacts", "contact_emails"):
             assert uow.session.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar() == 0
+
+
+# ------------------------------------------------------------------ migration 0002
+
+
+def _message_for(uow: UnitOfWork, company_id: str, contact_id: str, state: MessageState) -> None:
+    address = uow.emails.add(
+        contact_id, f"{company_id[:6]}{state.value}@acme.com", Provenance.API_DATABASE
+    )
+    uow.messages.create(
+        company_id=company_id,
+        contact_id=contact_id,
+        contact_email_id=address.id,
+        step=0,
+        subject="s",
+        generated_body="b",
+        state=state,
+    )
+
+
+def test_a_cancelled_or_rejected_message_does_not_block_a_new_first_email(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    with factory(ws) as uow:
+        company_id, contact_id = seeded(uow)
+        _message_for(uow, company_id, contact_id, MessageState.CANCELLED)
+        _message_for(uow, company_id, contact_id, MessageState.REJECTED)
+        _message_for(uow, company_id, contact_id, MessageState.GENERATED)  # the live one
+        uow.session.flush()
+
+
+@pytest.mark.parametrize(
+    "first", [MessageState.GENERATED, MessageState.APPROVED, MessageState.SENT]
+)
+def test_two_live_messages_for_one_touch_are_still_refused(
+    factory: UnitOfWorkFactory, ws: str, first: MessageState
+) -> None:
+    with factory(ws) as uow:
+        company_id, contact_id = seeded(uow)
+        _message_for(uow, company_id, contact_id, first)
+        uow.session.flush()
+        with pytest.raises(IntegrityError):
+            _message_for(uow, company_id, contact_id, MessageState.GENERATED)
+
+
+def test_one_batch_per_webhook_event_even_if_two_arrive_together(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    with factory(ws) as uow:
+        uow.imports.create_batch(ImportSource.WEBHOOK, "webhook", filename="webhook:evt-1")
+        uow.session.flush()
+        with pytest.raises(IntegrityError):
+            uow.imports.create_batch(ImportSource.WEBHOOK, "webhook", filename="webhook:evt-1")
+
+
+def test_file_imports_with_the_same_name_are_still_allowed(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    with factory(ws) as uow:
+        for _ in range(2):
+            uow.imports.create_batch(ImportSource.CSV, "operator", filename="targets.csv")
+        uow.session.flush()
+
+
+def test_workspace_names_are_unique(factory: UnitOfWorkFactory, ws: str) -> None:
+    with factory.admin() as admin, pytest.raises(IntegrityError):
+        admin.workspaces.create("acme", {}, {})  # the fixture already made one called "acme"

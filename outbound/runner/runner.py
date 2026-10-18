@@ -21,8 +21,16 @@ from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Company
-from outbound.domain.enums import CompanyStatus, EntityType, RunKind, RunStatus
-from outbound.domain.state_machines import COMPANY, STAGE_INPUT_STATUS, retry_status_for
+from outbound.domain.enums import (
+    CompanyStatus,
+    EntityType,
+    HoldReason,
+    MessageState,
+    RunKind,
+    RunStatus,
+)
+from outbound.domain.errors import ConfigurationError
+from outbound.domain.state_machines import STAGE_INPUT_STATUS, retry_status_for
 from outbound.logging import get_logger
 from outbound.providers.metered import call_scope
 from outbound.runner.guards import Guards, Refusal, RefusalKind
@@ -135,28 +143,46 @@ class Runner:
     # ------------------------------------------------------------------ one lead
 
     def _process(self, stage: Stage, company_id: str, run_id: str) -> Outcome:
-        with self._uow(self._workspace_id) as uow:
-            company = uow.companies.get(company_id)
-            if company.status is not stage.input_status:
-                return Outcome.SKIPPED  # someone moved it since the list was made
-            refusal = self._guards.check(uow, company, stage)
-            campaign = uow.campaigns.get(company.campaign_id) if company.campaign_id else None
-        if refusal is not None:
-            return self._apply_refusal(stage, company, refusal)
-        with self._uow.admin() as admin:
-            workspace = admin.workspaces.get(self._workspace_id)
-        if workspace is None:
-            raise LookupError(f"workspace {self._workspace_id} does not exist")
-
-        context = StageContext(company, workspace, campaign, self._read, self._now())
+        # Everything about one lead, including loading it, is inside the try: whatever is wrong
+        # with this lead must not stop the run for the others.
+        company: Company | None = None
+        result: StageResult | None = None
         try:
+            with self._uow(self._workspace_id) as uow:
+                company = uow.companies.get(company_id)
+                if company.status is not stage.input_status:
+                    return Outcome.SKIPPED  # someone moved it since the list was made
+                refusal = self._guards.check(uow, company, stage)
+                campaign = uow.campaigns.get(company.campaign_id) if company.campaign_id else None
+            if refusal is not None:
+                return self._apply_refusal(stage, company, refusal)
+            with self._uow.admin() as admin:
+                workspace = admin.workspaces.get(self._workspace_id)
+            if workspace is None:
+                raise ConfigurationError(f"workspace {self._workspace_id} does not exist")
+
+            context = StageContext(company, workspace, campaign, self._read, self._now())
             with call_scope(run_id=run_id, company_id=company.id):
                 result = stage.handle(context)
             return self._apply(stage, company, result)
         except ConcurrencyConflict:
+            self._undo(result)
             return Outcome.SKIPPED
         except Exception as error:
+            self._undo(result)
+            if company is None:  # the lead could not even be loaded
+                log.exception("lead_unreadable", stage=stage.name, company_id=company_id)
+                return Outcome.SKIPPED
             return self._record_failure(stage, company, error)
+
+    @staticmethod
+    def _undo(result: StageResult | None) -> None:
+        """Take back an outside effect (a saved draft) when its database write did not happen."""
+        if result is not None and result.undo is not None:
+            try:
+                result.undo()
+            except Exception:
+                log.exception("undo_failed")
 
     def _apply(self, stage: Stage, company: Company, result: StageResult) -> Outcome:
         with self._uow(self._workspace_id) as uow:
@@ -201,16 +227,17 @@ class Runner:
                         reason=refusal.reason,
                     )
                     outcome = Outcome.SUPPRESSED
-                elif refusal.kind is RefusalKind.HOLD and COMPANY.allows(
-                    company.status, CompanyStatus.HELD
-                ):
-                    assert refusal.hold_reason is not None
+                elif refusal.kind is RefusalKind.HOLD:
+                    # An email already approved for a lead that is now on hold is withdrawn: once
+                    # the hold is released the lead is checked again and gets a fresh email.
+                    if company.status is CompanyStatus.APPROVED:
+                        self._withdraw_open_messages(uow, company.id)
                     uow.companies.transition(
                         company.id,
                         CompanyStatus.HELD,
                         expected_version=company.row_version,
                         reason=refusal.reason,
-                        hold_reason=refusal.hold_reason,
+                        hold_reason=refusal.hold_reason or HoldReason.NEEDS_OPERATOR,
                     )
                     outcome = Outcome.HELD
                 elif refusal.kind is RefusalKind.BUDGET and stage.name in STAGE_INPUT_STATUS:
@@ -256,8 +283,23 @@ class Runner:
             next_action_at=self._now() + wait,
         )
 
+    @staticmethod
+    def _withdraw_open_messages(uow: UnitOfWork, company_id: str) -> None:
+        for message in uow.messages.for_company(company_id):
+            if message.state in (MessageState.GENERATED, MessageState.APPROVED):
+                uow.messages.transition(
+                    message.id,
+                    MessageState.CANCELLED,
+                    expected_version=message.row_version,
+                    actor=SYSTEM,
+                )
+
     def _defer(self, uow: UnitOfWork, company: Company, message: str) -> None:
-        """Leave the company where it is, and look again later."""
+        """Leave the company where it is, and look again later.
+
+        A deferral is recorded once per distinct reason: repeating "mailbox unreachable" every
+        hour would bury the timeline.
+        """
         later = self._now() + self._defer_delay
         uow.companies.update_fields(
             company.id,
@@ -265,13 +307,14 @@ class Runner:
             actor=SYSTEM,
             expected_version=company.row_version,
         )
-        uow.events.append(
-            EntityType.COMPANY,
-            company.id,
-            "deferred",
-            SYSTEM,
-            {"reason": message[:MAX_ERROR_LENGTH]},
-        )
+        reason = message[:MAX_ERROR_LENGTH]
+        previous = [
+            e for e in uow.events.for_entity(EntityType.COMPANY, company.id) if e.type == "deferred"
+        ]
+        if not previous or previous[-1].data.get("reason") != reason:
+            uow.events.append(
+                EntityType.COMPANY, company.id, "deferred", SYSTEM, {"reason": reason}
+            )
 
     # ------------------------------------------------------------------ retries
 

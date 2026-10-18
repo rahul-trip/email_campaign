@@ -57,6 +57,9 @@ from outbound.domain.enums import (
 _NOT_NULL = "{col} IS NOT NULL"
 
 
+_LIVE_MESSAGE = "state NOT IN ('cancelled', 'rejected')"
+
+
 def _partial(column: str) -> Any:
     return text(_NOT_NULL.format(col=column))
 
@@ -66,6 +69,7 @@ def _partial(column: str) -> Any:
 
 class WorkspaceRow(Identified, Base):
     __tablename__ = "workspaces"
+    __table_args__ = (UniqueConstraint("name"),)  # workspaces are looked up by name
 
     name: Mapped[str] = mapped_column(String(200))
     sender_profile: Mapped[dict[str, Any]] = mapped_column(Json)
@@ -141,6 +145,20 @@ class SuppressionRow(Mutable, Base):
 
 class ImportBatchRow(Mutable, Base):
     __tablename__ = "import_batches"
+
+    __table_args__ = (
+        # A webhook delivery is identified by the sender's event id, kept in ``filename``. The
+        # index makes "have we seen this event?" safe even when two deliveries arrive together.
+        Index(
+            "ux_import_batches_webhook",
+            "workspace_id",
+            "source",
+            "filename",
+            unique=True,
+            sqlite_where=text("source = 'webhook'"),
+            postgresql_where=text("source = 'webhook'"),
+        ),
+    )
 
     campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id"))
     source: Mapped[ImportSource] = mapped_column(enum_type(ImportSource, "import_source"))
@@ -288,7 +306,17 @@ class ConsentRow(Mutable, Base):
 class MessageRow(Mutable, Base):
     __tablename__ = "messages"
     __table_args__ = (
-        UniqueConstraint("company_id", "contact_id", "step"),
+        # One live message per touch. A cancelled or rejected one no longer counts, so a lead
+        # released after a policy change can be given a fresh first email for the same person.
+        Index(
+            "ux_messages_live_touch",
+            "company_id",
+            "contact_id",
+            "step",
+            unique=True,
+            sqlite_where=text(_LIVE_MESSAGE),
+            postgresql_where=text(_LIVE_MESSAGE),
+        ),
         CheckConstraint("step BETWEEN 0 AND 2", name="step_range"),
         Index(
             "ux_messages_rfc",

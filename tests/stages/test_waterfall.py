@@ -355,3 +355,40 @@ def test_without_a_resolver_a_catch_all_is_unverified() -> None:
     out = run([FakeFinder("hunter", "a@acme.com")], FakeVerifier({"a@acme.com": V.CATCH_ALL}))
     assert out.catch_all_unverified
     assert out.records[0].status is E.CATCH_ALL_UNVERIFIED
+
+
+# ------------------------------------------------------------------ do-not-contact list
+
+
+def test_a_suppressed_address_is_neither_paid_for_nor_chosen() -> None:
+    finder = FakeFinder("hunter", "jane.doe@acme.com")
+    verifier = FakeVerifier({"jane.doe@acme.com": V.VALID})
+    target = Target("acme.com", "Acme", is_blocked=lambda a: a == "jane.doe@acme.com")
+    out = run([finder], verifier, target=target)
+    assert out.verdict is Verdict.NONE
+    assert verifier.checked == []  # no verification credit spent on an address we must not email
+
+
+def test_a_blocked_pattern_or_published_address_is_skipped_too() -> None:
+    verifier = FakeVerifier({"jane.doe@acme.com": V.VALID, "j.doe@acme.com": V.VALID})
+    target = Target(
+        "acme.com",
+        "Acme",
+        pattern="{first}.{last}",
+        site_emails=("j.doe@acme.com",),
+        is_blocked=lambda a: True,
+    )
+    out = run([FakeFinder("hunter", None)], verifier, target=target)
+    assert out.verdict is Verdict.NONE and verifier.checked == []
+
+
+def test_a_held_address_that_is_now_suppressed_is_not_reused() -> None:
+    mail = held("jane@acme.com", E.VALID, Provenance.API_DATABASE)
+    out = run(
+        [],
+        FakeVerifier({}),
+        emails=[mail],
+        target=Target("acme.com", "Acme", is_blocked=lambda a: True),
+    )
+    assert out.verdict is Verdict.NONE
+    assert any("do-not-contact" in p for p in out.problems)

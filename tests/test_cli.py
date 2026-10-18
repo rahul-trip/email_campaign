@@ -34,9 +34,9 @@ def test_db_upgrade_creates_the_schema_and_current_reports_it(url: str) -> None:
     code, out = run("db", "current", url=url)
     assert code == 0 and "not created yet" in out
     code, out = run("db", "upgrade", url=url)
-    assert code == 0 and "revision 0001" in out
+    assert code == 0 and "revision 0002" in out
     code, out = run("db", "current", url=url)
-    assert code == 0 and "0001" in out
+    assert code == 0 and "0002" in out
 
 
 def test_db_downgrade_steps_back_to_nothing(url: str) -> None:

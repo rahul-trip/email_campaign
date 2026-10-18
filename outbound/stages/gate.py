@@ -20,6 +20,7 @@ class GateStage:
     name = "gate"
     input_status = CompanyStatus.RESEARCHED
     guard_policy = False  # this stage makes the policy decision itself
+    spends = False
 
     def handle(self, ctx: StageContext) -> StageResult:
         company = ctx.company

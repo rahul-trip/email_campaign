@@ -15,6 +15,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from sqlalchemy.exc import IntegrityError
+
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CompanySource, ImportSource
 from outbound.services.intake import IntakeReport, IntakeService
@@ -81,13 +83,17 @@ class WebhookService:
         with self._uow(self._workspace_id) as uow:
             if uow.imports.batch_exists(ImportSource.WEBHOOK, label):
                 return WebhookResult(duplicate=True)
-        report = self._intake.run(
-            rows,
-            source=ImportSource.WEBHOOK,
-            company_source=CompanySource.MANUAL,
-            filename=label,
-            actor="webhook",
-        )
+        try:
+            report = self._intake.run(
+                rows,
+                source=ImportSource.WEBHOOK,
+                company_source=CompanySource.MANUAL,
+                filename=label,
+                actor="user:webhook",
+            )
+        except IntegrityError:
+            # Another delivery of the same event won the race and committed first.
+            return WebhookResult(duplicate=True)
         return WebhookResult(duplicate=False, report=report)
 
 

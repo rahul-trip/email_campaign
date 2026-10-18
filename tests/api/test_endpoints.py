@@ -598,3 +598,17 @@ def test_a_campaign_or_person_from_another_workspace_is_refused(
         json={"row_version": mine["row_version"], "campaign_id": foreign.id},
     )
     assert stolen.status_code == 404
+
+
+def test_a_delivery_that_loses_the_race_to_the_same_event_is_a_duplicate(
+    services: Services, secret: None
+) -> None:
+    """If another delivery commits first, the database index turns ours into a clean duplicate."""
+    from sqlalchemy.exc import IntegrityError
+
+    def raced(*args: object, **kwargs: object) -> None:
+        raise IntegrityError("insert", {}, Exception("unique"))
+
+    services.webhook._intake.run = raced  # type: ignore[method-assign,assignment]
+    result = services.webhook.receive({"event_id": "evt-race", "website": "acme.com"})
+    assert result.duplicate is True

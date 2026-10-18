@@ -18,7 +18,9 @@ from outbound.domain.enums import (
     CompanyStatus,
     ContactSource,
     HoldReason,
+    MessageState,
     PolicyRule,
+    Provenance,
     RunStatus,
 )
 from outbound.providers.budget import BudgetPolicy
@@ -55,11 +57,13 @@ class FakeStage:
         to_status: CompanyStatus,
         *,
         guard_policy: bool = False,
+        spends: bool = True,
         action: Callable[[StageContext], StageResult | None] | None = None,
     ) -> None:
         self.name = name
         self.input_status = input_status
         self.guard_policy = guard_policy
+        self.spends = spends
         self._to = to_status
         self._action = action
         self.seen: list[str] = []
@@ -130,6 +134,7 @@ def add_company(
             C.RESEARCHED: [C.RESEARCHED],
             C.QUALIFIED: [C.RESEARCHED, C.QUALIFIED],
             C.CONTACTS_FOUND: [C.RESEARCHED, C.QUALIFIED, C.CONTACTS_FOUND],
+            C.EMAIL_READY: [C.RESEARCHED, C.QUALIFIED, C.CONTACTS_FOUND, C.EMAIL_READY],
             C.APPROVED: [
                 C.RESEARCHED,
                 C.QUALIFIED,
@@ -478,14 +483,132 @@ def test_a_policy_that_now_needs_a_person_holds_the_lead_when_a_hold_is_possible
     assert stage.seen == []
 
 
-def test_a_hold_that_the_lifecycle_does_not_allow_defers_the_lead(
+@pytest.mark.parametrize(
+    ("status", "stage_name", "target"),
+    [
+        (C.QUALIFIED, "contacts", C.CONTACTS_FOUND),
+        (C.CONTACTS_FOUND, "email", C.EMAIL_READY),
+        (C.EMAIL_READY, "copy", C.COPY_READY),
+        (C.APPROVED, "deliver", C.IN_SEQUENCE),
+    ],
+)
+def test_a_policy_that_now_needs_a_person_holds_the_lead_at_every_stage(
+    factory: UnitOfWorkFactory,
+    ws: str,
+    status: CompanyStatus,
+    stage_name: str,
+    target: CompanyStatus,
+) -> None:
+    cid = add_company(factory, ws, "acme.com", status=status, country=None)
+    stage = FakeStage(stage_name, status, target, guard_policy=True)
+    report = make_runner(factory, ws, [stage]).run_pipeline()
+    held = company(factory, ws, cid)
+    assert (held.status, held.hold_reason) == (C.HELD, HoldReason.COUNTRY_UNKNOWN)
+    assert report.count(stage_name, Outcome.HELD) == 1 and stage.seen == []
+    assert held.next_action_at is None  # nothing will pick it up until a person releases it
+
+
+def test_holding_an_approved_lead_withdraws_its_approved_email(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
-    cid = add_company(factory, ws, "acme.com", status=C.QUALIFIED, country=None)
-    stage = FakeStage("contacts", C.QUALIFIED, C.CONTACTS_FOUND, guard_policy=True)
+    cid = add_company(factory, ws, "acme.com", status=C.APPROVED, country=None)
+    with factory(ws) as uow:
+        contact = uow.contacts.add(cid, rank=1, source=ContactSource.SITE)
+        address = uow.emails.add(contact.id, "j@acme.com", Provenance.API_DATABASE)
+        uow.messages.create(
+            company_id=cid,
+            contact_id=contact.id,
+            contact_email_id=address.id,
+            step=0,
+            subject="s",
+            generated_body="b",
+            state=MessageState.APPROVED,
+        )
+        uow.commit()
+    stage = FakeStage("deliver", C.APPROVED, C.IN_SEQUENCE, guard_policy=True, spends=False)
+    make_runner(factory, ws, [stage]).run_pipeline()
+    with factory(ws) as uow:
+        assert [m.state for m in uow.messages.for_company(cid)] == [MessageState.CANCELLED]
+
+
+def test_a_free_stage_still_runs_for_a_lead_that_has_used_its_budget(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add_company(factory, ws, "acme.com")
+    with factory(ws) as uow:
+        uow.calls.record(
+            provider="fake",
+            operation="find",
+            request_hash="h",
+            outcome=CallOutcome.HIT,
+            cost_micro_usd=500_000,
+            company_id=cid,
+        )
+        uow.commit()
+    free = FakeStage("research", C.NEW, C.RESEARCHED, spends=False)
+    make_runner(factory, ws, [free], budget=BudgetPolicy(per_prospect=500_000)).run_pipeline()
+    assert status_of(factory, ws, cid) is C.RESEARCHED
+
+
+def test_the_same_deferral_is_recorded_once_not_every_hour(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add_company(factory, ws, "acme.com", status=C.APPROVED)
+    clock = Clock()
+    stage = FakeStage("deliver", C.APPROVED, C.IN_SEQUENCE, spends=False, action=boom)
+    runner = make_runner(factory, ws, [stage], clock=clock)
+    for _ in range(4):
+        runner.run_pipeline()
+        clock.advance(hours=2)
+    assert events_of(factory, ws, cid).count("deferred") == 1
+
+
+def test_a_lead_that_cannot_even_be_loaded_does_not_stop_the_run(
+    factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    broken = add_company(factory, ws, "broken.com", priority=1)
+    fine = add_company(factory, ws, "fine.com", priority=2)
+    with factory(other_ws) as uow:  # a campaign that belongs to someone else's workspace
+        foreign = uow.campaigns.create("theirs", ["CTO"])
+        uow.commit()
+    with factory(ws) as uow:
+        uow.companies.update_fields(
+            broken,
+            {"campaign_id": foreign.id},
+            actor="system",
+            expected_version=uow.companies.get(broken).row_version,
+        )
+        uow.commit()
+    stage = FakeStage("research", C.NEW, C.RESEARCHED)
     report = make_runner(factory, ws, [stage]).run_pipeline()
-    assert status_of(factory, ws, cid) is C.QUALIFIED
-    assert report.count("contacts", Outcome.DEFERRED) == 1
+    assert status_of(factory, ws, fine) is C.RESEARCHED
+    failed = company(factory, ws, broken)  # visible to the operator, with a reason
+    assert (failed.status, failed.failed_stage) == (C.FAILED, "research")
+    assert "NotFound" in (failed.last_error or "")
+    assert report.status is RunStatus.SUCCEEDED
+
+
+def test_a_saved_draft_is_taken_back_when_the_database_write_cannot_happen(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add_company(factory, ws, "acme.com")
+    undone: list[str] = []
+
+    def action(ctx: StageContext) -> StageResult:
+        with factory(ws) as uow:  # the operator changes the lead while the stage is working
+            uow.companies.update_fields(
+                cid,
+                {"name": "Changed"},
+                actor=OPERATOR,
+                expected_version=ctx.company.row_version,
+            )
+            uow.commit()
+        return StageResult(C.RESEARCHED, undo=lambda: undone.append("draft removed"))
+
+    stage = FakeStage("research", C.NEW, C.RESEARCHED, action=action)
+    report = make_runner(factory, ws, [stage]).run_pipeline()
+    assert report.count("research", Outcome.SKIPPED) == 1
+    assert undone == ["draft removed"]
 
 
 def test_a_lead_over_its_budget_gets_no_more_paid_work(factory: UnitOfWorkFactory, ws: str) -> None:
