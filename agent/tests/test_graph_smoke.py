@@ -97,3 +97,53 @@ def test_graph_ends_early_with_no_companies(fake_bundle, test_config, repo):
     assert "discover_companies" in step_names
     assert "resolve_contacts" not in step_names
     assert final.get("appended_row_count", 0) == 0
+
+
+def test_graph_never_redrafts_earlier_rows(fake_bundle, test_config, repo, tmp_xlsx, monkeypatch):
+    """Regression for the duplicate-draft bug: each run drafts only the rows it appended.
+
+    The IMAP call is replaced by a recorder that reads the real workbook through the
+    real reader, so it sees exactly the rows the mailer would have drafted.
+    """
+    from dataclasses import replace
+
+    import agent.tools.drafts_tool as drafts_tool
+    from agent.domain.models import Company
+    from agent.providers.discovery.base import CompanyDiscoveryProvider
+    from agent.tools.mailer.ingestion.xlsx_reader import read_campaign_rows
+
+    drafted_row_numbers: list[list[int]] = []
+
+    class _Result:
+        def as_dict(self):
+            return {"drafted": len(drafted_row_numbers[-1]), "failed": 0}
+
+    def record_drafts(*, xlsx_path, dry_run, start_row):
+        rows = read_campaign_rows(xlsx_path, start_row=start_row)
+        drafted_row_numbers.append([r.row_number for r in rows])
+        return _Result()
+
+    monkeypatch.setattr(drafts_tool, "sync_campaign_to_drafts", record_drafts)
+
+    class Batch(CompanyDiscoveryProvider):
+        def __init__(self, names):
+            self._names = names
+
+        def discover(self, keywords, location, limit):
+            return [Company(n, f"{n.lower()}.io", f"https://{n.lower()}.io") for n in self._names]
+
+    config = replace(test_config, run_drafts_after=True)
+
+    def run(names):
+        object.__setattr__(fake_bundle, "discovery", Batch(names))
+        graph = build_graph(fake_bundle, repo, config, _LOG)
+        final = graph.invoke({
+            "config": config, "run_id": "r", "companies": [], "leads": [],
+            "appended_row_count": 0, "draft_result": {}, "step_log": [], "errors": [],
+        })
+        assert final.get("errors", []) == []
+
+    run(["Alpha", "Beta"])   # fixture workbook: header + 1 existing row (row 2)
+    run(["Gamma"])
+
+    assert drafted_row_numbers == [[3, 4], [5]]

@@ -194,9 +194,12 @@ def make_persist(
     @logged_step("persist_rows")
     def persist_rows(state: AgentState) -> dict:
         leads: list[Lead] = state.get("leads", [])
+        # row_count() includes the header, so the first appended row is one past it.
+        # Read it before appending: the drafts step must only draft these new rows.
+        start_row = repo.row_count() + 1
         count = repo.append_leads(leads)
-        log.info("persist_rows: appended %d rows", count)
-        return {"appended_row_count": count}
+        log.info("persist_rows: appended %d rows starting at row %d", count, start_row)
+        return {"appended_row_count": count, "drafts_start_row": start_row}
 
     return persist_rows
 
@@ -218,11 +221,17 @@ def make_sync(
             log.info("sync_drafts: no rows appended — nothing to draft")
             return {"draft_result": {"skipped": True, "reason": "no rows appended"}}
 
-        # The pre-append row_count is not stored in state, so we derive it:
-        # total current rows minus what we just appended.
+        # Without a start row the tool would draft every row in the workbook,
+        # including rows drafted in earlier runs, so refuse rather than guess.
+        start_row = state.get("drafts_start_row")
+        if start_row is None:
+            raise RuntimeError(
+                "drafts_start_row missing from state; refusing to draft the whole workbook"
+            )
+
         # Import inline to avoid circular deps and because this is a tool boundary.
         from agent.tools.drafts_tool import run_drafts_sync
-        result = run_drafts_sync(xlsx_path=config.xlsx_path)
+        result = run_drafts_sync(xlsx_path=config.xlsx_path, start_row=start_row)
         log.info("sync_drafts: drafted=%s failed=%s",
                  result.get("drafted"), result.get("failed"))
         return {"draft_result": result}

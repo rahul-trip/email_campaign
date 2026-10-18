@@ -14,7 +14,9 @@ from agent.graph.nodes import (
     make_copy,
     make_discover,
     make_find,
+    make_persist,
     make_resolve,
+    make_sync,
     make_verify,
     route_after_discovery,
     route_after_verify,
@@ -205,3 +207,78 @@ def test_route_after_verify_empty():
 
 def test_route_after_verify_non_empty(sample_lead):
     assert route_after_verify({"leads": [sample_lead]}) == "continue"
+
+
+# ---------------------------------------------------------------------------
+# persist_rows / sync_drafts — only newly appended rows may be drafted
+# ---------------------------------------------------------------------------
+
+def test_persist_records_first_appended_row(repo, sample_lead):
+    """The fixture workbook has a header (row 1) and one lead (row 2)."""
+    node = make_persist(repo, _LOG)
+    result = node({"leads": [sample_lead]})
+    assert result["appended_row_count"] == 1
+    assert result["drafts_start_row"] == 3
+
+
+def test_persist_start_row_follows_existing_rows(repo, sample_lead):
+    """A second append must start after the first one's rows."""
+    node = make_persist(repo, _LOG)
+    node({"leads": [sample_lead]})
+    result = node({"leads": [sample_lead, sample_lead]})
+    assert result["drafts_start_row"] == 4
+
+
+def test_new_rows_only_are_readable_from_start_row(repo, tmp_xlsx, sample_lead):
+    """The row range the persist node reports must select exactly the new rows."""
+    from agent.tools.mailer.ingestion.xlsx_reader import read_campaign_rows
+
+    result = make_persist(repo, _LOG)({"leads": [sample_lead]})
+    rows = read_campaign_rows(str(tmp_xlsx), start_row=result["drafts_start_row"])
+    assert [r.row_number for r in rows] == [3]
+    assert rows[0].to_addr == "alice@renewco.io"
+
+
+def test_sync_drafts_passes_start_row(test_config, monkeypatch):
+    """Regression: sync_drafts used to draft every row because start_row was dropped."""
+    from dataclasses import replace
+    import agent.tools.drafts_tool as drafts_tool
+
+    calls = []
+    monkeypatch.setattr(
+        drafts_tool, "run_drafts_sync",
+        lambda **kwargs: calls.append(kwargs) or {"drafted": 1, "failed": 0},
+    )
+    config = replace(test_config, run_drafts_after=True)
+    node = make_sync(config, _LOG)
+    result = node({"appended_row_count": 1, "drafts_start_row": 3})
+
+    assert calls == [{"xlsx_path": config.xlsx_path, "start_row": 3}]
+    assert result["draft_result"]["drafted"] == 1
+
+
+def test_sync_drafts_skips_when_nothing_appended(test_config, monkeypatch):
+    from dataclasses import replace
+    import agent.tools.drafts_tool as drafts_tool
+
+    def fail(**kwargs):
+        raise AssertionError("must not draft when no rows were appended")
+
+    monkeypatch.setattr(drafts_tool, "run_drafts_sync", fail)
+    node = make_sync(replace(test_config, run_drafts_after=True), _LOG)
+    result = node({"appended_row_count": 0})
+    assert result["draft_result"]["skipped"] is True
+
+
+def test_sync_drafts_refuses_to_draft_without_start_row(test_config, monkeypatch):
+    """Without a start row the tool would draft the whole workbook, so it must refuse."""
+    from dataclasses import replace
+    import agent.tools.drafts_tool as drafts_tool
+
+    def fail(**kwargs):
+        raise AssertionError("must not draft without a start row")
+
+    monkeypatch.setattr(drafts_tool, "run_drafts_sync", fail)
+    node = make_sync(replace(test_config, run_drafts_after=True), _LOG)
+    result = node({"appended_row_count": 1})
+    assert "drafts_start_row" in result["errors"][0]
