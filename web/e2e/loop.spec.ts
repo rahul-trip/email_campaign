@@ -85,7 +85,7 @@ test("targets to review to draft, and an unapproved lead is never drafted", asyn
 
   // 9. The operator can edit a lead; the value becomes theirs.
   await page.getByRole("link", { name: "Open lead to act on it" }).click();
-  await page.getByLabel("Name").fill("Beta Holdings");
+  await page.getByLabel("Name", { exact: true }).fill("Beta Holdings");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("heading", { name: "Beta Holdings" })).toBeVisible();
   await expect(page.getByText(/set by you:.*name/)).toBeVisible();

@@ -6,7 +6,7 @@ import pytest
 
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.entities import Company
+from outbound.domain.entities import Company, CountryPolicy
 from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
@@ -19,11 +19,14 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.domain.errors import InvalidInput
 from outbound.domain.hashing import hash_value
+from outbound.domain.policies import PolicyOutcome
 from outbound.services.dns_check import check_domain
 from outbound.services.leads import LeadError, LeadService
 from outbound.services.runs import RunMode, RunRequest, RunService
 from outbound.services.settings import SettingsError, SettingsService
+from outbound.stages.policy import policy_decision_for
 
 C = CompanyStatus
 
@@ -180,8 +183,102 @@ def test_releasing_a_hold_resumes_where_the_hold_came_from(
     company = make(
         factory, ws, "acme.com", path=(C.RESEARCHED, C.HELD), hold=HoldReason.COUNTRY_UNKNOWN
     )
-    released = leads(factory, ws).release_hold(company.id)
+    service = leads(factory, ws)
+    # Nothing has changed, so releasing would only hold it again: it is refused and says why.
+    with pytest.raises(LeadError, match="Nothing has changed"):
+        service.release_hold(company.id)
+    service.update(company.id, {"country_code": "US"}, expected_version=company.row_version)
+    released = service.release_hold(company.id)
     assert (released.status, released.hold_reason) == (C.RESEARCHED, None)
+
+
+def india_lead_held_for_consent(factory: UnitOfWorkFactory, ws: str) -> Company:
+    """The real case: a lead in a consent-required country, held before any person was found."""
+    with factory(ws) as uow:
+        uow.policies.upsert(CountryPolicy("IN", PolicyRule.CONSENT_REQUIRED))
+        uow.commit()
+    return make(
+        factory,
+        ws,
+        "tatapower.com",
+        path=(C.RESEARCHED, C.HELD),
+        hold=HoldReason.CONSENT_REQUIRED,
+        country_code="IN",
+    )
+
+
+def test_releasing_a_consent_hold_is_refused_while_nobody_has_consented(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = india_lead_held_for_consent(factory, ws)
+    service = leads(factory, ws)
+    for _ in range(3):  # however many times it is tried, it is never sent round the loop
+        with pytest.raises(LeadError, match="Add a person"):
+            service.release_hold(company.id)
+    assert service.detail(company.id).company.status is C.HELD
+
+
+def test_consent_given_with_a_new_person_lets_the_release_stand_for_good(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = india_lead_held_for_consent(factory, ws)
+    service = leads(factory, ws)
+    added = service.add_person(
+        company.id,
+        full_name="Asha Rao",
+        title="Head of Strategy",
+        email="Asha.Rao@tatapower.com",
+        consent_basis=ConsentBasis.EXPRESS,
+        consent_evidence="Asked for a demo at the 2026 grid summit",
+    )
+    assert (added.contact.source, added.contact.rank) == (ContactSource.OPERATOR, 1)
+    assert [(e.email, e.provenance, e.is_primary) for e in added.emails] == [
+        ("asha.rao@tatapower.com", Provenance.OPERATOR_GIVEN, True)
+    ]
+    assert service.release_hold(company.id).status is C.RESEARCHED
+    with factory(ws) as uow:  # the gate's own check now agrees, so it will not hold again
+        decision = policy_decision_for(uow, uow.companies.get(company.id))
+    assert decision.outcome is PolicyOutcome.ALLOW
+
+
+def test_a_person_can_be_added_without_consent_or_an_address(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    added = leads(factory, ws).add_person(company.id, full_name="  Sam   Lee ")
+    assert (added.contact.full_name, added.contact.first_name, added.contact.last_name) == (
+        "Sam Lee",
+        "Sam",
+        "Lee",
+    )
+    assert added.emails == []
+
+
+def test_adding_a_person_refuses_bad_input_and_blocked_addresses(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    service = leads(factory, ws)
+    with pytest.raises(InvalidInput, match="name"):
+        service.add_person(company.id, full_name="  ")
+    with pytest.raises(InvalidInput, match="not an email"):
+        service.add_person(company.id, full_name="Sam", email="sam-at-acme")
+    with pytest.raises(InvalidInput, match="evidence"):
+        service.add_person(company.id, full_name="Sam", consent_basis=ConsentBasis.EXPRESS)
+    with factory(ws) as uow:
+        uow.suppressions.add(SuppressionKind.DOMAIN, "acme.com", SuppressionReason.OPT_OUT)
+        uow.commit()
+    with pytest.raises(InvalidInput, match="do-not-contact"):
+        service.add_person(company.id, full_name="Sam", email="sam@acme.com")
+    assert leads(factory, ws).detail(company.id).contacts == []  # nothing half-saved
+
+
+def test_a_person_cannot_be_added_to_another_workspaces_lead(
+    factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    company = make(factory, other_ws, "acme.com")
+    with pytest.raises(NotFound):
+        leads(factory, ws).add_person(company.id, full_name="Sam Lee")
 
 
 def test_a_hold_with_no_default_needs_the_operator_to_choose(

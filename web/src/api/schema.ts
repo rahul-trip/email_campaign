@@ -107,6 +107,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Person */
+        post: operations["add_person_api_companies__company_id__people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/release-hold": {
         parameters: {
             query?: never;
@@ -1120,6 +1137,18 @@ export interface components {
             /** How */
             how: string;
         };
+        /** PersonIn */
+        PersonIn: {
+            consent_basis?: components["schemas"]["ConsentBasis"] | null;
+            /** Consent Evidence */
+            consent_evidence?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Full Name */
+            full_name: string;
+            /** Title */
+            title?: string | null;
+        };
         /** PolicyIn */
         PolicyIn: {
             /** Allowed Provenance */
@@ -1706,6 +1735,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_person_api_companies__company_id__people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PersonIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
                 };
             };
             /** @description Validation Error */

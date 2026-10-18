@@ -183,6 +183,8 @@ A first-visit tour of every screen with **Next**, **Skip section** (jumps to the
 
 **Fixed, each with a regression test:** the file-disclosure bug in the web route (`GET /..%2f..%2f.env` returned the `.env`), security headers and limits, typed errors with no detail in a 500, a login-protected API document; compliance (no seeded claims, sender-profile confirmation gate, stricter UK and country evidence, fenced web text in prompts); forget and suppress from the CLI, API and screens, with erasure checked by scanning every text column; no silent loops (held leads hold, over-budget leads can still be drafted, unsafe deliveries hold), migration 0002; one metered path, timeouts, typed settings, a worker that survives errors; layer rules enforced by import-linter and ruff; tests blocked from the network; web: edit, consent, release choice, suppress, forget, accessible tabs, shared loading and error states, sign-out on 401, typed upload; the lead journey page; the guided tour; secret scanning, dependency audit, Dependabot; langgraph 0.3 to 1.x to clear advisories.
 
+**Found by the operator in use (2026-10-19):** a lead in India (default rule: consent required) was held at the gate, before any person was known. Consent is recorded per person, so there was nobody to record it for; releasing sent the lead back to the same check and it was held again, four times. Fixed: **Add a person** on the lead page (C4 for new people), with consent recorded in the same step and the hold released; a release of a country-rule hold is refused, with the reason and the remedy, while nothing has changed. Tests: service, API and a browser test of the whole case.
+
 **Live check (2026-10-19, `scripts/live_check.py`, a few cents):**
 
 | Vendor | Result |

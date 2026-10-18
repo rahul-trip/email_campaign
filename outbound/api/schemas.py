@@ -201,6 +201,15 @@ class ReleaseIn(In):
     resume_to: CompanyStatus | None = None
 
 
+class PersonIn(In):
+    full_name: str = Field(min_length=1, max_length=200)
+    title: str | None = Field(default=None, max_length=200)
+    email: str | None = Field(default=None, max_length=320)
+    # Both, or neither: consent without evidence is not recorded.
+    consent_basis: ConsentBasis | None = None
+    consent_evidence: str | None = Field(default=None, max_length=2000)
+
+
 class ConsentIn(In):
     basis: ConsentBasis
     evidence: str

@@ -1390,6 +1390,68 @@
         "title": "OriginOut",
         "type": "object"
       },
+      "PersonIn": {
+        "additionalProperties": false,
+        "properties": {
+          "consent_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consent_evidence": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Evidence"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "title": "PersonIn",
+        "type": "object"
+      },
       "PolicyIn": {
         "additionalProperties": false,
         "properties": {
@@ -3049,6 +3111,58 @@
           }
         },
         "summary": "Journey",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/people": {
+      "post": {
+        "operationId": "add_person_api_companies__company_id__people_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Person",
         "tags": [
           "leads"
         ]

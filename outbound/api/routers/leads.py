@@ -16,6 +16,7 @@ from outbound.api.schemas import (
     LeadOut,
     MessageOut,
     NoteOut,
+    PersonIn,
     ReleaseIn,
     TimelineOut,
     WaterfallOut,
@@ -96,6 +97,23 @@ def release_hold(
 @router.post("/companies/{company_id}/requalify", response_model=CompanyOut)
 def requalify(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     return CompanyOut.model_validate(svc.leads.requalify(company_id))
+
+
+@router.post("/companies/{company_id}/people", response_model=ContactOut, status_code=201)
+def add_person(
+    company_id: str, body: PersonIn, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    added = svc.leads.add_person(
+        company_id,
+        full_name=body.full_name,
+        title=body.title,
+        email=body.email,
+        consent_basis=body.consent_basis,
+        consent_evidence=body.consent_evidence,
+    )
+    return ContactOut.model_validate(
+        {**added.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in added.emails]}
+    )
 
 
 @router.post("/contacts/{contact_id}/consents", response_model=ConsentOut, status_code=201)

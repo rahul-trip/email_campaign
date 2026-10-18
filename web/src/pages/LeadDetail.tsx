@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
-import { Badge, Button, Card, Field, Input, Problem, QueryState, Select, Table, Td, Th, Textarea, statusTone, usd, when, words } from "../components/ui";
+import { Badge, Button, Card, Field, Input, Problem, QueryState, SaveNote, Select, Table, Td, Th, Textarea, statusTone, usd, when, words } from "../components/ui";
 
 type Company = Schemas["CompanyOut"];
 type Contact = Schemas["ContactOut"];
@@ -121,6 +121,8 @@ export function LeadDetailPage() {
               </Card>
             </div>
 
+            <AddPersonPanel company={company} onAdded={refresh} />
+
             <EditPanel key={company.row_version} company={company} campaigns={campaigns.data ?? []} onSaved={refresh} />
 
             <Card title="Waterfall: every vendor call for this lead">
@@ -234,9 +236,20 @@ function HoldPanel({
 }) {
   const [resumeTo, setResumeTo] = useState<Resume>("researched");
   const needsChoice = company.hold_reason === "needs_operator";
+  const needsConsent = company.hold_reason === "consent_required" || company.hold_reason === "entity_unknown";
   return (
     <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
       <p className="font-medium">Held: {company.hold_reason ? words(company.hold_reason) : ""}</p>
+      {needsConsent && (
+        <p className="mt-1">
+          {company.country_code ? `The rule for ${company.country_code}` : "The country rule"} needs prior consent, and nobody at this company has given it.
+          Releasing the hold does not give consent, so it would only be held again. Add the person who agreed to be contacted and tick that they have given consent; the lead is released for you.{" "}
+          <a href="#add-person" className="font-medium text-brand underline" onClick={() => document.getElementById("add-person")?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+            Go to Add a person
+          </a>
+          . Or change the rule under Settings, Country policies.
+        </p>
+      )}
       {suggestion && company.hold_reason === "country_unknown" && (
         <p className="mt-1">
           The research suggests <strong>{suggestion.code}</strong> ({suggestion.evidence}), but that is not proof.{" "}
@@ -396,6 +409,96 @@ function EditPanel({ company, campaigns, onSaved }: { company: Company; campaign
         {stale && <span className="text-sm text-amber-800">Someone changed this lead since you opened it. Reload the page and try again.</span>}
       </div>
       {!stale && <Problem error={save.error} />}
+    </Card>
+  );
+}
+
+/**
+ * Add someone you know to this company. Ticking that they have consented records it in the same
+ * step, and on a lead held for consent it then releases the hold, so the lead carries on.
+ */
+function AddPersonPanel({ company, onAdded }: { company: Company; onAdded: () => void }) {
+  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
+  const [email, setEmail] = useState("");
+  const [consented, setConsented] = useState(false);
+  const [basis, setBasis] = useState<Basis>("express");
+  const [evidence, setEvidence] = useState("");
+  const heldForConsent = company.status === "held" && (company.hold_reason === "consent_required" || company.hold_reason === "entity_unknown");
+  const add = useMutation({
+    mutationFn: async () => {
+      await ok(
+        client.POST("/api/companies/{company_id}/people", {
+          params: { path: { company_id: company.id } },
+          body: {
+            full_name: name,
+            title: title.trim() || undefined,
+            email: email.trim() || undefined,
+            consent_basis: consented ? basis : undefined,
+            consent_evidence: consented ? evidence : undefined,
+          },
+        }),
+      );
+      // The hold was waiting for exactly this: carry the lead on.
+      if (consented && heldForConsent) await ok(client.POST("/api/companies/{company_id}/release-hold", { params: { path: { company_id: company.id } }, body: {} }));
+    },
+    onSuccess: () => {
+      setName("");
+      setTitle("");
+      setEmail("");
+      setEvidence("");
+      setConsented(false);
+      onAdded();
+    },
+  });
+  const ready = name.trim() !== "" && (!consented || evidence.trim() !== "");
+  return (
+    <Card tour="lead-add-person" title="Add a person">
+      <div id="add-person" className="space-y-3">
+        <p className="text-sm text-muted">
+          Someone you know at {company.name ?? company.domain}. They are tried first when an email is written{heldForConsent ? ", and the consent below is what this lead is waiting for" : ""}.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="Person's name">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Job title (optional)">
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Work email (optional)" hint="Leave blank to have it looked up.">
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field>
+        </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={consented} onChange={(e) => setConsented(e.target.checked)} />
+          <span>
+            <strong>This person has given consent to be contacted</strong>
+            <span className="block text-xs text-muted">Only tick this if you can show where it came from.</span>
+          </span>
+        </label>
+        {consented && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Basis">
+              <Select value={basis} onChange={(e) => setBasis(e.target.value as Basis)}>
+                {BASES.map((b) => (
+                  <option key={b} value={b}>
+                    {words(b)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Evidence" hint="Where the consent came from. It is kept with the record.">
+              <Textarea rows={2} value={evidence} onChange={(e) => setEvidence(e.target.value)} />
+            </Field>
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <Button disabled={!ready || add.isPending} onClick={() => add.mutate()}>
+            {consented && heldForConsent ? "Add person and release the hold" : "Add person"}
+          </Button>
+          <SaveNote mutation={add} done={consented && heldForConsent ? "Added. The lead will carry on at the next run." : "Person added."} />
+        </div>
+      </div>
     </Card>
   );
 }

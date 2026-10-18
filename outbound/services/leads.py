@@ -22,9 +22,15 @@ from outbound.domain.entities import (
 from outbound.domain.enums import (
     CompanyStatus,
     ConsentBasis,
+    ContactSource,
+    ContactStatus,
     EntityType,
     HoldReason,
+    Provenance,
 )
+from outbound.domain.errors import InvalidInput
+from outbound.domain.names import split_name
+from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
     COMPANY,
     IllegalTransition,
@@ -32,8 +38,26 @@ from outbound.domain.state_machines import (
     retry_status_for,
 )
 from outbound.services.journey import Journey, JourneyData, build_journey
+from outbound.stages.policy import policy_decision_for
 
 EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
+
+# Holds that come from the country rule. Releasing one without changing what caused it only
+# sends the lead back to the same check, which holds it again, so a release is refused first.
+_POLICY_HOLDS = frozenset(
+    {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
+)
+_HOW_TO_FIX = {
+    HoldReason.COUNTRY_UNKNOWN: "Set the country under Edit this lead, then release it.",
+    HoldReason.CONSENT_REQUIRED: (
+        "Add the person who has consented under Add a person (tick that they have given consent),"
+        " or change the country's rule under Settings, Country policies."
+    ),
+    HoldReason.ENTITY_UNKNOWN: (
+        "Add a person who has consented under Add a person, or change the country's rule under"
+        " Settings, Country policies."
+    ),
+}
 
 
 class LeadError(Exception):
@@ -207,10 +231,80 @@ class LeadService:
             company = uow.companies.get(company_id)
             if company.status is not CompanyStatus.HELD or company.hold_reason is None:
                 raise LeadError(f"the lead is {company.status.value}, not held")
+            if company.hold_reason in _POLICY_HOLDS:
+                self._refuse_if_nothing_changed(uow, company)
             target = resume_to or resume_status_for(company.hold_reason)
             if target is None:
                 raise LeadError("this hold has no default: say which status to resume at")
             return self._move(uow, company, target, actor, "hold released")
+
+    @staticmethod
+    def _refuse_if_nothing_changed(uow: UnitOfWork, company: Company) -> None:
+        decision = policy_decision_for(uow, company)
+        if decision.outcome is PolicyOutcome.ALLOW:
+            return
+        if decision.outcome is PolicyOutcome.BLOCK or decision.hold_reason == company.hold_reason:
+            why = "; ".join(decision.reasons) or "the country rule"
+            fix = _HOW_TO_FIX.get(company.hold_reason or HoldReason.NEEDS_OPERATOR, "")
+            raise LeadError(
+                f"Nothing has changed since it was held ({why}), so releasing it would only hold"
+                f" it again. {fix}".strip()
+            )
+
+    def add_person(
+        self,
+        company_id: str,
+        *,
+        full_name: str,
+        title: str | None = None,
+        email: str | None = None,
+        consent_basis: ConsentBasis | None = None,
+        consent_evidence: str | None = None,
+        actor: str = OPERATOR,
+    ) -> ContactWithEmails:
+        """Add a person you know to a company already in the system, with their consent if given.
+
+        The person is yours: ranked first and active, with the address (if any) marked as given
+        by you. Consent is recorded in the same step, which is how a lead held for *consent
+        required* gets the consent it is waiting for.
+        """
+        name = " ".join(full_name.split())
+        if not name:
+            raise InvalidInput("give the person's name")
+        address = (email or "").strip().lower() or None
+        if address and ("@" not in address or " " in address):
+            raise InvalidInput(f"{email!r} is not an email address")
+        if consent_basis is not None and not (consent_evidence or "").strip():
+            raise InvalidInput("say where the consent came from: the evidence is kept with it")
+        with self._uow(self._workspace_id) as uow:
+            uow.companies.get(company_id)  # NotFound for another workspace's lead
+            if address and uow.suppressions.blocks(address):
+                raise InvalidInput("that address or its domain is on the do-not-contact list")
+            if address and uow.emails.by_address(address) is not None:
+                raise InvalidInput("that address already belongs to another person")
+            first, last = split_name(name)
+            contact = uow.contacts.add(
+                company_id,
+                rank=1,
+                source=ContactSource.OPERATOR,
+                full_name=name,
+                first_name=first,
+                last_name=last,
+                title=(title or "").strip() or None,
+                status=ContactStatus.ACTIVE,
+                actor=actor,
+            )
+            emails = []
+            if address:
+                emails.append(
+                    uow.emails.add(
+                        contact.id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor
+                    )
+                )
+            if consent_basis is not None:
+                uow.consents.add(contact.id, consent_basis, (consent_evidence or "").strip(), actor)
+            uow.commit()
+            return ContactWithEmails(contact, emails)
 
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""

@@ -9,7 +9,7 @@ export default defineConfig({
   // runs only after the loop test has finished.
   projects: [
     { name: "loop", testMatch: /loop\.spec/ },
-    { name: "tour", testMatch: /tour\.spec/, dependencies: ["loop"] },
+    { name: "tour", testMatch: /(tour|consent)\.spec/, dependencies: ["loop"] },
   ],
   use: { baseURL: "http://127.0.0.1:8765", trace: "retain-on-failure" },
   webServer: {

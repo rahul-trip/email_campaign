@@ -162,6 +162,11 @@ export const SECTIONS: Section[] = [
         body: "Each person with their addresses and how they were checked. Record consent where someone has agreed to be contacted, or suppress a person for good.",
       },
       {
+        target: "lead-add-person",
+        title: "Add a person",
+        body: "Add someone you know at the company. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on. Releasing a consent hold without consent only holds it again.",
+      },
+      {
         target: "lead-edit",
         title: "Edit a lead",
         body: "Change the name, country, priority or campaign. What you set is marked as yours and kept.",

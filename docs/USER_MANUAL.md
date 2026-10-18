@@ -176,6 +176,7 @@ Every company, newest first, 25 to a page. Search by name or domain; filter by s
 - buttons that appear when they apply: **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
 - for a **held** lead, a panel that says why and offers **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume;
 - **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
+- **Add a person:** someone you know at the company (name, optional title and work email). They are tried first when an email is written. Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
 - **Edit this lead:** name, country, priority and campaign. What you save is marked as yours and kept. If someone else changed the lead meanwhile, you are asked to reload;
 - **Suppress this domain** at the bottom, for everyone at the company;
 - **Emails:** each email written, its state, and how much you edited it;
@@ -263,11 +264,13 @@ The company's status shows where it is:
 
 A held company is waiting. **Release hold** puts it back at the step that held it, where it is checked again.
 
+For the three holds that come from the country rule (*country unknown*, *entity unknown*, *consent required*) **Release hold** is refused while nothing has changed, and the message says what to do. Releasing without fixing the cause would only be held again, so the page does not let it loop. Releasing a hold is not the same as giving consent: consent belongs to a person and is recorded against them.
+
 | Hold reason | Meaning | What to do |
 |---|---|---|
-| country unknown | The country could not be worked out, and the rules depend on it | Set the country (see the limit in section 13), then release |
-| entity unknown | UK company, but nothing shows it is a registered company, and UK rules only allow those | Add a Companies House key so it can be checked, or confirm by other means, then release |
-| consent required | The country or company type needs the person's consent first | Only continue if you hold real consent; record it, then release |
+| country unknown | The country could not be worked out, and the rules depend on it | Set the country under **Edit this lead** (or **Use XX and release** if one was suggested), then release |
+| entity unknown | UK company, but nothing shows it is a registered company, and UK rules only allow those | Add a Companies House key so it can be checked, or **Add a person** who has consented (below), then release |
+| consent required | The country or company type needs the person's consent first (for example India under the default rules) | Use **Add a person** on the lead page: enter the person who agreed to be contacted, tick that they have consented and say where it came from. The hold is released for you and the next run carries on. Or, if the rule is wrong for you, change it under Settings → Country policies |
 | catch all resolving | The address is on a server that accepts anything, so it cannot be proven by a normal check. It has been sent to a resolver, which answers in 1–3 days | Wait. `outbound tick` collects the answer and releases the company by itself |
 | catch all unverified | The resolver could not decide, or there is none | Normally leave it. An unproven address risks a bounce |
 | needs operator | The rules for the country are missing or incomplete | Add or review the country's policy under Settings → Country policies |
@@ -379,7 +382,7 @@ Honest list of what is not there yet, so nothing surprises you.
 
 | Limit | Workaround |
 |---|---|
-| **Adding an email address or person to a company that already exists** is not possible: adding the same website again only adds your notes | Fill in everything when you first add a company |
+| **Adding an email address to a person who already exists** is not possible; adding the same website again only adds your notes | Use **Add a person** on the lead page for a new person with an address |
 | The **Mailboxes** screen records a mailbox and checks its DNS. Drafting and the Sent sync use the mailbox login in `.env`, not this list | Keep the two the same |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |

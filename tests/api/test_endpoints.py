@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 
 from outbound.api.deps import Services
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.entities import CountryPolicy
 from outbound.domain.enums import (
     CallOutcome,
     CompanySource,
@@ -23,6 +24,7 @@ from outbound.domain.enums import (
     EntityType,
     HoldReason,
     MessageState,
+    PolicyRule,
     Provenance,
 )
 from outbound.services.dns_check import TxtLookup
@@ -186,6 +188,13 @@ def test_retry_release_and_requalify(api: Api, factory: UnitOfWorkFactory, ws: s
     held = seed_company(factory, ws, "b.com", C.RESEARCHED, C.HELD, hold=HoldReason.COUNTRY_UNKNOWN)
     out = seed_company(factory, ws, "c.com", C.RESEARCHED, C.DISQUALIFIED)
     assert api.post(f"/api/companies/{failed}/retry").json()["status"] == "new"
+    unchanged = api.post(f"/api/companies/{held}/release-hold", json={})
+    assert unchanged.status_code == 409 and "Nothing has changed" in unchanged.json()["detail"]
+    company = api.get(f"/api/companies/{held}").json()["company"]
+    api.patch(
+        f"/api/companies/{held}",
+        json={"row_version": company["row_version"], "country_code": "US"},
+    )
     assert api.post(f"/api/companies/{held}/release-hold", json={}).json()["status"] == "researched"
     assert api.post(f"/api/companies/{out}/requalify").json()["status"] == "qualified"
     again = api.post(f"/api/companies/{failed}/retry")
@@ -763,3 +772,46 @@ def test_failed_and_disqualified_leads_say_where_they_stopped(
 
 def test_the_journey_of_another_workspaces_lead_is_not_found(api: Api) -> None:
     assert api.get("/api/companies/nope/journey").status_code == 404
+
+
+def test_a_person_added_with_consent_ends_the_consent_hold(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    with factory(ws) as uow:
+        uow.policies.upsert(CountryPolicy("IN", PolicyRule.CONSENT_REQUIRED))
+        company = uow.companies.create(
+            domain="tatapower.com", source=CompanySource.MANUAL, country_code="IN"
+        )
+        held = uow.companies.transition(
+            company.id, C.RESEARCHED, expected_version=company.row_version
+        )
+        uow.companies.transition(
+            company.id,
+            C.HELD,
+            expected_version=held.row_version,
+            hold_reason=HoldReason.CONSENT_REQUIRED,
+        )
+        uow.commit()
+    cid = company.id
+    stuck = api.post(f"/api/companies/{cid}/release-hold", json={})
+    assert stuck.status_code == 409 and "Add a person" in stuck.json()["detail"]
+
+    bad = api.post(
+        f"/api/companies/{cid}/people", json={"full_name": "Asha Rao", "consent_basis": "express"}
+    )
+    assert bad.status_code == 422 and "evidence" in bad.json()["detail"]
+
+    added = api.post(
+        f"/api/companies/{cid}/people",
+        json={
+            "full_name": "Asha Rao",
+            "title": "Head of Strategy",
+            "email": "asha@tatapower.com",
+            "consent_basis": "express",
+            "consent_evidence": "Asked for a demo at the 2026 summit",
+        },
+    )
+    assert added.status_code == 201
+    assert added.json()["emails"][0]["email"] == "asha@tatapower.com"
+    assert api.post(f"/api/companies/{cid}/release-hold", json={}).json()["status"] == "researched"
+    assert api.post("/api/companies/nope/people", json={"full_name": "Sam"}).status_code == 404

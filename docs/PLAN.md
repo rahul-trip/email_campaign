@@ -256,6 +256,7 @@ Modes are `manual`, `discovery` and `mixed`. Suppression always wins. A re-submi
 | Targets | Quick add from any anchor, upload with preview, confirm domains, edit saved targets, assign a campaign |
 | Leads | Filter by status or hold reason; timeline from `events`; waterfall inspector from `provider_calls`; operator and engine values side by side |
 | Guided tour | First-visit walkthrough of every screen: Next, Skip section, End tour; restart from the header. Steps are data in `web/src/tour/steps.ts`; kept current by a rule in CLAUDE.md and an e2e test |
+| Lead page | Edit, add a person (with consent), record consent, suppress, release. A release of a country-rule hold is refused while the cause is unchanged, so a lead never loops through the same hold |
 | Lead journey | One lead's story: origin (import row and batch), eight stages with state, details, incidents and vendor calls, built by `services/journey.py` from existing rows; read-only (`GET /api/companies/{id}/journey`), no schema change |
 | Runs | Start, watch or cancel a run; spend against budget |
 | Settings | Sender profile, campaigns, country policies, suppression list, mailbox with DNS check |
