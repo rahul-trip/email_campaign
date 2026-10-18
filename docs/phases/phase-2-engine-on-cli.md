@@ -114,7 +114,7 @@ Differences from the text below:
 
 ### 2.5 Stage 2 — Research (LangGraph supervisor and workers) — done
 
-As built: `stages/research/{facts,graph,stage}.py`, `prompts/research.py`. Tests: `tests/stages/test_research_graph.py` (34), `tests/db/test_research_stage.py` (5). LangGraph and textstat are now runtime dependencies (the `legacy` group keeps its own copy until `agent/` is deleted).
+As built: `stages/research/{facts,graph,stage}.py`, `prompts/research.py`. Tests: `tests/stages/test_research_graph.py` (34), `tests/db/test_research_stage.py` (5). LangGraph is now a runtime dependency (reading grade is our own Flesch-Kincaid in `domain/copy_lint.py`; textstat was dropped in Phase 3b because it downloads a word list on first use and pulls in nltk) (the `legacy` group keeps its own copy until `agent/` is deleted).
 
 Differences from the text below:
 - The graph is `pages -> supervisor -> site | legal | signals | persona -> fit`. A `pages` node (one Tavily extract of five URLs) runs first so workers share one fetch; if the site cannot be read, a search stands in and the result is marked `thin`.
@@ -188,12 +188,12 @@ As built: `domain/copy_lint.py`, `domain/footer.py`, `domain/editing.py`, `promp
 - The critic runs the linter first and only asks a model one question (is the hook specific to this company?) about a draft that already passes. Two rewrites at most; a draft still failing goes on flagged, with the reasons shown to the operator.
 - The footer is rendered from the country policy template and the sender profile. A blank sender field the footer needs fails the lead with the field names, before any model call. A placeholder signature (`[Your Name]`) also fails it.
 - Few-shot examples are the latest edited messages of the same campaign (`final_body` and `edit_distance > 0`), as before-and-after pairs; the count comes from the workspace setting `few_shot_examples`.
-- Subject lint is 2–5 lower-case words; reading grade at most 6.5 (Flesch-Kincaid via textstat).
+- Subject lint is 2–5 lower-case words; reading grade at most 6.5 (Flesch-Kincaid, computed in `copy_lint.py`).
 
 - [x] `domain/copy_lint.py`: deterministic rules from config. Word counts exclude the footer.
   - Touch-1 body 50–85 words; follow-ups 25–50.
   - Subject 2–5 lowercase words.
-  - Flesch-Kincaid grade 6.5 or lower (textstat).
+  - Flesch-Kincaid grade 6.5 or lower.
   - Exactly one question-style call to action.
   - No links in touch 1; no banned phrases; correct country footer.
   - Returns a `LintReport`.

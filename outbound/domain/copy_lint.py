@@ -11,8 +11,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-import textstat
-
 BANNED_PHRASES = (
     "i hope this email finds you well",
     "i hope this finds you well",
@@ -80,6 +78,29 @@ def count_words(text: str) -> int:
     return len(_WORDS.findall(text))
 
 
+_VOWEL_GROUP = re.compile(r"[aeiouy]+")
+_SENTENCE_END = re.compile(r"[.!?]+(?:\s|$)")
+
+
+def _syllables(word: str) -> int:
+    """A count by vowel groups, with a silent final "e" dropped. Needs no word list."""
+    word = re.sub(r"[^a-z]", "", word.lower())
+    count = len(_VOWEL_GROUP.findall(word))
+    if word.endswith("e") and not word.endswith(("le", "ee", "ye")) and count > 1:
+        count -= 1
+    return max(count, 1) if word else 0
+
+
+def reading_grade(text: str) -> float:
+    """Flesch-Kincaid grade level: 0.39 * words/sentence + 11.8 * syllables/word - 15.59."""
+    words = _WORDS.findall(text)
+    if not words:
+        return 0.0
+    sentences = max(len(_SENTENCE_END.findall(text.strip())), 1)
+    syllables = sum(_syllables(w) for w in words)
+    return 0.39 * len(words) / sentences + 11.8 * syllables / len(words) - 15.59
+
+
 def lint(
     *,
     body: str,
@@ -109,7 +130,7 @@ def lint(
             )
         )
 
-    grade = float(textstat.flesch_kincaid_grade(main)) if main else 0.0
+    grade = reading_grade(main) if main else 0.0
     if grade > rules.max_reading_grade:
         issues.append(
             LintIssue(
