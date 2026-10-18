@@ -1,0 +1,10 @@
+{
+  "email": "jane@acme.com",
+  "status": "risky",
+  "substatus": "catch_all",
+  "explanation": "The domain accepts all email, and the mailbox is unconfirmed.",
+  "email_provider": "Google Workspace",
+  "is_disposable": false,
+  "is_role_account": false,
+  "is_free": false
+}

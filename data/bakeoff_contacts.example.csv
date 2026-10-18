@@ -1,0 +1,4 @@
+first_name,last_name,domain,country,known_email,full_name
+Jane,Doe,example-us.com,US,jane.doe@example-us.com,Jane Doe
+Sam,Roe,example-uk.co.uk,GB,sam.roe@example-uk.co.uk,Sam Roe
+Ana,Lopez,example-fr.fr,FR,ana.lopez@example-fr.fr,Ana Lopez

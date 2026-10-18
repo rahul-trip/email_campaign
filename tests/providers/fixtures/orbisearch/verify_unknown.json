@@ -1,0 +1,10 @@
+{
+  "email": "jane@acme.com",
+  "status": "unknown",
+  "substatus": "greylisted",
+  "explanation": "The server delayed verification.",
+  "email_provider": "Google Workspace",
+  "is_disposable": false,
+  "is_role_account": false,
+  "is_free": false
+}

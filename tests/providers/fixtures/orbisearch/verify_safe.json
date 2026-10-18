@@ -1,0 +1,10 @@
+{
+  "email": "jane@acme.com",
+  "status": "safe",
+  "substatus": null,
+  "explanation": "Safe to email. The mailbox exists and can receive mail.",
+  "email_provider": "Google Workspace",
+  "is_disposable": false,
+  "is_role_account": false,
+  "is_free": false
+}

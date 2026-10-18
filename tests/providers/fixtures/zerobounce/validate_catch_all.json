@@ -1,0 +1,12 @@
+{
+  "address": "jane@acme.com",
+  "status": "catch-all",
+  "sub_status": "accept_all",
+  "free_email": false,
+  "catchall_domain": true,
+  "did_you_mean": null,
+  "account": "jane",
+  "domain": "acme.com",
+  "mx_found": "true",
+  "processed_at": "2026-10-16 09:00:00.000"
+}

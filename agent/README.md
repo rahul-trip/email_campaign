@@ -1,3 +1,5 @@
+> **Legacy, retiring.** Everything this package does now lives in `outbound/` (see the [root README](../README.md)). It is kept only until the first live run of the new engine, then deleted. Do not change it.
+
 # agent/ — LangGraph Outbound Lead-Generation Agent
 
 Upstream engine that **produces rows** in `Quantra_Energy_Outbound_Campaign_Matrix.xlsx`

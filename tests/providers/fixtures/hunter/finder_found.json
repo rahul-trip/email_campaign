@@ -1,0 +1,22 @@
+{
+  "data": {
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "email": "Jane.Doe@acme.com",
+    "score": 97,
+    "domain": "acme.com",
+    "accept_all": false,
+    "position": "CTO",
+    "verification": {
+      "date": "2026-09-30",
+      "status": "valid"
+    }
+  },
+  "meta": {
+    "params": {
+      "domain": "acme.com",
+      "first_name": "Jane",
+      "last_name": "Doe"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Secret scanning: gitleaks' own rules, plus the one file that holds placeholders on purpose.
+title = "outbound"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders, not secrets"
+paths = ['''\.env\.example$''']

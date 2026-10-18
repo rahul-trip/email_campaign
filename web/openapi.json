@@ -1,0 +1,4785 @@
+{
+  "components": {
+    "schemas": {
+      "ApproveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "edited_body": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited Body"
+          },
+          "row_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Version"
+          }
+        },
+        "title": "ApproveIn",
+        "type": "object"
+      },
+      "Body_upload_targets_api_targets_upload_post": {
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "preview": {
+            "default": true,
+            "title": "Preview",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_targets_api_targets_upload_post",
+        "type": "object"
+      },
+      "CallOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "provider",
+          "operation",
+          "outcome",
+          "cost_micro_usd"
+        ],
+        "title": "CallOut",
+        "type": "object"
+      },
+      "CampaignIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cadence_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cadence Days",
+            "type": "array"
+          },
+          "icp_description": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icp Description"
+          },
+          "min_fit_score": {
+            "default": 60,
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Min Fit Score",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 10000,
+            "title": "Name",
+            "type": "string"
+          },
+          "research_questions": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 3,
+            "title": "Research Questions",
+            "type": "array"
+          },
+          "target_titles": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "title": "Target Titles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "target_titles"
+        ],
+        "title": "CampaignIn",
+        "type": "object"
+      },
+      "CampaignOut": {
+        "properties": {
+          "cadence_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cadence Days",
+            "type": "array"
+          },
+          "icp_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icp Description"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "min_fit_score": {
+            "title": "Min Fit Score",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "research_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Research Questions",
+            "type": "array"
+          },
+          "target_titles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Titles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "target_titles",
+          "icp_description",
+          "min_fit_score",
+          "research_questions",
+          "cadence_days"
+        ],
+        "title": "CampaignOut",
+        "type": "object"
+      },
+      "CampaignPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "cadence_days": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cadence Days"
+          },
+          "icp_description": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icp Description"
+          },
+          "min_fit_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Fit Score"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "research_questions": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Questions"
+          },
+          "target_titles": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Titles"
+          }
+        },
+        "title": "CampaignPatch",
+        "type": "object"
+      },
+      "CompanyOut": {
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "failed_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Stage"
+          },
+          "fit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Reason"
+          },
+          "fit_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Score"
+          },
+          "hold_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "legal_entity_type": {
+            "title": "Legal Entity Type",
+            "type": "string"
+          },
+          "manual_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Fields",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "next_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action At"
+          },
+          "policy_decision": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Decision"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "research": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research"
+          },
+          "research_answers": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Answers"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompanyStatus"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "name",
+          "source",
+          "status",
+          "hold_reason",
+          "failed_stage",
+          "last_error",
+          "country_code",
+          "legal_entity_type",
+          "priority",
+          "fit_score",
+          "fit_reason",
+          "campaign_id",
+          "research",
+          "research_answers",
+          "policy_decision",
+          "manual_fields",
+          "next_action_at",
+          "row_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "CompanyOut",
+        "type": "object"
+      },
+      "CompanyPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CompanyOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "CompanyPage",
+        "type": "object"
+      },
+      "CompanyPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "minLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "maximum": 9.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "row_version"
+        ],
+        "title": "CompanyPatch",
+        "type": "object"
+      },
+      "CompanyStatus": {
+        "enum": [
+          "new",
+          "researched",
+          "qualified",
+          "disqualified",
+          "contacts_found",
+          "email_ready",
+          "held",
+          "copy_ready",
+          "approved",
+          "rejected",
+          "in_sequence",
+          "replied",
+          "completed",
+          "suppressed",
+          "failed"
+        ],
+        "title": "CompanyStatus",
+        "type": "string"
+      },
+      "ConfirmIn": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "maxLength": 10000,
+            "title": "Domain",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "title": "ConfirmIn",
+        "type": "object"
+      },
+      "ConsentBasis": {
+        "enum": [
+          "express",
+          "conspicuous_publication",
+          "voluntary_disclosure",
+          "existing_relationship"
+        ],
+        "title": "ConsentBasis",
+        "type": "string"
+      },
+      "ConsentIn": {
+        "additionalProperties": false,
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/ConsentBasis"
+          },
+          "evidence": {
+            "maxLength": 10000,
+            "title": "Evidence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "basis",
+          "evidence"
+        ],
+        "title": "ConsentIn",
+        "type": "object"
+      },
+      "ConsentOut": {
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/ConsentBasis"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "basis",
+          "evidence"
+        ],
+        "title": "ConsentOut",
+        "type": "object"
+      },
+      "ContactOut": {
+        "properties": {
+          "emails": {
+            "items": {
+              "$ref": "#/components/schemas/EmailOut"
+            },
+            "title": "Emails",
+            "type": "array"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "seniority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seniority"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "id",
+          "rank",
+          "full_name",
+          "title",
+          "seniority",
+          "linkedin_url",
+          "source",
+          "status",
+          "emails"
+        ],
+        "title": "ContactOut",
+        "type": "object"
+      },
+      "CostOut": {
+        "properties": {
+          "by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Provider",
+            "type": "object"
+          },
+          "calls_by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Calls By Provider",
+            "type": "object"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Outcomes",
+            "type": "object"
+          },
+          "paid_calls": {
+            "title": "Paid Calls",
+            "type": "integer"
+          },
+          "per_prospect": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Prospect"
+          },
+          "prospects": {
+            "title": "Prospects",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "per_prospect",
+          "prospects",
+          "by_provider",
+          "calls_by_provider",
+          "outcomes",
+          "paid_calls"
+        ],
+        "title": "CostOut",
+        "type": "object"
+      },
+      "EmailOut": {
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "found_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_primary": {
+            "title": "Is Primary",
+            "type": "boolean"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/Provenance"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "verified_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified By"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "status",
+          "provenance",
+          "is_primary",
+          "found_by",
+          "verified_by"
+        ],
+        "title": "EmailOut",
+        "type": "object"
+      },
+      "FactOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "FactOut",
+        "type": "object"
+      },
+      "ForgetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgetIn",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HoldReason": {
+        "enum": [
+          "catch_all_unverified",
+          "catch_all_resolving",
+          "consent_required",
+          "country_unknown",
+          "entity_unknown",
+          "needs_operator"
+        ],
+        "title": "HoldReason",
+        "type": "string"
+      },
+      "IncidentOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "text"
+        ],
+        "title": "IncidentOut",
+        "type": "object"
+      },
+      "IntakeOut": {
+        "properties": {
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "validate_only": {
+            "title": "Validate Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "batch_id",
+          "validate_only",
+          "rows"
+        ],
+        "title": "IntakeOut",
+        "type": "object"
+      },
+      "JourneyOut": {
+        "properties": {
+          "company_id": {
+            "title": "Company Id",
+            "type": "string"
+          },
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
+          "next_step": {
+            "title": "Next Step",
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/OriginOut"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "total_cost_micro_usd": {
+            "title": "Total Cost Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "company_id",
+          "headline",
+          "next_step",
+          "origin",
+          "stages",
+          "total_cost_micro_usd"
+        ],
+        "title": "JourneyOut",
+        "type": "object"
+      },
+      "LeadOut": {
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/CompanyOut"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactOut"
+            },
+            "title": "Contacts",
+            "type": "array"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "$ref": "#/components/schemas/NoteOut"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company",
+          "contacts",
+          "messages",
+          "notes"
+        ],
+        "title": "LeadOut",
+        "type": "object"
+      },
+      "LoginIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 10000,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "LoginIn",
+        "type": "object"
+      },
+      "MailboxIn": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 10000,
+            "title": "Address",
+            "type": "string"
+          },
+          "credentials_ref": {
+            "maxLength": 10000,
+            "title": "Credentials Ref",
+            "type": "string"
+          },
+          "daily_cap": {
+            "default": 10,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Daily Cap",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "address",
+          "credentials_ref"
+        ],
+        "title": "MailboxIn",
+        "type": "object"
+      },
+      "MailboxOut": {
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "daily_cap": {
+            "title": "Daily Cap",
+            "type": "integer"
+          },
+          "dns_check": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dns Check"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sending_domain": {
+            "title": "Sending Domain",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "address",
+          "gateway",
+          "sending_domain",
+          "daily_cap",
+          "status",
+          "dns_check"
+        ],
+        "title": "MailboxOut",
+        "type": "object"
+      },
+      "Me": {
+        "properties": {
+          "user": {
+            "default": "operator",
+            "title": "User",
+            "type": "string"
+          }
+        },
+        "title": "Me",
+        "type": "object"
+      },
+      "MessageOut": {
+        "properties": {
+          "edit_distance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edit Distance"
+          },
+          "final_body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Body"
+          },
+          "generated_body": {
+            "title": "Generated Body",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lint_report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lint Report"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "snippets": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippets"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "subject": {
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "step",
+          "state",
+          "subject",
+          "generated_body",
+          "final_body",
+          "edit_distance",
+          "lint_report",
+          "snippets",
+          "sent_at",
+          "row_version"
+        ],
+        "title": "MessageOut",
+        "type": "object"
+      },
+      "NoteOut": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "source",
+          "author",
+          "created_at"
+        ],
+        "title": "NoteOut",
+        "type": "object"
+      },
+      "OriginOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "how": {
+            "title": "How",
+            "type": "string"
+          }
+        },
+        "required": [
+          "how",
+          "at",
+          "by",
+          "facts"
+        ],
+        "title": "OriginOut",
+        "type": "object"
+      },
+      "PersonIn": {
+        "additionalProperties": false,
+        "properties": {
+          "consent_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consent_evidence": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consent Evidence"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Full Name",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "title": "PersonIn",
+        "type": "object"
+      },
+      "PersonPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "PersonPatch",
+        "type": "object"
+      },
+      "PolicyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_provenance": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Provenance"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Provenance"
+          },
+          "footer_template": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Template"
+          },
+          "requires_corporate_subscriber": {
+            "default": false,
+            "title": "Requires Corporate Subscriber",
+            "type": "boolean"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/PolicyRule"
+          }
+        },
+        "required": [
+          "rule"
+        ],
+        "title": "PolicyIn",
+        "type": "object"
+      },
+      "PolicyOut": {
+        "properties": {
+          "allowed_provenance": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Provenance"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowed Provenance"
+          },
+          "country_code": {
+            "title": "Country Code",
+            "type": "string"
+          },
+          "footer_template": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Template"
+          },
+          "requires_corporate_subscriber": {
+            "title": "Requires Corporate Subscriber",
+            "type": "boolean"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/PolicyRule"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "country_code",
+          "rule",
+          "requires_corporate_subscriber",
+          "allowed_provenance",
+          "footer_template",
+          "version",
+          "reviewed_by"
+        ],
+        "title": "PolicyOut",
+        "type": "object"
+      },
+      "PolicyRule": {
+        "enum": [
+          "allow",
+          "allow_with_footer",
+          "consent_required",
+          "block"
+        ],
+        "title": "PolicyRule",
+        "type": "string"
+      },
+      "PrivacyOut": {
+        "properties": {
+          "drafts_deleted": {
+            "title": "Drafts Deleted",
+            "type": "integer"
+          },
+          "drafts_left": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Drafts Left",
+            "type": "array"
+          },
+          "found": {
+            "title": "Found",
+            "type": "boolean"
+          },
+          "messages_cancelled": {
+            "title": "Messages Cancelled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "found",
+          "messages_cancelled",
+          "drafts_deleted",
+          "drafts_left"
+        ],
+        "title": "PrivacyOut",
+        "type": "object"
+      },
+      "Provenance": {
+        "enum": [
+          "operator_given",
+          "publicly_published",
+          "api_database",
+          "pattern_inferred",
+          "referral"
+        ],
+        "title": "Provenance",
+        "type": "string"
+      },
+      "QualityOut": {
+        "properties": {
+          "catch_all_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catch All Share"
+          },
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "flag_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flag Rate"
+          },
+          "flagged": {
+            "title": "Flagged",
+            "type": "integer"
+          },
+          "holds": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Holds",
+            "type": "object"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "unedited": {
+            "title": "Unedited",
+            "type": "integer"
+          },
+          "unedited_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unedited Share"
+          },
+          "written": {
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "written",
+          "flagged",
+          "sent",
+          "unedited",
+          "companies",
+          "holds",
+          "unedited_share",
+          "flag_rate",
+          "catch_all_share"
+        ],
+        "title": "QualityOut",
+        "type": "object"
+      },
+      "RejectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 10000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RejectIn",
+        "type": "object"
+      },
+      "ReleaseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "resume_to": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompanyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ReleaseIn",
+        "type": "object"
+      },
+      "ReviewDetailOut": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ReviewItemOut"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item",
+          "notes"
+        ],
+        "title": "ReviewDetailOut",
+        "type": "object"
+      },
+      "ReviewItemOut": {
+        "properties": {
+          "company": {
+            "$ref": "#/components/schemas/CompanyOut"
+          },
+          "contact": {
+            "$ref": "#/components/schemas/ContactOut"
+          },
+          "flagged": {
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageOut"
+          }
+        },
+        "required": [
+          "message",
+          "company",
+          "contact",
+          "flagged"
+        ],
+        "title": "ReviewItemOut",
+        "type": "object"
+      },
+      "RowOut": {
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "row_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Id"
+          },
+          "row_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "row_number",
+          "status",
+          "domain",
+          "reason",
+          "row_id"
+        ],
+        "title": "RowOut",
+        "type": "object"
+      },
+      "RunIn": {
+        "additionalProperties": false,
+        "properties": {
+          "campaign": {
+            "default": "default",
+            "maxLength": 10000,
+            "title": "Campaign",
+            "type": "string"
+          },
+          "discover": {
+            "default": 10,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Discover",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 50,
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/RunMode",
+            "default": "manual"
+          },
+          "only": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "title": "Only",
+            "type": "array"
+          }
+        },
+        "title": "RunIn",
+        "type": "object"
+      },
+      "RunMode": {
+        "enum": [
+          "manual",
+          "discovery",
+          "mixed"
+        ],
+        "title": "RunMode",
+        "type": "string"
+      },
+      "RunOut": {
+        "properties": {
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "counts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Counts"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "params",
+          "counts",
+          "cost_micro_usd",
+          "started_at",
+          "finished_at",
+          "created_at"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "SenderProfileIn": {
+        "additionalProperties": false,
+        "description": "The sender profile. ``reviewed_at`` is accepted and ignored: only the server sets it.",
+        "properties": {
+          "case_studies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Studies"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "contact_info": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Info"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "geographic_focus": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Geographic Focus"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "legal_name": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legal Name"
+          },
+          "mission": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mission"
+          },
+          "narrative": {
+            "anyOf": [
+              {
+                "maxLength": 8000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Narrative"
+          },
+          "postal_address": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Postal Address"
+          },
+          "registration_details": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registration Details"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "signature_name": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Name"
+          },
+          "signature_title": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Title"
+          },
+          "target_verticals": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Verticals"
+          },
+          "technologies": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technologies"
+          },
+          "value_propositions": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 30,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Propositions"
+          }
+        },
+        "title": "SenderProfileIn",
+        "type": "object"
+      },
+      "StageOut": {
+        "properties": {
+          "calls": {
+            "items": {
+              "$ref": "#/components/schemas/CallOut"
+            },
+            "title": "Calls",
+            "type": "array"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/FactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/IncidentOut"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "reached_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reached At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/StageState"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "state",
+          "reached_at",
+          "summary",
+          "facts",
+          "incidents",
+          "calls",
+          "cost_micro_usd"
+        ],
+        "title": "StageOut",
+        "type": "object"
+      },
+      "StageState": {
+        "enum": [
+          "done",
+          "current",
+          "waiting",
+          "held",
+          "failed",
+          "stopped",
+          "pending"
+        ],
+        "title": "StageState",
+        "type": "string"
+      },
+      "StatusOut": {
+        "properties": {
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Status",
+            "type": "object"
+          },
+          "held": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Held",
+            "type": "object"
+          },
+          "waiting_for_review": {
+            "title": "Waiting For Review",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "by_status",
+          "held",
+          "waiting_for_review"
+        ],
+        "title": "StatusOut",
+        "type": "object"
+      },
+      "SuppressionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SuppressionKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SuppressionReason",
+            "default": "manual"
+          },
+          "value": {
+            "maxLength": 10000,
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "value"
+        ],
+        "title": "SuppressionIn",
+        "type": "object"
+      },
+      "SuppressionKind": {
+        "enum": [
+          "email",
+          "domain"
+        ],
+        "title": "SuppressionKind",
+        "type": "string"
+      },
+      "SuppressionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SuppressionKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SuppressionReason"
+          }
+        },
+        "required": [
+          "kind",
+          "reason",
+          "fingerprint",
+          "created_at"
+        ],
+        "title": "SuppressionOut",
+        "type": "object"
+      },
+      "SuppressionReason": {
+        "enum": [
+          "opt_out",
+          "manual",
+          "hard_bounce",
+          "complaint",
+          "forget"
+        ],
+        "title": "SuppressionReason",
+        "type": "string"
+      },
+      "TargetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "linkedin": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "maximum": 9.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "validate_only": {
+            "default": false,
+            "title": "Validate Only",
+            "type": "boolean"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          }
+        },
+        "title": "TargetIn",
+        "type": "object"
+      },
+      "TimelineOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "entity_type": {
+            "title": "Entity Type",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "entity_type",
+          "entity_id",
+          "type",
+          "actor",
+          "data"
+        ],
+        "title": "TimelineOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WaitingRowOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "raw": {
+            "additionalProperties": true,
+            "title": "Raw",
+            "type": "object"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "resolution_confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution Confidence"
+          },
+          "resolved_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved Domain"
+          },
+          "row_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Number"
+          }
+        },
+        "required": [
+          "id",
+          "row_number",
+          "raw",
+          "resolved_domain",
+          "resolution_confidence",
+          "reason"
+        ],
+        "title": "WaitingRowOut",
+        "type": "object"
+      },
+      "WaterfallOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "contact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Id"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "provider",
+          "operation",
+          "outcome",
+          "cost_micro_usd",
+          "latency_ms",
+          "contact_id"
+        ],
+        "title": "WaterfallOut",
+        "type": "object"
+      },
+      "WorkspaceSettingsIn": {
+        "additionalProperties": false,
+        "description": "Only the settings an operator may change, each with its real type.",
+        "properties": {
+          "budget_per_prospect_micro_usd": {
+            "anyOf": [
+              {
+                "maximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Per Prospect Micro Usd"
+          },
+          "few_shot_examples": {
+            "anyOf": [
+              {
+                "maximum": 20.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Few Shot Examples"
+          },
+          "safe_to_send_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safe To Send Only"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "title": "WorkspaceSettingsIn",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Outbound",
+    "version": "0.3.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "operationId": "me_api_auth_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/companies": {
+      "get": {
+        "operationId": "companies_api_companies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CompanyStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hold_reason",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/HoldReason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hold Reason"
+            }
+          },
+          {
+            "in": "query",
+            "name": "campaign_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Companies",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}": {
+      "get": {
+        "operationId": "company_api_companies__company_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company",
+        "tags": [
+          "leads"
+        ]
+      },
+      "patch": {
+        "operationId": "edit_company_api_companies__company_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Company",
+        "tags": [
+          "targets"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/journey": {
+      "get": {
+        "operationId": "journey_api_companies__company_id__journey_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Journey",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/people": {
+      "post": {
+        "operationId": "add_person_api_companies__company_id__people_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Person",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/release-hold": {
+      "post": {
+        "operationId": "release_hold_api_companies__company_id__release_hold_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReleaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Hold",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/requalify": {
+      "post": {
+        "operationId": "requalify_api_companies__company_id__requalify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Requalify",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/retry": {
+      "post": {
+        "operationId": "retry_api_companies__company_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/suppress": {
+      "post": {
+        "description": "Never contact anyone at this company's domain again.",
+        "operationId": "suppress_company_api_companies__company_id__suppress_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suppress Company",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/timeline": {
+      "get": {
+        "operationId": "timeline_api_companies__company_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineOut"
+                  },
+                  "title": "Response Timeline Api Companies  Company Id  Timeline Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Timeline",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/waterfall": {
+      "get": {
+        "operationId": "waterfall_api_companies__company_id__waterfall_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WaterfallOut"
+                  },
+                  "title": "Response Waterfall Api Companies  Company Id  Waterfall Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Waterfall",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/contacts/{contact_id}": {
+      "patch": {
+        "operationId": "edit_person_api_contacts__contact_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Person",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/contacts/{contact_id}/consents": {
+      "post": {
+        "operationId": "consent_api_contacts__contact_id__consents_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Consent",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/contacts/{contact_id}/suppress": {
+      "post": {
+        "description": "Never contact this person again; their unsent emails are cancelled.",
+        "operationId": "suppress_contact_api_contacts__contact_id__suppress_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suppress Contact",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Api Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/intake/webhook": {
+      "post": {
+        "description": "Signed intake for other systems. Not behind the operator login: the signature is the key.",
+        "operationId": "webhook_api_intake_webhook_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Webhook Api Intake Webhook Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Webhook",
+        "tags": [
+          "intake"
+        ]
+      }
+    },
+    "/api/privacy/forget": {
+      "post": {
+        "description": "Erase a person: suppress the address for good and remove what identifies them.",
+        "operationId": "forget_api_privacy_forget_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PrivacyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget",
+        "tags": [
+          "privacy"
+        ]
+      }
+    },
+    "/api/reports/cost": {
+      "get": {
+        "operationId": "cost_api_reports_cost_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cost",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/reports/quality": {
+      "get": {
+        "operationId": "quality_api_reports_quality_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Quality",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/review": {
+      "get": {
+        "operationId": "queue_api_review_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReviewItemOut"
+                  },
+                  "title": "Response Queue Api Review Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Queue",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/review/{message_id}": {
+      "get": {
+        "operationId": "show_api_review__message_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Show",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/review/{message_id}/approve": {
+      "post": {
+        "operationId": "approve_api_review__message_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/review/{message_id}/reject": {
+      "post": {
+        "operationId": "reject_api_review__message_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "operationId": "recent_runs_api_runs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunOut"
+                  },
+                  "title": "Response Recent Runs Api Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Recent Runs",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Queue a run; the worker process picks it up. The API never runs the pipeline itself.",
+        "operationId": "start_run_api_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "operationId": "run_api_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_api_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/settings/campaigns": {
+      "get": {
+        "operationId": "campaigns_api_settings_campaigns_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CampaignOut"
+                  },
+                  "title": "Response Campaigns Api Settings Campaigns Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Campaigns",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "operationId": "create_campaign_api_settings_campaigns_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Campaign",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/campaigns/{campaign_id}": {
+      "patch": {
+        "operationId": "update_campaign_api_settings_campaigns__campaign_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CampaignPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Campaign",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/mailboxes": {
+      "get": {
+        "operationId": "mailboxes_api_settings_mailboxes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MailboxOut"
+                  },
+                  "title": "Response Mailboxes Api Settings Mailboxes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mailboxes",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "operationId": "add_mailbox_api_settings_mailboxes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MailboxIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Mailbox",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/mailboxes/{mailbox_id}/dns-check": {
+      "post": {
+        "operationId": "dns_check_api_settings_mailboxes__mailbox_id__dns_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Dns Check Api Settings Mailboxes  Mailbox Id  Dns Check Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dns Check",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/policies": {
+      "get": {
+        "operationId": "policies_api_settings_policies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyOut"
+                  },
+                  "title": "Response Policies Api Settings Policies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Policies",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/policies/{country_code}": {
+      "put": {
+        "operationId": "save_policy_api_settings_policies__country_code__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country_code",
+            "required": true,
+            "schema": {
+              "title": "Country Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Policy",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/sender-profile": {
+      "get": {
+        "operationId": "sender_profile_api_settings_sender_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Sender Profile Api Settings Sender Profile Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sender Profile",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "update_sender_profile_api_settings_sender_profile_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SenderProfileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Sender Profile Api Settings Sender Profile Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Sender Profile",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/suppressions": {
+      "get": {
+        "operationId": "suppressions_api_settings_suppressions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuppressionOut"
+                  },
+                  "title": "Response Suppressions Api Settings Suppressions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Suppressions",
+        "tags": [
+          "settings"
+        ]
+      },
+      "post": {
+        "operationId": "suppress_api_settings_suppressions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuppressionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Suppress Api Settings Suppressions Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suppress",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/workspace": {
+      "get": {
+        "operationId": "workspace_settings_api_settings_workspace_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Workspace Settings Api Settings Workspace Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Workspace Settings",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "update_workspace_settings_api_settings_workspace_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Workspace Settings Api Settings Workspace Put",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Workspace Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/status": {
+      "get": {
+        "operationId": "status_api_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/targets": {
+      "post": {
+        "operationId": "add_target_api_targets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Target",
+        "tags": [
+          "targets"
+        ]
+      }
+    },
+    "/api/targets/upload": {
+      "post": {
+        "description": "Read a CSV or XLSX. ``preview`` (the default) checks it and saves nothing.",
+        "operationId": "upload_targets_api_targets_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_targets_api_targets_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Targets",
+        "tags": [
+          "targets"
+        ]
+      }
+    },
+    "/api/targets/waiting": {
+      "get": {
+        "operationId": "waiting_api_targets_waiting_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WaitingRowOut"
+                  },
+                  "title": "Response Waiting Api Targets Waiting Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Waiting",
+        "tags": [
+          "targets"
+        ]
+      }
+    },
+    "/api/targets/{row_id}/confirm": {
+      "post": {
+        "operationId": "confirm_api_targets__row_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "row_id",
+            "required": true,
+            "schema": {
+              "title": "Row Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm",
+        "tags": [
+          "targets"
+        ]
+      }
+    }
+  }
+}
