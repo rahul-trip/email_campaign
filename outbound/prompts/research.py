@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from outbound.prompts.fence import UNTRUSTED_RULE, untrusted_text
+
 _JSON_ONLY = "Reply with one JSON object and nothing else: no commentary, no code fences."
 _GROUNDED = (
     "Use only the text provided. If the text does not say, leave the field empty rather than "
-    "guessing. Never invent people, numbers or news."
+    "guessing. Never invent people, numbers or news. " + UNTRUSTED_RULE
 )
 
 SITE_SYSTEM_PROMPT = f"""\
@@ -51,8 +53,12 @@ def _block(title: str, body: str) -> str:
     return f"## {title}\n{body.strip() or '(nothing)'}\n"
 
 
+def untrusted(title: str, body: str) -> str:
+    return f"## {title}\n{untrusted_text(body)}\n"
+
+
 def build_site_user_prompt(company: str, domain: str, pages: str) -> str:
-    return _block("Company", f"{company} ({domain})") + _block("Pages", pages)
+    return _block("Company", f"{company} ({domain})") + untrusted("Pages", pages)
 
 
 def build_signals_user_prompt(
@@ -62,13 +68,13 @@ def build_signals_user_prompt(
     return (
         _block("Company", company)
         + _block("Questions", asked)
-        + _block("Pages", pages)
-        + _block("Search results (hiring, technology)", search_snippets)
+        + untrusted("Pages", pages)
+        + untrusted("Search results (hiring, technology)", search_snippets)
     )
 
 
 def build_persona_user_prompt(company: str, team_text: str) -> str:
-    return _block("Company", company) + _block("Team text", team_text)
+    return _block("Company", company) + untrusted("Team text", team_text)
 
 
 def build_fit_user_prompt(
@@ -77,8 +83,8 @@ def build_fit_user_prompt(
     return (
         _block("Ideal customer", icp)
         + _block("Company", company)
-        + _block("What they do", summary)
-        + _block("Products", "\n".join(f"- {p}" for p in products))
+        + untrusted("What they do", summary)
+        + untrusted("Products", "\n".join(f"- {p}" for p in products))
         + _block("Operator notes", notes)
-        + _block("Answers to research questions", answers)
+        + untrusted("Answers to research questions", answers)
     )

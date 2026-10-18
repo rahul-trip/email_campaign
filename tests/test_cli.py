@@ -192,3 +192,16 @@ def test_the_quality_report_says_nothing_has_been_sent_yet(isolated: str) -> Non
 def test_the_cost_report_works_with_no_spend(isolated: str) -> None:
     code, out = run("report", "cost", "--days", "7", url=isolated)
     assert code == 0 and "total $0.0000 over 7 day(s)" in out and "calls: none" in out
+
+
+def test_the_sender_profile_must_be_confirmed_and_can_be(isolated: str) -> None:
+    code, out = run("sender-profile", "show", url=isolated)
+    assert code == 0 and "NO - emails will not be written" in out
+    declined = runner.invoke(
+        app, ["sender-profile", "review", "--database-url", isolated], input="n\n"
+    )
+    assert declined.exit_code == 1 and "Not confirmed" in declined.output
+    assert "NO" in run("sender-profile", "show", url=isolated)[1]
+    code, out = run("sender-profile", "review", "--yes", url=isolated)
+    assert code == 0 and "reviewed" in out
+    assert "NO - emails" not in run("sender-profile", "show", url=isolated)[1]

@@ -156,3 +156,9 @@ def test_a_small_edit_is_a_small_distance_and_a_rewrite_is_large() -> None:
 def test_distance_is_bounded() -> None:
     assert 0.0 <= edit_distance("abc", "xyz") <= 1.0
     assert edit_distance("", "") == 0.0
+
+
+def test_an_email_address_in_the_body_is_flagged() -> None:
+    body = GOOD_BODY.replace("Sam Lee", "Sam Lee sam@quantra.example")
+    assert "address_in_body" in issues(check(body))
+    assert "address_in_body" not in issues(check())

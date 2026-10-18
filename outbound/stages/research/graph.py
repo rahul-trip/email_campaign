@@ -27,6 +27,7 @@ from outbound.providers.llm_json import ask_json as ask
 from outbound.providers.ports import CompanyRegistry, LlmClient, SearchProvider
 from outbound.services.intake import read_profile_title
 from outbound.stages.research.facts import (
+    CountryInference,
     best_registry_match,
     classify_legal_entity,
     find_incorporation_markers,
@@ -145,6 +146,7 @@ class ResearchState(TypedDict, total=False):
     thin: bool
     site_facts: SiteFacts
     country_facts: tuple[str | None, str]
+    country_suggestion: tuple[str, str]
     legal_facts: tuple[LegalEntityType, str]
     signal_facts: SignalFacts
     people_found: list[Person]
@@ -175,7 +177,9 @@ def published_addresses(pages: dict[str, str], domain: str) -> list[str]:
     for text in pages.values():
         for match in _ADDRESS.finditer(text):
             address = match.group(0).lower()
-            if match.group(1).lower().endswith(domain) and address not in found:
+            host = match.group(1).lower()
+            own = host == domain or host.endswith("." + domain)  # not "notacme.com" for "acme.com"
+            if own and address not in found:
                 found.append(address)
     return found[:10]
 
@@ -222,17 +226,24 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         inp = state["inp"]
         text = _joined(state["page_text"])
         if inp.country_code:
-            country: tuple[str | None, str] = (inp.country_code, "given by the operator")
+            known = CountryInference(inp.country_code, "given by the operator", strong=True)
         else:
-            country = infer_country(inp.domain, text)
+            known = infer_country(inp.domain, text)
+        update: ResearchState = {
+            "country_facts": (known.code if known.strong else None, known.evidence)
+        }
+        if not known.strong and known.code:
+            update["country_suggestion"] = (known.code, known.evidence)
         entity: tuple[LegalEntityType, str] = (LegalEntityType.UNKNOWN, "not checked")
-        if country[0] == "GB":
+        if known.code == "GB":  # also for a suggestion, so confirming it needs no second hold
             match = None
             if deps.registry is not None:
                 entries = deps.registry.search(inp.company_name)
                 match = best_registry_match(inp.company_name, entries)
-            entity = classify_legal_entity(find_incorporation_markers(text), match)
-        return {"country_facts": country, "legal_facts": entity}
+            markers = find_incorporation_markers(text, inp.company_name, inp.domain)
+            entity = classify_legal_entity(markers, match)
+        update["legal_facts"] = entity
+        return update
 
     def signals_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
@@ -329,6 +340,7 @@ def run_research(graph: Any, inp: ResearchInput) -> ResearchOutput:
     country, country_evidence = state.get("country_facts") or (inp.country_code, "")
     entity, entity_evidence = state.get("legal_facts") or (LegalEntityType.UNKNOWN, "not checked")
     fit = state.get("fit_facts")
+    suggestion = state.get("country_suggestion")
     people = tuple(state.get("people_found") or ())
     return ResearchOutput(
         research={
@@ -342,6 +354,9 @@ def run_research(graph: Any, inp: ResearchInput) -> ResearchOutput:
             "site_emails": published_addresses(state.get("page_text") or {}, inp.domain),
             "thin": bool(state.get("thin")),
             "country_evidence": country_evidence,
+            "country_suggestion": (
+                {"code": suggestion[0], "evidence": suggestion[1]} if suggestion else None
+            ),
             "legal_evidence": entity_evidence,
             "workers": plan_workers(inp),
         },

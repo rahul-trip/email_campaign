@@ -23,22 +23,17 @@ DEFAULT_ICP = (
 _NARRATIVE = """\
 Quantra Energy is an AI-driven forecasting company serving utilities, retailers, and grid
 operators. We build machine-learning models for short-term renewable generation and demand
-forecasting, then plug them directly into a customer's existing dispatch, trading, or
-grid-operations workflows, with no rip-and-replace.
-
-Key differentiators:
-- Deployed and proven with prominent Indian and US-based energy utilities navigating volatile
-  renewable assets.
-- Forecasts are built for operational use (dispatch, trading desks), not just reporting.
-- Fast integration: designed to slot into a customer's stack in days, not months.
-
-Proof points: reduced forecast error by 20-35% for utility and trading-desk customers,
-directly improving dispatch accuracy and P&L.
+forecasting, then plug them into a customer's existing dispatch, trading, or grid-operations
+workflows.
 
 Overlap keywords: machine learning, renewable forecasting, solar nowcasting, grid
 optimization, dispatch algorithms, carbon-aware dispatch, demand forecasting, real-time
 operational data, high-resolution meteorological data.
 """
+
+# Deliberately empty. Anything listed here is offered to the writer as a true, usable fact, so
+# the operator must write these down and confirm them (see ``SettingsService``) before an email
+# can be written. Never ship numbers or customer claims as defaults.
 
 
 def default_sender_profile() -> dict[str, Any]:
@@ -47,11 +42,7 @@ def default_sender_profile() -> dict[str, Any]:
         "domain": "quantraenergy.com",
         "industry": "Energy & Renewables Analytics",
         "mission": "AI-driven intelligence for energy-sector decision-making",
-        "value_propositions": [
-            "Renewable grid analytics that slot into existing workflows, cutting integration "
-            "from months to days",
-            "Energy-forecast error reduction of 20-35%, improving trading desk P&L",
-        ],
+        "value_propositions": [],
         "technologies": [
             "machine learning",
             "renewable forecasting",
@@ -59,9 +50,7 @@ def default_sender_profile() -> dict[str, Any]:
             "dispatch algorithms",
         ],
         "target_verticals": ["Grid operators", "Energy trading desks"],
-        "case_studies": [
-            "Reduced forecast error 30% for a UK energy trader: GBP 2M annual P&L uplift"
-        ],
+        "case_studies": [],
         "geographic_focus": "UK, Europe, India",
         "signature_name": "[Your Name]",
         "signature_title": "CPO & Founder",

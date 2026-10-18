@@ -393,3 +393,23 @@ def test_recent_runs_are_listed_newest_first(factory: UnitOfWorkFactory, ws: str
     first = runs.queue(RunRequest(limit=1))
     second = runs.queue(RunRequest(limit=2))
     assert [r.id for r in runs.recent()] == [second.id, first.id]
+
+
+def test_every_save_of_the_profile_records_a_review_the_client_cannot_forge(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    service = settings(factory, ws)
+    assert "reviewed_at" not in service.sender_profile()
+    saved = service.update_sender_profile({"legal_name": "Quantra", "reviewed_at": "1999-01-01"})
+    assert saved["reviewed_at"] != "1999-01-01"
+    assert saved["reviewed_at"].startswith("20")
+
+
+def test_a_new_workspace_ships_no_claims_for_the_writer_to_quote() -> None:
+    from outbound.services.defaults import default_sender_profile
+
+    profile = default_sender_profile()
+    assert profile["value_propositions"] == [] and profile["case_studies"] == []
+    text = str(profile["narrative"])
+    assert "%" not in text and "GBP" not in text and "proven" not in text.lower()
+    assert "reviewed_at" not in profile and profile["signature_name"].startswith("[")

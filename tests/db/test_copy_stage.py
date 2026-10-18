@@ -24,6 +24,7 @@ from tests.stages.fakes import GOOD_SNIPPETS, ScriptedLlm
 C = CompanyStatus
 SPECIFIC = {"specific": True, "problem": ""}
 PROFILE = {
+    "reviewed_at": "2026-10-18T00:00:00+00:00",
     "company_name": "Quantra",
     "narrative": "We forecast renewable output.",
     "value_propositions": ["Cuts forecast error 20-35%"],
@@ -237,3 +238,24 @@ def test_asking_for_zero_examples_turns_the_feature_off(
     llm = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
     run_copy_stage(factory, ws, llm, examples=0)
     assert "Earlier drafts" not in llm.prompts["actor"][0]
+
+
+def test_nothing_is_written_until_the_operator_has_reviewed_the_profile(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    set_profile(factory, ws)
+    with factory(ws) as uow:  # the profile as it is right after seeding: never reviewed
+        from outbound.db.models import WorkspaceRow
+
+        row = uow.session.get(WorkspaceRow, ws)
+        assert row is not None
+        row.sender_profile = {k: v for k, v in row.sender_profile.items() if k != "reviewed_at"}
+        uow.commit()
+    cid = lead(factory, ws)
+    llm = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    run_copy_stage(factory, ws, llm)
+    after = company(factory, ws, cid)
+    assert after.status is C.FAILED and "review and save your sender profile" in (
+        after.last_error or ""
+    )
+    assert llm.calls == []  # not a single model call is spent on an email that cannot be sent

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from outbound.db.repositories.workspaces import MailboxView
@@ -26,6 +26,7 @@ SENDER_FIELDS = frozenset(
         "contact_info", "narrative",
     }
 )  # fmt: skip
+REVIEWED_KEY = "reviewed_at"
 SETTING_FIELDS = frozenset(
     {"safe_to_send_only", "budget_per_prospect_micro_usd", "few_shot_examples", "timezone"}
 )
@@ -63,13 +64,23 @@ class SettingsService:
         return dict(workspace.sender_profile) if workspace else {}
 
     def update_sender_profile(self, changes: dict[str, Any]) -> dict[str, Any]:
+        """Merge ``changes`` into the profile and record that the operator has reviewed it.
+
+        Every save is a review: the screen and the command line both ask the operator to
+        confirm that each statement is true. ``reviewed_at`` is ours to set, never the client's.
+        """
+        changes = {k: v for k, v in changes.items() if k != REVIEWED_KEY}
         unknown = set(changes) - SENDER_FIELDS
         if unknown:
             raise SettingsError(f"unknown sender profile field(s): {sorted(unknown)}")
         with self._uow.admin() as admin:
             workspace = admin.workspaces.get(self._workspace_id)
             assert workspace is not None
-            merged = {**workspace.sender_profile, **changes}
+            merged = {
+                **workspace.sender_profile,
+                **changes,
+                REVIEWED_KEY: datetime.now(UTC).isoformat(),
+            }
             admin.workspaces.set_sender_profile(self._workspace_id, merged)
             admin.commit()
         return merged

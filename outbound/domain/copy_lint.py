@@ -71,6 +71,7 @@ class LintReport:
         return "\n".join(f"- {issue.message}" for issue in self.issues)
 
 
+_EMAIL_ADDRESS = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _URL = re.compile(r"https?://|www\.|\b[a-z0-9-]+\.(?:com|io|co|net|org|ai|uk|de)/", re.IGNORECASE)
 _WORDS = re.compile(r"[A-Za-z0-9][A-Za-z0-9'\u2019-]*")
 
@@ -129,6 +130,11 @@ def lint(
 
     if step == 0 and _URL.search(main):
         issues.append(LintIssue("links", "The first email must not contain a link."))
+
+    if _EMAIL_ADDRESS.search(main):
+        issues.append(
+            LintIssue("address_in_body", "Remove the email address; the body must not contain one.")
+        )
 
     lowered = main.lower()
     for phrase in rules.banned_phrases:

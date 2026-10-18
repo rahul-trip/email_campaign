@@ -33,6 +33,11 @@ class CopyStage:
             if self._examples is not None
             else int(ctx.workspace.settings.get("few_shot_examples", 5))
         )
+        if not sender.get("reviewed_at"):
+            raise StageFailure(
+                "review and save your sender profile first (Settings → Sender profile, or "
+                "`outbound sender-profile review`): its statements are quoted in every email"
+            )
         for field_name in ("signature_name", "signature_title"):
             value = str(sender.get(field_name) or "").strip()
             if not value or value.startswith("["):

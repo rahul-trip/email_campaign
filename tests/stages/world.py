@@ -13,6 +13,7 @@ from outbound.providers.ports import (
 from tests.stages.fakes import FakeLlm, FakeMailbox, FakeRegistry, FakeSearch
 
 PROFILE = {
+    "reviewed_at": "2026-10-18T00:00:00+00:00",
     "company_name": "Quantra",
     "narrative": "We forecast renewable output.",
     "value_propositions": ["Cuts forecast error 20-35%"],

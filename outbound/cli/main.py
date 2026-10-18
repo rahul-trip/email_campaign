@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 
 from outbound.bootstrap import build_container
-from outbound.cli import ops, serve
+from outbound.cli import ops, profile, serve
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
 from outbound.cli.targets import targets_app
 from outbound.db import migrate
@@ -22,6 +22,7 @@ app.add_typer(db_app, name="db")
 app.add_typer(targets_app, name="targets")
 ops.register(app)
 serve.register(app)
+profile.register(app)
 
 
 @db_app.command("upgrade")

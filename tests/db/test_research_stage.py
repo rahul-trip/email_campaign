@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
+from outbound.domain.entities import Company
 from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
     ContactSource,
+    HoldReason,
     LegalEntityType,
 )
 from outbound.providers.ports import RegistryEntry
@@ -132,3 +134,27 @@ def test_a_model_failure_fails_the_lead_with_the_reason_and_keeps_the_rest(
         assert (company.status, company.failed_stage) == (CompanyStatus.FAILED, "research")
         assert "no JSON" in (company.last_error or "")
         assert uow.contacts.for_company(cid) == []
+
+
+def test_a_phone_number_only_suggests_a_country_so_the_lead_waits_for_the_operator(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from outbound.stages.gate import GateStage
+
+    cid = add(factory, ws, "acme.com", name="Acme Energy")
+    search = FakeSearch(
+        {"https://acme.com": "Acme builds software. London office +44 20 7946 0000."}
+    )
+    runner_for(factory, ws, search).run_pipeline()
+    with factory(ws) as uow:
+        researched = uow.companies.get(cid)
+        assert researched.country_code is None
+        assert (researched.research or {})["country_suggestion"]["code"] == "GB"
+    Runner(factory, ws, [GateStage()], Guards()).run_pipeline()
+    held = company_row(factory, ws, cid)
+    assert (held.status, held.hold_reason) == (CompanyStatus.HELD, HoldReason.COUNTRY_UNKNOWN)
+
+
+def company_row(factory: UnitOfWorkFactory, ws: str, company_id: str) -> Company:
+    with factory(ws) as uow:
+        return uow.companies.get(company_id)
