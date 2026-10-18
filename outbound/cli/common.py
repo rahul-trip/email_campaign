@@ -8,6 +8,7 @@ import typer
 
 from outbound.bootstrap import Container
 from outbound.config import Settings
+from outbound.domain.errors import ConfigurationError
 from outbound.logging import configure_logging
 
 DatabaseUrl = Annotated[
@@ -30,9 +31,8 @@ def settings_for(database_url: str | None) -> Settings:
 
 
 def workspace_id_or_exit(container: Container, name: str) -> str:
-    with container.uow.admin() as admin:
-        found = admin.workspaces.by_name(name)
-    if found is None:
-        typer.echo(f"no workspace named {name!r}: run `outbound seed` first", err=True)
-        raise typer.Exit(1)
-    return found.id
+    try:
+        return container.workspace_id(name)
+    except ConfigurationError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from error

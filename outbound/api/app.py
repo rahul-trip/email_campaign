@@ -120,17 +120,12 @@ def create_app_from_container(container: Container) -> FastAPI:
             "  SESSION_SECRET=<any random string of 32+ characters, for example the output of\n"
             '    python3 -c "import secrets; print(secrets.token_urlsafe(32))">'
         )
-    with container.uow.admin() as admin:
-        workspace = admin.workspaces.by_name(config.workspace_name)
-    if workspace is None:
-        raise ConfigurationError(
-            f"no workspace named {config.workspace_name!r}: run `outbound seed`"
-        )
+    workspace_id = container.workspace_id(config.workspace_name)
     return create_app(
         build_services(
             container,
-            workspace.id,
-            search=metered_search_or_none(container, workspace.id),
+            workspace_id,
+            search=metered_search_or_none(container, workspace_id),
             mailbox=build_mailbox_if_configured(config),
         )
     )

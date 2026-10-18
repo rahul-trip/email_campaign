@@ -205,3 +205,26 @@ def test_the_sender_profile_must_be_confirmed_and_can_be(isolated: str) -> None:
     code, out = run("sender-profile", "review", "--yes", url=isolated)
     assert code == 0 and "reviewed" in out
     assert "NO - emails" not in run("sender-profile", "show", url=isolated)[1]
+
+
+def test_serve_on_a_database_that_was_never_set_up_says_what_to_run(
+    url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPERATOR_PASSWORD_HASH", "x")
+    monkeypatch.setenv("SESSION_SECRET", "s" * 40)
+    code, out = run("serve", url=url)
+    assert code == 1
+    assert "has not been set up" in out and "outbound db upgrade" in out and "outbound seed" in out
+    assert "no such table" not in out
+
+
+def test_other_commands_say_the_same_instead_of_a_stack_trace(url: str) -> None:
+    code, out = run("status", url=url)
+    assert code == 1
+    assert "outbound db upgrade" in out and "Traceback" not in out
+
+
+def test_a_set_up_database_without_the_workspace_says_to_seed(url: str) -> None:
+    assert run("db", "upgrade", url=url)[0] == 0
+    code, out = run("status", url=url)
+    assert code == 1 and "outbound seed" in out
