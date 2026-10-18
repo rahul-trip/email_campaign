@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-ink: #111827;
+  --color-muted: #6b7280;
+  --color-line: #e5e7eb;
+  --color-panel: #ffffff;
+  --color-page: #f6f7f9;
+  --color-brand: #2f4bff;
+}
+
+body {
+  @apply bg-page text-ink antialiased;
+}

@@ -1,0 +1,10 @@
+{
+  "email": "jane@acme.com",
+  "valid": true,
+  "result": "ok",
+  "mx_domain": "acme-com.mail.protection.outlook.com",
+  "email_type": "business",
+  "mx_provider": "Microsoft",
+  "credits_consumed": true,
+  "mx_secure_email_gateway": false
+}

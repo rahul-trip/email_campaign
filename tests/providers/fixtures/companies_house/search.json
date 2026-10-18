@@ -1,0 +1,28 @@
+{
+  "items_per_page": 5,
+  "kind": "search#companies",
+  "start_index": 0,
+  "total_results": 3,
+  "page_number": 1,
+  "items": [
+    {
+      "title": "ACME ENERGY LIMITED",
+      "company_number": "01234567",
+      "company_status": "active",
+      "company_type": "ltd",
+      "address_snippet": "1 High Street, London, EC1A 1BB",
+      "kind": "searchresults#company"
+    },
+    {
+      "title": "ACME ENERGY HOLDINGS PLC",
+      "company_number": "07654321",
+      "company_status": "dissolved",
+      "company_type": "plc",
+      "kind": "searchresults#company"
+    },
+    {
+      "title": "no number",
+      "company_status": "active"
+    }
+  ]
+}

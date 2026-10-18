@@ -1,0 +1,21 @@
+{
+  "data": {
+    "status": "webmail",
+    "score": 50,
+    "regexp": true,
+    "gibberish": false,
+    "disposable": false,
+    "webmail": true,
+    "mx_records": true,
+    "smtp_server": true,
+    "smtp_check": false,
+    "accept_all": false,
+    "block": false,
+    "sources": []
+  },
+  "meta": {
+    "params": {
+      "email": "jane@acme.com"
+    }
+  }
+}

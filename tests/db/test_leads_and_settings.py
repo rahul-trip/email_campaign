@@ -1,0 +1,395 @@
+"""Lead queries and actions, settings, DNS checks and queued runs."""
+
+from __future__ import annotations
+
+import pytest
+
+from outbound.db.errors import ConcurrencyConflict, NotFound
+from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.entities import Company
+from outbound.domain.enums import (
+    CompanySource,
+    CompanyStatus,
+    ConsentBasis,
+    ContactSource,
+    HoldReason,
+    PolicyRule,
+    Provenance,
+    RunStatus,
+    SuppressionKind,
+    SuppressionReason,
+)
+from outbound.domain.hashing import hash_value
+from outbound.services.dns_check import check_domain
+from outbound.services.leads import LeadError, LeadService
+from outbound.services.runs import RunMode, RunRequest, RunService
+from outbound.services.settings import SettingsError, SettingsService
+
+C = CompanyStatus
+
+
+def make(
+    factory: UnitOfWorkFactory,
+    ws: str,
+    domain: str,
+    *,
+    path: tuple[CompanyStatus, ...] = (),
+    hold: HoldReason | None = None,
+    failed_stage: str | None = None,
+    **kwargs: object,
+) -> Company:
+    with factory(ws) as uow:
+        company = uow.companies.create(domain=domain, source=CompanySource.MANUAL, **kwargs)  # type: ignore[arg-type]
+        version = company.row_version
+        for step in path:
+            extra: dict[str, object] = {}
+            if step is C.HELD:
+                extra["hold_reason"] = hold
+            if step is C.FAILED:
+                extra.update(failed_stage=failed_stage, last_error="boom")
+            company = uow.companies.transition(
+                company.id,
+                step,
+                expected_version=version,
+                **extra,  # type: ignore[arg-type]
+            )
+            version = company.row_version
+        uow.commit()
+        return company
+
+
+def leads(factory: UnitOfWorkFactory, ws: str) -> LeadService:
+    return LeadService(factory, ws)
+
+
+# ------------------------------------------------------------------ listing and detail
+
+
+def test_leads_can_be_filtered_searched_and_paged(factory: UnitOfWorkFactory, ws: str) -> None:
+    make(factory, ws, "acme.com", name="Acme Energy")
+    make(factory, ws, "beta.io", path=(C.RESEARCHED,))
+    make(factory, ws, "gamma.io", path=(C.RESEARCHED, C.HELD), hold=HoldReason.COUNTRY_UNKNOWN)
+    service = leads(factory, ws)
+    assert service.search()[1] == 3
+    assert [c.domain for c in service.search(status=C.RESEARCHED)[0]] == ["beta.io"]
+    held, total = service.search(hold_reason=HoldReason.COUNTRY_UNKNOWN)
+    assert (total, held[0].domain) == (1, "gamma.io")
+    assert [c.domain for c in service.search(text="ENERGY")[0]] == ["acme.com"]
+    page, total = service.search(limit=2, offset=2)
+    assert (len(page), total) == (1, 3)
+
+
+def test_the_list_is_scoped_to_the_workspace(
+    factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    make(factory, ws, "acme.com")
+    assert leads(factory, other_ws).search()[1] == 0
+
+
+def test_detail_gathers_people_addresses_messages_and_notes(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    with factory(ws) as uow:
+        contact = uow.contacts.add(company.id, rank=1, source=ContactSource.SITE, full_name="J D")
+        uow.emails.add(contact.id, "j@acme.com", Provenance.API_DATABASE, is_primary=True)
+        uow.commit()
+    detail = leads(factory, ws).detail(company.id)
+    assert detail.company.domain == "acme.com"
+    assert [e.email for e in detail.contacts[0].emails] == ["j@acme.com"]
+
+
+def test_detail_of_another_workspaces_lead_is_not_found(
+    factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    company = make(factory, ws, "acme.com")
+    with pytest.raises(NotFound):
+        leads(factory, other_ws).detail(company.id)
+
+
+def test_the_timeline_merges_events_from_the_lead_and_its_people(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com", path=(C.RESEARCHED,))
+    with factory(ws) as uow:
+        contact = uow.contacts.add(company.id, rank=1, source=ContactSource.SITE)
+        uow.emails.add(contact.id, "j@acme.com", Provenance.API_DATABASE)
+        uow.commit()
+    kinds = [(e.entity_type.value, e.type) for e in leads(factory, ws).timeline(company.id)]
+    assert ("company", "created") in kinds and ("company", "status_changed") in kinds
+    assert ("contact", "created") in kinds and ("contact_email", "created") in kinds
+
+
+def test_the_waterfall_lists_every_provider_call_for_the_lead(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from outbound.domain.enums import CallOutcome
+
+    company = make(factory, ws, "acme.com")
+    with factory(ws) as uow:
+        for provider, outcome, cost in (
+            ("hunter", CallOutcome.MISS, 0),
+            ("zerobounce", CallOutcome.HIT, 160_000),
+        ):
+            uow.calls.record(
+                provider=provider,
+                operation="find",
+                request_hash="h",
+                outcome=outcome,
+                cost_micro_usd=cost,
+                company_id=company.id,
+            )
+        uow.commit()
+    steps = leads(factory, ws).waterfall(company.id)
+    assert [(s.provider, s.outcome, s.cost_micro_usd) for s in steps] == [
+        ("hunter", "miss", 0),
+        ("zerobounce", "hit", 160_000),
+    ]
+
+
+# ------------------------------------------------------------------ actions
+
+
+def test_editing_a_saved_target_is_version_checked(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "acme.com")
+    service = leads(factory, ws)
+    updated = service.update(company.id, {"name": "Acme Ltd"}, expected_version=company.row_version)
+    assert updated.name == "Acme Ltd" and "name" in updated.manual_fields
+    with pytest.raises(ConcurrencyConflict):
+        service.update(company.id, {"name": "Stale"}, expected_version=company.row_version)
+
+
+def test_only_a_few_fields_can_be_edited(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "acme.com")
+    with pytest.raises(LeadError, match="cannot change"):
+        leads(factory, ws).update(company.id, {"status": "approved"}, expected_version=1)
+
+
+def test_retry_sends_a_failed_lead_back_to_the_stage_that_failed(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com", path=(C.FAILED,), failed_stage="research")
+    assert leads(factory, ws).retry(company.id).status is C.NEW
+    with pytest.raises(LeadError, match="not failed"):
+        leads(factory, ws).retry(company.id)
+
+
+def test_releasing_a_hold_resumes_where_the_hold_came_from(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(
+        factory, ws, "acme.com", path=(C.RESEARCHED, C.HELD), hold=HoldReason.COUNTRY_UNKNOWN
+    )
+    released = leads(factory, ws).release_hold(company.id)
+    assert (released.status, released.hold_reason) == (C.RESEARCHED, None)
+
+
+def test_a_hold_with_no_default_needs_the_operator_to_choose(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(
+        factory,
+        ws,
+        "acme.com",
+        path=(C.RESEARCHED, C.HELD),
+        hold=HoldReason.NEEDS_OPERATOR,
+    )
+    service = leads(factory, ws)
+    with pytest.raises(LeadError, match="no default"):
+        service.release_hold(company.id)
+    assert service.release_hold(company.id, resume_to=C.RESEARCHED).status is C.RESEARCHED
+
+
+def test_a_lead_that_is_not_held_cannot_be_released(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "acme.com")
+    with pytest.raises(LeadError, match="not held"):
+        leads(factory, ws).release_hold(company.id)
+
+
+def test_a_resume_target_the_lifecycle_forbids_is_refused(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(
+        factory, ws, "acme.com", path=(C.RESEARCHED, C.HELD), hold=HoldReason.NEEDS_OPERATOR
+    )
+    with pytest.raises(LeadError, match="cannot move"):
+        leads(factory, ws).release_hold(company.id, resume_to=C.COPY_READY)
+
+
+def test_a_disqualified_lead_can_be_requalified_by_the_operator(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "acme.com", path=(C.RESEARCHED, C.DISQUALIFIED))
+    assert leads(factory, ws).requalify(company.id).status is C.QUALIFIED
+    with pytest.raises(LeadError, match="not disqualified"):
+        leads(factory, ws).requalify(company.id)
+
+
+def test_consent_needs_its_evidence_and_is_recorded(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "acme.com")
+    with factory(ws) as uow:
+        contact = uow.contacts.add(company.id, rank=1, source=ContactSource.SITE)
+        uow.commit()
+    service = leads(factory, ws)
+    with pytest.raises(LeadError, match="evidence"):
+        service.record_consent(contact.id, ConsentBasis.EXPRESS, " ")
+    consent = service.record_consent(contact.id, ConsentBasis.EXPRESS, "replied yes on 2026-10-01")
+    assert consent.active
+    with factory(ws) as uow:
+        assert uow.consents.has_active(contact.id)
+
+
+# ------------------------------------------------------------------ settings
+
+
+def settings(factory: UnitOfWorkFactory, ws: str, **kwargs: object) -> SettingsService:
+    return SettingsService(factory, ws, **kwargs)  # type: ignore[arg-type]
+
+
+def test_the_sender_profile_is_merged_not_replaced(factory: UnitOfWorkFactory, ws: str) -> None:
+    service = settings(factory, ws)
+    service.update_sender_profile({"legal_name": "Quantra Ltd", "postal_address": "1 High St"})
+    service.update_sender_profile({"signature_name": "Sam"})
+    profile = service.sender_profile()
+    assert (profile["legal_name"], profile["signature_name"]) == ("Quantra Ltd", "Sam")
+    with pytest.raises(SettingsError, match="unknown"):
+        service.update_sender_profile({"favourite_colour": "teal"})
+
+
+def test_automatic_sending_cannot_be_switched_on_yet(factory: UnitOfWorkFactory, ws: str) -> None:
+    service = settings(factory, ws)
+    with pytest.raises(SettingsError, match="Phase 5"):
+        service.update_workspace_settings({"send_enabled": True})
+    assert service.update_workspace_settings({"few_shot_examples": 3})["few_shot_examples"] == 3
+    with pytest.raises(SettingsError, match="cannot change"):
+        service.update_workspace_settings({"breaker": {}})
+
+
+def test_campaigns_are_created_and_changed(factory: UnitOfWorkFactory, ws: str) -> None:
+    service = settings(factory, ws)
+    created = service.create_campaign("expo", ["CTO"], min_fit_score=70)
+    assert created.min_fit_score == 70
+    with pytest.raises(SettingsError, match="already exists"):
+        service.create_campaign("expo", ["CEO"])
+    with pytest.raises(SettingsError, match="at least one"):
+        service.create_campaign("empty", [])
+    updated = service.update_campaign(created.id, {"research_questions": ["Do they trade?"]})
+    assert updated.research_questions == ("Do they trade?",)
+    with pytest.raises(SettingsError, match="cannot change"):
+        service.update_campaign(created.id, {"status": "x"})
+
+
+def test_a_policy_change_bumps_the_version_and_an_unchanged_save_does_not(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    service = settings(factory, ws)
+    first = service.save_policy("gb", PolicyRule.ALLOW_WITH_FOOTER, footer_template="Footer")
+    assert (first.country_code, first.version) == ("GB", 1)
+    again = service.save_policy("GB", PolicyRule.ALLOW_WITH_FOOTER, footer_template="Footer")
+    assert again.version == 1
+    changed = service.save_policy("GB", PolicyRule.BLOCK, reviewer="lawyer@firm")
+    assert changed.version == 2
+    with factory(ws) as uow:
+        stored = uow.policies.get("GB")
+    assert stored is not None and stored.reviewed_by == "lawyer@firm"
+    with pytest.raises(SettingsError, match="two-letter"):
+        service.save_policy("GBR", PolicyRule.BLOCK)
+
+
+def test_suppressions_are_hashed_and_only_a_fingerprint_is_shown(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    service = settings(factory, ws)
+    assert service.suppress(SuppressionKind.EMAIL, "Jane@Acme.com", SuppressionReason.OPT_OUT)
+    assert not service.suppress(SuppressionKind.EMAIL, "jane@acme.com", SuppressionReason.OPT_OUT)
+    [entry] = service.suppressions()
+    assert entry.fingerprint == hash_value("jane@acme.com")[:10]
+    assert "acme" not in repr(entry)
+    with pytest.raises(SettingsError):
+        service.suppress(SuppressionKind.EMAIL, " ", SuppressionReason.OPT_OUT)
+
+
+def test_a_mailbox_dns_check_is_run_and_stored(factory: UnitOfWorkFactory, ws: str) -> None:
+    records = {
+        "quantra.example": ["v=spf1 include:_spf.google.com ~all"],
+        "google._domainkey.quantra.example": ["v=DKIM1; k=rsa; p=ABC"],
+        "_dmarc.quantra.example": ["v=DMARC1; p=quarantine"],
+    }
+    service = settings(factory, ws, dns_lookup=lambda name: records.get(name, []))
+    box = service.add_mailbox("Sam@Quantra.example", "env:IMAP_PASSWORD")
+    assert (box.address, box.sending_domain) == ("sam@quantra.example", "quantra.example")
+    report = service.dns_check(box.id)
+    assert report["ok"] is True
+    assert service.mailboxes()[0].dns_check == report
+
+
+def test_dns_problems_are_reported_in_plain_words() -> None:
+    records = {
+        "bad.example": ["v=spf1 a ~all", "v=spf1 mx ~all"],
+        "_dmarc.bad.example": ["v=DMARC1; p=none"],
+    }
+    report = check_domain("Bad.Example", lambda name: records.get(name, []))
+    assert not report.ok
+    assert "more than one SPF" in report.spf.detail
+    assert "no DKIM key" in report.dkim.detail
+    assert report.dmarc.ok and "monitoring only" in report.dmarc.detail
+    assert check_domain("nothing.example", lambda name: []).spf.detail.startswith("no SPF")
+
+
+def test_a_mailbox_needs_a_real_address(factory: UnitOfWorkFactory, ws: str) -> None:
+    with pytest.raises(SettingsError):
+        settings(factory, ws).add_mailbox("not-an-address", "env:X")
+
+
+# ------------------------------------------------------------------ runs
+
+
+def test_a_run_is_queued_then_claimed_once_then_cancelled_or_finished(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    runs = RunService(factory, ws)
+    queued = runs.queue(RunRequest(limit=5, mode=RunMode.MIXED, discover=3))
+    assert queued.status is RunStatus.QUEUED
+    assert RunRequest.from_params(queued.params) == RunRequest(
+        limit=5, mode=RunMode.MIXED, discover=3
+    )
+    with factory(ws) as uow:
+        claimed = uow.runs.claim_next()
+        uow.commit()
+        assert claimed is not None and claimed.id == queued.id
+        assert uow.runs.claim_next() is None
+    assert runs.get(queued.id).status is RunStatus.RUNNING
+    assert runs.cancel(queued.id).status is RunStatus.CANCELLED
+
+
+def test_cancelling_a_queued_run_stops_it_before_it_starts(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    runs = RunService(factory, ws)
+    queued = runs.queue(RunRequest())
+    assert runs.cancel(queued.id).status is RunStatus.CANCELLED
+    with factory(ws) as uow:
+        assert uow.runs.claim_next() is None
+
+
+def test_a_cancelled_run_is_not_overwritten_when_it_finishes(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    runs = RunService(factory, ws)
+    queued = runs.queue(RunRequest())
+    with factory(ws) as uow:
+        uow.runs.claim_next()
+        uow.commit()
+    runs.cancel(queued.id)
+    with factory(ws) as uow:
+        uow.runs.finish(queued.id, RunStatus.SUCCEEDED, {"research": {"advanced": 1}})
+        uow.commit()
+    final = runs.get(queued.id)
+    assert final.status is RunStatus.CANCELLED and final.counts == {"research": {"advanced": 1}}
+
+
+def test_recent_runs_are_listed_newest_first(factory: UnitOfWorkFactory, ws: str) -> None:
+    runs = RunService(factory, ws)
+    first = runs.queue(RunRequest(limit=1))
+    second = runs.queue(RunRequest(limit=2))
+    assert [r.id for r in runs.recent()] == [second.id, first.id]

@@ -1,0 +1,10 @@
+{
+  "email": "jane@acme.com",
+  "status": "invalid",
+  "substatus": "mailbox_not_found",
+  "explanation": "The specific mailbox doesn't exist.",
+  "email_provider": "Google Workspace",
+  "is_disposable": false,
+  "is_role_account": false,
+  "is_free": false
+}

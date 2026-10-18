@@ -1,0 +1,84 @@
+"""Prompts for the research stage: read a company's pages, answer questions, score the fit."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+_JSON_ONLY = "Reply with one JSON object and nothing else: no commentary, no code fences."
+_GROUNDED = (
+    "Use only the text provided. If the text does not say, leave the field empty rather than "
+    "guessing. Never invent people, numbers or news."
+)
+
+SITE_SYSTEM_PROMPT = f"""\
+You read a company's own web pages and report what a salesperson needs before writing to them.
+{_GROUNDED}
+
+Return: {{"summary": "<2-3 sentences: what the company does and for whom>",
+"products": ["<product or service>", ...],
+"news": ["<recent, specific, dated if the text dates it>", ...],
+"hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...]}}
+At most 5 products, 3 news items and 3 hooks. A hook must be something only this company
+would have said or done. {_JSON_ONLY}"""
+
+SIGNALS_SYSTEM_PROMPT = f"""\
+You answer a salesperson's research questions about one company, and note hiring and
+technology signals. {_GROUNDED}
+
+Return: {{"answers": {{"<question exactly as asked>": "<short answer, or empty string>"}},
+"hiring": "<what the careers text or search results show about hiring, or empty>",
+"tech": ["<technology or tool the company is shown to use>", ...]}}
+{_JSON_ONLY}"""
+
+PERSONA_SYSTEM_PROMPT = f"""\
+You extract the people listed on a company's team, leadership or about page.
+{_GROUNDED}
+
+Return: {{"people": [{{"name": "<full name>", "title": "<job title>",
+"linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}
+At most 10 people, most senior first. {_JSON_ONLY}"""
+
+FIT_SYSTEM_PROMPT = f"""\
+You judge how well a company matches a seller's ideal customer, from 0 (no match) to 100
+(exactly the target). Be strict: 80 or more means you would put them at the top of the list.
+{_GROUNDED}
+
+Return: {{"score": <integer 0-100>, "reason": "<one sentence naming the deciding factor>"}}
+{_JSON_ONLY}"""
+
+
+def _block(title: str, body: str) -> str:
+    return f"## {title}\n{body.strip() or '(nothing)'}\n"
+
+
+def build_site_user_prompt(company: str, domain: str, pages: str) -> str:
+    return _block("Company", f"{company} ({domain})") + _block("Pages", pages)
+
+
+def build_signals_user_prompt(
+    company: str, questions: Sequence[str], pages: str, search_snippets: str
+) -> str:
+    asked = "\n".join(f"- {q}" for q in questions)
+    return (
+        _block("Company", company)
+        + _block("Questions", asked)
+        + _block("Pages", pages)
+        + _block("Search results (hiring, technology)", search_snippets)
+    )
+
+
+def build_persona_user_prompt(company: str, team_text: str) -> str:
+    return _block("Company", company) + _block("Team text", team_text)
+
+
+def build_fit_user_prompt(
+    icp: str, company: str, summary: str, products: Sequence[str], notes: str, answers: str
+) -> str:
+    return (
+        _block("Ideal customer", icp)
+        + _block("Company", company)
+        + _block("What they do", summary)
+        + _block("Products", "\n".join(f"- {p}" for p in products))
+        + _block("Operator notes", notes)
+        + _block("Answers to research questions", answers)
+    )

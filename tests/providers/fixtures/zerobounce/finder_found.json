@@ -1,0 +1,8 @@
+{
+  "email": "jane.doe@acme.com",
+  "email_confidence": "HIGH",
+  "domain": "acme.com",
+  "company_name": "Acme",
+  "did_you_mean": "",
+  "failure_reason": ""
+}

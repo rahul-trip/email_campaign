@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "url": "https://acme.com/about",
+      "raw_content": "About Acme. We build things."
+    },
+    {
+      "url": "https://acme.com/empty",
+      "raw_content": ""
+    }
+  ],
+  "failed_results": [
+    {
+      "url": "https://acme.com/team",
+      "error": "timeout"
+    }
+  ],
+  "response_time": 1.2,
+  "usage": {
+    "credits": 1
+  },
+  "request_id": "r2"
+}

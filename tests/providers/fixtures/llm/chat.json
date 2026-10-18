@@ -1,0 +1,13 @@
+{
+  "id": "chatcmpl-123",
+  "object": "chat.completion",
+  "model": "gpt-test-2026",
+  "choices": [
+    {
+      "index": 0,
+      "message": {"role": "assistant", "content": "{\"hook\": \"Saw your grid report\"}"},
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}
+}

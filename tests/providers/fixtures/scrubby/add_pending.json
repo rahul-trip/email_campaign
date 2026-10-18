@@ -1,0 +1,5 @@
+{
+  "email": "jane@acme.com",
+  "status": "pending",
+  "identifier": "https://webhook.scrubby.io/result"
+}
