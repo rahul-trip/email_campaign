@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/*
+ * Design tokens. The light values are the DESIGN.md seed given to Stitch (see the design brief's
+ * "Stitch prompt pack" tab); the dark values mirror the same roles. Components use the Tailwind
+ * names below (bg-surface, text-muted, bg-attention-container ...), never raw colours, so a change
+ * of palette happens here only.
+ */
+:root {
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-low: #f9fafb;
+  --surface-container: #f3f4f6;
+  --ink: #111827;
+  --muted: #6b7280;
+  --outline: #d1d5db;
+  --line: #e5e7eb;
+  --primary: #002be4;
+  --on-primary: #ffffff;
+  --primary-container: #2f4bff;
+  --primary-fixed: #dfe0ff;
+
+  /* The five status families: engine working, needs a person, good, stopped, broken. */
+  --working: #0284c7;
+  --working-container: #e0f2fe;
+  --on-working-container: #075985;
+  --attention: #d97706;
+  --attention-container: #fef3c7;
+  --on-attention-container: #92400e;
+  --good: #16a34a;
+  --good-container: #dcfce7;
+  --on-good-container: #166534;
+  --stopped: #64748b;
+  --stopped-container: #f1f5f9;
+  --on-stopped-container: #334155;
+  --error: #dc2626;
+  --error-container: #fee2e2;
+  --on-error-container: #991b1b;
+
+  color-scheme: light;
+}
+
+/* Dark follows the system unless the user picked a theme; the same values repeat for the pick. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #0b0d12;
+    --surface: #12151c;
+    --surface-low: #161a22;
+    --surface-container: #1c212b;
+    --ink: #e5e7eb;
+    --muted: #9ca3af;
+    --outline: #3a4150;
+    --line: #262b36;
+    --primary: #9aa8ff;
+    --on-primary: #0b0d12;
+    --primary-container: #4a62ff;
+    --primary-fixed: #1e2a66;
+    --working: #38bdf8;
+    --working-container: #0c2a3a;
+    --on-working-container: #bae6fd;
+    --attention: #f59e0b;
+    --attention-container: #3a2a0a;
+    --on-attention-container: #fde68a;
+    --good: #22c55e;
+    --good-container: #0d2e1a;
+    --on-good-container: #bbf7d0;
+    --stopped: #94a3b8;
+    --stopped-container: #1e2530;
+    --on-stopped-container: #cbd5e1;
+    --error: #f87171;
+    --error-container: #3a1414;
+    --on-error-container: #fecaca;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #0b0d12;
+  --surface: #12151c;
+  --surface-low: #161a22;
+  --surface-container: #1c212b;
+  --ink: #e5e7eb;
+  --muted: #9ca3af;
+  --outline: #3a4150;
+  --line: #262b36;
+  --primary: #9aa8ff;
+  --on-primary: #0b0d12;
+  --primary-container: #4a62ff;
+  --primary-fixed: #1e2a66;
+  --working: #38bdf8;
+  --working-container: #0c2a3a;
+  --on-working-container: #bae6fd;
+  --attention: #f59e0b;
+  --attention-container: #3a2a0a;
+  --on-attention-container: #fde68a;
+  --good: #22c55e;
+  --good-container: #0d2e1a;
+  --on-good-container: #bbf7d0;
+  --stopped: #94a3b8;
+  --stopped-container: #1e2530;
+  --on-stopped-container: #cbd5e1;
+  --error: #f87171;
+  --error-container: #3a1414;
+  --on-error-container: #fecaca;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-low: var(--surface-low);
+  --color-surface-container: var(--surface-container);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-outline: var(--outline);
+  --color-line: var(--line);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-primary-fixed: var(--primary-fixed);
+
+  --color-working: var(--working);
+  --color-working-container: var(--working-container);
+  --color-on-working-container: var(--on-working-container);
+  --color-attention: var(--attention);
+  --color-attention-container: var(--attention-container);
+  --color-on-attention-container: var(--on-attention-container);
+  --color-good: var(--good);
+  --color-good-container: var(--good-container);
+  --color-on-good-container: var(--on-good-container);
+  --color-stopped: var(--stopped);
+  --color-stopped-container: var(--stopped-container);
+  --color-on-stopped-container: var(--on-stopped-container);
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
+}
+
+body {
+  @apply bg-background font-sans text-sm text-ink antialiased;
+  font-variant-numeric: tabular-nums;
+}
