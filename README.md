@@ -63,7 +63,7 @@ Then fill in the **sender profile** (legal name, postal address, registration de
 **In the browser**
 
 ```bash
-(cd web && npm ci && npm run build)      # once, and after UI changes
+(cd web2 && npm ci && npm run build)     # once, and after UI changes
 uv run outbound serve                    # http://127.0.0.1:8000
 uv run outbound worker                   # second terminal: executes the runs you start
 ```
@@ -95,8 +95,12 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy
 uv run --with pgserver python -m scripts.pg_tests tests -q   # the same suite on a throwaway Postgres
 uv run datasette outbound.db --immutable                     # read-only database viewer
 
-cd web
+cd web2
 npm run typecheck && npm run build
 npm run gen:api                          # regenerate the client after any API change
-npx playwright test                      # the browser loop, against fake vendors
+npx playwright test                      # browser tests (and the guided tour), against fake vendors
+npm run dev                              # live-reloading app on :5174; API_TARGET=http://127.0.0.1:8765
+                                         # points it at `uv run python -m scripts.e2e_server`
+
+# web/ is the first app, kept until it is deleted; its tests still run in CI.
 ```

@@ -87,6 +87,35 @@ jobs:
       - run: npx playwright test
         working-directory: web
 
+  web2:
+    name: web2 app (types, build, generated client, browser test with the guided tour)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web2/package-lock.json
+      - run: uv sync --frozen
+      - run: npm ci
+        working-directory: web2
+      - name: Generated client matches the API
+        working-directory: web2
+        run: |
+          npm run gen:api
+          git diff --exit-code openapi.json src/api/schema.ts
+      # typecheck covers the app and the browser tests; build is what the server serves.
+      - run: npm run build
+        working-directory: web2
+      - run: npx playwright install --with-deps chromium
+        working-directory: web2
+      - run: npx playwright test
+        working-directory: web2
+
   security:
     name: security (secrets, dependencies)
     runs-on: ubuntu-latest
@@ -110,4 +139,7 @@ jobs:
           node-version: 22
       - name: Known vulnerabilities in web dependencies
         working-directory: web
+        run: npm audit --audit-level=high
+      - name: Known vulnerabilities in web2 dependencies
+        working-directory: web2
         run: npm audit --audit-level=high

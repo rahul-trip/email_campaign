@@ -127,7 +127,8 @@ outbound/
   bootstrap.py builds the engine and unit-of-work factory once
   pipeline.py  wires stages to metered providers (real ones, or fakes in tests)
   worker.py    executes runs queued by the API
-web/           React app; its API client is generated from the OpenAPI document
+web2/          React app (served from web2/dist); its API client is generated from the OpenAPI document.
+web/           the first React app, kept until it is deleted
 ```
 
 **How one lead moves.** The runner reads a company due in a stage's input status, runs the guards (suppression, country policy after the gate, per-prospect budget), then calls the stage with no transaction open. The stage may call vendors (always through the meter) and returns a `StageResult`: the next status, engine-written fields, and any child rows to add. The runner writes all of it in one short transaction that checks `row_version`. A failure is recorded on the company with its stage and error, and the run moves on.
@@ -255,7 +256,7 @@ Modes are `manual`, `discovery` and `mixed`. Suppression always wins. A re-submi
 | Review queue | Generated email shown next to the research and the lint report; edit, approve or reject (edits are captured) |
 | Targets | Quick add from any anchor, upload with preview, confirm domains, edit saved targets, assign a campaign |
 | Leads | Filter by status or hold reason; timeline from `events`; waterfall inspector from `provider_calls`; operator and engine values side by side |
-| Guided tour | First-visit walkthrough of every screen: Next, Skip section, End tour; restart from the header. Steps are data in `web/src/tour/steps.ts`; kept current by a rule in CLAUDE.md and an e2e test |
+| Guided tour | First-visit walkthrough of every screen: Next, Back, Skip section, End tour; restart from the header. Steps are data in `web2/src/tour/steps.ts`; kept current by a rule in CLAUDE.md and an e2e test (`web2/e2e/tour.spec.ts`) |
 | Lead page | Edit, add a person (with consent), record consent, suppress, delete (typed domain, refused once emailed), release. A release of a country-rule hold is refused while the cause is unchanged, so a lead never loops through the same hold |
 | Lead journey | One lead's story: origin (import row and batch), eight stages with state, details, incidents and vendor calls, built by `services/journey.py` from existing rows; read-only (`GET /api/companies/{id}/journey`), no schema change |
 | Runs | Start, watch or cancel a run; spend against budget |

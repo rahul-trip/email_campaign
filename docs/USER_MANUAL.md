@@ -45,7 +45,7 @@ You need the following in place once. [README.md](../README.md) has the commands
 | Your mailbox login (IMAP): `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME` | `.env` | The engine works up to "approved" but cannot make drafts or read your Sent folder |
 | A web login: `OPERATOR_PASSWORD_HASH` and `SESSION_SECRET` | `.env` | The web app will not start |
 | Your **sender profile**: legal name, postal address, registration details, signature | Settings → Sender profile | The writer refuses to produce an email, because the legal footer would have a hole |
-| A **campaign**: wanted job titles and a description of your ideal customer | Settings → Campaigns | Contacts cannot be ranked and fit cannot be scored well |
+| A **campaign**: wanted job titles and a description of your ideal customer | Campaigns | Contacts cannot be ranked and fit cannot be scored well |
 
 Keep `.env` private. It is never committed to git.
 
@@ -67,159 +67,194 @@ uv run outbound worker     # does the work you start from the browser
 
 ### 3.1 The guided tour
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, Targets, Runs, Review, Leads, a lead's journey, acting on a lead, Settings), dimming the page and outlining the part it is explaining.
+The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 
-Every step has three buttons:
+Every step has these buttons:
 
 1. **Next** goes to the next step. On the last step it says **Finish**.
-2. **Skip section** leaves the rest of the section you are in and jumps to the first step of the next one, opening that screen for you. On the last section it ends the tour.
-3. **End tour** closes it. Pressing Escape does the same.
+2. **Back** goes to the previous step.
+3. **Skip section** leaves the rest of the section you are in and jumps to the first step of the next one, opening that screen for you. On the last section it ends the tour.
+4. **End tour** closes it. Pressing Escape does the same.
 
-The tour opens once per browser; ending or finishing it is remembered, and it will not come back by itself. To see it again, press **Tour** at the top of any page.
+The tour opens once per browser; ending or finishing it is remembered, and it will not come back by itself. To see it again, press **Tour** at the top right of any page.
 
-The two sections about a single lead open your most recent lead. If you have none yet, they say so; add a target and start a run, then take the tour again.
+The two sections about a single lead open your most recent lead. If you have none yet, they say so; add a target and start a run, then take the tour again. A step whose part of the screen has nothing to show yet (for example the review queue when it is empty) is shown in the middle of the page.
 
-**For whoever changes the app:** the tour is data, not code. Its text and the element each step points at are in `web/src/tour/steps.ts`; the player is `web/src/tour/Tour.tsx`.
+**For whoever changes the app:** the tour is data, not code. Its text and the element each step points at are in `web2/src/tour/steps.ts`; the player is `web2/src/tour/Tour.tsx`.
 
 - New screen: add a section to `steps.ts` (in the order a person would meet it) and a `place` for it.
-- New feature or changed screen: add or edit a step. Give the element `tour="name"` (on a `Card`) or `data-tour="name"`, and use the same name as the step's `target`.
-- Removed or renamed element: change or delete the step. `web/e2e/tour.spec.ts` walks every step against a real lead and fails if a step points at something that no longer exists, so a forgotten step shows up in the checks.
+- New feature or changed screen: add or edit a step. Give the element `data-tour="name"` (or `tour="name"` on a `Card` or `Tabs`), and use the same name as the step's `target`.
+- Removed or renamed element: change or delete the step. `web2/e2e/tour.spec.ts` walks every step against a real lead and fails if a step points at something that no longer exists, so a forgotten step shows up in the checks.
 - Keep this section of the manual in step with the sections in `steps.ts`.
 
 ---
 
 ## 4. A first email, start to finish
 
-1. **Settings → Sender profile:** fill in your legal name, postal address, registration details and signature. Save.
-2. **Settings → Campaigns:** set the wanted job titles (best first) and describe your ideal customer.
-3. **Targets:** add a company, for example just a website.
-4. **Runs:** press **Start run**. Watch the row until it says *succeeded*.
-5. **Review:** open the email, read it, change anything you like, then **Approve**.
-6. **Runs:** press **Start run** again. This step saves the approved email as a draft.
+1. **Settings → Sender profile:** fill in your legal name, postal address, registration details and signature. Press **Confirm and save**.
+2. **Campaigns:** set the wanted job titles (best first) and describe your ideal customer.
+3. **Add leads:** add a company, for example just a website.
+4. **Runs:** press **Start run**. Watch the row until it says *Succeeded*.
+5. **Review:** read the email, change anything you like, then **Approve**.
+6. **Runs:** press **Start run** again. This run saves the approved email as a draft.
 7. Open your mail program, find the draft in **Drafts**, check it and press Send.
 
 ---
 
 ## 5. The screens
 
-The top bar has five sections. A number next to **Review** is how many emails are waiting for you.
+The menu on the left groups the screens by what you do there. The numbers next to **Review** and **Needs attention** are how many items wait for you there. **Replies** and **Sending** are marked *Soon*: they arrive in later phases.
 
-### 5.1 Review
+Across the top:
+
+- **Search** finds a lead by company or domain. Press Enter to open the filtered list; Ctrl+K (Cmd+K on a Mac) jumps to the box from anywhere.
+- A chip shows a run that is queued or in progress. If a run stays queued, a red banner says the worker is not running.
+- **Add target**, **Tour**, the **theme** button (light, dark, or follow the computer) and **Sign out**.
+- A yellow banner reminds you while the sender profile is not confirmed, because no email is written until it is.
+
+On a narrow screen the menu folds away; open it with the button at the top left.
+
+### 5.1 Dashboard
+
+The first screen after signing in.
+
+- **Needs you:** emails to review, leads on hold (with the reasons), failed leads and websites to confirm. Each card opens the list behind it.
+- **Pipeline:** how many companies sit at each of the eight stages, from Intake to Drafted, and how many left the main path (held, disqualified, failed, rejected, suppressed). Click a stage to open those leads.
+- **Spend** over the last 30 days, per vendor and per prospect against your budget; **Quality** (how many sent emails went out without an edit, against the 80% target); and **Engine activity**, the last run and what it did.
+
+### 5.2 Review
 
 This is where you spend most of your time.
 
-- **Left:** the emails waiting. A red *flagged* tag means the application's own checks found a problem (see below).
-- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red.
-- **Right, "Why this lead":** the company, its fit score and the reason, what the research found, the research questions' answers, and any notes you added.
-- **Right, "Checks":**
-  - whether the linter passed (length, reading level, one question, no links, no banned phrases, footer present);
-  - the country and whether the company is confirmed as an incorporated company;
-  - each problem found, in plain words;
-  - the country-rule decision, with the version of the rule used.
-
-Buttons:
+- **Left:** the emails waiting. A *Flagged* tag means the application's own checks found a problem. On a narrow screen the list is hidden; use the arrows and *1 of N* at the top.
+- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send, where it came from and which vendor checked it.
+- **Right, "Why this lead":** the fit score and its reason, what the research found, the answers to your research questions, and any notes you added.
+- **Right, "Checks":** each quality check (length, subject, reading level, one question, no links, no address, no banned phrases, footer present) with a tick or a warning and the reason, then the country, the company type and the country rule with the version used.
 
 | Button | Does |
 |---|---|
 | **Approve** | Accepts the email as written |
 | **Approve with my edit** | Accepts your edited text. Both versions are kept, and how much you changed is recorded |
-| **Reject** | Ends work on this company. A reason is required and is kept |
+| **Undo my edits** | Puts the original text back |
+| **Reject…** | Ends work on this company. A reason is required and is kept |
+
+Keyboard: **J** and **K** move through the queue, **Ctrl+Enter** in the text approves, **?** lists the shortcuts.
 
 Good to know:
 
 - **Do not remove the footer.** It is the legal text for the country. An edit that deletes it is refused.
 - Approving does not draft the email. The draft is made by the **next run**.
-- Your edits teach the writer: your most recent corrected emails in the same campaign are shown to it as examples (the number is set in Settings → Limits).
-- A *flagged* email is not an error. It means "look carefully here". Typical flags: wrong length, a claim in the opening line that the research does not support, a missing footer.
+- Your edits teach the writer: your most recent corrected emails in the same campaign are shown to it as examples (the number is set in Settings → Limits and budget).
+- A *flagged* email is not an error. It means "look carefully here".
 
-### 5.2 Targets
+### 5.3 Needs attention
 
-Three ways to add companies, plus a place to settle unclear ones.
+Everything that waits on you apart from review, grouped by reason, each group saying in plain words why and what fixes it:
 
-**Add a target.** Fill in whatever you know; one of these is enough:
+- **Held** leads, one group per hold reason (section 7.1). Each row offers the action that resolves it: **Use XX and release** when the research suggested a country, **Add a person with consent** for consent and company-type holds, or *Waiting for the resolver* for catch-all addresses.
+- **Failed** leads, with the step, the reason and when the automatic retry is due; **Retry now** retries at once.
+- **Websites to confirm:** companies added by name where the website found is not certain. Press **Yes, domain** if the guess is right, or type the right website and press **Use this website**.
+
+The buttons at the top show one kind at a time.
+
+### 5.4 Add leads
+
+Three tabs.
+
+**Add one company.** Fill in whatever you know; one of these is enough:
 
 | You know | Fill in | What the application does |
 |---|---|---|
 | The website | Website or domain | Uses it directly |
-| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** |
+| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** under *Websites to confirm* |
 | A work email | Known work email | Takes the company from the address; still verifies the address |
 | A person and a company | Person + Company name | Finds the company; keeps the person as your first choice |
-| A LinkedIn profile | LinkedIn profile URL | Never opens it. A public search of the profile's title finds the name and company |
+| A LinkedIn profile | LinkedIn profile URL | Never opens it. A public search of the profile finds the name and company |
 
-Other fields: job title, country (for example `UK`, `DE`, or a name like `Germany`), priority (1 is handled first, 9 last), a campaign, and **notes for the copywriter**. Notes are read by the writer and by the fit judgement, so use them for things like "met at the expo".
+Other fields: job title, country (for example `UK`, `DE`, or a name like `Germany`), priority (1 is handled first, 9 last), a campaign, and **notes for the copywriter**. Notes are read by the writer and by the fit judgement, so use them for things like "met at the expo". Tick **Check only, do not save** to see what would happen without adding anything.
 
-Tick **Check only, do not save** to see what would happen without adding anything.
+**Upload a file.** A CSV or Excel file, up to 2 MB. Column names are matched loosely (for example `Company`, `Website`, `Email`, `Person`, `Title`, `LinkedIn`, `Country`, `Notes`, `Priority`). Press **1. Preview** first: it shows what each row would become and saves nothing. Then **2. Import**.
 
-**Upload a CSV or Excel file.** Column names are matched loosely (for example `Company`, `Website`, `Email`, `Person`, `Title`, `LinkedIn`, `Country`, `Notes`, `Priority`). Press **Preview** first: it shows what each row would become and saves nothing. Then **Import after preview**. Maximum 2 MB.
+**Websites to confirm.** The same list as on Needs attention.
 
 **Results for each row**
 
 | Result | Meaning |
 |---|---|
-| accepted | A new company was created |
-| merged | The company already exists. Your notes were added to it; nothing was duplicated |
-| needs confirmation | The website is a guess. It appears under *Waiting for your confirmation* |
-| rejected | Not usable. The note says why: no company or website, a free-mail address, a social-media site, or on your do-not-contact list |
-| pending | Only in preview: the row needs a web search that preview does not make |
-
-**Waiting for your confirmation.** For each row you see what you typed and the application's guess. Press **Yes, domain** if the guess is right, or type the correct website and press **Use this website**.
+| Accepted | A new company was created |
+| Merged | The company already exists. Your notes were added to it; nothing was duplicated |
+| Needs confirmation | The website is a guess. It waits under *Websites to confirm* |
+| Rejected | Not usable. The note says why: no company or website, a free-mail address, a social-media site, or on your do-not-contact list |
+| Pending | Only in a preview: the row needs a web search that a preview does not make |
 
 Things that always apply: a company or address on the do-not-contact list is never added; the same website is never added twice; values you type (name, country, priority) are marked as yours and the engine will not overwrite them.
 
-### 5.3 Leads
+### 5.5 Leads
 
-Every company, newest first, 25 to a page. Search by name or domain; filter by status or by hold reason.
+Every company, 25 to a page. Search by name or domain; filter by status or by hold reason. The filters are part of the page address, so a filtered list can be bookmarked or shared. Each row shows the status (and the hold reason or error), a small bar of the eight stages with the next one named, country, fit, priority and when it last changed, and a **Journey** link.
 
-**A lead's page** shows:
+**A lead's page** (click its name) shows:
 
-- the status, hold reason, country, fit score, and the last error if it failed;
-- buttons that appear when they apply: **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
-- for a **held** lead, a panel that says why and offers **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume;
-- **People and addresses:** each person in rank order, each address with its status, where it came from (*provenance*), which vendor found it and which one checked it. Each person has **Edit** (correct the name or title, or give a work email if they have none; on a lead whose email step failed for lack of a full name it also retries that step), **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
-- **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). The address finder cannot search on one word, so a one-word name without an email is refused. They are tried first when an email is written. Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
-- **Edit this lead:** name, country, priority and campaign. What you save is marked as yours and kept. If someone else changed the lead meanwhile, you are asked to reload;
-- **Delete this lead** (a red card near the bottom): removes the lead for good, with its people, addresses, emails, notes and history, and any draft waiting in your mailbox. To stop a mis-click you must type the lead's domain before the button works, and the server checks it again. You can tick *Also never contact this domain again* so it cannot be added back by mistake; otherwise it can be added again as a fresh lead. A lead that has already been emailed **cannot** be deleted, because the record of mail that left must stay: use *Suppress* to stop contact instead. Money already spent stays in the cost totals, and one line records that the lead was deleted, when and by whom, with no personal detail. A run that is working on the lead at that moment simply skips it;
-- **Suppress this domain** at the bottom, for everyone at the company;
-- **Emails:** each email written, its state, and how much you edited it;
-- **Waterfall:** every vendor call made for this company: when, which vendor, what, the result and the cost. *cache hit* means a stored answer was reused at no cost;
-- **Field history:** only appears if the engine tried to change something you set. Your value is kept;
-- **Timeline:** everything that happened, in order.
+- the status, hold reason, company type, country, fit score and priority, and which values you set yourself;
+- buttons that appear when they apply: **Journey**, **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
+- for a **held** lead, a panel that says why and what fixes it, with **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume. For consent and company-type holds it points you to **Add a person with consent**;
+- **People and addresses:** each person in rank order, each address with its status, where it came from, which vendor found it and which one checked it. Each person has **Edit** (correct the name or title, or give a work email if they have none; on a lead whose email step failed for lack of a full name, saving also retries that step), **Record consent** (choose the basis and write where it came from) and **Suppress** (never contact them again; their unsent emails are cancelled);
+- **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well;
+- **Emails:** each email written, its state, how much you edited it and when it was sent;
+- **Research:** the summary, the fit reason, the findings, your research questions' answers and the country rule;
+- **Vendor calls:** every vendor call made for this company: when, which vendor, what, the result and the cost. *Cache hit, free* means a stored answer was reused;
+- **Your values kept:** only appears if the engine found a different value for something you set. Yours was kept; theirs is shown;
+- **Timeline:** everything that happened, in order, and whether you or the engine did it;
+- **Edit this lead** (right): name, country, priority and campaign. What you save is marked as yours and kept. If something changed the lead meanwhile, you are asked to reload;
+- **Danger zone** (right, red): **Suppress this domain** for everyone at the company, and **Delete permanently…**, which removes the lead for good with its people, addresses, emails, notes and history, and any draft waiting in your mailbox. You must type the lead's domain before the button works, and the server checks it again. You can tick *Also never contact this domain again*. A lead that has already been emailed **cannot** be deleted: suppress it instead. Money already spent stays in the cost totals.
 
-**A lead's journey** (the *Journey* link in the leads table, and the button on a lead's page) is a dashboard that tells the whole story of one company:
+**A lead's journey** (the *Journey* link) tells the whole story of one company:
 
-- the **header** says what state the lead is in, **what happens next** (and whether the next move is yours), how many of the eight stages are finished, what has been spent on it, and how many people and emails there are;
-- the **stage bar** shows the eight stages: Intake, Research, Qualification, People, Email address, Copy, Review, and Draft and outreach. Green is done, blue is next up for the engine, amber is held or waiting for you, red is failed or stopped, grey is not reached. Click a stage (or use the arrow keys) to read it. The page opens on the stage that needs attention;
-- each **stage** shows a summary, its details (what the research found, the fit score and country policy, the people and their titles, each address and how it was verified, the email and its checks, your edits, the draft), any holds or failures that happened during it, and the vendor calls made to get there with their cost. A call is counted against the stage the lead was moving towards when it was made;
-- **How this lead arrived** shows whether it was typed in, imported from a file, sent by the webhook or found by search, who added it and when, exactly what was supplied, and how the website was matched.
+- what state the lead is in and **what happens next** (and whether the next move is yours), how many of the eight stages are finished, what has been spent on it, and how many people and emails there are;
+- the **stage bar** of the eight stages: Intake, Research, Qualification, People, Email address, Copy, Review, and Draft and outreach. Green is done, blue is next for the engine, amber is held or waiting for you, red is failed or stopped, grey is not reached. Click a stage (or use the arrow keys) to read it. The page opens on the stage that needs attention;
+- each **stage** shows a summary, its details, any holds or failures, and the vendor calls made with their cost;
+- **How this lead arrived:** typed in, imported from a file, sent by the webhook or found by search, who added it and when, exactly what was supplied, and how the website was matched.
 
-It only shows; to retry, release or edit, use the lead's page.
+It only shows; to act, use **Open the lead to act on it**.
 
-### 5.4 Runs
+### 5.6 Runs
 
-- **Mode.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching your campaign's ideal-customer description), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it.
+- **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it.
 - **Leads per stage.** At most this many companies are handled by each step in one run (default 50).
-- **Companies to discover.** Only for the discovery modes.
 
-A run moves every company as far as it can go, step by step, and reports counts per step and the money spent. **Cancel** stops a run between companies. The page updates by itself while a run is queued or running.
+A run moves every company as far as it can go and lists, per step, how many moved on, were held or failed, plus the time it took and the money spent. **Cancel** stops a run between companies; **Details** shows when it was queued, started and finished and its settings. The list updates by itself while a run is queued or running.
 
-Run states: *queued* (waiting for the worker), *running*, *succeeded*, *failed* (the run itself broke; individual companies failing does not make a run fail), *cancelled*.
+Run states: *Queued* (waiting for the worker), *Running*, *Succeeded*, *Failed* (the run itself broke; individual companies failing does not make a run fail), *Cancelled*.
 
-The per-prospect budget is shown under the form. When a company has used its budget, no more paid calls are made for it.
+### 5.7 Reports
 
-### 5.5 Settings
+Quality since the start (sent without an edit against the 80% target, flagged share, catch-all share), spend for the period you choose (7, 30 or 90 days, or a year: total, per prospect against your budget, and how many calls were answered from the cache), where leads are held, and cost per vendor: calls, spend and average cost per call, which is what the vendor bake-off decides on.
 
-Every Save button shows what happened next to it: *Saving…*, then a green tick (for example *Campaign saved.*), or the error. In the boxes marked *one per line* press Enter for a new line; blank lines are dropped when you save. The **Mailboxes** tab explains that drafts use the login in `.env`, and shows the SPF, DKIM and DMARC result after **Check DNS**.
+### 5.8 Campaigns
 
-Until you press **Confirm and save** on the sender profile, a notice says it is not confirmed and no emails are written. A blank per-prospect budget means no limit; 0 means no paid calls. **Do not contact** also has **Forget an address**, which erases a person on request (see section 10).
+Each campaign has its wanted job titles (one per line, best first), the ideal customer, the minimum fit score (0–100), up to 3 research questions and the follow-up days (stored for a later phase). **New campaign** adds one.
+
+### 5.9 Mailboxes
+
+Record a mailbox and press **Check DNS** to see whether its domain has SPF, DKIM and DMARC set up. Drafting and the Sent sync use the mailbox login in `.env`, not this list, so record the same mailbox.
+
+### 5.10 Policies and privacy
 
 | Tab | What it holds |
 |---|---|
-| **Sender profile** | Who you are. The legal name, postal address, registration details and contact details are printed in footers. Signature name and title end every email. *About you*, value propositions and proof points are what the writer draws on, **so only put true statements there** |
-| **Limits** | Budget per prospect; how many of your earlier corrections the writer sees; and *Only send to proven addresses* (leave this on) |
-| **Campaigns** | Wanted job titles (best first), ideal customer, minimum fit score (0–100), up to 3 research questions, and follow-up days (stored for a later phase) |
-| **Country policies** | The rule and footer for each country. Each change raises a version number that every decision records. There is a field for who reviewed it |
-| **Do not contact** | Add an address or a whole domain. It is stored only as a fingerprint, never as text. You can add but not remove |
-| **Mailboxes** | Record a mailbox and press **Check DNS** to see whether its domain has SPF, DKIM and DMARC set up |
+| **Country rules** | The rule (allow, allow with footer, consent required, block) and footer for each country, *Incorporated companies only*, and who reviewed it. A change to the rule, the companies-only box or the footer saves a new version, and every decision records the version it used. Add a country with its two letters; it starts as blocked |
+| **Do not contact** | Add an address or a whole domain. It is stored only as a fingerprint, never as text, and asks you to confirm because it cannot be removed |
+| **Forget a person** | Erases a person on request (section 10): the address goes on the do-not-contact list, unsent emails are cancelled, drafts are deleted, and their name, title and address are removed |
+
+### 5.11 Settings
+
+Every Save shows what happened next to it: *Saving…*, then a green tick, or the error. In the boxes marked *one per line* press Enter for a new line; blank lines are dropped when you save.
+
+| Tab | What it holds |
+|---|---|
+| **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
+| **Sender profile** | Who you are, in three parts: the legal identity printed in footers, your signature, and what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
+| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, and *Only send to proven addresses* (leave this on) |
 
 Automatic sending cannot be switched on in this version.
 
@@ -271,15 +306,15 @@ For the three holds that come from the country rule (*country unknown*, *entity 
 |---|---|---|
 | country unknown | The country could not be worked out, and the rules depend on it | Set the country under **Edit this lead** (or **Use XX and release** if one was suggested), then release |
 | entity unknown | UK company, but nothing shows it is a registered company, and UK rules only allow those | Add a Companies House key so it can be checked, or **Add a person** who has consented (below), then release |
-| consent required | The country or company type needs the person's consent first (for example India under the default rules) | Use **Add a person** on the lead page: enter the person who agreed to be contacted, tick that they have consented and say where it came from. The hold is released for you and the next run carries on. Or, if the rule is wrong for you, change it under Settings → Country policies |
+| consent required | The country or company type needs the person's consent first (for example India under the default rules) | Use **Add a person** on the lead page: enter the person who agreed to be contacted, tick that they have consented and say where it came from. The hold is released for you and the next run carries on. Or, if the rule is wrong for you, change it under Policies and privacy → Country rules |
 | catch all resolving | The address is on a server that accepts anything, so it cannot be proven by a normal check. It has been sent to a resolver, which answers in 1–3 days | Wait. `outbound tick` collects the answer and releases the company by itself |
 | catch all unverified | The resolver could not decide, or there is none | Normally leave it. An unproven address risks a bounce |
-| needs operator | The rules for the country are missing or incomplete | Add or review the country's policy under Settings → Country policies |
+| needs operator | The rules for the country are missing or incomplete | Add or review the country's rule under Policies and privacy → Country rules |
 
 ### 7.2 Disqualified
 
 - **Fit too low:** the research judged the company a poor match. If you disagree, **Override and qualify** on the lead's page.
-- **Country forbids cold email** (by default Germany and Austria): it stays disqualified. Pressing *Override and qualify* will not get it through, because the country check runs again before the next step and stops it. Only a recorded consent changes that, and recording consent has no screen yet (section 13).
+- **Country forbids cold email** (by default Germany and Austria): it stays disqualified. Pressing *Override and qualify* will not get it through, because the country check runs again before the next step and stops it. Only consent changes that: add the person who agreed to be contacted with **Add a person** on the lead page, ticking that they have consented.
 
 ### 7.3 Failed
 
@@ -287,12 +322,12 @@ A failed lead shows the step and the reason. The application retries automatical
 
 | Message | Meaning | What to do |
 |---|---|---|
-| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | Nothing to retry. Adding a known address to an existing company is not possible on screen yet (section 13); for a new company, fill in the email when you add it |
+| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | Nothing to retry. If you know someone there, use **Add a person** on the lead page with their work email; or **Edit** a person who has no address and give it |
 | no decision-maker was found | The site named nobody and the search found nobody | Add a person yourself |
 | the sender profile needs: legal_name, postal_address … | The footer cannot be filled | Fill in those fields in Settings → Sender profile, then Retry |
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |
 | no contact has an address that is safe to send to | The chosen address is no longer usable | Check the lead's People section |
-| per-prospect budget used up | The company hit its spend ceiling | Raise it in Settings → Limits if you accept the cost |
+| per-prospect budget used up | The company hit its spend ceiling | Raise it in Settings → Limits and budget if you accept the cost |
 | the reply was cut off at the token limit | The model ran out of room | Raise `LLM_MAX_TOKENS` in `.env` |
 | a vendor error such as 401 or 429 | A key is wrong or a limit was hit | Check the key and your plan, then Retry |
 
@@ -300,7 +335,7 @@ A failed lead shows the step and the reason. The application retries automatical
 
 ## 8. Country rules (defaults)
 
-These are working defaults, **not legal advice**. Have a lawyer review them before you rely on them, and record who did under Settings → Country policies.
+These are working defaults, **not legal advice**. Have a lawyer review them before you rely on them, and record who did under Policies and privacy → Country rules.
 
 | Country | Default behaviour |
 |---|---|
@@ -319,13 +354,13 @@ The country is taken from what you entered, otherwise from the site (a stated re
 
 ## 9. Money
 
-- The ceiling is **$0.50 per company** by default (Settings → Limits). Before every paid call the application checks the company's spend so far and refuses the call if it would go over.
+- The ceiling is **$0.50 per company** by default (Settings → Limits and budget). Before every paid call the application checks the company's spend so far and refuses the call if it would go over.
 - Every call is recorded with its cost. A stored answer is reused instead of buying it again: web searches for 30 days, addresses and checks for 90 days. **Running the same targets again costs nothing.**
 - Approximate default prices the application assumes (change them in `.env` with `PROVIDER_PRICES`): a web search or page read about $0.008, an address found by Hunter about $0.025, by ZeroBounce about $0.16, a MyEmailVerifier check $0.0025. Model use is billed by your model provider.
 - To stop one vendor overspending in a month, set `MONTHLY_CAPS_MICRO_USD` in `.env` (amounts in millionths of a dollar).
 - In the first live test, two companies cost $0.051 in total.
 
-See what you spent: `uv run outbound report cost --days 30`, or the Waterfall on any lead.
+See what you spent: `uv run outbound report cost --days 30`, the Reports screen, or *Vendor calls* on any lead's page.
 
 ---
 
@@ -428,7 +463,7 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | Symptom | Likely cause and fix |
 |---|---|
 | The web app will not start: "The web app needs a login" | `OPERATOR_PASSWORD_HASH` or `SESSION_SECRET` is missing in `.env` |
-| Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web && npm ci && npm run build` |
+| Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web2 && npm ci && npm run build` |
 | Something failed in the browser and the message ends "Reference: …" | Search the logs for that reference (see 13a); the line with `unhandled_error` has the cause |
 | A lead fails with "has no first and last name" | A person was saved with one word. Open the lead, press **Edit** on the person, give both names (or a work email) and **Save and retry the email step** |
 | A button fails with "The server has no such endpoint" (or, on an older version, "Method Not Allowed") | The page is newer than the running server. Stop `uv run outbound serve` and `uv run outbound worker` and start them again. Do this after every update |
