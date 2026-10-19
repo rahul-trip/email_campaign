@@ -15,7 +15,7 @@ VM  /opt/outbound/
       migrate   one-shot: outbound db upgrade && outbound seed
       api       outbound serve  → 127.0.0.1:8010  ← the VM's existing nginx/Caddy adds https
       worker    outbound worker
-    Supabase Postgres (session pooler, TLS)  ← DATABASE_URL, from Doppler
+    Supabase Postgres (session pooler, TLS)  ← POSTGRES_URL, from Doppler
 ```
 
 - **Secrets live in Doppler.** Every container starts as `doppler run -- outbound …`. The VM holds only a read-only Doppler service token. Doppler also keeps an encrypted copy of the last secrets on the `outbound_doppler` volume, so a restart works while Doppler is unreachable.
@@ -57,10 +57,20 @@ postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.co
 - **Use the session pooler on port 5432**, not the direct connection, which is IPv6-only and so out of reach of most GCP VMs. Do not use the transaction pooler on port 6543 either: it breaks the prepared statements psycopg uses.
 - Replace `[YOUR-PASSWORD]` with the database password (**Project Settings → Database**). URL-encode it if it contains `@`, `:`, `/`, `#` or `?`.
 - Add `?sslmode=require` at the end, so the connection is always encrypted.
-- Store the result in Doppler as `DATABASE_URL`. `postgresql://` is fine: the app switches it to the psycopg 3 driver by itself.
+- Store the result in Doppler as `POSTGRES_URL`. `postgresql://` is fine: the app switches it to the psycopg 3 driver by itself. The compose file sets `DATABASE_BACKEND=postgres`, so production always uses it.
 - Small Supabase plans allow about 15 pooler clients in all. Each process (api, worker, a one-off CLI command) keeps `DATABASE_POOL_SIZE` connections (default 5). Lower it in Doppler if Supabase reports `max clients reached`.
 
 The first deploy creates the tables (`db upgrade`) and the default workspace, campaign and country rules (`seed`). Both are safe to run again, and every deploy runs them. The tables go in the `public` schema, so use a Supabase project of its own, or at least one where nothing else owns tables with the same names.
+
+**Testing locally against either database.** Keep both settings in your `.env` and flip one switch:
+
+```bash
+DATABASE_BACKEND=sqlite        # or postgres
+SQLITE_PATH=outbound.db
+POSTGRES_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+`uv run outbound db upgrade`, `seed`, `serve` and `worker` then use whichever is switched on. An explicit `DATABASE_URL` (or `--database-url`) overrides the switch. While switched to `postgres` on your laptop, you are working on the production data. Prefer a second Supabase project for testing.
 
 Migrations are additive. A rollback to an older commit does not undo them, and the older code runs on the newer schema.
 
@@ -68,11 +78,11 @@ Migrations are additive. A rollback to an older commit does not undo them, and t
 
 1. Create a project `outbound` with a `prd` config.
 2. Add every key from [`.env.example`](../.env.example) that you use, plus:
-   - `DATABASE_URL`, the Supabase URL from 1.2;
+   - `POSTGRES_URL`, the Supabase URL from 1.2;
    - `OPERATOR_PASSWORD_HASH`, from `uv run outbound auth hash-password`;
    - `SESSION_SECRET`, a long random string (`openssl rand -hex 32`).
    From a filled-in local `.env`: `doppler secrets upload --project outbound --config prd .env`. Then remove keys that are only for your laptop.
-3. Do **not** put `ENVIRONMENT`, `LOG_FORMAT`, `API_HOST`, `API_PORT`, `COOKIE_SECURE` or `FORWARDED_ALLOW_IPS` there. `deploy/compose.yml` sets them, and the compose values win.
+3. Do **not** put `DATABASE_BACKEND`, `ENVIRONMENT`, `LOG_FORMAT`, `API_HOST`, `API_PORT`, `COOKIE_SECURE` or `FORWARDED_ALLOW_IPS` there. `deploy/compose.yml` sets them, and the compose values win.
 4. Create a **service token** for `outbound/prd` with read access. That is the `DOPPLER_TOKEN` secret below. Never use a personal token (`dp.pt.…`) for the VM: it can read and change every project you can.
 
 ### 1.4 GitHub
@@ -137,8 +147,8 @@ Moving the data from a laptop's SQLite file is not automatic. Start on the empty
 |---|---|
 | `doppler.env is missing` | The workflow writes it; check the `DOPPLER_TOKEN` secret. |
 | `Doppler Error: … token` in the logs | The token is wrong or revoked. Make a new service token and update the secret. |
-| `migrate` exits with `password authentication failed` | The password in `DATABASE_URL` is wrong, still `[YOUR-PASSWORD]`, or not URL-encoded (1.2). |
-| `migrate` exits with `Network is unreachable` | `DATABASE_URL` is the direct connection (IPv6). Use the session pooler URL (1.2). |
+| `migrate` exits with `password authentication failed` | The password in `POSTGRES_URL` is wrong, still `[YOUR-PASSWORD]`, or not URL-encoded (1.2). |
+| `migrate` exits with `Network is unreachable` | `POSTGRES_URL` is the direct connection (IPv6). Use the session pooler URL (1.2). |
 | `max clients reached` in the logs | Too many connections for the Supabase plan. Lower `DATABASE_POOL_SIZE` in Doppler. |
 | The worker restarts every few seconds, logging `not configured: …` | A vendor key named in the message is missing in Doppler. |
 | The login page loads but signing in fails with a cookie error | The site is not on https, or the proxy does not forward to the app. |

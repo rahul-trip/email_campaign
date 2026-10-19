@@ -7,7 +7,7 @@
 #   worker   executes the runs queued from the web app
 #
 # Secrets come from Doppler at start-up. Only DOPPLER_TOKEN is on disk, in ${OUTBOUND_HOME}/doppler.env.
-# The database is Supabase Postgres, through its session pooler (DATABASE_URL in Doppler).
+# The database is Supabase Postgres, through its session pooler (POSTGRES_URL in Doppler).
 
 x-app: &app
   image: outbound:${RELEASE:?set RELEASE to the commit being deployed}
@@ -16,6 +16,7 @@ x-app: &app
   environment:
     # Not secrets, and the same on every deployment, so they live here rather than in Doppler.
     ENVIRONMENT: production
+    DATABASE_BACKEND: postgres  # POSTGRES_URL (Supabase) comes from Doppler
     LOG_FORMAT: json
     API_HOST: 0.0.0.0
     API_PORT: "8000"
