@@ -29,3 +29,4 @@ tests/
 scripts/
 docs/
 deploy/
+.deploy-local/

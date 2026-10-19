@@ -20,7 +20,7 @@ VM  /opt/outbound/
 
 - **Secrets live in Doppler.** Every container starts as `doppler run -- outbound …`. The VM holds only a read-only Doppler service token. Doppler also keeps an encrypted copy of the last secrets on the `outbound_doppler` volume, so a restart works while Doppler is unreachable.
 - **The database is Supabase Postgres.** The VM reaches it over the internet, encrypted; nothing database-related runs on the VM.
-- **The image is built on the VM** from the `Dockerfile`, at low CPU priority. There is no registry.
+- **The image is built on the VM** from the `Dockerfile`. There is no registry. Docker caches the dependency layers, so after the first build a code change rebuilds much faster.
 - **HTTPS is the job of the proxy already on the VM.** The app publishes its port on `127.0.0.1` only and sets `COOKIE_SECURE=true`. It refuses logins over plain http, so it is never reachable without the proxy.
 
 ## 1. One-time setup
@@ -62,15 +62,7 @@ postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.co
 
 The first deploy creates the tables (`db upgrade`) and the default workspace, campaign and country rules (`seed`). Both are safe to run again, and every deploy runs them. The tables go in the `public` schema, so use a Supabase project of its own, or at least one where nothing else owns tables with the same names.
 
-**Testing locally against either database.** Keep both settings in your `.env` and flip one switch:
-
-```bash
-DATABASE_BACKEND=sqlite        # or postgres
-SQLITE_PATH=outbound.db
-POSTGRES_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
-```
-
-`uv run outbound db upgrade`, `seed`, `serve` and `worker` then use whichever is switched on. An explicit `DATABASE_URL` (or `--database-url`) overrides the switch. While switched to `postgres` on your laptop, you are working on the production data. Prefer a second Supabase project for testing.
+To try the app against Supabase from your laptop first, see [section 5.1](#51-the-app-against-either-database).
 
 Migrations are additive. A rollback to an older commit does not undo them, and the older code runs on the newer schema.
 
@@ -156,3 +148,65 @@ Moving the data from a laptop's SQLite file is not automatic. Start on the empty
 | `port is already allocated` | Another app uses `OUTBOUND_PORT`. Choose another (1.1) and update the proxy. |
 
 The compose file's `env_file` treats `$` as a variable. That does not matter for `doppler.env`, which holds only the token, but an Argon2 hash pasted into an env file for a local test must be in single quotes.
+
+## 5. Testing locally first
+
+Two levels, the quick one first.
+
+### 5.1 The app against either database
+
+No Docker: the app runs as in development, and one line in `.env` picks the database.
+
+```bash
+DATABASE_BACKEND=sqlite        # or postgres
+SQLITE_PATH=outbound.db
+POSTGRES_URL=postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+```
+
+```bash
+uv run outbound db upgrade && uv run outbound seed   # once per database
+uv run outbound serve                                  # http://127.0.0.1:8000
+uv run outbound worker                                 # in a second terminal
+```
+
+An explicit `DATABASE_URL`, or `--database-url`, overrides the switch. While switched to `postgres` you are working on the production data, so prefer a second Supabase project for testing. Switching back to `sqlite` leaves both databases as they were.
+
+### 5.2 Rehearse the whole deploy in Docker
+
+[`deploy/local-test.sh`](../deploy/local-test.sh) runs the VM's own deploy script on your machine. It uses the same image, the same `doppler run` start-up, the same health check and the same rollback. Two things are different:
+
+| On the VM | In the rehearsal ([`deploy/compose.local.yml`](../deploy/compose.local.yml)) |
+|---|---|
+| Supabase | a local Postgres 16 container (`db`), kept between runs |
+| the VM's nginx or Caddy | Caddy with its own certificate on <https://localhost:8443> (`proxy`) |
+| Doppler config `prd` | Doppler config `dev`: the same keys, with `POSTGRES_URL=postgresql://outbound:outbound@db:5432/outbound` |
+| `/opt/outbound` | `.deploy-local/` in the repo (git-ignored) |
+
+**Once:**
+
+1. Docker Desktop is running.
+2. In Doppler, `outbound/dev` holds the same keys as `prd`, with `POSTGRES_URL` as in the table and its own `SESSION_SECRET`.
+3. Create a read-only service token for `outbound/dev` and save it:
+   ```bash
+   mkdir -p .deploy-local && (umask 077 && echo 'DOPPLER_TOKEN=dp.st.dev...' > .deploy-local/doppler.env)
+   ```
+
+**Each time:**
+
+```bash
+deploy/local-test.sh up       # copies the working tree (uncommitted changes too, never .env) as a new release
+deploy/local-test.sh logs     # follow migrate, api, worker, db and proxy
+deploy/local-test.sh down     # stop; the local database is kept
+deploy/local-test.sh reset    # stop and delete the local database
+```
+
+Open <https://localhost:8443>, accept the certificate warning once, and sign in with the operator password. A good run prints `==> healthy on 127.0.0.1:8010` and `==> deployed local-… (previous: …)`. Check that:
+
+- `docker compose -p outbound ps -a` shows `migrate` exited with code 0, and `api` healthy, `worker`, `db` and `proxy` up;
+- the worker logs `service_started` with `role` `worker`, not `not configured: …`;
+- signing in at <https://localhost:8443> works, and the `api` logs show `login_succeeded`. Port 8010 is published on the loopback only, as on the VM, where nothing outside can reach it.
+
+The first `up` builds everything (a few minutes); after that a redeploy takes about 20 seconds. To see a rollback, deploy once, break the `migrate` command in the newest `.deploy-local/releases/<release>/deploy/compose.yml`, and run that release's `deploy/remote-deploy.sh` with `OUTBOUND_HOME=$PWD/.deploy-local OUTBOUND_COMPOSE_EXTRA=deploy/compose.local.yml`. The script reports the failure, goes back to the previous release and checks that it is healthy.
+
+**Careful:** the `dev` config holds the real vendor, LLM and mailbox keys. A run started in the rehearsal makes real paid calls and saves real drafts. Remove keys from `dev`, or do not start runs, if you only want to check the deploy itself.
+

@@ -6,6 +6,9 @@
 # waits for /api/health. If anything fails it switches back to the previous release and restarts
 # that, then exits non-zero. It only ever touches the compose project `outbound`, so the other
 # application on the VM is left alone.
+#
+# OUTBOUND_COMPOSE_EXTRA names one more compose file inside the release (deploy/local-test.sh
+# uses it to add a local Postgres and https proxy). It is unset on the VM.
 set -euo pipefail
 
 RELEASE="${1:?usage: remote-deploy.sh <release-sha>}"
@@ -32,7 +35,11 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 compose() { # compose <release> <args...>
   local release="$1"
   shift
-  RELEASE="$release" docker compose -p "$PROJECT" -f "$RELEASES/$release/deploy/compose.yml" "$@"
+  local files=(-f "$RELEASES/$release/deploy/compose.yml")
+  if [[ -n "${OUTBOUND_COMPOSE_EXTRA:-}" ]]; then
+    files+=(-f "$RELEASES/$release/$OUTBOUND_COMPOSE_EXTRA")
+  fi
+  RELEASE="$release" docker compose -p "$PROJECT" "${files[@]}" "$@"
 }
 
 healthy() {
@@ -58,10 +65,9 @@ if [[ -L "$OUTBOUND_HOME/current" ]]; then
   previous="$(basename "$(readlink "$OUTBOUND_HOME/current")")"
 fi
 
-# ---- build (the only heavy step; low priority so the other app keeps its CPU) -----------------
+# ---- build (the only heavy step; the image layers are cached, so a code change is quick) -----
 say "building outbound:$RELEASE"
-nice -n 10 env RELEASE="$RELEASE" docker compose -p "$PROJECT" \
-  -f "$RELEASES/$RELEASE/deploy/compose.yml" build api
+compose "$RELEASE" build api
 
 # ---- switch and start --------------------------------------------------------------------------
 rollback() {
@@ -71,7 +77,7 @@ rollback() {
     say "rolling back to $previous"
     ln -sfn "$RELEASES/$previous" "$OUTBOUND_HOME/current"
     # Migrations are not undone: they are written to be additive, so the old code still runs.
-    compose "$previous" up -d --remove-orphans api worker || true
+    compose "$previous" up -d --remove-orphans || true  # the whole stack, as it was
     if healthy; then
       say "rolled back to $previous and it is healthy"
     else
@@ -94,7 +100,9 @@ say "healthy on 127.0.0.1:$OUTBOUND_PORT"
 # ---- tidy up: old release folders and their images, never anything else -----------------------
 # Keeps this release, the previous one and the KEEP_RELEASES newest others, for quick rollbacks.
 kept=0
-while read -r _ release; do
+# Release folders are named by commit, so listing them by time is safe (and works on macOS too).
+# shellcheck disable=SC2012
+while read -r release; do
   [[ "$release" == "$RELEASE" || "$release" == "$previous" ]] && continue
   if (( kept < KEEP_RELEASES )); then
     kept=$((kept + 1))
@@ -102,7 +110,7 @@ while read -r _ release; do
   fi
   rm -rf "${RELEASES:?}/$release"
   docker image rm "outbound:$release" >/dev/null 2>&1 || true
-done < <(find "$RELEASES" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %f\n' | sort -rn)
+done < <(ls -1t "$RELEASES")
 docker image prune -f --filter "label=com.docker.compose.project=$PROJECT" >/dev/null 2>&1 || true
 
 say "deployed $RELEASE (previous: ${previous:-none})"
