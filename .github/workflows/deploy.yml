@@ -1,0 +1,145 @@
+name: deploy
+
+# Deploys a commit to a VM over SSH: Actions → deploy → Run workflow, then give the host and user.
+# The VM builds the image and runs it with docker compose (project `outbound`); secrets come from
+# Doppler at container start. One-time VM setup and the secrets below are in docs/DEPLOY.md.
+#
+# Secrets (in the `production` environment):
+#   DEPLOY_SSH_KEY   private key whose public half is in the deploy user's authorized_keys
+#   DOPPLER_TOKEN    a read-only Doppler *service token* for the outbound/prd config
+#   SSH_KNOWN_HOSTS  optional; the VM's host key line(s). Without it the key is trusted on first use.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: VM IP address or hostname
+        required: true
+        type: string
+      username:
+        description: SSH user on the VM (must be in the docker group)
+        required: true
+        type: string
+      ref:
+        description: Branch, tag or commit to deploy
+        required: false
+        default: main
+        type: string
+      port:
+        description: Loopback port the proxy forwards to (blank keeps the VM's setting, else 8010)
+        required: false
+        default: ""
+        type: string
+      app_dir:
+        description: Folder on the VM that holds the releases
+        required: false
+        default: /opt/outbound
+        type: string
+      run_checks:
+        description: Run the full CI suite before deploying
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: deploy-${{ inputs.host }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: ${{ inputs.run_checks }}
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  deploy:
+    needs: checks
+    # Runs when the checks passed, or were switched off.
+    if: ${{ !cancelled() && (needs.checks.result == 'success' || needs.checks.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    env:
+      HOST: ${{ inputs.host }}
+      DEPLOY_USER: ${{ inputs.username }}
+      APP_DIR: ${{ inputs.app_dir }}
+      PORT: ${{ inputs.port }}
+    steps:
+      - name: Check the inputs
+        run: |
+          [[ "$HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::host looks wrong: $HOST"; exit 1; }
+          [[ "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "::error::username looks wrong"; exit 1; }
+          [[ "$APP_DIR" =~ ^/[A-Za-z0-9/_.-]+$ ]] || { echo "::error::app_dir must be an absolute path"; exit 1; }
+          [[ -z "$PORT" || "$PORT" =~ ^[0-9]{2,5}$ ]] || { echo "::error::port must be a number"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve the release
+        id: release
+        run: echo "sha=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          [[ -n "$DEPLOY_SSH_KEY" ]] || { echo "::error::the DEPLOY_SSH_KEY secret is not set"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [[ -n "$SSH_KNOWN_HOSTS" ]]; then
+            printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::SSH_KNOWN_HOSTS is not set; trusting the host key seen now"
+            ssh-keyscan -T 10 "$HOST" > ~/.ssh/known_hosts
+          fi
+          cat > ~/.ssh/config <<EOF
+          Host target
+            HostName $HOST
+            User $DEPLOY_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+
+      - name: Upload the release
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          ssh target "mkdir -p '$APP_DIR/releases/$SHA' && find '$APP_DIR/releases/$SHA' -mindepth 1 -delete"
+          git archive --format=tar HEAD | ssh target "tar -x -C '$APP_DIR/releases/$SHA'"
+
+      - name: Give the VM its Doppler token
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+        run: |
+          [[ -n "$DOPPLER_TOKEN" ]] || { echo "::error::the DOPPLER_TOKEN secret is not set"; exit 1; }
+          # Sent on stdin, so the token is never in a command line or a log.
+          printf 'DOPPLER_TOKEN=%s\n' "$DOPPLER_TOKEN" \
+            | ssh target "umask 077 && cat > '$APP_DIR/doppler.env'"
+
+      - name: Build, migrate and start on the VM
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+        run: |
+          ssh target "OUTBOUND_HOME='$APP_DIR' OUTBOUND_PORT='$PORT' bash '$APP_DIR/releases/$SHA/deploy/remote-deploy.sh' '$SHA'"
+
+      - name: Summary
+        if: always()
+        env:
+          SHA: ${{ steps.release.outputs.sha }}
+          REF: ${{ inputs.ref }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo "### Outbound deploy: $OUTCOME"
+            echo "- host: \`$HOST\` as \`$DEPLOY_USER\`"
+            echo "- ref: \`$REF\` → release \`$SHA\`"
+            echo "- roll back: run this workflow again with an older ref"
+          } >> "$GITHUB_STEP_SUMMARY"
+          rm -f ~/.ssh/deploy_key

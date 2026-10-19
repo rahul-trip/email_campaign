@@ -63,7 +63,9 @@ uv run outbound worker     # does the work you start from the browser
 - **Both must be running.** The web app only *queues* a run; the worker carries it out. If you press Start run and nothing happens, the worker is not running.
 - Open <http://127.0.0.1:8000> and sign in with the password you chose when you created `OPERATOR_PASSWORD_HASH`.
 - The web app listens only on your own computer. Five wrong passwords in a minute locks sign-in for a minute. A sign-in lasts 12 hours.
+- The database is the local file `outbound.db` unless `.env` says `DATABASE_BACKEND=postgres`, which uses `POSTGRES_URL` (the Supabase database) instead. Change that one line to switch.
 - First time only: `uv run outbound db upgrade` and `uv run outbound seed` create the database, a default workspace, a default campaign and the country rules.
+- **On the server** the app and worker run all the time, at the address your team set up (always https). A deploy sets up the database itself and restarts both processes for a few seconds, so avoid deploying while a run is going. Logs, restarts and CLI commands on the server are in [DEPLOY.md](DEPLOY.md), section 3.
 
 ### 3.1 The guided tour
 

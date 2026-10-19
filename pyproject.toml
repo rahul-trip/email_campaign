@@ -30,6 +30,7 @@ dependencies = [
     "itsdangerous>=2.2",
     "python-multipart>=0.0.9",
     "dnspython>=2.6",
+    "psycopg[binary]>=3.2",  # Postgres in production (Supabase) and in CI
 ]
 
 [dependency-groups]
@@ -38,7 +39,6 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.11",
-    "psycopg[binary]>=3.2",  # lets the database tests run against Postgres in CI
     "pre-commit>=3.8",
     "types-openpyxl>=3.1",
     "datasette>=0.65",  # read-only database viewer for Phases 1 and 2

@@ -1,0 +1,6 @@
+# The local stand-in for the VM's proxy (deploy/compose.local.yml). `tls internal` makes a
+# certificate signed by Caddy's own authority, so the browser warns once; accept it.
+https://localhost:8443 {
+	tls internal
+	reverse_proxy api:8000
+}

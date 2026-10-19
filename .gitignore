@@ -42,3 +42,6 @@ web2/dist/
 web2/node_modules/
 web2/test-results/
 web2/playwright-report/
+
+# Local deploy rehearsal (deploy/local-test.sh): releases and the Doppler dev token
+.deploy-local/

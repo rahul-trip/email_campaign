@@ -67,7 +67,13 @@ def register(app: typer.Typer) -> None:
         )
         # log_config=None keeps our logging setup; the access line is replaced by the middleware.
         uvicorn.run(
-            api, host=bind_host, port=port or config.api_port, log_config=None, access_log=False
+            api,
+            host=bind_host,
+            port=port or config.api_port,
+            log_config=None,
+            access_log=False,
+            proxy_headers=True,
+            forwarded_allow_ips=config.forwarded_allow_ips,
         )
 
     @app.command()

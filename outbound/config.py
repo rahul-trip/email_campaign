@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -19,7 +19,16 @@ class Settings(BaseSettings):
         env_file=(".env", "agent/.env"), env_file_encoding="utf-8", extra="ignore"
     )
 
-    database_url: str = "sqlite:///outbound.db"
+    # --- database: switch with DATABASE_BACKEND; both settings can sit in .env side by side ---
+    database_backend: Literal["sqlite", "postgres"] = "sqlite"
+    sqlite_path: str = "outbound.db"
+    postgres_url: str = ""  # e.g. Supabase's session pooler; postgresql:// is fine
+    # Set it to bypass the switch (the tests and --database-url do). Otherwise it is worked out
+    # from the three settings above.
+    database_url: str = ""
+    # Connections each process keeps open to Postgres. Supabase's session pooler allows few
+    # clients in all (15 on the small plans), and the api, worker and CLI each have a pool.
+    database_pool_size: int = 5
 
     # --- logging ---
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR or CRITICAL
@@ -76,12 +85,27 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # set true when served over https
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    # Proxies whose X-Forwarded-For is trusted, so the login throttle and logs see the real
+    # client. "*" is right in the container, whose port is published on the VM's loopback only.
+    forwarded_allow_ips: str = "127.0.0.1"
 
     # --- email waterfall (provisional until the bake-off) ---
     # Finders are tried in this order. OrbiSearch is verify-only, so it cannot be a finder.
     finder_chain: Annotated[list[str], NoDecode] = ["hunter", "zerobounce"]
     verifier: str = "myemailverifier"
     catch_all_resolver: str = "scrubby"
+
+    @model_validator(mode="after")
+    def _pick_database(self) -> Settings:
+        if self.database_url:
+            return self
+        if self.database_backend == "sqlite":
+            self.database_url = f"sqlite:///{self.sqlite_path}"
+        elif self.postgres_url:
+            self.database_url = self.postgres_url
+        else:
+            raise ValueError("DATABASE_BACKEND is postgres but POSTGRES_URL is not set")
+        return self
 
     @field_validator("log_level")
     @classmethod

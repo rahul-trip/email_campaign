@@ -1,0 +1,66 @@
+# The production stack on the VM. Run it with the project name `outbound` so it never touches the
+# other application's containers:  docker compose -p outbound -f deploy/compose.yml ...
+# deploy/remote-deploy.sh does this for you; docs/DEPLOY.md explains every variable.
+#
+#   migrate  one-shot: `db upgrade` then `seed` (both safe to repeat), before anything else starts
+#   api      the web app and API on 127.0.0.1:${OUTBOUND_PORT}; the VM's proxy adds https
+#   worker   executes the runs queued from the web app
+#
+# Secrets come from Doppler at start-up. Only DOPPLER_TOKEN is on disk, in ${OUTBOUND_HOME}/doppler.env.
+# The database is Supabase Postgres, through its session pooler (POSTGRES_URL in Doppler).
+
+x-app: &app
+  image: outbound:${RELEASE:?set RELEASE to the commit being deployed}
+  pull_policy: never  # built on this VM by the api service below
+  env_file: ${OUTBOUND_HOME:-/opt/outbound}/doppler.env
+  environment:
+    # Not secrets, and the same on every deployment, so they live here rather than in Doppler.
+    ENVIRONMENT: production
+    DATABASE_BACKEND: postgres  # POSTGRES_URL (Supabase) comes from Doppler
+    LOG_FORMAT: json
+    API_HOST: 0.0.0.0
+    API_PORT: "8000"
+    COOKIE_SECURE: "true"
+    # The port is published on the VM's loopback only, so the one sender that can reach it is the
+    # VM's own proxy; trusting its X-Forwarded-For lets the login throttle see real client IPs.
+    FORWARDED_ALLOW_IPS: "*"
+  volumes:
+    - doppler:/doppler
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  migrate:
+    <<: *app
+    entrypoint: ["doppler", "run", "--fallback", "/doppler/migrate.json", "--"]
+    command: ["sh", "-c", "outbound db upgrade && outbound seed"]
+    restart: "no"
+    mem_limit: 512m
+
+  api:
+    <<: *app
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    pull_policy: build
+    entrypoint: ["doppler", "run", "--fallback", "/doppler/api.json", "--"]
+    command: ["outbound", "serve"]
+    ports:
+      - "127.0.0.1:${OUTBOUND_PORT:-8010}:8000"
+    mem_limit: 1g
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    <<: *app
+    entrypoint: ["doppler", "run", "--fallback", "/doppler/worker.json", "--"]
+    command: ["outbound", "worker"]
+    healthcheck: { disable: true }  # no HTTP server in this process
+    mem_limit: 1g
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  doppler:

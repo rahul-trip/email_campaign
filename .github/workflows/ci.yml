@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:  # the deploy workflow runs these checks first
 
 jobs:
   checks:
@@ -115,6 +116,16 @@ jobs:
         working-directory: web2
       - run: npx playwright test
         working-directory: web2
+
+  image:
+    name: production image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image the VM builds (deploy/compose.yml)
+        run: docker build --pull -t outbound:ci .
+      - name: The CLI starts inside it
+        run: docker run --rm --entrypoint outbound outbound:ci --help
 
   security:
     name: security (secrets, dependencies)
