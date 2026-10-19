@@ -11,7 +11,7 @@ jobs:
     name: lint and types
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -26,7 +26,7 @@ jobs:
     name: tests (SQLite)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -53,7 +53,7 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql+psycopg://outbound:outbound@localhost:5432/outbound_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -64,7 +64,7 @@ jobs:
     name: web app (types, build, generated client, browser test)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -92,7 +92,7 @@ jobs:
     name: web2 app (types, build, generated client, browser test with the guided tour)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -121,7 +121,7 @@ jobs:
     name: production image builds
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the image the VM builds (deploy/compose.yml)
         run: docker build --pull -t outbound:ci .
       - name: The CLI starts inside it
@@ -131,7 +131,7 @@ jobs:
     name: security (secrets, dependencies)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # gitleaks reads the whole history
       - name: Secrets in the history
