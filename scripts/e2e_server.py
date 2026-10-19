@@ -2,13 +2,15 @@
 
     uv run python -m scripts.e2e_server
 
-It starts on a throwaway database with a seeded workspace, serves ``web/dist``, and runs a
+It starts on a throwaway database with a seeded workspace, serves ``web2/dist`` (or the folder
+in ``E2E_WEB_DIST``, which the legacy ``web/`` tests set), and runs a
 worker thread that executes queued runs against fake search, model, finder and mailbox
 objects. No network and no keys are used. The password is printed in ``E2E_PASSWORD``.
 """
 
 from __future__ import annotations
 
+import os
 import tempfile
 import threading
 from pathlib import Path
@@ -54,7 +56,8 @@ def build() -> tuple[FastAPI, Worker]:
     )
     container = Container(settings, engine, factory)
     pipeline = assemble(container, workspace.id, World().providers())
-    app = create_app(build_services(container, workspace.id), web_dist=WEB_DIST)
+    web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST
+    app = create_app(build_services(container, workspace.id), web_dist=web_dist)
     return app, Worker(container, workspace.id, pipeline)
 
 

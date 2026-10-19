@@ -13,7 +13,8 @@ export default defineConfig({
   ],
   use: { baseURL: "http://127.0.0.1:8765", trace: "retain-on-failure" },
   webServer: {
-    command: "cd .. && uv run python -m scripts.e2e_server",
+    // The server serves web2 by default; these tests are for the legacy app, so point it here.
+    command: "cd .. && E2E_WEB_DIST=web/dist uv run python -m scripts.e2e_server",
     url: "http://127.0.0.1:8765/api/health",
     reuseExistingServer: false,
     timeout: 60_000,

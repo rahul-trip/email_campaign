@@ -38,3 +38,7 @@ logs/
 web/test-results/
 web/playwright-report/
 test_keys.py
+web2/dist/
+web2/node_modules/
+web2/test-results/
+web2/playwright-report/
