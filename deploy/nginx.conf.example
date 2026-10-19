@@ -1,0 +1,30 @@
+# /etc/nginx/sites-available/outbound  (then: ln -s ../sites-available/outbound sites-enabled/)
+# A virtual host for Outbound next to the other app. Replace outbound.example.com; get the
+# certificate with: sudo certbot --nginx -d outbound.example.com
+# The app listens on 127.0.0.1:8010 (OUTBOUND_PORT); it refuses logins over plain http.
+
+server {
+    listen 80;
+    server_name outbound.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name outbound.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/outbound.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/outbound.example.com/privkey.pem;
+
+    client_max_body_size 10m;  # target CSV uploads
+
+    location / {
+        proxy_pass http://127.0.0.1:8010;
+        proxy_set_header Host $host;
+        # The app reads the client address from these for the login throttle and the logs.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 120s;
+    }
+}

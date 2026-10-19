@@ -19,7 +19,10 @@ class Settings(BaseSettings):
         env_file=(".env", "agent/.env"), env_file_encoding="utf-8", extra="ignore"
     )
 
-    database_url: str = "sqlite:///outbound.db"
+    database_url: str = "sqlite:///outbound.db"  # or a Postgres URL, e.g. Supabase's pooler
+    # Connections each process keeps open to Postgres. Supabase's session pooler allows few
+    # clients in all (15 on the small plans), and the api, worker and CLI each have a pool.
+    database_pool_size: int = 5
 
     # --- logging ---
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR or CRITICAL
@@ -76,6 +79,9 @@ class Settings(BaseSettings):
     cookie_secure: bool = False  # set true when served over https
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    # Proxies whose X-Forwarded-For is trusted, so the login throttle and logs see the real
+    # client. "*" is right in the container, whose port is published on the VM's loopback only.
+    forwarded_allow_ips: str = "127.0.0.1"
 
     # --- email waterfall (provisional until the bake-off) ---
     # Finders are tried in this order. OrbiSearch is verify-only, so it cannot be a finder.

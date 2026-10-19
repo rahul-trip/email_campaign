@@ -10,13 +10,15 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine
 
+from outbound.db.session import normalise_url
+
 _MIGRATIONS = Path(__file__).parent / "migrations"
 
 
 def alembic_config(url: str) -> Config:
     config = Config()
     config.set_main_option("script_location", str(_MIGRATIONS))
-    config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
+    config.set_main_option("sqlalchemy.url", normalise_url(url).replace("%", "%%"))
     return config
 
 
@@ -29,7 +31,7 @@ def downgrade(url: str, revision: str = "-1") -> None:
 
 
 def current_revision(url: str) -> str | None:
-    engine = create_engine(url)
+    engine = create_engine(normalise_url(url))
     try:
         with engine.connect() as connection:
             return MigrationContext.configure(connection).get_current_revision()

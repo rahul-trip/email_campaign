@@ -1,0 +1,7 @@
+# Add to the VM's Caddyfile, next to the other app's site, then: sudo systemctl reload caddy
+# Caddy gets the certificate itself and sets X-Forwarded-For / X-Forwarded-Proto.
+# The app listens on 127.0.0.1:8010 (OUTBOUND_PORT).
+
+outbound.example.com {
+    reverse_proxy 127.0.0.1:8010
+}

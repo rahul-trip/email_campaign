@@ -44,5 +44,5 @@ class Container:
 
 def build_container(settings: Settings | None = None) -> Container:
     settings = settings or Settings()
-    engine = make_engine(settings.database_url)
+    engine = make_engine(settings.database_url, pool_size=settings.database_pool_size)
     return Container(settings, engine, UnitOfWorkFactory(make_session_factory(engine)))

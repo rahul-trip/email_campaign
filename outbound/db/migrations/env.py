@@ -9,13 +9,14 @@ from sqlalchemy import engine_from_config, pool
 import outbound.db.models  # noqa: F401  (registers every table on the metadata)
 from outbound.config import Settings
 from outbound.db.base import Base
+from outbound.db.session import normalise_url
 
 config = context.config
 target_metadata = Base.metadata
 
 
 def _url() -> str:
-    return config.get_main_option("sqlalchemy.url") or Settings().database_url
+    return normalise_url(config.get_main_option("sqlalchemy.url") or Settings().database_url)
 
 
 def run_migrations_offline() -> None:

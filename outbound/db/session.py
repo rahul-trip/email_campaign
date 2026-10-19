@@ -8,11 +8,35 @@ from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 
-def make_engine(url: str, *, echo: bool = False) -> Engine:
-    engine = create_engine(url, echo=echo, future=True)
-    if engine.dialect.name == "sqlite":
+def normalise_url(url: str) -> str:
+    """Use psycopg 3 for Postgres URLs that do not name a driver.
+
+    Supabase and most hosts hand out ``postgresql://`` or ``postgres://``, which SQLAlchemy would
+    open with psycopg2, which is not installed.
+    """
+    for prefix in ("postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg://" + url.removeprefix(prefix)
+    return url
+
+
+def make_engine(url: str, *, echo: bool = False, pool_size: int = 5) -> Engine:
+    url = normalise_url(url)
+    if url.startswith("sqlite"):
+        engine = create_engine(url, echo=echo, future=True)
         event.listen(engine, "connect", _configure_sqlite)
-    return engine
+        return engine
+    # A hosted pooler (Supabase's session pooler) allows few clients and closes idle ones, so
+    # each process keeps a small fixed pool and checks a connection before using it.
+    return create_engine(
+        url,
+        echo=echo,
+        future=True,
+        pool_size=pool_size,
+        max_overflow=0,
+        pool_pre_ping=True,
+        pool_recycle=300,
+    )
 
 
 def _configure_sqlite(dbapi_connection: Any, _record: Any) -> None:

@@ -218,6 +218,27 @@ def test_serve_on_a_database_that_was_never_set_up_says_what_to_run(
     assert "no such table" not in out
 
 
+def test_serve_in_the_container_listens_on_all_addresses_and_trusts_the_proxy(
+    isolated: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import uvicorn
+
+    started: dict[str, object] = {}
+    monkeypatch.setattr(uvicorn, "run", lambda _app, **kwargs: started.update(kwargs))
+    for name, value in {
+        "OPERATOR_PASSWORD_HASH": "x",
+        "SESSION_SECRET": "s" * 40,
+        "API_HOST": "0.0.0.0",
+        "COOKIE_SECURE": "true",
+        "FORWARDED_ALLOW_IPS": "*",
+    }.items():
+        monkeypatch.setenv(name, value)
+    code, out = run("serve", url=isolated)
+    assert code == 0, out
+    assert started["host"] == "0.0.0.0" and started["proxy_headers"] is True
+    assert started["forwarded_allow_ips"] == "*"
+
+
 def test_other_commands_say_the_same_instead_of_a_stack_trace(url: str) -> None:
     code, out = run("status", url=url)
     assert code == 1

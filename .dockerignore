@@ -1,0 +1,31 @@
+# Only what the Dockerfile copies matters; everything else stays out of the build context.
+# Secrets and private data must never reach an image.
+.env
+.env.*
+**/.env
+*.db
+*.db-*
+*.sqlite3
+data/
+test_keys.py
+*.xlsx
+
+.git
+.github
+.venv
+**/__pycache__
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.import_linter_cache
+**/node_modules
+web2/dist
+web2/test-results
+web2/playwright-report
+
+agent/
+web/
+tests/
+scripts/
+docs/
+deploy/
