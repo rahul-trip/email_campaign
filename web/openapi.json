@@ -1259,6 +1259,10 @@
       },
       "MessageOut": {
         "properties": {
+          "contact_id": {
+            "title": "Contact Id",
+            "type": "string"
+          },
           "edit_distance": {
             "anyOf": [
               {
@@ -1344,6 +1348,7 @@
         },
         "required": [
           "id",
+          "contact_id",
           "step",
           "state",
           "subject",
@@ -1806,6 +1811,21 @@
           "catch_all_share"
         ],
         "title": "QualityOut",
+        "type": "object"
+      },
+      "RecipientIn": {
+        "additionalProperties": false,
+        "properties": {
+          "contact_id": {
+            "maxLength": 10000,
+            "title": "Contact Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contact_id"
+        ],
+        "title": "RecipientIn",
         "type": "object"
       },
       "RejectIn": {
@@ -3179,6 +3199,58 @@
         ]
       }
     },
+    "/api/companies/{company_id}/change-recipient": {
+      "post": {
+        "operationId": "change_recipient_api_companies__company_id__change_recipient_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipientIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Recipient",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/{company_id}/delete": {
       "post": {
         "description": "Permanently delete a lead. The body must repeat the lead's domain to confirm.",
@@ -3598,6 +3670,39 @@
       }
     },
     "/api/contacts/{contact_id}": {
+      "delete": {
+        "operationId": "remove_person_api_contacts__contact_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Person",
+        "tags": [
+          "leads"
+        ]
+      },
       "patch": {
         "operationId": "edit_person_api_contacts__contact_id__patch",
         "parameters": [

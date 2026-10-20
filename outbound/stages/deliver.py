@@ -48,7 +48,9 @@ class DeliverStage:
             message = approved[0]
             contact = uow.contacts.get(message.contact_id)
             address = uow.emails.get(message.contact_email_id)
-            decision = policy_decision_for(uow, company, email_provenance=address.provenance)
+            decision = policy_decision_for(
+                uow, company, email_provenance=address.provenance, recipient_id=contact.id
+            )
             verdict = check_send(
                 email_status=address.status,
                 contact_status=contact.status,

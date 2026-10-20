@@ -10,6 +10,7 @@ from outbound.domain.domains import is_free_mail, is_platform, registrable_domai
 from outbound.domain.hashing import hash_value
 from outbound.domain.ids import new_id
 from outbound.domain.money import format_usd, micro_to_usd, usd_to_micro
+from outbound.domain.names import same_person
 
 
 def test_ids_are_unique_and_sort_by_creation_time() -> None:
@@ -59,3 +60,22 @@ def test_registrable_domain(typed: str, expected: str | None) -> None:
 def test_free_mail_and_platform_lists() -> None:
     assert is_free_mail("gmail.com") and not is_free_mail("acme.com")
     assert is_platform("linkedin.com") and not is_platform("acme.com")
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        ("Romain", "Romain Serres", True),
+        ("romain serres", "Romain  Serres", True),
+        ("Damian Płaza", "DAMIAN PŁAZA", True),
+        ("José García", "Jose Garcia", True),
+        ("Romain Serres", "Romain Dupont", False),
+        ("Sebastian Haglund", "Mihai Chiru", False),
+        ("", "Romain", False),
+        (None, "Romain", False),
+    ],
+)
+def test_two_names_are_the_same_person_ignoring_case_and_accents(
+    a: str | None, b: str, same: bool
+) -> None:
+    assert same_person(a, b) is same

@@ -97,6 +97,7 @@ class ContactOut(Out):
 
 class MessageOut(Out):
     id: str
+    contact_id: str
     step: int
     state: str
     subject: str
@@ -199,6 +200,10 @@ class CompanyPatch(In):
 
 class ReleaseIn(In):
     resume_to: CompanyStatus | None = None
+
+
+class RecipientIn(In):
+    contact_id: str
 
 
 class PersonIn(In):

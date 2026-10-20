@@ -8,7 +8,7 @@ comes first, because the operator chose them.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
 from outbound.domain.entities import Contact
@@ -82,13 +82,24 @@ class RankedContact:
     seniority: str
 
 
-def rank_contacts(contacts: Sequence[Contact], wanted_titles: Sequence[str]) -> list[RankedContact]:
-    """Best first. Ranks are consecutive from 1."""
+def rank_contacts(
+    contacts: Sequence[Contact],
+    wanted_titles: Sequence[str],
+    chosen_ids: Collection[str] = (),
+) -> list[RankedContact]:
+    """Best first. Ranks are consecutive from 1.
+
+    ``chosen_ids`` are people the operator picked without adding them: they gave an address
+    or recorded a consent. Like a person the operator added, they come first, in the order the
+    operator left them, so the email goes to the person whose consent or address it relies on.
+    """
 
     def key(contact: Contact) -> tuple[int, int, int, int]:
-        operator_first = 0 if contact.source is ContactSource.OPERATOR else 1
+        chosen = contact.source is ContactSource.OPERATOR or contact.id in chosen_ids
+        if chosen:
+            return (0, contact.rank, 0, 0)
         return (
-            operator_first,
+            1,
             wanted_index(contact.title, wanted_titles),
             _level_index(seniority_of(contact.title)),
             contact.rank,

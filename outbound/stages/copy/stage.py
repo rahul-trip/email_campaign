@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Contact, ContactEmail
-from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, CompanyStatus, MessageState
+from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
+    CompanyStatus,
+    HoldReason,
+    MessageState,
+)
 from outbound.domain.footer import MissingProfileField, render_footer
-from outbound.domain.policies import is_safe_email_status
+from outbound.domain.policies import PolicyOutcome, is_safe_email_status
 from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.copy.graph import CopyInput, CopyOutput, run_copy
@@ -44,7 +49,13 @@ class CopyStage:
 
         def load(uow: UnitOfWork):  # type: ignore[no-untyped-def]
             chosen = _chosen_address(uow, company.id, safe_only)
-            decision = policy_decision_for(uow, company)
+            decision = (
+                policy_decision_for(
+                    uow, company, email_provenance=chosen[1].provenance, recipient_id=chosen[0].id
+                )
+                if chosen
+                else None
+            )
             notes = "\n".join(n.body for n in uow.notes.for_company(company.id))
             shots = (
                 uow.messages.edited_examples(company.campaign_id, wanted)
@@ -54,9 +65,16 @@ class CopyStage:
             return chosen, decision, notes, shots
 
         chosen, decision, notes, shots = ctx.read(load)
-        if chosen is None:
+        if chosen is None or decision is None:
             raise StageFailure("no contact has an address that is safe to send to")
         contact, address = chosen
+        if decision.outcome is not PolicyOutcome.ALLOW:  # e.g. the consent is someone else's
+            return StageResult(
+                CompanyStatus.HELD,
+                reason="; ".join(decision.reasons),
+                hold_reason=decision.hold_reason or HoldReason.NEEDS_OPERATOR,
+                company_updates={"policy_decision": decision.to_json()},
+            )
 
         footer: str | None = None
         if decision.footer_template:

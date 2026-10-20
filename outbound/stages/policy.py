@@ -21,12 +21,25 @@ def _primary_provenance(uow: UnitOfWork, contacts: list[Contact]) -> Provenance 
 
 
 def policy_decision_for(
-    uow: UnitOfWork, company: Company, *, email_provenance: Provenance | None = None
+    uow: UnitOfWork,
+    company: Company,
+    *,
+    email_provenance: Provenance | None = None,
+    recipient_id: str | None = None,
 ) -> PolicyDecision:
+    """The decision for ``company`` now.
+
+    Before a recipient is known (the gate, the runner's guard) a consent from anyone at the
+    company counts, so the lead is not held while the right person is still being found. Once
+    the email, copy or deliver step names the recipient, only *their* consent counts: someone
+    else's consent never allows writing to this person.
+    """
     policy = uow.policies.get(company.country_code) if company.country_code else None
     contacts = [
         c for c in uow.contacts.for_company(company.id) if c.status in WORKABLE_CONTACT_STATUSES
     ]
+    if recipient_id is not None:
+        contacts = [c for c in contacts if c.id == recipient_id]
     consented = any(uow.consents.has_active(c.id) for c in contacts)
     if email_provenance is None:  # not told which address: use the one the company will send to
         email_provenance = _primary_provenance(uow, contacts)

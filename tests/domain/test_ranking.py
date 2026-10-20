@@ -109,3 +109,20 @@ def test_ranks_are_consecutive_and_carry_the_seniority_label() -> None:
 def test_no_wanted_titles_falls_back_to_seniority() -> None:
     people = [contact("a", "Analyst"), contact("ceo", "CEO")]
     assert order(people, []) == ["ceo", "a"]
+
+
+def test_a_person_the_operator_chose_outranks_a_better_title() -> None:
+    # Rebase: the operator gave the CEO's address and consent; the campaign wants a CTO.
+    ceo = contact("sebastian", "CEO and Co-Founder", rank=1)
+    cto = contact("mihai", "CTO and Co-Founder", rank=2)
+    assert order([ceo, cto]) == ["mihai", "sebastian"]
+    ranked = rank_contacts([ceo, cto], WANTED, chosen_ids={"sebastian"})
+    assert [r.contact.id for r in ranked] == ["sebastian", "mihai"]
+    assert [r.rank for r in ranked] == [1, 2]
+
+
+def test_chosen_people_keep_the_order_the_operator_left_them_in() -> None:
+    first = contact("first", "Engineer", rank=1, source=ContactSource.OPERATOR)
+    second = contact("second", "CTO", rank=2)
+    ranked = rank_contacts([second, first], WANTED, chosen_ids={"second"})
+    assert [r.contact.id for r in ranked] == ["first", "second"]

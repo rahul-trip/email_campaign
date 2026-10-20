@@ -100,6 +100,24 @@ class ContactRepository(ScopedRepository):
         self._events.append(EntityType.CONTACT, row.id, "status_changed", actor, detail)
         return snapshot(row, Contact)
 
+    def make_first(self, contact_id: str) -> None:
+        """Put one person at rank 1 and move the others down, keeping their order.
+
+        Written as the engine, so the contacts stage may still re-rank later: what keeps the
+        operator's person first is ``rank_contacts`` reading who they chose, not a frozen rank.
+        """
+        chosen = self._row(ContactRow, contact_id)
+        others = [c.id for c in self.for_company(chosen.company_id) if c.id != contact_id]
+        for position, contact in enumerate([contact_id, *others], start=1):
+            self._apply_changes(
+                self._row(ContactRow, contact),
+                {"rank": position},
+                editable=CONTACT_EDITABLE,
+                actor=SYSTEM,
+                entity_type=EntityType.CONTACT,
+            )
+        self._flush()
+
     def update_fields(self, contact_id: str, changes: Mapping[str, Any], *, actor: str) -> Contact:
         row = self._row(ContactRow, contact_id)
         self._apply_changes(
@@ -268,6 +286,10 @@ class NoteRepository(ScopedRepository):
 
 class ConsentRepository(ScopedRepository):
     def add(self, contact_id: str, basis: ConsentBasis, evidence: str, recorded_by: str) -> Consent:
+        """Record a consent. The same active basis twice for one person is kept once."""
+        for existing in self.for_contact(contact_id):
+            if existing.active and existing.basis == basis:
+                return existing
         row = ConsentRow(
             workspace_id=self._workspace_id,
             contact_id=contact_id,

@@ -894,3 +894,24 @@ def test_a_lead_that_was_emailed_cannot_be_deleted_through_the_api(
     response = api.post(f"/api/companies/{cid}/delete", json={"confirm_domain": "sent.com"})
     assert response.status_code == 409 and "Suppress" in response.json()["detail"]
     assert api.get(f"/api/companies/{cid}").status_code == 200
+
+
+def test_the_email_can_go_to_someone_else_and_a_wrong_match_be_removed(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid, mid = seed_review(factory, ws)
+    with factory(ws) as uow:
+        other = uow.contacts.add(cid, rank=2, source=ContactSource.SITE, full_name="Sam Lee")
+        wrong = uow.contacts.add(cid, rank=3, source=ContactSource.SEARCH, full_name="Dan Roth")
+        uow.commit()
+    moved = api.post(f"/api/companies/{cid}/change-recipient", json={"contact_id": other.id})
+    assert moved.status_code == 200 and moved.json()["status"] == "contacts_found"
+    lead = api.get(f"/api/companies/{cid}").json()
+    assert lead["contacts"][0]["id"] == other.id
+    assert [m["state"] for m in lead["messages"] if m["id"] == mid] == ["cancelled"]
+
+    assert api.delete(f"/api/contacts/{wrong.id}").status_code == 204
+    assert wrong.id not in [c["id"] for c in api.get(f"/api/companies/{cid}").json()["contacts"]]
+    written_to = api.get(f"/api/companies/{cid}").json()["messages"][0]["contact_id"]
+    refused = api.delete(f"/api/contacts/{written_to}")
+    assert refused.status_code in (409, 422) and "already been written" in refused.json()["detail"]

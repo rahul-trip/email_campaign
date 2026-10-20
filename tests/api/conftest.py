@@ -52,6 +52,9 @@ class Api:
     def patch(self, path: str, **kwargs: object):  # type: ignore[no-untyped-def]
         return self.client.patch(path, headers=HEADERS, **kwargs)  # type: ignore[arg-type]
 
+    def delete(self, path: str, **kwargs: object):  # type: ignore[no-untyped-def]
+        return self.client.delete(path, headers=HEADERS, **kwargs)  # type: ignore[arg-type]
+
 
 @pytest.fixture
 def container(engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path) -> Container:

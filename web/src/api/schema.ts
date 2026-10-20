@@ -90,6 +90,23 @@ export interface paths {
         patch: operations["edit_company_api_companies__company_id__patch"];
         trace?: never;
     };
+    "/api/companies/{company_id}/change-recipient": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change Recipient */
+        post: operations["change_recipient_api_companies__company_id__change_recipient_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/delete": {
         parameters: {
             query?: never;
@@ -259,7 +276,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Remove Person */
+        delete: operations["remove_person_api_contacts__contact_id__delete"];
         options?: never;
         head?: never;
         /** Edit Person */
@@ -1148,6 +1166,8 @@ export interface components {
         };
         /** MessageOut */
         MessageOut: {
+            /** Contact Id */
+            contact_id: string;
             /** Edit Distance */
             edit_distance: number | null;
             /** Final Body */
@@ -1294,6 +1314,11 @@ export interface components {
             unedited_share: number | null;
             /** Written */
             written: number;
+        };
+        /** RecipientIn */
+        RecipientIn: {
+            /** Contact Id */
+            contact_id: string;
         };
         /** RejectIn */
         RejectIn: {
@@ -1788,6 +1813,41 @@ export interface operations {
             };
         };
     };
+    change_recipient_api_companies__company_id__change_recipient_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecipientIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_lead_api_companies__company_id__delete_post: {
         parameters: {
             query?: never;
@@ -2067,6 +2127,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WaterfallOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_person_api_contacts__contact_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
