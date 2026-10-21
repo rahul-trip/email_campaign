@@ -398,6 +398,11 @@ function Person({
       onChanged();
     },
   });
+  const confirm = useMutation({
+    mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/confirm", { params: { path: { contact_id: contact.id } } })),
+    onSuccess: onChanged,
+  });
+  const unconfirmed = contact.status === "unconfirmed";
   const choose = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/change-recipient", { params: { path: { company_id: companyId } }, body: { contact_id: contact.id } })),
     onSuccess: () => {
@@ -422,7 +427,12 @@ function Person({
             <span className="flex size-6 items-center justify-center rounded-full bg-primary-fixed font-mono text-[11px] font-semibold text-primary">{contact.rank}</span>
             <span className="font-semibold">{contact.full_name ?? "(no name)"}</span>
             {contact.title && <span className="text-xs text-muted">{contact.title}</span>}
-            {contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
+            {unconfirmed && (
+              <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container" title="A search found this person, but their profile does not clearly say they work here.">
+                Unconfirmed: check they work here
+              </span>
+            )}
+            {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
             {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url && (
               <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
@@ -448,6 +458,11 @@ function Person({
         </div>
         {!gone && (
           <div className="flex flex-wrap gap-1">
+            {unconfirmed && (
+              <Button size="sm" busy={confirm.isPending} onClick={() => confirm.mutate()}>
+                Confirm they work here
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "edit" ? null : "edit")}>
               Edit
             </Button>
@@ -489,6 +504,11 @@ function Person({
             onChanged();
           }}
         />
+      )}
+      {confirm.error && (
+        <div className="mt-2">
+          <Problem error={confirm.error} />
+        </div>
       )}
       {choosing && (
         <Confirm title={`Write to ${contact.full_name ?? "this person"} instead?`} confirmLabel="Write to them" busy={choose.isPending} error={choose.error} onClose={() => setChoosing(false)} onConfirm={() => choose.mutate()}>

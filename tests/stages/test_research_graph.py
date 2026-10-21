@@ -27,6 +27,7 @@ from outbound.stages.research.graph import (
     plan_workers,
     published_addresses,
     run_research,
+    search_people,
 )
 from tests.stages.fakes import PAGES, TEAM_PAGE, FakeLlm, FakeRegistry, FakeSearch
 
@@ -388,3 +389,81 @@ def test_notes_and_answers_reach_the_fit_judgement() -> None:
     run(base(notes="met at the expo", questions=("Do they trade power?",)), llm=llm)
     assert "met at the expo" in llm.users["fit"]
     assert "Yes, via a trading desk." in llm.users["fit"]
+
+
+# ------------------------------------------------------------------ the right name and people
+
+SITE_REPLY = {"summary": "Amperon forecasts power demand.", "products": [], "news": [], "hooks": []}
+
+
+def amperon(**kwargs: object) -> ResearchInput:
+    # Discovered from a blog post: the headline used to become the company's name.
+    return base(domain="amperon.co", company_name="6 Grid Trends to Watch in 2026", **kwargs)
+
+
+def test_the_site_gives_the_name_and_the_people_search_uses_it() -> None:
+    llm = FakeLlm({"site": {**SITE_REPLY, "company_name": "Amperon"}})
+    pages = {"https://amperon.co": "Amperon forecasts power demand for utilities."}
+    out, llm, search = run(amperon(), llm=llm, search=FakeSearch(pages, []))
+    assert out.company_name == "Amperon"
+    assert search.searches[-1].startswith('site:linkedin.com/in "Amperon"')
+    assert "Amperon" in llm.users["fit"]
+
+
+def test_without_a_name_from_the_site_what_was_known_is_kept() -> None:
+    out, _, _ = run(base(), llm=FakeLlm({"site": SITE_REPLY}))
+    assert out.company_name is None
+
+
+# The LinkedIn results the real run attached to the wrong companies.
+REAL_HITS = [
+    SearchHit(
+        url="https://www.linkedin.com/in/danielproth",
+        title="Dan Roth - Power Grid Automation at G&W Electric",
+    ),
+    SearchHit(
+        url="https://www.linkedin.com/in/jigarshahdc",
+        title="Jigar Shah - Host of the Energy Empire and Open Circuit ...",
+    ),
+    SearchHit(
+        url="https://www.linkedin.com/in/adam-shaw-stl",
+        title="Adam Shaw ⚡️ - The Grid Needs More Innovators",
+    ),
+    SearchHit(
+        url="https://se.linkedin.com/in/damian-plaza",
+        title="Damian Płaza - Senior Software Engineer / Power Grid Product Leader at Volue",
+    ),
+    SearchHit(
+        url="https://linkedin.com/in/isak-bergset-250886123",
+        title="Isak Bergset - Head of Sale, Volue Power Grid",
+    ),
+    SearchHit(
+        url="https://www.linkedin.com/in/someone",
+        title="Sam Lee - Chief Technology Officer",
+        snippet="Sam has led engineering at Volue since 2021.",
+    ),
+]
+
+
+def test_only_people_whose_employer_is_this_company_are_confirmed() -> None:
+    people = search_people(FakeSearch({}, REAL_HITS), "Volue", "volue.com", ["CTO"])
+    assert [(p.name, p.confirmed) for p in people] == [
+        ("Damian Płaza", True),
+        ("Isak Bergset", True),
+        ("Sam Lee", False),  # only the snippet names Volue: kept for the operator to confirm
+    ]
+
+
+@pytest.mark.parametrize("company", ["Amperon", "Maverick Corporation", "LTIMindtree"])
+def test_one_shared_word_is_not_enough_to_place_someone_at_a_company(company: str) -> None:
+    people = search_people(FakeSearch({}, REAL_HITS), company, "amperon.co", ["CTO"])
+    assert people == []
+
+
+def test_no_people_are_taken_from_other_sites_when_the_site_could_not_be_read() -> None:
+    team = "Our team: Jane Doe, CTO of Rival Ltd, and many more people listed on this page."
+    hits = [SearchHit(url="https://news.example.com/team-about", title="Team", snippet=team * 3)]
+    out, llm, _ = run(base(target_titles=()), search=FakeSearch({}, hits))
+    assert out.research["thin"] is True
+    assert "persona" not in llm.calls
+    assert out.people == ()

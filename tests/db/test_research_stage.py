@@ -9,10 +9,11 @@ from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
     ContactSource,
+    ContactStatus,
     HoldReason,
     LegalEntityType,
 )
-from outbound.providers.ports import RegistryEntry
+from outbound.providers.ports import RegistryEntry, SearchHit
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Outcome, Runner
 from outbound.stages.research.graph import ResearchDeps
@@ -158,3 +159,52 @@ def test_a_phone_number_only_suggests_a_country_so_the_lead_waits_for_the_operat
 def company_row(factory: UnitOfWorkFactory, ws: str, company_id: str) -> Company:
     with factory(ws) as uow:
         return uow.companies.get(company_id)
+
+
+def named_by(name: str) -> FakeLlm:
+    llm = FakeLlm()
+    llm.replies["site"] = {**llm.replies["site"], "company_name": name}
+    return llm
+
+
+def test_research_names_a_discovered_lead_after_its_own_site(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add(factory, ws, "acme.co.uk", name="6 Grid Trends to Watch in 2026")
+    runner_for(factory, ws, FakeSearch(PAGES), llm=named_by("Acme Energy")).run_pipeline()
+    with factory(ws) as uow:
+        assert uow.companies.get(cid).name == "Acme Energy"
+
+
+def test_a_name_the_operator_typed_is_kept(factory: UnitOfWorkFactory, ws: str) -> None:
+    cid = add(factory, ws, "acme.co.uk")
+    with factory(ws) as uow:
+        uow.companies.update_fields(
+            cid,
+            {"name": "Acme"},
+            actor=OPERATOR,
+            expected_version=uow.companies.get(cid).row_version,
+        )
+        uow.commit()
+    runner_for(factory, ws, FakeSearch(PAGES), llm=named_by("Acme Energy Ltd")).run_pipeline()
+    with factory(ws) as uow:
+        assert uow.companies.get(cid).name == "Acme"
+
+
+def test_a_person_a_search_could_not_place_here_is_saved_unconfirmed(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add(factory, ws, "volue.com", name="Volue")
+    hits = [
+        SearchHit(
+            url="https://www.linkedin.com/in/someone",
+            title="Sam Lee - Chief Technology Officer",
+            snippet="Sam has led engineering at Volue since 2021.",
+        ),
+        SearchHit(url="https://www.linkedin.com/in/dan", title="Dan Roth - CTO at G&W Electric"),
+    ]
+    search = FakeSearch({"https://volue.com": "Volue builds software for grids."}, hits)
+    runner_for(factory, ws, search).run_pipeline()
+    with factory(ws) as uow:
+        people = uow.contacts.for_company(cid)
+    assert [(p.full_name, p.status) for p in people] == [("Sam Lee", ContactStatus.UNCONFIRMED)]

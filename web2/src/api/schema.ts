@@ -284,6 +284,23 @@ export interface paths {
         patch: operations["edit_person_api_contacts__contact_id__patch"];
         trace?: never;
     };
+    "/api/contacts/{contact_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Person */
+        post: operations["confirm_person_api_contacts__contact_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}/consents": {
         parameters: {
             query?: never;
@@ -2182,6 +2199,37 @@ export interface operations {
                 "application/json": components["schemas"]["PersonPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_person_api_contacts__contact_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

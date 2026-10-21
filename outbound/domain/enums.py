@@ -50,6 +50,9 @@ class LegalEntityType(StrEnum):
 
 
 class ContactStatus(StrEnum):
+    # Found by a public search whose employer could not be confirmed. Never worked on (no paid
+    # lookups, no email) until the operator confirms the person works there.
+    UNCONFIRMED = "unconfirmed"
     CANDIDATE = "candidate"
     ACTIVE = "active"
     BOUNCED = "bounced"

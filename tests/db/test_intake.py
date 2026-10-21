@@ -30,6 +30,7 @@ from outbound.services.intake import (
     RowOutcome,
     detect_anchor,
     discover_rows,
+    discovery_query,
     load_rows,
     match_confidence,
     parse_target,
@@ -588,9 +589,34 @@ def test_discovery_rows_are_websites_only_and_skip_platforms_and_repeats() -> No
         }
     )
     assert discover_rows(search, ["grid software"]) == [
-        {"website": "acme.com", "company": "Acme"},
-        {"website": "beta.io", "company": "Beta"},
+        {"website": "acme.com", "notes": "Found by discovery: https://acme.com/a"},
+        {"website": "beta.io", "notes": "Found by discovery: https://beta.io"},
     ]
+
+
+def test_discovery_never_names_a_company_after_an_article_and_skips_documents() -> None:
+    # The real run: an ICP search returned reports and blog posts, and their headlines became
+    # company names ("6 Grid Trends to Watch in 2026" for amperon.co).
+    search = FakeSearch(
+        {
+            "companies": [
+                hit("https://www.ltm.com/uploads/report/2026/06/utilities-report.pdf", "AI Report"),
+                hit("https://www.ifs.com/en/insights/assets/2026-utility-predictions", "2026"),
+                hit("https://www.amperon.co/blog/6-grid-trends-to-watch-in-2026", "6 Grid Trends"),
+                hit("https://www.volue.com/distribution", "Modern Grids. Stronger Communities."),
+                hit("https://www.misoenergy.org", "MISO"),
+            ]
+        }
+    )
+    rows = discover_rows(search, [discovery_query("grid operators")], per_query=5)
+    assert [r["website"] for r in rows] == ["volue.com", "misoenergy.org"]
+    assert all("company" not in r for r in rows)
+
+
+def test_discovery_asks_for_companies_rather_than_articles() -> None:
+    query = discovery_query("utilities and  grid operators")
+    assert query.startswith("companies")
+    assert query.endswith("utilities and grid operators")
 
 
 def test_discovered_companies_are_marked_as_discovered_and_not_operator_chosen(
@@ -617,3 +643,20 @@ def test_csv_round_trip_through_the_service(
         writer.writerow(["https://acme.com", "jane@acme.com"])
     report = service(factory, ws).run(load_rows(path), source=ImportSource.CSV, filename=path.name)
     assert report.count(R.ACCEPTED) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "domain", "at_least", "below"),
+    [
+        ("Tata Power", "tatapower.com", 0.9, 1.0),
+        ("Rebase Energy", "rebase.energy", 0.9, 1.0),
+        ("Acme", "acmeenergy.com", 0.8, 0.9),
+        # The parent group's site holds only part of the name: the operator is asked.
+        ("tata power", "tata.com", 0.0, 0.8),
+    ],
+)
+def test_a_website_must_hold_the_whole_company_name_to_be_taken_without_asking(
+    name: str, domain: str, at_least: float, below: float
+) -> None:
+    found = match_confidence(name, domain, hit(f"https://{domain}", "Tata Power | Business"))
+    assert at_least <= found < below

@@ -49,6 +49,9 @@ EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 _POLICY_HOLDS = frozenset(
     {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
 )
+# The reason on the event when the operator confirms a person a search could not place.
+CONFIRMED_WORKS_HERE = "confirmed by the operator: works here"
+
 # Where a lead can be when the operator picks someone else to write to: before the mailbox.
 _RECIPIENT_CHANGEABLE = frozenset(
     {
@@ -375,6 +378,26 @@ class LeadService:
             return ContactWithEmails(
                 uow.contacts.get(updated.id), uow.emails.for_contact(contact_id)
             )
+
+    def confirm_person(self, contact_id: str, *, actor: str = OPERATOR) -> ContactWithEmails:
+        """Say that a person a search could not place here does work here.
+
+        Until then they are never looked up or written to. The confirmation is recorded with
+        your name, and approving an email to them asks you to acknowledge it.
+        """
+        with self._uow(self._workspace_id) as uow:
+            contact = uow.contacts.get(
+                contact_id
+            )  # NotFound unless the person is in this workspace
+            if contact.status is not ContactStatus.UNCONFIRMED:
+                raise LeadError(
+                    f"this person is {contact.status.value}, not waiting to be confirmed"
+                )
+            confirmed = uow.contacts.transition(
+                contact_id, ContactStatus.CANDIDATE, actor=actor, reason=CONFIRMED_WORKS_HERE
+            )
+            uow.commit()
+            return ContactWithEmails(confirmed, uow.emails.for_contact(contact_id))
 
     def remove_person(self, contact_id: str, *, actor: str = OPERATOR) -> None:
         """Take a person off a lead, such as someone a search matched by mistake.

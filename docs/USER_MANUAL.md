@@ -168,7 +168,7 @@ Three tabs.
 | You know | Fill in | What the application does |
 |---|---|---|
 | The website | Website or domain | Uses it directly |
-| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** under *Websites to confirm* |
+| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** under *Websites to confirm*. A site whose name holds only part of the company's (the group's site for one of its companies) always asks |
 | A work email | Known work email | Takes the company from the address; still verifies the address |
 | A person and a company | Person + Company name | Finds the company; keeps the person as your first choice |
 | A LinkedIn profile | LinkedIn profile URL | Never opens it. A public search of the profile finds the name and company |
@@ -202,6 +202,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 - for a **held** lead, a panel that says why and what fixes it, with **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume. For consent and company-type holds it points you to **Add a person with consent**;
 - **People and addresses:** each person in rank order, each address with its status, where it came from, which vendor found it and which one checked it. *The email is to this person* marks who the waiting email is written to. A person you added, gave an address to, or recorded consent for always comes first, whatever the campaign's job titles prefer, and only that person's own consent lets them be written to. Each person has:
   - **Edit:** correct the name or title, or give a work email. A new address replaces the old one as the one written to; the old one stays as history. On a lead whose email step failed, saving also retries that step;
+  - **Confirm they work here:** shown on a person marked *Unconfirmed: check they work here*. A public search found them, but their profile does not clearly say they work at this company, so they are never looked up or written to until you confirm them. Remove them if they do not;
   - **Record consent:** choose the basis and write where it came from. Recording the same basis twice keeps one record;
   - **Write to this person instead:** when the email is going to the wrong person. The waiting (or approved, not yet drafted) email is cancelled, this person is put first and the lead goes back to the email step;
   - **Remove:** for someone who does not work here, such as a wrong match from a search. It is refused once anything has been written to them;
@@ -226,7 +227,7 @@ It only shows; to act, use **Open the lead to act on it**.
 
 ### 5.6 Runs
 
-- **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it.
+- **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it. A discovered company is named from its own website during research, never from the article or report that led to it, and articles and documents in the search results are skipped.
 - **Leads per stage.** At most this many companies are handled by each step in one run (default 50).
 
 A run moves every company as far as it can go and lists, per step, how many moved on, were held or failed, plus the time it took and the money spent. **Cancel** stops a run between companies; **Details** shows when it was queued, started and finished and its settings. The list updates by itself while a run is queued or running.

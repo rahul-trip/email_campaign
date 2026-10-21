@@ -10,7 +10,12 @@ from __future__ import annotations
 from outbound.db.uow import UnitOfWork
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Contact
-from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, CompanyStatus, Provenance
+from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
+    CompanyStatus,
+    ContactStatus,
+    Provenance,
+)
 from outbound.domain.ranking import RankedContact, rank_contacts
 from outbound.stages.base import StageContext, StageFailure, StageResult
 
@@ -29,6 +34,12 @@ class ContactsStage:
             if c.status in WORKABLE_CONTACT_STATUSES
         ]
         if not usable:
+            everyone = ctx.read(lambda uow: uow.contacts.for_company(company_id))
+            if any(c.status is ContactStatus.UNCONFIRMED for c in everyone):
+                raise StageFailure(
+                    "the only people found could not be confirmed to work here: confirm one on"
+                    " the lead page, or add a person you know"
+                )
             raise StageFailure("no decision-maker was found on the site or in a public search")
         wanted = ctx.campaign.target_titles if ctx.campaign else ()
         chosen = ctx.read(lambda uow: operator_chosen(uow, usable))
