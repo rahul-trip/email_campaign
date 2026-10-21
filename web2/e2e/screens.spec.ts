@@ -123,3 +123,16 @@ test("an unknown address shows the not-found page", async ({ page }) => {
   await page.goto("/no-such-page");
   await expect(page.getByText("This page does not exist")).toBeVisible();
 });
+
+test("country rules can be switched off for the workspace, with a banner, and back on", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/compliance");
+  await page.getByRole("button", { name: "Switch country rules off…" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Switch off" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Country rules are switched off" })).toBeVisible();
+  await page.goto("/leads");
+  await expect(page.getByRole("alert").filter({ hasText: "Country rules are switched off" })).toBeVisible();
+  await page.goto("/compliance");
+  await page.getByRole("button", { name: "Switch country rules back on" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Country rules are switched off" })).toHaveCount(0);
+});

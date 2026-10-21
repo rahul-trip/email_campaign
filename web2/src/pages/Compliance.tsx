@@ -15,6 +15,13 @@ const RULES: [Policy["rule"], string][] = [
   ["consent_required", "Consent required"],
   ["block", "Block"],
 ];
+const SOURCES: [string, string][] = [
+  ["operator_given", "Given by you"],
+  ["publicly_published", "Published by them"],
+  ["api_database", "A business directory"],
+  ["pattern_inferred", "Guessed from the company's format"],
+  ["referral", "A referral"],
+];
 const RULE_TONE: Record<string, string> = {
   allow: "text-good",
   allow_with_footer: "text-primary",
@@ -54,7 +61,12 @@ export function CompliancePage() {
           ],
         ]}
       >
-        {tab === "policies" && <Policies />}
+        {tab === "policies" && (
+          <div className="space-y-4">
+            <RulesSwitch />
+            <Policies />
+          </div>
+        )}
         {tab === "suppressions" && <Suppressions />}
         {tab === "forget" && <Forget />}
       </Tabs>
@@ -64,12 +76,69 @@ export function CompliancePage() {
 
 // ------------------------------------------------------------------ country rules
 
+/** The workspace-wide switch for country rules, and releasing the leads they were holding. */
+function RulesSwitch() {
+  const queryClient = useQueryClient();
+  const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
+  const [confirming, setConfirming] = useState(false);
+  const on = settings.data?.country_policy_enabled !== false;
+  const flip = useMutation({
+    mutationFn: (enabled: boolean) => ok(client.PUT("/api/settings/workspace", { body: { country_policy_enabled: enabled } })),
+    onSuccess: () => {
+      setConfirming(false);
+      void queryClient.invalidateQueries({ queryKey: ["workspace-settings"] });
+    },
+  });
+  const release = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/release-policy-holds")),
+    onSuccess: () => {
+      for (const key of ["companies", "status", "lead"]) void queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  return (
+    <Card
+      tour="compliance-switch"
+      tone={on ? undefined : "attention"}
+      title={on ? "Country rules are on" : "Country rules are switched off"}
+      subtitle={
+        on
+          ? "Every lead is checked against its country's rule at each step. You can also skip the rule for a single lead, from its page."
+          : "No lead is held, blocked or asked for consent because of its country. The do-not-contact list still applies, and footers follow the setting under Settings, Limits."
+      }
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        {on ? (
+          <Button variant="danger-ghost" onClick={() => setConfirming(true)}>
+            Switch country rules off…
+          </Button>
+        ) : (
+          <Button busy={flip.isPending} onClick={() => flip.mutate(true)}>
+            Switch country rules back on
+          </Button>
+        )}
+        <Button variant="secondary" busy={release.isPending} onClick={() => release.mutate()}>
+          Release leads the rules no longer hold
+        </Button>
+        {release.data && <span className="text-xs text-muted">{release.data.released === 1 ? "1 lead went on." : `${release.data.released} leads went on.`}</span>}
+        <Problem error={flip.error ?? release.error} />
+      </div>
+      {confirming && (
+        <Confirm title="Switch country rules off for the whole workspace?" confirmLabel="Switch off" busy={flip.isPending} error={flip.error} onClose={() => setConfirming(false)} onConfirm={() => flip.mutate(false)}>
+          <p>Leads in countries that require consent or forbid cold email will go ahead. You are responsible for that. The do-not-contact list still applies, and switching back on later holds leads again rather than ending them.</p>
+          <p className="mt-2">Leads already held stay held until you press <em>Release leads the rules no longer hold</em>.</p>
+        </Confirm>
+      )}
+    </Card>
+  );
+}
+
 function Policies() {
   const queryClient = useQueryClient();
   const policies = useQuery({ queryKey: ["policies"], queryFn: () => ok(client.GET("/api/settings/policies")) });
   const [code, setCode] = useState("");
+  const [newRule, setNewRule] = useState<Policy["rule"]>("block");
   const add = useMutation({
-    mutationFn: () => ok(client.PUT("/api/settings/policies/{country_code}", { params: { path: { country_code: code } }, body: { rule: "block" } })),
+    mutationFn: () => ok(client.PUT("/api/settings/policies/{country_code}", { params: { path: { country_code: code } }, body: { rule: newRule } })),
     onSuccess: () => {
       setCode("");
       void queryClient.invalidateQueries({ queryKey: ["policies"] });
@@ -81,10 +150,17 @@ function Policies() {
       title="Country rules"
       subtitle="Working defaults, not legal advice. Have them reviewed and record who did before automatic sending. A change to the rule, the companies-only box or the footer saves a new version, and each decision records the version it used."
       actions={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input aria-label="Country code to add" value={code} maxLength={2} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} placeholder="FR" className="w-16 font-mono uppercase" />
+          <Select aria-label="Rule for the new country" value={newRule} onChange={(e) => setNewRule(e.target.value as Policy["rule"])} className="w-40">
+            {RULES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
           <Button size="sm" variant="secondary" busy={add.isPending} disabled={code.length !== 2 || exists} onClick={() => add.mutate()}>
-            <Plus className="size-3.5" aria-hidden /> Add as blocked
+            <Plus className="size-3.5" aria-hidden /> Add country
           </Button>
         </div>
       }
@@ -118,7 +194,7 @@ function Policies() {
         }
       </QueryState>
       <p className="px-4 py-3 text-[11px] text-muted">
-        Footer fields: <code className="font-mono">{"{sender_legal_name}"}</code>, <code className="font-mono">{"{postal_address}"}</code>, <code className="font-mono">{"{registration_details}"}</code>, <code className="font-mono">{"{contact_info}"}</code> and <code className="font-mono">{"{data_source}"}</code> (where the address came from). Unknown countries are always held.
+        Footer fields: <code className="font-mono">{"{sender_legal_name}"}</code>, <code className="font-mono">{"{postal_address}"}</code>, <code className="font-mono">{"{registration_details}"}</code>, <code className="font-mono">{"{contact_info}"}</code> and <code className="font-mono">{"{data_source}"}</code> (where the address came from). Countries without a rule, and leads with no known country, are held for you. Removing a rule does the same for its leads.
       </p>
     </Card>
   );
@@ -130,7 +206,10 @@ function PolicyRow({ policy }: { policy: Policy }) {
   const [corporate, setCorporate] = useState(policy.requires_corporate_subscriber);
   const [footer, setFooter] = useState(policy.footer_template ?? "");
   const [reviewer, setReviewer] = useState(policy.reviewed_by ?? "");
-  const ruleChanged = rule !== policy.rule || corporate !== policy.requires_corporate_subscriber || footer !== (policy.footer_template ?? "");
+  const [sources, setSources] = useState<string[]>(policy.allowed_provenance ?? []);
+  const [removing, setRemoving] = useState(false);
+  const sourcesChanged = [...sources].sort().join() !== [...(policy.allowed_provenance ?? [])].sort().join();
+  const ruleChanged = rule !== policy.rule || corporate !== policy.requires_corporate_subscriber || footer !== (policy.footer_template ?? "") || sourcesChanged;
   const changed = ruleChanged || reviewer !== (policy.reviewed_by ?? "");
   const [savedAs, setSavedAs] = useState("Saved.");
   const save = useMutation({
@@ -138,11 +217,24 @@ function PolicyRow({ policy }: { policy: Policy }) {
       ok(
         client.PUT("/api/settings/policies/{country_code}", {
           params: { path: { country_code: policy.country_code } },
-          body: { rule, requires_corporate_subscriber: corporate, allowed_provenance: policy.allowed_provenance, footer_template: footer.trim() || null, reviewed_by: reviewer.trim() || null },
+          body: {
+            rule,
+            requires_corporate_subscriber: corporate,
+            allowed_provenance: sources.length ? (sources as Policy["allowed_provenance"]) : null,
+            footer_template: footer.trim() || null,
+            reviewed_by: reviewer.trim() || null,
+          },
         }),
       ),
     onMutate: () => setSavedAs(ruleChanged ? "Saved as a new version." : "Reviewer saved."),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["policies"] }),
+  });
+  const remove = useMutation({
+    mutationFn: () => ok(client.DELETE("/api/settings/policies/{country_code}", { params: { path: { country_code: policy.country_code } } })),
+    onSuccess: () => {
+      setRemoving(false);
+      void queryClient.invalidateQueries({ queryKey: ["policies"] });
+    },
   });
   return (
     <tr className="align-top">
@@ -158,7 +250,20 @@ function PolicyRow({ policy }: { policy: Policy }) {
         <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted">
           <input type="checkbox" checked={corporate} onChange={(e) => setCorporate(e.target.checked)} className="accent-[var(--primary-container)]" /> Incorporated companies only
         </label>
-        {policy.allowed_provenance && <div className="mt-1 text-[11px] text-muted">Addresses from: {policy.allowed_provenance.map(words).join(", ")}</div>}
+        <fieldset className="mt-1.5">
+          <legend className="text-[11px] text-muted">Only addresses from (none ticked: any)</legend>
+          {SOURCES.map(([value, label]) => (
+            <label key={value} className="flex items-center gap-1.5 text-[11px] text-muted">
+              <input
+                type="checkbox"
+                checked={sources.includes(value)}
+                onChange={(e) => setSources(e.target.checked ? [...sources, value] : sources.filter((v) => v !== value))}
+                className="accent-[var(--primary-container)]"
+              />
+              {label}
+            </label>
+          ))}
+        </fieldset>
       </Td>
       <Td className="min-w-64">
         <Textarea rows={3} aria-label={`Footer for ${policy.country_code}`} value={footer} onChange={(e) => setFooter(e.target.value)} className="font-mono text-[11px]" placeholder={rule === "block" ? "Not used while blocked" : "Footer text with {fields}"} />
@@ -174,6 +279,14 @@ function PolicyRow({ policy }: { policy: Policy }) {
         <div className="mt-1 max-w-48">
           <SaveNote mutation={save} done={savedAs} />
         </div>
+        <Button size="sm" variant="danger-ghost" className="mt-2" onClick={() => setRemoving(true)}>
+          Remove
+        </Button>
+        {removing && (
+          <Confirm title={`Remove the rule for ${policy.country_code}?`} confirmLabel="Remove" busy={remove.isPending} error={remove.error} onClose={() => setRemoving(false)} onConfirm={() => remove.mutate()}>
+            <p>Leads in {policy.country_code} will then be held for you at their next step, because there is no rule to decide by. The change is recorded.</p>
+          </Confirm>
+        )}
       </Td>
     </tr>
   );

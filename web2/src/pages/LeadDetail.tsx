@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-ro
 import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlock, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
+import { PolicySkip } from "../components/PolicySkip";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   Button,
@@ -148,7 +149,7 @@ export function LeadDetailPage() {
         )}
         {company.status === "disqualified" && countryBlocked && (
           <Callout tone="attention" title="This country's rule blocks contact">
-            There is no override for a block. To go ahead, add a person who has given consent; or change the rule under Policies and privacy.
+            To go ahead, add a person who has given consent, skip the country rule for this lead under <em>Country rule</em>, or change the rule under Policies and privacy.
           </Callout>
         )}
         {company.status === "disqualified" && !countryBlocked && company.fit_reason && (
@@ -287,6 +288,9 @@ export function LeadDetailPage() {
         </div>
 
         <div className="flex flex-col gap-5">
+          <Card tour="lead-policy" title="Country rule" subtitle={`Rule for ${company.country_code ?? "an unknown country"}. You can skip it for this lead.`}>
+            <PolicySkip key={`${company.row_version}`} company={company} heldAt={lead.data.held_at} />
+          </Card>
           <EditLead key={company.row_version} company={company} campaigns={campaigns.data ?? []} onSaved={refresh} />
           {notes.length > 0 && (
             <Card title="Notes">
@@ -361,7 +365,9 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
         )}
       </div>
       {suggestion && hold.action === "country" && <p className="mt-2 text-xs text-muted">Suggested from the research: {suggestion.evidence}. It is a suggestion, not proof.</p>}
-      <p className="mt-2 text-[11px] text-muted">The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed.</p>
+      <p className="mt-2 text-[11px] text-muted">
+        The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
+      </p>
       <Problem error={release.error ?? setCountry.error} className="mt-2" />
     </Card>
   );

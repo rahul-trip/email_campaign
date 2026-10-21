@@ -37,6 +37,7 @@ EDITABLE_FIELDS = frozenset(
         "research",
         "research_answers",
         "policy_decision",
+        "policy_skip_from",
         "next_action_at",
     }
 )

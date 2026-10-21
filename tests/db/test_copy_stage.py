@@ -284,3 +284,40 @@ def test_a_lead_released_after_its_email_was_withdrawn_gets_a_fresh_first_email(
     with factory(ws) as uow:
         states = sorted(m.state.value for m in uow.messages.for_company(cid))
     assert states == ["cancelled", "generated"]
+
+
+def set_settings(factory: UnitOfWorkFactory, ws: str, **settings: Any) -> None:
+    from outbound.db.models import WorkspaceRow
+
+    with factory(ws) as uow:
+        row = uow.session.get(WorkspaceRow, ws)
+        assert row is not None
+        row.settings = {**row.settings, **settings}
+        uow.commit()
+
+
+def test_a_skipped_country_rule_still_gets_a_footer_the_default_one_if_the_country_has_none(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    set_profile(factory, ws)
+    set_settings(factory, ws, country_policy_enabled=False)
+    cid = lead(factory, ws, country="DE")  # a blocking country, with no footer of its own
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    assert company(factory, ws, cid).status is C.COPY_READY
+    with factory(ws) as uow:
+        [message] = uow.messages.for_company(cid)
+    assert message.generated_body.endswith(
+        "--\nQuantra Energy Inc, 1 Main St, Austin TX. If this is not relevant to you, reply and"
+        " I will not write again."
+    )
+
+
+def test_with_footers_switched_off_no_footer_is_added(factory: UnitOfWorkFactory, ws: str) -> None:
+    set_profile(factory, ws)
+    set_settings(factory, ws, footer_enabled=False)
+    cid = lead(factory, ws)
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    with factory(ws) as uow:
+        [message] = uow.messages.for_company(cid)
+    assert "\n--\n" not in message.generated_body
+    assert "unsubscribe" not in message.generated_body

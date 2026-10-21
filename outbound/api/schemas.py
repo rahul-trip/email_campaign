@@ -12,6 +12,7 @@ from outbound.domain.enums import (
     ConsentBasis,
     HoldReason,
     PolicyRule,
+    PolicyStage,
     Provenance,
     SuppressionKind,
     SuppressionReason,
@@ -61,6 +62,7 @@ class CompanyOut(Out):
     research: dict[str, Any] | None
     research_answers: dict[str, Any] | None
     policy_decision: dict[str, Any] | None
+    policy_skip_from: str | None = None
     manual_fields: list[str]
     next_action_at: datetime | None
     row_version: int
@@ -123,6 +125,7 @@ class LeadOut(Out):
     contacts: list[ContactOut]
     messages: list[MessageOut]
     notes: list[NoteOut]
+    held_at: str | None = None  # the stage whose country check held the lead
 
 
 class TimelineOut(Out):
@@ -204,6 +207,11 @@ class ReleaseIn(In):
 
 class RecipientIn(In):
     contact_id: str
+
+
+class PolicySkipIn(In):
+    from_stage: PolicyStage
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class PersonIn(In):
@@ -308,6 +316,8 @@ class WorkspaceSettingsIn(In):
     budget_per_prospect_micro_usd: int | None = Field(default=None, ge=0, le=100_000_000)
     few_shot_examples: int | None = Field(default=None, ge=0, le=20)
     timezone: str | None = Field(default=None, max_length=64)
+    country_policy_enabled: bool | None = None
+    footer_enabled: bool | None = None
 
 
 class SenderProfileIn(In):

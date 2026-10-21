@@ -196,6 +196,19 @@ Found by the operator in use (2026-10-19): a discovery run named every company a
 
 **Tests:** the real LinkedIn results (Dan Roth, Jigar Shah, Adam Shaw, Damian Płaza, Isak Bergset); one shared word is not enough; name from the site, used by the search and fit; operator name kept; unconfirmed saved; no people from a thin site; profile-title parsing; website matching (tata); discovery without names and without documents; confirm; migration 0003 up and down on both databases.
 
+### 3b.14 Country rules you can configure and skip (added during the work)
+
+Asked for by the operator (2026-10-20): skip the country rule for one lead at chosen stages, from the lead or journey page, or switch it off for the workspace; and configure the rules fully.
+
+- `companies.policy_skip_from` (migration 0004): the rule is skipped from that stage onward. `policy_decision_for(..., stage=...)` returns ALLOW with `skipped` when the workspace switch `country_policy_enabled` is off or the lead's skip covers the stage. Suppression is separate and always applies.
+- A guard that finds a block now **holds** the lead (`needs_operator`) instead of suppressing it, so revoking a skip or switching the rules back on never ends a lead.
+- `LeadService.skip_policy` (reason required, `policy_skip_granted` event) moves a lead the rule stopped back to where it stopped; a later start is refused. `revoke_policy_skip` until approval; `release_policy_holds` after switching the rules off.
+- The footer is its own setting, `footer_enabled` (default on): the country's footer, or a default one, also when the rule is skipped.
+- Country rules: add any country with any rule, edit *Only addresses from*, remove a rule; `policy_changed` and `policy_deleted` events.
+- Screens: *Country rule* card on the lead page, the same control in the journey's stage panel, the switch and bulk release on Policies and privacy, a red banner while the rules are off, the footer switch under Limits.
+
+**Tests:** the skip rule per stage; rules off qualifies a blocked country; suppression still wins; a block at the gate and a hold at contacts each resume where they stopped; a later start refused; revoke until approval; release after switching off and holding again after switching on; the country's footer kept; the default footer and no footer; policy change and removal events; the API.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

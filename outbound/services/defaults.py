@@ -73,4 +73,6 @@ def default_workspace_settings() -> dict[str, Any]:
         "reply_webhook_url": None,
         "few_shot_examples": 5,
         "timezone": "UTC",
+        "country_policy_enabled": True,
+        "footer_enabled": True,
     }

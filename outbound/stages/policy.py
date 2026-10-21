@@ -9,7 +9,12 @@ from __future__ import annotations
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Company, Contact
 from outbound.domain.enums import WORKABLE_CONTACT_STATUSES, Provenance
-from outbound.domain.policies import PolicyDecision, decide_country_policy
+from outbound.domain.policies import (
+    PolicyDecision,
+    decide_country_policy,
+    policy_skipped_at,
+    skipped_decision,
+)
 
 
 def _primary_provenance(uow: UnitOfWork, contacts: list[Contact]) -> Provenance | None:
@@ -24,6 +29,7 @@ def policy_decision_for(
     uow: UnitOfWork,
     company: Company,
     *,
+    stage: str | None = None,
     email_provenance: Provenance | None = None,
     recipient_id: str | None = None,
 ) -> PolicyDecision:
@@ -33,8 +39,19 @@ def policy_decision_for(
     company counts, so the lead is not held while the right person is still being found. Once
     the email, copy or deliver step names the recipient, only *their* consent counts: someone
     else's consent never allows writing to this person.
+
+    ``stage`` is the stage asking. When the workspace has country rules switched off, or the
+    operator skipped the rule for this lead from that stage or an earlier one, the answer is
+    ALLOW with ``skipped`` set (and the country's footer, if it has one).
     """
     policy = uow.policies.get(company.country_code) if company.country_code else None
+    # The operator's switches come first. Suppression is not part of this decision: it is
+    # checked separately everywhere and always wins.
+    if not uow.workspace_settings().get("country_policy_enabled", True):
+        return skipped_decision("country rules are switched off for this workspace", policy)
+    if policy_skipped_at(stage, company.policy_skip_from):
+        stage_from = company.policy_skip_from.value if company.policy_skip_from else ""
+        return skipped_decision(f"country rule skipped by the operator from {stage_from}", policy)
     contacts = [
         c for c in uow.contacts.for_company(company.id) if c.status in WORKABLE_CONTACT_STATUSES
     ]

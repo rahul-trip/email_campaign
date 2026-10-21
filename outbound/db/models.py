@@ -47,6 +47,7 @@ from outbound.domain.enums import (
     MessageState,
     NoteSource,
     PolicyRule,
+    PolicyStage,
     Provenance,
     RunKind,
     RunStatus,
@@ -220,6 +221,9 @@ class CompanyRow(Mutable, Base):
     research: Mapped[dict[str, Any] | None] = mapped_column(Json)
     research_answers: Mapped[dict[str, Any] | None] = mapped_column(Json)
     policy_decision: Mapped[dict[str, Any] | None] = mapped_column(Json)
+    policy_skip_from: Mapped[PolicyStage | None] = mapped_column(
+        enum_type(PolicyStage, "policy_stage")
+    )
     manual_fields: Mapped[list[str]] = mapped_column(Json, default=list)
     row_version: Mapped[int] = mapped_column(Integer, default=1)
 

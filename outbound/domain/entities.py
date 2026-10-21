@@ -24,6 +24,7 @@ from outbound.domain.enums import (
     MessageState,
     NoteSource,
     PolicyRule,
+    PolicyStage,
     Provenance,
     SuppressionKind,
     SuppressionReason,
@@ -71,6 +72,7 @@ class Company:
     research: dict[str, Any] | None = None
     research_answers: dict[str, Any] | None = None
     policy_decision: dict[str, Any] | None = None
+    policy_skip_from: PolicyStage | None = None  # the operator skipped the country rule from here
     manual_fields: tuple[str, ...] = field(default=())
     created_at: datetime | None = None
     updated_at: datetime | None = None

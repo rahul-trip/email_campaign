@@ -27,6 +27,20 @@ class CountryPolicyRepository(ScopedRepository):
         )
         return [snapshot(row, CountryPolicy) for row in self._session.scalars(stmt)]
 
+    def delete(self, country_code: str) -> bool:
+        """Remove a country's rule; a lead in that country is then held for the operator."""
+        row = self._session.scalars(
+            select(CountryPolicyRow).where(
+                CountryPolicyRow.workspace_id == self._workspace_id,
+                CountryPolicyRow.country_code == country_code.upper(),
+            )
+        ).one_or_none()
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
     def upsert(self, policy: CountryPolicy, *, reviewer: str | None = None) -> CountryPolicy:
         """Create or change a country's policy. A real change bumps the version, which every
         later decision records, so an audit can tell which rules a lead was judged by."""

@@ -446,6 +446,17 @@
             ],
             "title": "Policy Decision"
           },
+          "policy_skip_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Skip From"
+          },
           "priority": {
             "title": "Priority",
             "type": "integer"
@@ -1128,6 +1139,17 @@
             "title": "Contacts",
             "type": "array"
           },
+          "held_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held At"
+          },
           "messages": {
             "items": {
               "$ref": "#/components/schemas/MessageOut"
@@ -1692,6 +1714,38 @@
           "block"
         ],
         "title": "PolicyRule",
+        "type": "string"
+      },
+      "PolicySkipIn": {
+        "additionalProperties": false,
+        "properties": {
+          "from_stage": {
+            "$ref": "#/components/schemas/PolicyStage"
+          },
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_stage",
+          "reason"
+        ],
+        "title": "PolicySkipIn",
+        "type": "object"
+      },
+      "PolicyStage": {
+        "description": "The stages that check the country policy, in pipeline order.\n\nThe operator can skip the policy for a lead *from* one of them onward\n(``companies.policy_skip_from``); a tail cannot contradict itself the way an arbitrary set\ncould (copy skipped but deliver not would write an email deliver then withdraws).",
+        "enum": [
+          "gate",
+          "contacts",
+          "email",
+          "copy",
+          "deliver"
+        ],
+        "title": "PolicyStage",
         "type": "string"
       },
       "PrivacyOut": {
@@ -2863,6 +2917,17 @@
             ],
             "title": "Budget Per Prospect Micro Usd"
           },
+          "country_policy_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Policy Enabled"
+          },
           "few_shot_examples": {
             "anyOf": [
               {
@@ -2875,6 +2940,17 @@
               }
             ],
             "title": "Few Shot Examples"
+          },
+          "footer_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Footer Enabled"
           },
           "safe_to_send_only": {
             "anyOf": [
@@ -3102,6 +3178,31 @@
           }
         },
         "summary": "Companies",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/release-policy-holds": {
+      "post": {
+        "operationId": "release_policy_holds_api_companies_release_policy_holds_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Release Policy Holds Api Companies Release Policy Holds Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Release Policy Holds",
         "tags": [
           "leads"
         ]
@@ -3393,6 +3494,98 @@
           }
         },
         "summary": "Add Person",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/policy-skip": {
+      "delete": {
+        "operationId": "revoke_policy_skip_api_companies__company_id__policy_skip_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Policy Skip",
+        "tags": [
+          "leads"
+        ]
+      },
+      "post": {
+        "operationId": "skip_policy_api_companies__company_id__policy_skip_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicySkipIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skip Policy",
         "tags": [
           "leads"
         ]
@@ -4615,6 +4808,39 @@
       }
     },
     "/api/settings/policies/{country_code}": {
+      "delete": {
+        "operationId": "delete_policy_api_settings_policies__country_code__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "country_code",
+            "required": true,
+            "schema": {
+              "title": "Country Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Policy",
+        "tags": [
+          "settings"
+        ]
+      },
       "put": {
         "operationId": "save_policy_api_settings_policies__country_code__put",
         "parameters": [

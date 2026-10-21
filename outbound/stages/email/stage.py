@@ -97,7 +97,11 @@ class EmailStage:
         if chosen is not None and chosen_contact is not None:
             decision = ctx.read(
                 lambda uow: policy_decision_for(
-                    uow, company, email_provenance=chosen.provenance, recipient_id=chosen_contact.id
+                    uow,
+                    company,
+                    stage=self.name,
+                    email_provenance=chosen.provenance,
+                    recipient_id=chosen_contact.id,
                 )
             )
             if (

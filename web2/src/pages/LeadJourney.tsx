@@ -3,6 +3,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { AlertCircle, Check, Clock, Coins, FileText, Info, Layers, Users, X } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 import { client, ok, type Schemas } from "../api/client";
+import { JOURNEY_POLICY_STAGE, PolicySkip } from "../components/PolicySkip";
 import { StatusBadge } from "../components/StatusBadge";
 import { Callout, Card, Facts, Label, PageHeader, Problem, Skeleton, Table, Td, Th, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
@@ -85,7 +86,7 @@ export function LeadJourneyPage() {
       <Stepper stages={trail.stages} selected={selected.key} onPick={setPicked} />
 
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <StagePanel stage={selected} />
+        <StagePanel stage={selected} lead={lead.data} />
         <Card tour="journey-origin" title="How this lead arrived">
           <p className="text-[13px] font-medium">{trail.origin.how}</p>
           <p className="mt-0.5 text-xs text-muted">
@@ -161,7 +162,14 @@ function Stepper({ stages, selected, onPick }: { stages: Stage[]; selected: stri
   );
 }
 
-function StagePanel({ stage }: { stage: Stage }) {
+function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] }) {
+  const policyStage = JOURNEY_POLICY_STAGE[stage.key];
+  const company = lead.company;
+  // Offer the skip where the country rule stopped this lead, or where it is already skipped.
+  const stoppedHere =
+    (lead.held_at && lead.held_at === policyStage) ||
+    (stage.key === "qualification" && company.status === "disqualified" && (company.policy_decision as { outcome?: string } | null)?.outcome === "block");
+  const skippedFromHere = company.policy_skip_from === policyStage;
   const look = LOOK[stage.state];
   return (
     <div id="stage-panel" role="tabpanel" aria-labelledby={`stage-${stage.key}`} data-tour="journey-stage">
@@ -188,6 +196,13 @@ function StagePanel({ stage }: { stage: Stage }) {
                 <div className="mt-0.5 text-[11px] opacity-80">{when(incident.at)}</div>
               </Callout>
             ))}
+          </div>
+        )}
+
+        {policyStage && (stoppedHere || skippedFromHere) && (
+          <div className="mt-4" data-tour="journey-policy-skip">
+            <Label className="mb-2">Country rule</Label>
+            <PolicySkip company={company} heldAt={lead.held_at} preset={policyStage} />
           </div>
         )}
 
