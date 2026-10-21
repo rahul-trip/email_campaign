@@ -21,6 +21,7 @@ from outbound.api.schemas import (
     PolicySkipIn,
     RecipientIn,
     ReleaseIn,
+    SkipCheckIn,
     TimelineOut,
     WaterfallOut,
 )
@@ -180,4 +181,24 @@ def confirm_person(contact_id: str, svc: Annotated[Services, Depends(services)])
             **confirmed.contact.__dict__,
             "emails": [EmailOut.model_validate(e) for e in confirmed.emails],
         }
+    )
+
+
+@router.post("/contact-emails/{email_id}/skip-verification", response_model=ContactOut)
+def skip_email_verification(
+    email_id: str, body: SkipCheckIn, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    person = svc.leads.skip_email_verification(email_id, body.reason)
+    return ContactOut.model_validate(
+        {**person.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in person.emails]}
+    )
+
+
+@router.delete("/contact-emails/{email_id}/skip-verification", response_model=ContactOut)
+def restore_email_verification(
+    email_id: str, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    person = svc.leads.restore_email_verification(email_id)
+    return ContactOut.model_validate(
+        {**person.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in person.emails]}
     )

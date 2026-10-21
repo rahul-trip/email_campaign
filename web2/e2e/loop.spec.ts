@@ -68,3 +68,29 @@ test("rejecting needs a reason, and the email leaves the queue", async ({ page }
   await page.goto(`/leads?q=${domain}`);
   await expect(page.getByRole("row", { name: /Rejected/ })).toHaveCount(1);
 });
+
+test("a lead held by its country rule goes on once the rule is skipped, and approval asks to confirm it", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("skip-rule");
+  await addTarget(page, { website: domain, country: "IN" }); // India: consent required by default
+  await runEngine(page);
+  await page.goto(`/leads/${await leadId(page, domain)}`);
+  await expect(page.getByText("Held: ")).toBeVisible();
+
+  // Skip the country rule from where it held the lead, with a reason.
+  const card = page.locator("[data-tour=lead-policy]");
+  await card.getByLabel("Why").fill("They asked us for details at the expo");
+  await card.getByRole("button", { name: "Skip the country rule" }).click();
+  await expect(card.getByText(/Country rule skipped from/)).toBeVisible();
+
+  // The engine carries on and writes the email; approving needs the confirmation.
+  await runEngine(page);
+  await page.goto("/review");
+  await page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(domain) }).click();
+  await expect(page.getByText("This email relies on checks you skipped")).toBeVisible();
+  const approve = page.getByRole("button", { name: "Approve", exact: true });
+  await expect(approve).toBeDisabled();
+  await page.getByText("I know these checks were skipped").click();
+  await approve.click();
+  await expect(page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
+});

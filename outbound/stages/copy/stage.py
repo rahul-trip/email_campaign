@@ -11,7 +11,7 @@ from outbound.domain.enums import (
     MessageState,
 )
 from outbound.domain.footer import DEFAULT_FOOTER, MissingProfileField, render_footer
-from outbound.domain.policies import PolicyOutcome, is_safe_email_status
+from outbound.domain.policies import PolicyOutcome, is_sendable
 from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.copy.graph import CopyInput, CopyOutput, run_copy
@@ -121,8 +121,10 @@ def _chosen_address(
         if contact.status not in WORKABLE_CONTACT_STATUSES:
             continue
         for address in uow.emails.for_contact(contact.id):
-            if address.is_primary and is_safe_email_status(
-                address.status, safe_to_send_only=safe_only
+            if address.is_primary and is_sendable(
+                address.status,
+                verification_skipped=address.verification_skipped,
+                safe_to_send_only=safe_only,
             ):
                 return contact, address
     return None

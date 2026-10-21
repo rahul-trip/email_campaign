@@ -210,6 +210,10 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 | `unknown` | No |
 | `invalid` | No, and never retried |
 
+**The operator can skip the check for one address** (`contact_emails.verification_skipped`, with a reason in the `email_verification_skipped` event): the address is then sendable whatever its status, even `invalid`, and no verifier or finder is called for it. Suppression still applies.
+
+**Approval confirms every skip.** An email that relies on a skipped check (the country rule skipped for the lead or switched off for the workspace, an address used without proof, or a person a search could not place and the operator confirmed) is approved only with an explicit acknowledgement (`acknowledge_skips`; the Review screen's tick box, or `--acknowledge-skips` on the CLI), recorded in an `approved_with_skips` event. Approval also refuses a suppressed address. **Automatic sending (Phase 5) must never send a message that relies on a skipped check**; such a message always waits for a person.
+
 ## 8. Pipeline stages
 
 | Stage | Moves | What it does | Paid calls |

@@ -24,7 +24,7 @@ from enum import StrEnum
 
 from outbound.domain.entities import Contact, ContactEmail
 from outbound.domain.enums import EmailStatus, Provenance
-from outbound.domain.policies import is_safe_email_status
+from outbound.domain.policies import is_sendable
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import (
@@ -173,13 +173,23 @@ class Waterfall:
     # ------------------------------------------------------------------ helpers
 
     def _reuse(self, held: ContactEmail, contact: Contact, target: Target, out: Outcome) -> bool:
-        """Use an address we already have. True when the search is over."""
-        if held.email is None or held.status is EmailStatus.INVALID:
+        """Use an address we already have. True when the search is over.
+
+        An address the operator skipped verification for is used as it is: no verifier is
+        called, whatever it said before (even ``invalid``). Suppression still wins.
+        """
+        if held.email is None:
+            return False
+        if held.status is EmailStatus.INVALID and not held.verification_skipped:
             return False
         if target.is_blocked(held.email):
             out.problems.append("an address we hold is on the do-not-contact list")
             return False
-        if is_safe_email_status(held.status, safe_to_send_only=target.safe_to_send_only):
+        if is_sendable(
+            held.status,
+            verification_skipped=held.verification_skipped,
+            safe_to_send_only=target.safe_to_send_only,
+        ):
             out.verdict = Verdict.READY
             out.chosen = Record(
                 held.email,

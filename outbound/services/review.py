@@ -15,7 +15,13 @@ from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.editing import edit_distance
 from outbound.domain.entities import Company, Contact, ContactEmail, Message
-from outbound.domain.enums import CompanyStatus, EntityType, MessageState
+from outbound.domain.enums import (
+    CompanyStatus,
+    ContactStatus,
+    EmailStatus,
+    EntityType,
+    MessageState,
+)
 
 FOOTER_MARK = "\n\n--\n"
 
@@ -25,11 +31,20 @@ class ReviewError(Exception):
 
 
 @dataclass(frozen=True)
+class Skip:
+    """A check the operator chose to skip that this email relies on."""
+
+    kind: str  # country_policy, email_verification or works_here
+    text: str
+
+
+@dataclass(frozen=True)
 class QueueItem:
     message: Message
     company: Company
     contact: Contact
     address: ContactEmail
+    skips: tuple[Skip, ...] = ()
 
     @property
     def flagged(self) -> bool:
@@ -87,12 +102,25 @@ class ReviewService:
         *,
         edited_body: str | None = None,
         expected_version: int | None = None,
+        acknowledge_skips: bool = False,
         actor: str = OPERATOR,
     ) -> Message:
+        """Approve an email. One that relies on a check you skipped (the country rule, the
+        email check, or that the person works there) needs ``acknowledge_skips``: approval is
+        where you confirm it, and what you confirmed is recorded."""
         with self._uow(self._workspace_id) as uow:
             message = self._pending(uow, message_id)
             if expected_version is not None and message.row_version != expected_version:
                 raise ConcurrencyConflict("the message changed since you opened it")
+            item = self._item(uow, message)
+            if item.address.email and uow.suppressions.blocks(item.address.email):
+                raise ReviewError("that address or its domain is now on the do-not-contact list")
+            if item.skips and not acknowledge_skips:
+                raise ReviewError(
+                    "This email relies on checks you skipped: "
+                    + "; ".join(s.text for s in item.skips)
+                    + ". Confirm that you know before approving."
+                )
             fields: dict[str, object] = {}
             edited = edited_body.strip() if edited_body is not None else None
             if edited is not None and edited != message.generated_body.strip():
@@ -115,6 +143,14 @@ class ReviewService:
                     "edited",
                     actor,
                     {"edit_distance": fields["edit_distance"]},
+                )
+            if item.skips:
+                uow.events.append(
+                    EntityType.MESSAGE,
+                    message.id,
+                    "approved_with_skips",
+                    actor,
+                    {"skips": [s.kind for s in item.skips]},
                 )
             self._move_company(uow, message.company_id, CompanyStatus.APPROVED, actor, "approved")
             uow.commit()
@@ -179,9 +215,40 @@ class ReviewService:
 
     @staticmethod
     def _item(uow: UnitOfWork, message: Message) -> QueueItem:
-        return QueueItem(
-            message,
-            uow.companies.get(message.company_id),
-            uow.contacts.get(message.contact_id),
-            uow.emails.get(message.contact_email_id),
+        company = uow.companies.get(message.company_id)
+        contact = uow.contacts.get(message.contact_id)
+        address = uow.emails.get(message.contact_email_id)
+        return QueueItem(message, company, contact, address, _skips(uow, company, contact, address))
+
+
+def _skips(
+    uow: UnitOfWork, company: Company, contact: Contact, address: ContactEmail
+) -> tuple[Skip, ...]:
+    """The checks the operator skipped that an email to this address relies on."""
+    skips: list[Skip] = []
+    if not uow.workspace_settings().get("country_policy_enabled", True):
+        skips.append(Skip("country_policy", "country rules are switched off for this workspace"))
+    elif company.policy_skip_from:
+        skips.append(
+            Skip(
+                "country_policy",
+                f"the country rule is skipped for this lead from the"
+                f" {company.policy_skip_from.value} step",
+            )
         )
+    if address.verification_skipped:
+        said = (
+            "it was not checked"
+            if address.status is EmailStatus.UNVERIFIED
+            else f"the check said {address.status.value.replace('_', ' ')}"
+        )
+        skips.append(Skip("email_verification", f"the address is used without proof ({said})"))
+    confirmed = any(
+        e.type == "status_changed" and e.data.get("from") == ContactStatus.UNCONFIRMED.value
+        for e in uow.events.for_entities([(EntityType.CONTACT, contact.id)])
+    )
+    if confirmed:
+        skips.append(
+            Skip("works_here", "a search could not place this person here; you confirmed it")
+        )
+    return tuple(skips)

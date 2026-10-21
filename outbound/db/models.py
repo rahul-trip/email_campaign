@@ -282,6 +282,7 @@ class ContactEmailRow(Mutable, Base):
     resolution_ref: Mapped[str | None] = mapped_column(String(300))
     verified_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_skipped: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class NoteRow(AppendOnly, Base):

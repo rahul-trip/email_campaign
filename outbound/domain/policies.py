@@ -174,6 +174,17 @@ def is_safe_email_status(status: EmailStatus, *, safe_to_send_only: bool = True)
     return status is EmailStatus.CATCH_ALL_UNVERIFIED and not safe_to_send_only
 
 
+def is_sendable(
+    status: EmailStatus, *, verification_skipped: bool = False, safe_to_send_only: bool = True
+) -> bool:
+    """Whether an address may be written to: proven safe, or the operator skipped the check.
+
+    A skip covers any verifier answer, even ``invalid``: the operator knows the address (and
+    approving the email asks them to confirm that they skipped it).
+    """
+    return verification_skipped or is_safe_email_status(status, safe_to_send_only=safe_to_send_only)
+
+
 @dataclass(frozen=True)
 class SendVerdict:
     ok: bool
@@ -188,10 +199,15 @@ def check_send(
     domain_suppressed: bool,
     policy_decision: PolicyDecision,
     safe_to_send_only: bool = True,
+    verification_skipped: bool = False,
 ) -> SendVerdict:
     """All four conditions of the safe-to-send rule; every failing reason is reported."""
     reasons: list[str] = []
-    if not is_safe_email_status(email_status, safe_to_send_only=safe_to_send_only):
+    if not is_sendable(
+        email_status,
+        verification_skipped=verification_skipped,
+        safe_to_send_only=safe_to_send_only,
+    ):
         reasons.append(f"email status is {email_status.value}")
     if email_suppressed:
         reasons.append("email address is suppressed")

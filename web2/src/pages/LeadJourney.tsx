@@ -4,6 +4,7 @@ import { AlertCircle, Check, Clock, Coins, FileText, Info, Layers, Users, X } fr
 import { useState, type KeyboardEvent } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { JOURNEY_POLICY_STAGE, PolicySkip } from "../components/PolicySkip";
+import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
 import { Callout, Card, Facts, Label, PageHeader, Problem, Skeleton, Table, Td, Th, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
@@ -170,6 +171,11 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
     (lead.held_at && lead.held_at === policyStage) ||
     (stage.key === "qualification" && company.status === "disqualified" && (company.policy_decision as { outcome?: string } | null)?.outcome === "block");
   const skippedFromHere = company.policy_skip_from === policyStage;
+  // The email step stopped on addresses it could not prove: offer to skip the check on them.
+  const stuckOnEmail =
+    stage.key === "email" &&
+    ((company.status === "failed" && company.failed_stage === "email") || (company.status === "held" && (company.hold_reason ?? "").startsWith("catch_all")));
+  const addresses = lead.contacts.filter((c) => c.status === "candidate" || c.status === "active").flatMap((c) => c.emails.filter((e) => e.email).map((e) => ({ person: c.full_name, email: e })));
   const look = LOOK[stage.state];
   return (
     <div id="stage-panel" role="tabpanel" aria-labelledby={`stage-${stage.key}`} data-tour="journey-stage">
@@ -196,6 +202,23 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
                 <div className="mt-0.5 text-[11px] opacity-80">{when(incident.at)}</div>
               </Callout>
             ))}
+          </div>
+        )}
+
+        {stuckOnEmail && addresses.length > 0 && (
+          <div className="mt-4" data-tour="journey-skip-check">
+            <Label className="mb-2">Addresses the check could not prove</Label>
+            <ul className="space-y-1.5">
+              {addresses.map(({ person, email }) => (
+                <li key={email.id} className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-mono">{email.email}</span>
+                  <span className="text-muted">
+                    {person ?? "unknown"} · {words(email.status)}
+                  </span>
+                  <SkipCheck email={email} personName={person} />
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

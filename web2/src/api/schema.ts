@@ -301,6 +301,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contact-emails/{email_id}/skip-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Email Verification */
+        post: operations["skip_email_verification_api_contact_emails__email_id__skip_verification_post"];
+        /** Restore Email Verification */
+        delete: operations["restore_email_verification_api_contact_emails__email_id__skip_verification_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}": {
         parameters: {
             query?: never;
@@ -840,6 +858,11 @@ export interface components {
     schemas: {
         /** ApproveIn */
         ApproveIn: {
+            /**
+             * Acknowledge Skips
+             * @default false
+             */
+            acknowledge_skips?: boolean;
             /** Edited Body */
             edited_body?: string | null;
             /** Row Version */
@@ -1107,6 +1130,11 @@ export interface components {
             provenance: components["schemas"]["Provenance"];
             /** Status */
             status: string;
+            /**
+             * Verification Skipped
+             * @default false
+             */
+            verification_skipped?: boolean;
             /** Verified By */
             verified_by: string | null;
         };
@@ -1415,6 +1443,11 @@ export interface components {
             /** Flagged */
             flagged: boolean;
             message: components["schemas"]["MessageOut"];
+            /**
+             * Skips
+             * @default []
+             */
+            skips?: components["schemas"]["SkipOut"][];
         };
         /** RowOut */
         RowOut: {
@@ -1523,6 +1556,18 @@ export interface components {
             technologies?: string[] | null;
             /** Value Propositions */
             value_propositions?: string[] | null;
+        };
+        /** SkipCheckIn */
+        SkipCheckIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** SkipOut */
+        SkipOut: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
         };
         /** StageOut */
         StageOut: {
@@ -2291,6 +2336,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WaterfallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_email_verification_api_contact_emails__email_id__skip_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkipCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_email_verification_api_contact_emails__email_id__skip_verification_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
                 };
             };
             /** @description Validation Error */

@@ -63,6 +63,7 @@ class DeliverStage:
                 domain_suppressed=uow.suppressions.is_domain_suppressed(company.domain),
                 policy_decision=decision,
                 safe_to_send_only=safe_only,
+                verification_skipped=address.verification_skipped,
             )
             return message, address, verdict, decision.hold_reason
 

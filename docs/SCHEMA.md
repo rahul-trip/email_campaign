@@ -230,6 +230,7 @@ CREATE TABLE contact_emails (
   resolution_ref TEXT,                             -- catch-all resolver job id while catch_all_pending
   verified_at    TIMESTAMP,
   is_primary     BOOLEAN NOT NULL DEFAULT FALSE,
+  verification_skipped BOOLEAN NOT NULL DEFAULT FALSE, -- the operator writes to it without proof (migration 0005)
   UNIQUE (workspace_id, email)
 );
 CREATE UNIQUE INDEX ux_contact_emails_primary ON contact_emails (contact_id) WHERE is_primary;
@@ -348,7 +349,7 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 
 A message may be drafted or sent only when **all** of the following hold:
 
-1. `contact_emails.status IN ('valid','catch_all_resolved')`. `catch_all_unverified` is also allowed, but only if `settings.safe_to_send_only` is false.
+1. `contact_emails.status IN ('valid','catch_all_resolved')`, or `contact_emails.verification_skipped` (the operator skipped the check; approval then needs an explicit acknowledgement). `catch_all_unverified` is also allowed, but only if `settings.safe_to_send_only` is false.
 2. Neither the email nor its domain hash is in `suppressions`.
 3. The company's country policy allows it under the current policy version:
    - for GB, `legal_entity_type = 'corporate_subscriber'`;
@@ -358,7 +359,7 @@ A message may be drafted or sent only when **all** of the following hold:
 
 ## 7. Value conventions the code relies on
 
-Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, migration 0003 added `unconfirmed` to `contacts.status`, and migration 0004 added `companies.policy_skip_from`. The workspace settings `country_policy_enabled` and `footer_enabled` (both default true) live in `workspaces.settings`. They did fix how some columns are used; these conventions are part of the schema contract.
+Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, migration 0003 added `unconfirmed` to `contacts.status`, migration 0004 added `companies.policy_skip_from`, and migration 0005 added `contact_emails.verification_skipped`. The workspace settings `country_policy_enabled` and `footer_enabled` (both default true) live in `workspaces.settings`. They did fix how some columns are used; these conventions are part of the schema contract.
 
 | Column | Convention |
 |---|---|
