@@ -28,6 +28,7 @@ from outbound.domain.enums import (
     EntityType,
     HoldReason,
     MessageState,
+    PolicyStage,
     Provenance,
 )
 from outbound.domain.errors import InvalidInput
@@ -35,6 +36,8 @@ from outbound.domain.names import same_person, split_name
 from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
     COMPANY,
+    POLICY_STAGE_AT,
+    RESUME_AFTER_SKIP,
     IllegalTransition,
     resume_status_for,
     retry_status_for,
@@ -49,6 +52,17 @@ EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 _POLICY_HOLDS = frozenset(
     {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
 )
+# Past the point where any country check runs.
+_AFTER_THE_MAILBOX = frozenset(
+    {
+        CompanyStatus.IN_SEQUENCE,
+        CompanyStatus.REPLIED,
+        CompanyStatus.COMPLETED,
+        CompanyStatus.REJECTED,
+        CompanyStatus.SUPPRESSED,
+    }
+)
+
 # The reason on the event when the operator confirms a person a search could not place.
 CONFIRMED_WORKS_HERE = "confirmed by the operator: works here"
 
@@ -96,6 +110,9 @@ class LeadDetail:
     contacts: list[ContactWithEmails]
     messages: list[Message]
     notes: list[Note]
+    # For a held lead: the stage whose country check held it (gate, contacts, email, copy or
+    # deliver), so the screen offers to skip the rule from there or earlier.
+    held_at: PolicyStage | None = None
 
 
 @dataclass(frozen=True)
@@ -146,8 +163,10 @@ class LeadService:
 
     def detail(self, company_id: str) -> LeadDetail:
         with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
             return LeadDetail(
-                company=uow.companies.get(company_id),
+                held_at=_held_at(uow, company),
+                company=company,
                 contacts=[
                     ContactWithEmails(c, uow.emails.for_contact(c.id))
                     for c in uow.contacts.for_company(company_id)
@@ -452,6 +471,98 @@ class LeadService:
                 uow, company, CompanyStatus.CONTACTS_FOUND, actor, "recipient changed"
             )
 
+    def skip_policy(
+        self, company_id: str, from_stage: PolicyStage, reason: str, *, actor: str = OPERATOR
+    ) -> Company:
+        """Skip the country rule for this lead from ``from_stage`` onward.
+
+        Suppression still applies, and the footer follows the workspace setting. A lead held
+        (or disqualified) by the rule at that stage or a later one goes straight on from where
+        it was stopped; otherwise the skip simply waits until the lead gets there.
+        """
+        why = " ".join(reason.split())
+        if not why:
+            raise InvalidInput("say why the country rule is skipped: it is kept with the record")
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            if company.status in _AFTER_THE_MAILBOX:
+                raise LeadError(f"the lead is {company.status.value}: nothing is left to check")
+            stopped_at = _stopped_by_policy_at(uow, company)
+            order = list(PolicyStage)
+            if stopped_at is not None and order.index(from_stage) > order.index(stopped_at):
+                raise LeadError(
+                    f"The country rule stopped this lead at the {stopped_at.value} step, so the"
+                    f" skip must start there or earlier, not at {from_stage.value}."
+                )
+            uow.companies.update_fields(
+                company_id,
+                {"policy_skip_from": from_stage},
+                actor=actor,
+                expected_version=company.row_version,
+            )
+            uow.events.append(
+                EntityType.COMPANY,
+                company_id,
+                "policy_skip_granted",
+                actor,
+                {"from_stage": from_stage.value, "reason": why},
+            )
+            company = uow.companies.get(company_id)
+            if stopped_at is None:
+                uow.commit()
+                return company
+            if company.status is CompanyStatus.DISQUALIFIED:
+                target = CompanyStatus.QUALIFIED
+            else:
+                target = RESUME_AFTER_SKIP[stopped_at]
+            return self._move(uow, company, target, actor, "country rule skipped by the operator")
+
+    def revoke_policy_skip(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+        """Apply the country rule to this lead again. Refused once its email is approved."""
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            if company.policy_skip_from is None:
+                raise LeadError("the country rule is not skipped for this lead")
+            if company.status is CompanyStatus.APPROVED or company.status in _AFTER_THE_MAILBOX:
+                raise LeadError(
+                    "The email was approved with the country rule skipped. Reject it first if"
+                    " the rule should apply."
+                )
+            updated = uow.companies.update_fields(
+                company_id,
+                {"policy_skip_from": None},
+                actor=actor,
+                expected_version=company.row_version,
+            )
+            uow.events.append(EntityType.COMPANY, company_id, "policy_skip_revoked", actor, {})
+            uow.commit()
+            return updated
+
+    def release_policy_holds(self, *, actor: str = OPERATOR) -> int:
+        """Release every lead held by a country rule that no longer holds it (say, after the
+        rules were switched off for the workspace). Returns how many went on."""
+        released = 0
+        with self._uow(self._workspace_id) as uow:
+            held, _ = uow.companies.search(status=CompanyStatus.HELD, limit=10_000)
+            for company in held:
+                stopped_at = _stopped_by_policy_at(uow, company)
+                if stopped_at is None:
+                    continue
+                decision = policy_decision_for(uow, company, stage=stopped_at.value)
+                if decision.outcome is not PolicyOutcome.ALLOW:
+                    continue
+                uow.companies.transition(
+                    company.id,
+                    RESUME_AFTER_SKIP[stopped_at],
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason="country rule no longer holds it",
+                    next_action_at=None,
+                )
+                released += 1
+            uow.commit()
+        return released
+
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
         with self._uow(self._workspace_id) as uow:
@@ -490,6 +601,29 @@ class LeadService:
         )
         uow.commit()
         return updated
+
+
+def _held_at(uow: UnitOfWork, company: Company) -> PolicyStage | None:
+    """The stage that put a held lead on hold, read from the event that did it."""
+    if company.status is not CompanyStatus.HELD:
+        return None
+    events = uow.events.for_entities([(EntityType.COMPANY, company.id)])
+    for event in reversed(events):
+        if event.type == "status_changed" and event.data.get("to") == CompanyStatus.HELD.value:
+            return POLICY_STAGE_AT.get(CompanyStatus(event.data["from"]))
+    return None
+
+
+def _stopped_by_policy_at(uow: UnitOfWork, company: Company) -> PolicyStage | None:
+    """Where the country rule stopped this lead, if it did: a hold, or a block at the gate."""
+    if company.status is CompanyStatus.DISQUALIFIED:
+        blocked = (company.policy_decision or {}).get("outcome") == PolicyOutcome.BLOCK.value
+        return PolicyStage.GATE if blocked else None
+    if company.status is not CompanyStatus.HELD:
+        return None
+    if company.hold_reason not in _POLICY_HOLDS | {HoldReason.NEEDS_OPERATOR}:
+        return None  # a catch-all hold is about the address, not the country
+    return _held_at(uow, company)
 
 
 def _give_address(uow: UnitOfWork, contact_id: str, address: str, actor: str) -> None:

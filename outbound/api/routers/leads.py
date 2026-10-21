@@ -18,6 +18,7 @@ from outbound.api.schemas import (
     NoteOut,
     PersonIn,
     PersonPatch,
+    PolicySkipIn,
     RecipientIn,
     ReleaseIn,
     TimelineOut,
@@ -40,6 +41,7 @@ def _lead(detail: LeadDetail) -> LeadOut:
         ],
         messages=[MessageOut.model_validate(m) for m in detail.messages],
         notes=[NoteOut.model_validate(n) for n in detail.notes],
+        held_at=detail.held_at.value if detail.held_at else None,
     )
 
 
@@ -99,6 +101,25 @@ def release_hold(
 @router.post("/companies/{company_id}/requalify", response_model=CompanyOut)
 def requalify(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     return CompanyOut.model_validate(svc.leads.requalify(company_id))
+
+
+@router.post("/companies/{company_id}/policy-skip", response_model=CompanyOut)
+def skip_policy(
+    company_id: str, body: PolicySkipIn, svc: Annotated[Services, Depends(services)]
+) -> CompanyOut:
+    return CompanyOut.model_validate(
+        svc.leads.skip_policy(company_id, body.from_stage, body.reason)
+    )
+
+
+@router.delete("/companies/{company_id}/policy-skip", response_model=CompanyOut)
+def revoke_policy_skip(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
+    return CompanyOut.model_validate(svc.leads.revoke_policy_skip(company_id))
+
+
+@router.post("/companies/release-policy-holds")
+def release_policy_holds(svc: Annotated[Services, Depends(services)]) -> dict[str, int]:
+    return {"released": svc.leads.release_policy_holds()}
 
 
 @router.post("/companies/{company_id}/change-recipient", response_model=CompanyOut)

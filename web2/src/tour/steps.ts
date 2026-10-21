@@ -159,7 +159,7 @@ export const SECTIONS: Section[] = [
       {
         target: "journey-stage",
         title: "What happened at a stage",
-        body: "The details found, any holds or failures, and every vendor call made with its cost.",
+        body: "The details found, any holds or failures, and every vendor call made with its cost. Where a country rule held the lead, you can skip the rule for it from this stage.",
       },
       {
         target: "journey-origin",
@@ -187,6 +187,11 @@ export const SECTIONS: Section[] = [
         target: "lead-add-person",
         title: "Add a person",
         body: "Someone you know at the company, with a first and last name or their work email. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on.",
+      },
+      {
+        target: "lead-policy",
+        title: "Country rule",
+        body: "Skip the country's rule for this lead from a step onward, with a reason that is kept. A lead it held goes straight on. The do-not-contact list still applies, and approving the email asks you to confirm.",
       },
       {
         target: "lead-edit",
@@ -220,7 +225,7 @@ export const SECTIONS: Section[] = [
       {
         target: "settings-tabs",
         title: "Setup, profile, limits",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect.",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect and the footer switch.",
       },
       {
         target: "setup-check",
@@ -238,6 +243,11 @@ export const SECTIONS: Section[] = [
         target: "compliance-tabs",
         title: "Rules and requests",
         body: "The rule and footer for each country, the do-not-contact list, and Forget a person for erasure requests. Have the country rules reviewed and record who did.",
+      },
+      {
+        target: "compliance-switch",
+        title: "Switch country rules on or off",
+        body: "Off means no lead is held or blocked because of its country, for the whole workspace; a red banner says so on every page. Suppression still applies. Add any country with any rule below, or remove one.",
       },
     ],
   },

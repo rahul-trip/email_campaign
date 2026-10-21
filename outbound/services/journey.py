@@ -271,7 +271,10 @@ def _headline(company: Company) -> str:
 def _next_step(company: Company) -> str:
     status = company.status
     if status is S.HELD:
-        return "Held for you: open the lead, read why, and release it or leave it."
+        return (
+            "Held for you: open the lead, read why, and release it or leave it. A hold by a"
+            " country rule can also be skipped for this lead from the stage that held it."
+        )
     if status is S.FAILED:
         detail = f" ({company.last_error})" if company.last_error else ""
         return f"A stage failed{detail}. Retry it from the lead page."
@@ -457,6 +460,13 @@ def _qualification(data: JourneyData, stage: StageView) -> tuple[list[Fact], str
     if suggestion:
         facts.append(
             Fact("Suggested country", f"{suggestion.get('code')} ({suggestion.get('evidence')})")
+        )
+    if company.policy_skip_from:
+        facts.append(
+            Fact(
+                "Country policy",
+                f"skipped by the operator from the {company.policy_skip_from.value} step on",
+            )
         )
     decision = company.policy_decision or {}
     if decision:

@@ -250,7 +250,7 @@ Record a mailbox and press **Check DNS** to see whether its domain has SPF, DKIM
 
 | Tab | What it holds |
 |---|---|
-| **Country rules** | The rule (allow, allow with footer, consent required, block) and footer for each country, *Incorporated companies only*, and who reviewed it. A change to the rule, the companies-only box or the footer saves a new version, and every decision records the version it used. Add a country with its two letters; it starts as blocked |
+| **Country rules** | At the top, the switch for the whole workspace: **Switch country rules off…** (it asks first) means no lead is held, blocked or asked for consent because of its country; a red banner then shows on every page, and **Switch country rules back on** undoes it. The do-not-contact list still applies either way. **Release leads the rules no longer hold** lets held leads go on once nothing holds them. Below, the rule (allow, allow with footer, consent required, block) and footer for each country, *Incorporated companies only*, *Only addresses from* (where an address must have come from; none ticked means any), and who reviewed it. A change saves a new version, and every decision records the version it used. **Add country** takes its two letters and a rule; **Remove** deletes a rule, after which that country's leads are held for you. Every change is recorded |
 | **Do not contact** | Add an address or a whole domain. It is stored only as a fingerprint, never as text, and asks you to confirm because it cannot be removed |
 | **Forget a person** | Erases a person on request (section 10): the address goes on the do-not-contact list, unsent emails are cancelled, drafts are deleted, and their name, title and address are removed |
 
@@ -262,7 +262,7 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
 | **Sender profile** | Who you are, in three parts: the legal identity printed in footers, your signature, and what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
-| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, and *Only send to proven addresses* (leave this on) |
+| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
 
 Automatic sending cannot be switched on in this version.
 
@@ -310,6 +310,8 @@ A held company is waiting. **Release hold** puts it back at the step that held i
 
 For the three holds that come from the country rule (*country unknown*, *entity unknown*, *consent required*) **Release hold** is refused while nothing has changed, and the message says what to do. Releasing without fixing the cause would only be held again, so the page does not let it loop. Releasing a hold is not the same as giving consent: consent belongs to a person and is recorded against them.
 
+**Skipping the country rule for one lead.** On the lead page (card *Country rule*) or in its journey at the stage that held it: choose the step to skip it from (*Qualify*, *Find people*, *Find the email address*, *Write the email*, *Draft it in the mailbox*), write why, and press **Skip the country rule**. The rule is then not applied to this lead from that step on; a lead it held goes straight on from where it stopped. You can only skip from the step that stopped it or an earlier one. The do-not-contact list still applies, the footer follows Settings → Limits, and approving the email asks you to confirm the skip. **Apply the country rule again** undoes it until the email is approved. Who skipped it, when and why are in the timeline.
+
 | Hold reason | Meaning | What to do |
 |---|---|---|
 | country unknown | The country could not be worked out, and the rules depend on it | Set the country under **Edit this lead** (or **Use XX and release** if one was suggested), then release |
@@ -322,7 +324,7 @@ For the three holds that come from the country rule (*country unknown*, *entity 
 ### 7.2 Disqualified
 
 - **Fit too low:** the research judged the company a poor match. If you disagree, **Override and qualify** on the lead's page.
-- **Country forbids cold email** (by default Germany and Austria): it stays disqualified. Pressing *Override and qualify* will not get it through, because the country check runs again before the next step and stops it. Only consent changes that: add the person who agreed to be contacted with **Add a person** on the lead page, ticking that they have consented.
+- **Country forbids cold email** (by default Germany and Austria): it stays disqualified, and *Override and qualify* is not offered. To go ahead, add the person who agreed to be contacted with **Add a person** (ticking that they have consented), or skip the country rule for this lead from *Qualify* (section 7.1). If a country's rule changes to block after a lead was qualified, the lead is **held** at its next step, never ended for good.
 
 ### 7.3 Failed
 
@@ -355,6 +357,8 @@ These are working defaults, **not legal advice**. Have a lawyer review them befo
 | India | Held unless consent is recorded |
 | Unknown country | Held until the country is known |
 | Any other country | Held until a policy is added |
+
+You can change all of this: edit or remove any country's rule, add any country with any rule, skip the rule for a single lead, or switch country rules off for the workspace (Policies and privacy → Country rules).
 
 The country is taken from what you entered, otherwise from the site (a stated registration, the domain ending, a phone prefix, a UK postcode).
 

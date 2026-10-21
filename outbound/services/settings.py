@@ -30,7 +30,14 @@ SENDER_FIELDS = frozenset(
 )  # fmt: skip
 REVIEWED_KEY = "reviewed_at"
 SETTING_FIELDS = frozenset(
-    {"safe_to_send_only", "budget_per_prospect_micro_usd", "few_shot_examples", "timezone"}
+    {
+        "safe_to_send_only",
+        "budget_per_prospect_micro_usd",
+        "few_shot_examples",
+        "timezone",
+        "country_policy_enabled",  # off: no country rule is applied anywhere (suppression is)
+        "footer_enabled",  # off: no footer is added to any email
+    }
 )
 
 
@@ -174,8 +181,38 @@ class SettingsService:
         )
         with self._uow(self._workspace_id) as uow:
             saved = uow.policies.upsert(policy, reviewer=reviewer)
+            # Country rules decide who may be written to, so every change is in the audit trail.
+            uow.events.append(
+                EntityType.WORKSPACE,
+                self._workspace_id,
+                "policy_changed",
+                OPERATOR,
+                {
+                    "country_code": saved.country_code,
+                    "rule": saved.rule.value,
+                    "requires_corporate_subscriber": saved.requires_corporate_subscriber,
+                    "allowed_provenance": [p.value for p in saved.allowed_provenance or ()],
+                    "version": saved.version,
+                    "reviewed_by": saved.reviewed_by,
+                },
+            )
             uow.commit()
             return saved
+
+    def delete_policy(self, country_code: str) -> None:
+        """Remove a country's rule. Its leads are then held for you (no rule means no guess)."""
+        code = country_code.strip().upper()
+        with self._uow(self._workspace_id) as uow:
+            if not uow.policies.delete(code):
+                raise NotFound(f"no rule for {code}")
+            uow.events.append(
+                EntityType.WORKSPACE,
+                self._workspace_id,
+                "policy_deleted",
+                OPERATOR,
+                {"country_code": code},
+            )
+            uow.commit()
 
     # ------------------------------------------------------------------ suppressions
 

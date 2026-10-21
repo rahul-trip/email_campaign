@@ -20,7 +20,7 @@ from outbound.stages.policy import policy_decision_for
 
 
 class RefusalKind(StrEnum):
-    SUPPRESSED = "suppressed"  # never contact: suppressed domain, or the country forbids it
+    SUPPRESSED = "suppressed"  # never contact: the domain is on the suppression list
     HOLD = "hold"  # wait for a person
     BUDGET = "budget"
 
@@ -41,11 +41,16 @@ class Guards:
             return Refusal(RefusalKind.SUPPRESSED, f"{company.domain} is on the suppression list")
 
         if stage.guard_policy:
-            decision = policy_decision_for(uow, company)
-            if decision.outcome is PolicyOutcome.BLOCK:
-                return Refusal(RefusalKind.SUPPRESSED, "; ".join(decision.reasons))
-            if decision.outcome is PolicyOutcome.HOLD:
-                return Refusal(RefusalKind.HOLD, "; ".join(decision.reasons), decision.hold_reason)
+            decision = policy_decision_for(uow, company, stage=stage.name)
+            # A country that blocks contact holds the lead rather than suppressing it: a rule
+            # can come back into force (a skip revoked, the workspace switch turned back on),
+            # and that must never end a lead for good. Only the suppression list does that.
+            if decision.outcome is not PolicyOutcome.ALLOW:
+                return Refusal(
+                    RefusalKind.HOLD,
+                    "; ".join(decision.reasons),
+                    decision.hold_reason or HoldReason.NEEDS_OPERATOR,
+                )
 
         ceiling = self._budget.per_prospect
         if ceiling is not None and stage.spends:

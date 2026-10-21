@@ -28,6 +28,14 @@ _SENDER_KEYS = {
 }
 
 
+# Used when the workspace keeps footers on and the country has none of its own (no row, or the
+# rule was skipped for a country without one): who is writing, where, and a plain way out.
+DEFAULT_FOOTER = (
+    "{sender_legal_name}, {postal_address}. If this is not relevant to you, reply and I will not"
+    " write again."
+)
+
+
 class MissingProfileField(ValueError):
     def __init__(self, fields: list[str]) -> None:
         super().__init__(f"the sender profile needs: {', '.join(fields)}")

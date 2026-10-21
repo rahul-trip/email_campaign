@@ -53,6 +53,8 @@ function Shell({ children }: { children: ReactNode }) {
     refetchInterval: (query) => (query.state.data?.some((r) => r.status === "queued" || r.status === "running") ? 2000 : 10000),
   });
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
+  const workspace = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
+  const rulesOff = workspace.data?.country_policy_enabled === false;
   const logout = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => queryClient.clear() });
 
   const held = Object.values(status.data?.held ?? {}).reduce((sum, n) => sum + n, 0);
@@ -149,6 +151,15 @@ function Shell({ children }: { children: ReactNode }) {
           {stuck && (
             <Banner tone="error">
               A run has been waiting {ago(active?.created_at)} and nothing has picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.
+            </Banner>
+          )}
+          {rulesOff && (
+            <Banner tone="error">
+              Country rules are switched off for this workspace: no lead is held or blocked by its country. The do-not-contact list still applies.{" "}
+              <Link to="/compliance" className="font-semibold underline">
+                Switch them back on
+              </Link>
+              .
             </Banner>
           )}
           {unconfirmed && (

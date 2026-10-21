@@ -15,6 +15,7 @@ from outbound.domain.enums import (
     EmailStatus,
     HoldReason,
     MessageState,
+    PolicyStage,
     RunStatus,
 )
 
@@ -76,8 +77,17 @@ COMPANY = StateMachine(
         C.CONTACTS_FOUND: _row(C.EMAIL_READY, C.HELD, C.FAILED, C.SUPPRESSED),
         # Back to CONTACTS_FOUND when the operator picks a different person to write to.
         C.EMAIL_READY: _row(C.COPY_READY, C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
-        # Released back to where the hold came from; see ``resume_status_for``.
-        C.HELD: _row(C.RESEARCHED, C.CONTACTS_FOUND, C.REJECTED, C.FAILED, C.SUPPRESSED),
+        # Released back to where the hold came from; see ``resume_status_for``. QUALIFIED and
+        # EMAIL_READY are for a country rule skipped where the contacts or copy step held it.
+        C.HELD: _row(
+            C.RESEARCHED,
+            C.QUALIFIED,
+            C.CONTACTS_FOUND,
+            C.EMAIL_READY,
+            C.REJECTED,
+            C.FAILED,
+            C.SUPPRESSED,
+        ),
         C.COPY_READY: _row(C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED),
         C.APPROVED: _row(C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
         # A bounce or a referral sends the lead back for the next contact.
@@ -107,6 +117,25 @@ _HELD_RESUMES: Mapping[HoldReason, CompanyStatus | None] = {
     HoldReason.COUNTRY_UNKNOWN: C.RESEARCHED,
     HoldReason.ENTITY_UNKNOWN: C.RESEARCHED,
     HoldReason.NEEDS_OPERATOR: None,  # the caller must choose where to resume
+}
+
+
+# The stage that checks the country rule on a lead in each status, and back: where a lead held
+# at that stage goes when the rule is skipped for it. Deliver goes back to copy, because its
+# approved email was withdrawn when it was held.
+POLICY_STAGE_AT: Mapping[CompanyStatus, PolicyStage] = {
+    C.RESEARCHED: PolicyStage.GATE,
+    C.QUALIFIED: PolicyStage.CONTACTS,
+    C.CONTACTS_FOUND: PolicyStage.EMAIL,
+    C.EMAIL_READY: PolicyStage.COPY,
+    C.APPROVED: PolicyStage.DELIVER,
+}
+RESUME_AFTER_SKIP: Mapping[PolicyStage, CompanyStatus] = {
+    PolicyStage.GATE: C.RESEARCHED,
+    PolicyStage.CONTACTS: C.QUALIFIED,
+    PolicyStage.EMAIL: C.CONTACTS_FOUND,
+    PolicyStage.COPY: C.EMAIL_READY,
+    PolicyStage.DELIVER: C.EMAIL_READY,
 }
 
 

@@ -194,7 +194,7 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 - **A retry after `failed`** restores the input status of the stage that failed. Only research, gate, contacts, email and copy can fail a lead. Deliver and sync leave the lead where it is and try again an hour later.
 - **Back-off.** A failed lead waits 15 minutes times the number of attempts so far before `outbound tick` retries it, and is retried automatically at most 3 times. The operator can retry at once from the CLI or the lead page.
 - **A hold can start at `qualified`, `email_ready` and `approved` too.** If the country rules change after approval, or delivery finds the email is no longer safe (an opt-out, a bounce, a suppressed address), the lead is held with the reason and its approved email is withdrawn; once released it is checked again and gets a fresh first email. Nothing is retried silently.
-- **Guards before every stage.** A suppressed domain, or a country that now blocks, moves the lead to `suppressed`. A policy that now needs a person holds the lead where the lifecycle allows a hold, and otherwise defers it. A lead that has used its per-prospect budget fails with that reason.
+- **Guards before every stage.** A suppressed domain moves the lead to `suppressed`. A country rule that now blocks or needs a person holds the lead (`needs_operator` for a block) where the lifecycle allows a hold, and otherwise defers it: a rule can come back into force (a skip revoked, the workspace switch turned back on), so it never ends a lead for good. A lead that has used its per-prospect budget fails with that reason.
 
 **Message state:** `generated → approved | rejected → drafted → sent → bounced`. A message can become `cancelled` at any point before it is sent. In Phases 2–4, `sent` is set by the Sent-folder sync.
 
@@ -288,6 +288,8 @@ These summarise the research. They are not legal advice: a lawyer confirms the p
 | CA | CASL: implied consent via conspicuous publication | Only with `publicly_published` or `operator_given` provenance |
 | IN | DPDP: consent-based | Held unless consent is recorded (for example, an expo card) |
 | Unknown | — | Held as `country_unknown` |
+
+**The operator can switch the country rules.** For one lead, `companies.policy_skip_from` skips the rule from a stage onward (`gate`, `contacts`, `email`, `copy`, `deliver`); a tail, never an arbitrary set, so no stage contradicts a later one. A lead the rule stopped resumes at the stage that stopped it; the skip can start there or earlier. For the workspace, `settings.country_policy_enabled` (default on) switches them all off. Either way the decision is ALLOW with `skipped` recorded, suppression still applies, and the footer follows `settings.footer_enabled` (default on): the country's footer, or a short default with the sender's address and an opt-out line. Every country-rule change, removal and skip is an event.
 
 Consent belongs to a person. Before a recipient is chosen (the gate, the runner's guard), anyone's consent at the company keeps the lead moving; once the email, copy or deliver step names the recipient, only *that person's* consent counts, so someone else's consent never allows writing to them.
 

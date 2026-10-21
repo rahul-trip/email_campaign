@@ -10,7 +10,7 @@ from outbound.domain.enums import (
     HoldReason,
     MessageState,
 )
-from outbound.domain.footer import MissingProfileField, render_footer
+from outbound.domain.footer import DEFAULT_FOOTER, MissingProfileField, render_footer
 from outbound.domain.policies import PolicyOutcome, is_safe_email_status
 from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
@@ -51,7 +51,11 @@ class CopyStage:
             chosen = _chosen_address(uow, company.id, safe_only)
             decision = (
                 policy_decision_for(
-                    uow, company, email_provenance=chosen[1].provenance, recipient_id=chosen[0].id
+                    uow,
+                    company,
+                    stage=self.name,
+                    email_provenance=chosen[1].provenance,
+                    recipient_id=chosen[0].id,
                 )
                 if chosen
                 else None
@@ -76,10 +80,13 @@ class CopyStage:
                 company_updates={"policy_decision": decision.to_json()},
             )
 
+        # The footer is its own setting: on by default, and kept when the country rule is
+        # skipped. A country without a footer of its own gets the short default one.
         footer: str | None = None
-        if decision.footer_template:
+        if ctx.workspace.settings.get("footer_enabled", True):
+            template = decision.footer_template or DEFAULT_FOOTER
             try:
-                footer = render_footer(decision.footer_template, sender, address.provenance)
+                footer = render_footer(template, sender, address.provenance)
             except MissingProfileField as error:
                 raise StageFailure(str(error)) from None
 

@@ -191,7 +191,9 @@ CREATE TABLE companies (
   email_pattern     TEXT,                          -- e.g. '{first}.{last}', cached once one address is valid
   research          JSON,                          -- summary, products, news, signals, hook candidates
   research_answers  JSON,                          -- answers to the campaign's questions
-  policy_decision   JSON,                          -- rule, policy version, reasons, decided_at
+  policy_decision   JSON,                          -- rule, policy version, reasons, skipped
+  policy_skip_from  TEXT CHECK (policy_skip_from IN ('gate','contacts','email','copy','deliver')),
+                                                   -- the operator skipped the country rule from this stage on (migration 0004)
   manual_fields     JSON NOT NULL DEFAULT '[]',
   row_version       INTEGER NOT NULL DEFAULT 1,
   UNIQUE (workspace_id, domain)
@@ -356,7 +358,7 @@ A message may be drafted or sent only when **all** of the following hold:
 
 ## 7. Value conventions the code relies on
 
-Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, and migration 0003 added `unconfirmed` to `contacts.status`. They did fix how some columns are used; these conventions are part of the schema contract.
+Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, migration 0003 added `unconfirmed` to `contacts.status`, and migration 0004 added `companies.policy_skip_from`. The workspace settings `country_policy_enabled` and `footer_enabled` (both default true) live in `workspaces.settings`. They did fix how some columns are used; these conventions are part of the schema contract.
 
 | Column | Convention |
 |---|---|
