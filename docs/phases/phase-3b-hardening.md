@@ -219,6 +219,12 @@ Asked for by the operator (2026-10-20): the email check and the person check sho
 
 **Tests:** the waterfall uses a skipped address of every status without paying; suppression still wins; the Tilt case through the email step; reason required; refused for a suppressed address; approval refused without, recorded with; every kind of skip listed; restore until approval; a browser test from a held lead to an acknowledged approval.
 
+### 3b.16 Clean up the first discovery run's data (added during the work)
+
+`scripts/fix_discovery_data.py`, run once after 3b.12 to 3b.15 are deployed. It goes through the services, so every change writes its event, and it prints its plan without changing anything unless given `--apply`. It renames the discovered leads after their own sites (as the engine, not as an operator edit), removes the six people a search attached to the wrong companies, replaces the tata.com lead with tatapower.com, and moves the rebase.energy draft from the CTO to the CEO who gave consent; `--rerun-research` also sends amperon.co back to research. Each step finds its lead by domain and person by name and skips itself once done.
+
+**Tests:** a seeded copy of the live data: the plan, the result of applying it, and an empty plan on a second run.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.
