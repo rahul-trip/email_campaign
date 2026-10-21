@@ -149,3 +149,14 @@ def consent(
 @router.delete("/contacts/{contact_id}", status_code=204)
 def remove_person(contact_id: str, svc: Annotated[Services, Depends(services)]) -> None:
     svc.leads.remove_person(contact_id)
+
+
+@router.post("/contacts/{contact_id}/confirm", response_model=ContactOut)
+def confirm_person(contact_id: str, svc: Annotated[Services, Depends(services)]) -> ContactOut:
+    confirmed = svc.leads.confirm_person(contact_id)
+    return ContactOut.model_validate(
+        {
+            **confirmed.contact.__dict__,
+            "emails": [EmailOut.model_validate(e) for e in confirmed.emails],
+        }
+    )

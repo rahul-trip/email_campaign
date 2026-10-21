@@ -209,7 +209,9 @@ CREATE TABLE contacts (
   rank          INTEGER NOT NULL,                  -- 0 = referral, 1 = top choice
   source        TEXT NOT NULL CHECK (source IN ('operator','site','search','database','referral','ooo_alternate')),
   status        TEXT NOT NULL DEFAULT 'candidate'
-                CHECK (status IN ('candidate','active','bounced','referred_away','opted_out','forgotten')),
+                CHECK (status IN ('unconfirmed','candidate','active','bounced','referred_away','opted_out','forgotten')),
+                -- unconfirmed (migration 0003): found by a public search whose employer did not
+                -- clearly match the company; never worked on until the operator confirms them
   manual_fields JSON NOT NULL DEFAULT '[]'
 );
 CREATE UNIQUE INDEX ux_contacts_linkedin ON contacts (workspace_id, linkedin_url) WHERE linkedin_url IS NOT NULL;
@@ -354,7 +356,7 @@ A message may be drafted or sent only when **all** of the following hold:
 
 ## 7. Value conventions the code relies on
 
-Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3. They did fix how some columns are used; these conventions are part of the schema contract.
+Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, and migration 0003 added `unconfirmed` to `contacts.status`. They did fix how some columns are used; these conventions are part of the schema contract.
 
 | Column | Convention |
 |---|---|

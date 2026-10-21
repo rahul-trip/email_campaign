@@ -8,6 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from outbound.cli.main import app
+from outbound.db import migrate
 
 runner = CliRunner()
 WORKBOOK = Path(__file__).parents[1] / "Quantra_Energy_Outbound_Campaign_Matrix.xlsx"
@@ -34,9 +35,9 @@ def test_db_upgrade_creates_the_schema_and_current_reports_it(url: str) -> None:
     code, out = run("db", "current", url=url)
     assert code == 0 and "not created yet" in out
     code, out = run("db", "upgrade", url=url)
-    assert code == 0 and "revision 0002" in out
+    assert code == 0 and f"revision {migrate.head_revision()}" in out
     code, out = run("db", "current", url=url)
-    assert code == 0 and "0002" in out
+    assert code == 0 and f"database: {migrate.head_revision()}" in out
 
 
 def test_db_downgrade_steps_back_to_nothing(url: str) -> None:

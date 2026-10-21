@@ -3754,6 +3754,48 @@
         ]
       }
     },
+    "/api/contacts/{contact_id}/confirm": {
+      "post": {
+        "operationId": "confirm_person_api_contacts__contact_id__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Person",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/contacts/{contact_id}/consents": {
       "post": {
         "operationId": "consent_api_contacts__contact_id__consents_post",

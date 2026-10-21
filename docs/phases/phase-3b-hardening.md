@@ -184,6 +184,18 @@ Found by the operator in use (2026-10-19): on rebase.energy the operator gave th
 
 **Tests:** ranking with a chosen CEO against a wanted CTO; recipient-only consent; idempotent consent; same-name dedupe; rank after a late add; remove and its refusal; change recipient with the email cancelled; the API for both; the state-machine table.
 
+### 3b.13 Real company names and the right people (added during the work)
+
+Found by the operator in use (2026-10-19): a discovery run named every company after the search hit's page title ("6 Grid Trends to Watch in 2026" for amperon.co, "AI Foresight Trends Report" for ltm.com), and the LinkedIn search then used that title and accepted anyone sharing one word with it ("foresight", "grid", even "the"). Six people at other companies were attached to three leads. "tata power" resolved to the group's tata.com without asking.
+
+- Discovery stores the website and the page it was found on, never a name; it asks for companies, takes twice the hits and skips articles and documents.
+- Research runs the site worker first; it returns the company's own name, which is saved (operator names are kept) and used by the legal, signals, persona and fit workers.
+- `search_people` confirms a person only when the profile's employer is the company (whole name or website name); a mention only gives `unconfirmed` (new contact status, migration 0003), anyone else is dropped. `read_profile_title` reads "Title at Company", keeps the title, and strips emoji. No people are taken from other sites' pages when the site could not be read. Research dedupes people by name too.
+- `match_confidence` needs the whole name in the website's name; a partial one ("tata" for "tata power") asks the operator.
+- **Confirm they work here** on the lead page (`POST /api/contacts/{id}/confirm`); the contacts stage says so when only unconfirmed people were found.
+
+**Tests:** the real LinkedIn results (Dan Roth, Jigar Shah, Adam Shaw, Damian Płaza, Isak Bergset); one shared word is not enough; name from the site, used by the search and fit; operator name kept; unconfirmed saved; no people from a thin site; profile-title parsing; website matching (tata); discovery without names and without documents; confirm; migration 0003 up and down on both databases.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

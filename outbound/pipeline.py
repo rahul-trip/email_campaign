@@ -47,7 +47,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
 from outbound.services import defaults
-from outbound.services.intake import IntakeService, discover_rows
+from outbound.services.intake import IntakeService, discover_rows, discovery_query
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunMode, RunRequest, RunService
 from outbound.stages.base import Stage
@@ -206,7 +206,7 @@ def discover_companies(
         campaign = uow.campaigns.by_name(campaign_name)
     if campaign is None:
         raise LookupError(f"no campaign named {campaign_name!r}")
-    query = campaign.icp_description or defaults.DEFAULT_ICP
+    query = discovery_query(campaign.icp_description or defaults.DEFAULT_ICP)
     rows = discover_rows(pipeline.search, [query], per_query=count)
     report = pipeline.intake.run(
         rows,

@@ -12,6 +12,7 @@ from outbound.domain.enums import (
     CompanyStatus,
     ConsentBasis,
     ContactSource,
+    ContactStatus,
     EntityType,
     HoldReason,
     MessageState,
@@ -25,7 +26,7 @@ from outbound.domain.errors import InvalidInput
 from outbound.domain.hashing import hash_value
 from outbound.domain.policies import PolicyOutcome
 from outbound.services.dns_check import check_domain
-from outbound.services.leads import LeadError, LeadService
+from outbound.services.leads import CONFIRMED_WORKS_HERE, LeadError, LeadService
 from outbound.services.runs import RunMode, RunRequest, RunService
 from outbound.services.settings import SettingsError, SettingsService
 from outbound.stages.policy import policy_decision_for
@@ -537,6 +538,33 @@ def test_the_draft_can_be_moved_to_another_person(factory: UnitOfWorkFactory, ws
     with factory(ws) as uow:
         assert uow.messages.get(draft.id).state is MessageState.CANCELLED
         assert uow.contacts.for_company(company.id)[0].id == ceo
+
+
+def test_a_person_a_search_could_not_place_is_confirmed_by_the_operator(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "volue.com")
+    with factory(ws) as uow:
+        person = uow.contacts.add(
+            company.id,
+            rank=1,
+            source=ContactSource.SEARCH,
+            full_name="Sam Lee",
+            status=ContactStatus.UNCONFIRMED,
+        )
+        uow.commit()
+    service = leads(factory, ws)
+    confirmed = service.confirm_person(person.id)
+    assert confirmed.contact.status is ContactStatus.CANDIDATE
+    with pytest.raises(LeadError, match="not waiting"):
+        service.confirm_person(person.id)
+    with factory(ws) as uow:
+        (event,) = [
+            e
+            for e in uow.events.for_entities([(EntityType.CONTACT, person.id)])
+            if e.type == "status_changed"
+        ]
+    assert (event.actor, event.data["reason"]) == ("operator", CONFIRMED_WORKS_HERE)
 
 
 # ------------------------------------------------------------------ settings

@@ -10,7 +10,7 @@ from outbound.domain.domains import is_free_mail, is_platform, registrable_domai
 from outbound.domain.hashing import hash_value
 from outbound.domain.ids import new_id
 from outbound.domain.money import format_usd, micro_to_usd, usd_to_micro
-from outbound.domain.names import same_person
+from outbound.domain.names import employer_matches, read_profile_title, same_person
 
 
 def test_ids_are_unique_and_sort_by_creation_time() -> None:
@@ -79,3 +79,49 @@ def test_two_names_are_the_same_person_ignoring_case_and_accents(
     a: str | None, b: str, same: bool
 ) -> None:
     assert same_person(a, b) is same
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Jane Doe - CTO - Acme Energy | LinkedIn", ("Jane Doe", "CTO", "Acme Energy")),
+        (
+            "Dan Roth - Power Grid Automation at G&W Electric",
+            ("Dan Roth", "Power Grid Automation", "G&W Electric"),
+        ),
+        # A headline that names no employer stays the title; it is never taken as the company.
+        (
+            "Del Misenheimer - Vice President and CEO of Grid ...",
+            ("Del Misenheimer", "Vice President and CEO of Grid ...", ""),
+        ),
+        (
+            "Adam Shaw ⚡️ - The Grid Needs More Innovators",
+            ("Adam Shaw", "The Grid Needs More Innovators", ""),
+        ),
+        ("Chris Phillips", ("Chris Phillips", "", "")),
+        ("", ("", "", "")),
+    ],
+)
+def test_a_linkedin_result_title_is_read_into_name_title_and_employer(
+    title: str, expected: tuple[str, str, str]
+) -> None:
+    assert read_profile_title(title) == expected
+
+
+@pytest.mark.parametrize(
+    ("employer", "company", "domain", "same"),
+    [
+        ("Volue", "Volue", "volue.com", True),
+        ("Volue ASA", "Volue", "volue.com", True),
+        ("Acme Energy Ltd", "Acme Energy", "acme.co.uk", True),
+        ("Tilt Energy", "6 Grid Trends to Watch in 2026", "tilt-energy.com", True),
+        ("G&W Electric", "Amperon", "amperon.co", False),
+        ("Foresight Intelligence AI", "AI Foresight Trends Report", "ltm.com", False),
+        ("Grid Power Co", "Volue", "volue.com", False),
+        ("", "Volue", "volue.com", False),
+    ],
+)
+def test_an_employer_matches_on_the_whole_name_or_the_website_never_one_word(
+    employer: str, company: str, domain: str, same: bool
+) -> None:
+    assert employer_matches(employer, company, domain) is same

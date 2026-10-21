@@ -180,6 +180,8 @@ K = ContactStatus
 CONTACT = StateMachine(
     "contact",
     {
+        # Confirmed by the operator, or suppressed and forgotten like anyone else.
+        K.UNCONFIRMED: _row(K.CANDIDATE, K.ACTIVE, K.OPTED_OUT, K.FORGOTTEN),
         K.CANDIDATE: _row(K.ACTIVE, K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN),
         K.ACTIVE: _row(K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN),
         K.BOUNCED: _row(K.OPTED_OUT, K.FORGOTTEN),

@@ -23,6 +23,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import openpyxl
 
@@ -43,7 +44,13 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.domain.errors import InvalidInput
-from outbound.domain.names import read_profile_title, split_name, split_person
+from outbound.domain.names import (
+    company_tokens,
+    domain_label,
+    read_profile_title,
+    split_name,
+    split_person,
+)
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import SearchHit, SearchProvider
@@ -73,10 +80,6 @@ _HEADERS = {
     "priority": "priority",
 }  # fmt: skip
 
-_NAME_NOISE = frozenset(
-    {"ltd", "limited", "llc", "inc", "incorporated", "gmbh", "plc", "co", "company", "corp",
-     "corporation", "the", "group", "holdings", "sa", "bv", "ag", "llp", "and"}
-)  # fmt: skip
 _LINKEDIN_PROFILE = re.compile(r"linkedin\.com/in/([^/?#\s]+)", re.IGNORECASE)
 
 
@@ -200,19 +203,23 @@ class Resolution:
     searched: bool = True
 
 
-def _name_tokens(name: str) -> list[str]:
-    return [t for t in re.findall(r"[a-z0-9]+", name.lower()) if t not in _NAME_NOISE]
-
-
 def match_confidence(name: str, domain: str, hit: SearchHit) -> float:
-    """How sure we are that ``domain`` is the official site of ``name`` (no model involved)."""
-    tokens = _name_tokens(name)
+    """How sure we are that ``domain`` is the official site of ``name`` (no model involved).
+
+    The website's name must hold the *whole* company name. A site whose name is only part of
+    it ("tata.com" for "Tata Power": the parent group's site) is below the threshold, so the
+    operator is asked rather than the lead going to the wrong company.
+    """
+    tokens = company_tokens(name)
     if not tokens:
         return 0.0
-    label = domain.split(".")[0].replace("-", "")
     joined = "".join(tokens)
-    if joined in label or (len(label) >= 4 and label in joined):
-        return 0.9
+    label = domain_label(domain)
+    whole = domain.lower().replace(".", "").replace("-", "")  # "rebase.energy" for Rebase Energy
+    if joined in (label, whole):
+        return 0.95
+    if joined in label:  # "acme" at "acmeenergy.com"
+        return 0.85
     text = f"{hit.title} {hit.snippet}".lower()
     if all(token in text for token in tokens):
         return 0.65
@@ -620,21 +627,47 @@ def _version(uow: UnitOfWork, company_id: str) -> int:
     return uow.companies.get(company_id).row_version
 
 
+# Pages that talk *about* a market (articles, reports, downloads) rather than a company's own
+# product. The site behind them may still fit, but such hits crowd out real companies.
+_CONTENT_PATH = re.compile(
+    r"\.pdf$|/(blog|news|insights?|articles?|reports?|press|events?|webinars?|ebooks?|guides?)/",
+    re.IGNORECASE,
+)
+
+
+def discovery_query(icp: str) -> str:
+    """Phrase the campaign's description as a search for companies, not for articles about it."""
+    return f"companies offering products or services for: {' '.join(icp.split())}"
+
+
 def discover_rows(
     search: SearchProvider, queries: Iterable[str], *, per_query: int = 10
 ) -> list[dict[str, Any]]:
-    """Candidate target rows from web searches, for ``discovery`` mode (website only)."""
+    """Candidate target rows from web searches, for ``discovery`` mode (website only).
+
+    A hit's page title is not the company's name (it is often an article's headline), so no
+    name is stored: research reads the name from the company's own site. Twice as many hits
+    are asked for, articles and documents are skipped, and the page a company was found on is
+    kept as a note.
+    """
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     for query in queries:
-        for hit in search.search(query, max_results=per_query):
+        found = 0
+        for hit in search.search(query, max_results=per_query * 2):
+            if found >= per_query:
+                break
             domain = registrable_domain(hit.url)
+            path = urlsplit(hit.url).path
             if (
-                domain
-                and domain not in seen
-                and not is_platform(domain)
-                and not is_free_mail(domain)
+                not domain
+                or domain in seen
+                or is_platform(domain)
+                or is_free_mail(domain)
+                or _CONTENT_PATH.search(path)
             ):
-                seen.add(domain)
-                rows.append({"website": domain, "company": hit.title.split("|")[0].strip()})
+                continue
+            seen.add(domain)
+            found += 1
+            rows.append({"website": domain, "notes": f"Found by discovery: {hit.url}"})
     return rows

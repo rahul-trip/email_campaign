@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from outbound.db.uow import UnitOfWork
-from outbound.domain.enums import CompanyStatus, ContactSource, LegalEntityType
-from outbound.domain.names import display_name
+from outbound.domain.enums import CompanyStatus, ContactSource, ContactStatus, LegalEntityType
+from outbound.domain.names import display_name, same_person
 from outbound.stages.base import StageContext, StageResult
 from outbound.stages.research.graph import (
     Person,
@@ -56,6 +56,10 @@ class ResearchStage:
             "fit_score": output.fit_score,
             "fit_reason": output.fit_reason,
         }
+        # The name the company's own site uses. A name you typed is kept (manual_fields), and a
+        # discovered lead arrives with none, or with an article's headline from older runs.
+        if output.company_name and output.company_name != company.name:
+            updates["name"] = output.company_name
         if output.country_code and not company.country_code:
             updates["country_code"] = output.country_code
         if output.legal_entity_type is not LegalEntityType.UNKNOWN:
@@ -69,9 +73,12 @@ class ResearchStage:
 
 
 def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -> None:
-    rank = len(uow.contacts.for_company(company_id))
+    known = uow.contacts.for_company(company_id)
+    rank = len(known)
     for person in people:
         if person.linkedin_url and uow.contacts.linkedin_taken(person.linkedin_url):
+            continue
+        if any(same_person(c.full_name, person.name) for c in known):
             continue
         rank += 1
         first, _, last = person.name.partition(" ")
@@ -84,4 +91,5 @@ def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -
             last_name=last or None,
             title=person.title or None,
             linkedin_url=person.linkedin_url,
+            status=ContactStatus.CANDIDATE if person.confirmed else ContactStatus.UNCONFIRMED,
         )
