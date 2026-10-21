@@ -96,11 +96,13 @@ class EmailStage:
 
         if chosen is not None and chosen_contact is not None:
             decision = ctx.read(
-                lambda uow: policy_decision_for(uow, company, email_provenance=chosen.provenance)
+                lambda uow: policy_decision_for(
+                    uow, company, email_provenance=chosen.provenance, recipient_id=chosen_contact.id
+                )
             )
             if (
                 decision.outcome is not PolicyOutcome.ALLOW
-            ):  # for example a guessed Canadian address
+            ):  # a guessed Canadian address, or consent recorded for someone else
                 return StageResult(
                     CompanyStatus.HELD,
                     reason="; ".join(decision.reasons),

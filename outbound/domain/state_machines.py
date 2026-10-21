@@ -74,11 +74,12 @@ COMPANY = StateMachine(
         # An operator can override a low fit score.
         C.DISQUALIFIED: _row(C.QUALIFIED, C.SUPPRESSED),
         C.CONTACTS_FOUND: _row(C.EMAIL_READY, C.HELD, C.FAILED, C.SUPPRESSED),
-        C.EMAIL_READY: _row(C.COPY_READY, C.HELD, C.FAILED, C.SUPPRESSED),
+        # Back to CONTACTS_FOUND when the operator picks a different person to write to.
+        C.EMAIL_READY: _row(C.COPY_READY, C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
         # Released back to where the hold came from; see ``resume_status_for``.
         C.HELD: _row(C.RESEARCHED, C.CONTACTS_FOUND, C.REJECTED, C.FAILED, C.SUPPRESSED),
-        C.COPY_READY: _row(C.APPROVED, C.REJECTED, C.SUPPRESSED),
-        C.APPROVED: _row(C.IN_SEQUENCE, C.HELD, C.REJECTED, C.SUPPRESSED),
+        C.COPY_READY: _row(C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED),
+        C.APPROVED: _row(C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
         # A bounce or a referral sends the lead back for the next contact.
         C.IN_SEQUENCE: _row(C.REPLIED, C.COMPLETED, C.CONTACTS_FOUND, C.SUPPRESSED),
         # A retry restores the input status of the stage that failed.

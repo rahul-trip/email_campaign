@@ -173,6 +173,17 @@ A first-visit tour of every screen with **Next**, **Skip section** (jumps to the
 
 **Tests:** `web/e2e/tour.spec.ts`: opens on a first visit and End tour closes it for good; Skip section opens the next screen at its first step; a walk of every step against a real lead that fails when a target is missing (checked by renaming one).
 
+### 3b.12 The right person gets the email (added during the work)
+
+Found by the operator in use (2026-10-19): on rebase.energy the operator gave the CEO's address and recorded his consent, but the campaign's titles prefer a CTO, so the CTO (found by Hunter) was ranked first and the draft was written to him; the country check passed on the CEO's consent because consent was counted for anyone at the company. Also: the same consent recorded twice, a second card for a person first added by first name only, and no way to change an address, remove a wrong match or move a waiting email to someone else.
+
+- `rank_contacts` puts operator-chosen people first: added by the operator, given an address by the operator, or with a recorded consent. `contacts.make_first` after add, edit-address and consent fixes the tie at rank 1 for people added after ranking.
+- `policy_decision_for(..., recipient_id=...)`: the email, copy and deliver steps count only the recipient's consent; the gate and guard still count anyone's (no recipient yet). Copy now holds instead of writing when the recipient is not allowed.
+- `consents.add` keeps one active consent per basis; **Add a person** updates a person with the same name (case and accents ignored, a first name matching a full name); **Edit** gives a new address, the old one kept as history.
+- New: **Write to this person instead** (`POST /api/companies/{id}/change-recipient`; `email_ready`, `copy_ready` and `approved` may go back to `contacts_found`, the waiting email is cancelled) and **Remove** (`DELETE /api/contacts/{id}`, refused once written to; `ErasureRepository.delete_contact`).
+
+**Tests:** ranking with a chosen CEO against a wanted CTO; recipient-only consent; idempotent consent; same-name dedupe; rank after a late add; remove and its refusal; change recipient with the email cancelled; the API for both; the state-machine table.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

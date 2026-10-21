@@ -200,6 +200,59 @@ class ErasureRepository(ScopedRepository):
         self._session.flush()
         return DeletedLead(contacts, emails, messages, events)
 
+    def delete_contact(self, contact_id: str, *, actor: str) -> None:
+        """Remove one person who was never written to, such as someone matched by mistake.
+
+        The caller checks that no message names them. Cached vendor answers keep their cost
+        but lose the link, and the person's own events go with them; the company keeps one
+        ``person_removed`` event that says it happened.
+        """
+        ws = self._workspace_id
+        contact = self._row(ContactRow, contact_id)
+        email_ids = list(
+            self._session.scalars(
+                select(ContactEmailRow.id).where(
+                    ContactEmailRow.workspace_id == ws, ContactEmailRow.contact_id == contact_id
+                )
+            )
+        )
+        self._session.execute(
+            update(ProviderCallRow)
+            .where(ProviderCallRow.workspace_id == ws, ProviderCallRow.contact_id == contact_id)
+            .values(contact_id=None, response=None)
+        )
+        self._session.execute(
+            update(InboundMessageRow)
+            .where(InboundMessageRow.workspace_id == ws, InboundMessageRow.contact_id == contact_id)
+            .values(contact_id=None)
+        )
+        self._session.execute(
+            update(NoteRow)
+            .where(NoteRow.workspace_id == ws, NoteRow.contact_id == contact_id)
+            .values(contact_id=None)
+        )
+        self._session.execute(delete(ConsentRow).where(ConsentRow.contact_id == contact_id))
+        self._session.execute(delete(ContactEmailRow).where(ContactEmailRow.id.in_(email_ids)))
+        for entity_type, ids in (
+            (EntityType.CONTACT, [contact_id]),
+            (EntityType.CONTACT_EMAIL, email_ids),
+        ):
+            if ids:
+                self._session.execute(
+                    delete(EventRow).where(
+                        EventRow.workspace_id == ws,
+                        EventRow.entity_type == entity_type,
+                        EventRow.entity_id.in_(ids),
+                    )
+                )
+        company_id = contact.company_id
+        self._session.delete(contact)
+        self._session.flush()
+        self._events.append(
+            EntityType.COMPANY, company_id, "person_removed", actor, {"contact_id": contact_id}
+        )
+        self._session.flush()
+
     def _scrub_provider_calls(self, contact_id: str, needles: list[str]) -> None:
         """Blank cached vendor answers about the person.
 

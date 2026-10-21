@@ -181,7 +181,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-people",
         title: "People and consent",
-        body: "Each person with their addresses, where each came from and who checked it. Edit a name, record consent, or suppress a person for good.",
+        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Edit a name or give a new address, record consent, write to someone else instead, remove a wrong match, or suppress a person for good.",
       },
       {
         target: "lead-add-person",

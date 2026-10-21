@@ -86,6 +86,8 @@ export function LeadDetailPage() {
   // Only the times the engine tried to overwrite a value you set: yours was kept, theirs is shown.
   const changes = (timeline.data ?? []).filter((e) => e.type === "field_changed" && e.data.applied === false);
   const emailStepFailed = company.status === "failed" && company.failed_stage === "email";
+  // The person the email waiting for review (or approved) is written to.
+  const liveRecipient = messages.find((m) => m.state === "generated" || m.state === "approved")?.contact_id;
 
   return (
     <>
@@ -165,7 +167,15 @@ export function LeadDetailPage() {
             ) : (
               <ul className="divide-y divide-line">
                 {contacts.map((contact) => (
-                  <Person key={contact.id} contact={contact} onChanged={refresh} retryAfterEdit={emailStepFailed} companyId={companyId} />
+                  <Person
+                    key={contact.id}
+                    contact={contact}
+                    onChanged={refresh}
+                    retryAfterEdit={emailStepFailed}
+                    company={company}
+                    recipient={liveRecipient === contact.id}
+                    writtenTo={messages.some((m) => m.contact_id === contact.id)}
+                  />
                 ))}
               </ul>
             )}
@@ -357,9 +367,45 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
   );
 }
 
-function Person({ contact, onChanged, retryAfterEdit, companyId }: { contact: Contact; onChanged: () => void; retryAfterEdit: boolean; companyId: string }) {
+// A lead in one of these can be pointed at a different person before the email reaches the mailbox.
+const RECIPIENT_CHANGEABLE = new Set(["contacts_found", "email_ready", "copy_ready", "approved", "failed", "held"]);
+const WORKABLE = new Set(["candidate", "active"]);
+
+function Person({
+  contact,
+  onChanged,
+  retryAfterEdit,
+  company,
+  recipient,
+  writtenTo,
+}: {
+  contact: Contact;
+  onChanged: () => void;
+  retryAfterEdit: boolean;
+  company: Company;
+  recipient: boolean;
+  writtenTo: boolean;
+}) {
+  const companyId = company.id;
   const [panel, setPanel] = useState<"edit" | "consent" | null>(null);
   const [suppressing, setSuppressing] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => ok(client.DELETE("/api/contacts/{contact_id}", { params: { path: { contact_id: contact.id } } })),
+    onSuccess: () => {
+      setRemoving(false);
+      onChanged();
+    },
+  });
+  const choose = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/{company_id}/change-recipient", { params: { path: { company_id: companyId } }, body: { contact_id: contact.id } })),
+    onSuccess: () => {
+      setChoosing(false);
+      onChanged();
+    },
+  });
+  const canChoose = !recipient && WORKABLE.has(contact.status) && RECIPIENT_CHANGEABLE.has(company.status);
   const suppress = useMutation({
     mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/suppress", { params: { path: { contact_id: contact.id } } })),
     onSuccess: () => {
@@ -377,6 +423,7 @@ function Person({ contact, onChanged, retryAfterEdit, companyId }: { contact: Co
             <span className="font-semibold">{contact.full_name ?? "(no name)"}</span>
             {contact.title && <span className="text-xs text-muted">{contact.title}</span>}
             {contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
+            {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url && (
               <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
                 LinkedIn
@@ -407,6 +454,16 @@ function Person({ contact, onChanged, retryAfterEdit, companyId }: { contact: Co
             <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "consent" ? null : "consent")}>
               Record consent
             </Button>
+            {canChoose && (
+              <Button variant="ghost" size="sm" onClick={() => setChoosing(true)}>
+                Write to this person instead
+              </Button>
+            )}
+            {!writtenTo && (
+              <Button variant="danger-ghost" size="sm" onClick={() => setRemoving(true)}>
+                Remove
+              </Button>
+            )}
             <Button variant="danger-ghost" size="sm" onClick={() => setSuppressing(true)}>
               Suppress
             </Button>
@@ -433,6 +490,16 @@ function Person({ contact, onChanged, retryAfterEdit, companyId }: { contact: Co
           }}
         />
       )}
+      {choosing && (
+        <Confirm title={`Write to ${contact.full_name ?? "this person"} instead?`} confirmLabel="Write to them" busy={choose.isPending} error={choose.error} onClose={() => setChoosing(false)} onConfirm={() => choose.mutate()}>
+          <p>They are put first. An email waiting for review (or approved and not yet in your mailbox) is cancelled, and the lead goes back to the email step, which reuses an address it already has before paying for a new one.</p>
+        </Confirm>
+      )}
+      {removing && (
+        <Confirm title={`Remove ${contact.full_name ?? "this person"} from this lead?`} confirmLabel="Remove" busy={remove.isPending} error={remove.error} onClose={() => setRemoving(false)} onConfirm={() => remove.mutate()}>
+          <p>Use this for someone who does not work here, such as a wrong match from a search. Their card, addresses and consents are deleted; nothing goes on the do-not-contact list.</p>
+        </Confirm>
+      )}
       {suppressing && (
         <Confirm title={`Never contact ${contact.full_name ?? "this person"} again?`} confirmLabel="Suppress" busy={suppress.isPending} error={suppress.error} onClose={() => setSuppressing(false)} onConfirm={() => suppress.mutate()}>
           <p>Their address goes on the do-not-contact list, their unsent emails are cancelled, and any draft waiting in your mailbox is deleted. This cannot be undone here.</p>
@@ -442,18 +509,19 @@ function Person({ contact, onChanged, retryAfterEdit, companyId }: { contact: Co
   );
 }
 
-/** Correct a person. If the email step failed for lack of a full name, it is retried after. */
+/** Correct a person or give them a new address. If the email step had failed, it is retried after. */
 function EditPerson({ contact, retry, onSaved }: { contact: Contact; retry?: () => Promise<unknown>; onSaved: () => void }) {
   const [name, setName] = useState(contact.full_name ?? "");
   const [title, setTitle] = useState(contact.title ?? "");
   const [email, setEmail] = useState("");
   const hasAddress = contact.emails.some((e) => e.email);
+  const current = contact.emails.find((e) => e.is_primary)?.email;
   const save = useMutation({
     mutationFn: async () => {
       await ok(
         client.PATCH("/api/contacts/{contact_id}", {
           params: { path: { contact_id: contact.id } },
-          body: { full_name: name.trim(), title: title.trim(), email: hasAddress ? undefined : email.trim() || undefined },
+          body: { full_name: name.trim(), title: title.trim(), email: email.trim() || undefined },
         }),
       );
       if (retry) await retry();
@@ -469,11 +537,12 @@ function EditPerson({ contact, retry, onSaved }: { contact: Contact; retry?: () 
         <Field label="Job title">
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
-        {!hasAddress && (
-          <Field label="Work email" hint="Optional; blank means it is looked up.">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </Field>
-        )}
+        <Field
+          label={hasAddress ? "New work email" : "Work email"}
+          hint={hasAddress ? `Replaces ${current ?? "the current address"} as the one written to; the old one is kept as history.` : "Optional; blank means it is looked up."}
+        >
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <Button size="sm" busy={save.isPending} disabled={!name.trim()} onClick={() => save.mutate()}>

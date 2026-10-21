@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 
 def split_person(cell: str) -> tuple[str, str]:
@@ -21,6 +22,27 @@ def split_name(full_name: str) -> tuple[str | None, str | None]:
     if not parts:
         return None, None
     return parts[0], " ".join(parts[1:]) or None
+
+
+def _plain(name: str) -> list[str]:
+    decomposed = unicodedata.normalize("NFKD", name.casefold())
+    letters = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return re.findall(r"[^\W_]+", letters)
+
+
+def same_person(a: str | None, b: str | None) -> bool:
+    """Whether two names at one company are the same person.
+
+    Case and accents are ignored, and a first name alone matches a full name that starts with
+    it ("Romain" and "Romain Serres"), since that is how a person is often added first.
+    """
+    left, right = _plain(a or ""), _plain(b or "")
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    shorter, longer = sorted((left, right), key=len)
+    return len(shorter) == 1 and shorter[0] == longer[0]
 
 
 def read_profile_title(title: str) -> tuple[str, str, str]:

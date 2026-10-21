@@ -20,16 +20,18 @@ from outbound.domain.entities import (
     ProviderCall,
 )
 from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     ConsentBasis,
     ContactSource,
     ContactStatus,
     EntityType,
     HoldReason,
+    MessageState,
     Provenance,
 )
 from outbound.domain.errors import InvalidInput
-from outbound.domain.names import split_name
+from outbound.domain.names import same_person, split_name
 from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
     COMPANY,
@@ -46,6 +48,17 @@ EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 # sends the lead back to the same check, which holds it again, so a release is refused first.
 _POLICY_HOLDS = frozenset(
     {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
+)
+# Where a lead can be when the operator picks someone else to write to: before the mailbox.
+_RECIPIENT_CHANGEABLE = frozenset(
+    {
+        CompanyStatus.CONTACTS_FOUND,
+        CompanyStatus.EMAIL_READY,
+        CompanyStatus.COPY_READY,
+        CompanyStatus.APPROVED,
+        CompanyStatus.FAILED,
+        CompanyStatus.HELD,
+    }
 )
 _NEEDS_A_NAME = (
     "Give both a first and a last name, or the person's work email: the finder that looks up"
@@ -283,32 +296,46 @@ class LeadService:
             raise InvalidInput("say where the consent came from: the evidence is kept with it")
         with self._uow(self._workspace_id) as uow:
             uow.companies.get(company_id)  # NotFound for another workspace's lead
-            if address and uow.suppressions.blocks(address):
-                raise InvalidInput("that address or its domain is on the do-not-contact list")
-            if address and uow.emails.by_address(address) is not None:
-                raise InvalidInput("that address already belongs to another person")
-            contact = uow.contacts.add(
-                company_id,
-                rank=1,
-                source=ContactSource.OPERATOR,
-                full_name=name,
-                first_name=first,
-                last_name=last,
-                title=(title or "").strip() or None,
-                status=ContactStatus.ACTIVE,
-                actor=actor,
+            existing = next(
+                (
+                    c
+                    for c in uow.contacts.for_company(company_id)
+                    if c.status in WORKABLE_CONTACT_STATUSES and same_person(c.full_name, name)
+                ),
+                None,
             )
-            emails = []
+            if existing is not None:
+                # The same person again (often first added by first name only): give them the
+                # new details instead of a second card that splits their history.
+                changes: dict[str, Any] = {}
+                if len(name.split()) > len((existing.full_name or "").split()):
+                    changes.update(full_name=name, first_name=first, last_name=last)
+                if title and title.strip():
+                    changes["title"] = title.strip()
+                if changes:
+                    uow.contacts.update_fields(existing.id, changes, actor=actor)
+                contact_id = existing.id
+            else:
+                contact_id = uow.contacts.add(
+                    company_id,
+                    rank=1,
+                    source=ContactSource.OPERATOR,
+                    full_name=name,
+                    first_name=first,
+                    last_name=last,
+                    title=(title or "").strip() or None,
+                    status=ContactStatus.ACTIVE,
+                    actor=actor,
+                ).id
             if address:
-                emails.append(
-                    uow.emails.add(
-                        contact.id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor
-                    )
-                )
+                _give_address(uow, contact_id, address, actor)
             if consent_basis is not None:
-                uow.consents.add(contact.id, consent_basis, (consent_evidence or "").strip(), actor)
+                uow.consents.add(contact_id, consent_basis, (consent_evidence or "").strip(), actor)
+            uow.contacts.make_first(contact_id)
             uow.commit()
-            return ContactWithEmails(contact, emails)
+            return ContactWithEmails(
+                uow.contacts.get(contact_id), uow.emails.for_contact(contact_id)
+            )
 
     def update_person(
         self,
@@ -319,10 +346,11 @@ class LeadService:
         email: str | None = None,
         actor: str = OPERATOR,
     ) -> ContactWithEmails:
-        """Correct a person: their name or title, and an address if they have none yet.
+        """Correct a person: their name, title or address.
 
-        The values become yours (the engine will not overwrite them). A lead whose email step
-        failed because the name was incomplete can then be retried.
+        The values become yours (the engine will not overwrite them). A new address becomes the
+        one written to, the earlier one stays as history, and the person is put first. A lead
+        whose email step failed (a wrong guess, an incomplete name) can then be retried.
         """
         address = _clean_address(email)
         with self._uow(self._workspace_id) as uow:
@@ -340,18 +368,66 @@ class LeadService:
             if title is not None:
                 changes["title"] = title.strip() or None
             updated = uow.contacts.update_fields(contact_id, changes, actor=actor)
-            if address and not any(e.email == address for e in held):
-                if held:
-                    raise InvalidInput("this person already has an address; it cannot be changed")
-                if uow.suppressions.blocks(address):
-                    raise InvalidInput("that address or its domain is on the do-not-contact list")
-                if uow.emails.by_address(address) is not None:
-                    raise InvalidInput("that address already belongs to another person")
-                uow.emails.add(
-                    contact_id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor
-                )
+            if address:
+                _give_address(uow, contact_id, address, actor)
+                uow.contacts.make_first(contact_id)
             uow.commit()
-            return ContactWithEmails(updated, uow.emails.for_contact(contact_id))
+            return ContactWithEmails(
+                uow.contacts.get(updated.id), uow.emails.for_contact(contact_id)
+            )
+
+    def remove_person(self, contact_id: str, *, actor: str = OPERATOR) -> None:
+        """Take a person off a lead, such as someone a search matched by mistake.
+
+        Refused once anything has been written to them: then the history matters, and the
+        person can be suppressed or forgotten instead.
+        """
+        with self._uow(self._workspace_id) as uow:
+            uow.contacts.get(contact_id)  # NotFound unless the person is in this workspace
+            if uow.messages.for_contact(contact_id):
+                raise LeadError(
+                    "An email has already been written to this person, so they stay on the lead."
+                    " Suppress them instead if they must not be contacted."
+                )
+            uow.erasure.delete_contact(contact_id, actor=actor)
+            uow.commit()
+
+    def change_recipient(
+        self, company_id: str, contact_id: str, *, actor: str = OPERATOR
+    ) -> Company:
+        """Write to a different person at this lead.
+
+        An email waiting for review (or approved but not yet in the mailbox) is cancelled, the
+        person is put first, and the lead goes back to the email step, which reuses an address
+        it already has at no cost.
+        """
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            contact = uow.contacts.get(contact_id)
+            if contact.company_id != company_id:
+                raise LeadError("that person is not at this lead")
+            if contact.status not in WORKABLE_CONTACT_STATUSES:
+                raise LeadError(f"that person is {contact.status.value} and cannot be written to")
+            if company.status not in _RECIPIENT_CHANGEABLE:
+                raise LeadError(
+                    f"the lead is {company.status.value}: the person can only be changed before"
+                    " the email is in the mailbox"
+                )
+            for message in uow.messages.for_company(company_id):
+                if message.state in (MessageState.GENERATED, MessageState.APPROVED):
+                    uow.messages.transition(
+                        message.id,
+                        MessageState.CANCELLED,
+                        expected_version=message.row_version,
+                        actor=actor,
+                    )
+            uow.contacts.make_first(contact_id)
+            if company.status is CompanyStatus.CONTACTS_FOUND:
+                uow.commit()
+                return uow.companies.get(company_id)
+            return self._move(
+                uow, company, CompanyStatus.CONTACTS_FOUND, actor, "recipient changed"
+            )
 
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
@@ -369,6 +445,7 @@ class LeadService:
         with self._uow(self._workspace_id) as uow:
             uow.contacts.get(contact_id)  # NotFound unless the person is in this workspace
             consent = uow.consents.add(contact_id, basis, evidence.strip(), actor)
+            uow.contacts.make_first(contact_id)  # the person who consented is the one to write to
             uow.commit()
             return consent
 
@@ -390,6 +467,19 @@ class LeadService:
         )
         uow.commit()
         return updated
+
+
+def _give_address(uow: UnitOfWork, contact_id: str, address: str, actor: str) -> None:
+    """Make ``address`` the person's primary one; earlier addresses stay as history."""
+    held = uow.emails.by_address(address)
+    if held is not None:
+        if held.contact_id != contact_id:
+            raise InvalidInput("that address already belongs to another person")
+        uow.emails.set_primary(held.id)
+        return
+    if uow.suppressions.blocks(address):
+        raise InvalidInput("that address or its domain is on the do-not-contact list")
+    uow.emails.add(contact_id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor)
 
 
 def _clean_address(email: str | None) -> str | None:

@@ -178,10 +178,10 @@ Schema v1 has 17 tables in five areas. The company row is the lead. See [SCHEMA.
 | `qualified` | Passed the fit gate and the country policy | `contacts_found`, `held`, `failed` |
 | `disqualified` | Fit below the campaign minimum. Manual leads bypass this gate, but the score is still recorded | `qualified` on operator override |
 | `contacts_found` | 2–3 people ranked against the target titles | `email_ready`, `held`, `failed` |
-| `email_ready` | The top usable contact has a safe-to-send email | `copy_ready`, `held` |
+| `email_ready` | The top usable contact has a safe-to-send email | `copy_ready`, `held`, `contacts_found` (operator picks someone else) |
 | `held` | Waiting on someone; `hold_reason` says why | The status it was held from |
-| `copy_ready` | Touch 1 passed the linter or was flagged for review | `approved`, `rejected` |
-| `approved` | An operator approved touch 1 | `in_sequence`, `held` |
+| `copy_ready` | Touch 1 passed the linter or was flagged for review | `approved`, `rejected`, `contacts_found` (operator picks someone else; the email is cancelled) |
+| `approved` | An operator approved touch 1 | `in_sequence`, `held`, `contacts_found` (operator picks someone else; the email is cancelled) |
 | `in_sequence` | Touch 1 drafted or sent; follow-ups scheduled | `replied`, `completed`, `contacts_found`, `suppressed` |
 | `replied` / `completed` / `rejected` / `suppressed` | Final states | — |
 | `failed` | A stage error; `failed_stage` and `last_error` are stored | That stage's input status, on retry |
@@ -217,7 +217,7 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 | 1 Intake | import row → `new` | A service, not a runner stage: called by `outbound targets`, the Targets screen and the webhook. Resolves the anchor to a root domain, normalises, deduplicates, checks suppression, and keeps operator notes and priority. Searches happen before the transaction; one transaction writes the batch | Tavily, only for rows with no domain |
 | 2 Research (LangGraph) | `new` → `researched` | A supervisor dispatches up to four workers. **Site and trigger:** home, about, team and news pages. **Compliance and legal entity:** ISO country; UK incorporation from the site footer, then Companies House. **Campaign signals:** the campaign's research questions plus hiring and tech-stack signals. **Persona discovery:** people with titles and LinkedIn URLs from the team page, or one public LinkedIn-title search if there is none; skipped if the operator gave a contact. Then fit is scored with a reason. The legal-entity worker is plain code, not a model | 2–4 Tavily credits, 1–4 LLM calls |
 | 3 Gate | `researched` → `qualified` / `disqualified` / `held` | Applies the campaign fit minimum (manual leads bypass it) and the country policy | — |
-| 4 Contacts | `qualified` → `contacts_found` | Ranks the people found against the target titles, then by seniority; an operator-given person is rank 1. Research has already made the one public search, so this stage spends nothing; with nobody to rank, the lead fails with a reason | — |
+| 4 Contacts | `qualified` → `contacts_found` | Ranks the people found against the target titles, then by seniority. A person the operator chose (added them, gave their address, or recorded their consent) comes first, in the order the operator left them. Research has already made the one public search, so this stage spends nothing; with nobody to rank, the lead fails with a reason | — |
 | 5 Email | `contacts_found` → `email_ready` / `held` | Per contact, top 3: an address already held, then one published on the company site that fits the person, then the cached pattern (one address), then each finder in order, verifying every result. Invalid: next finder, then next contact. Catch-all: sent to the resolver. The chosen address's provenance is checked against the country policy before the lead moves on | Finder, verifier and resolver credits |
 | 6 Copy (LangGraph) | `email_ready` → `copy_ready` | Writes snippet JSON using recent operator edits as examples, assembles it, and adds the country footer rendered from the sender profile (a blank field the footer needs fails the lead before any model call). The linter and a specificity check allow up to 2 rewrites; a draft that still fails goes to review flagged | 1–6 LLM calls |
 | 7 Review | `copy_ready` → `approved` / `rejected` | By CLI (`outbound review`) or the web review queue. Edits are stored next to the generated text with their edit distance; an edit that removes the footer is refused | — |
@@ -257,7 +257,7 @@ Modes are `manual`, `discovery` and `mixed`. Suppression always wins. A re-submi
 | Targets | Quick add from any anchor, upload with preview, confirm domains, edit saved targets, assign a campaign |
 | Leads | Filter by status or hold reason; timeline from `events`; waterfall inspector from `provider_calls`; operator and engine values side by side |
 | Guided tour | First-visit walkthrough of every screen: Next, Back, Skip section, End tour; restart from the header. Steps are data in `web2/src/tour/steps.ts`; kept current by a rule in CLAUDE.md and an e2e test (`web2/e2e/tour.spec.ts`) |
-| Lead page | Edit, add a person (with consent), record consent, suppress, delete (typed domain, refused once emailed), release. A release of a country-rule hold is refused while the cause is unchanged, so a lead never loops through the same hold |
+| Lead page | Edit (including a new address, kept beside the old one), add a person (with consent; the same name updates the existing person), record consent (once per basis), write to someone else (cancels the waiting email), remove a wrong match (refused once written to), suppress, delete (typed domain, refused once emailed), release. A release of a country-rule hold is refused while the cause is unchanged, so a lead never loops through the same hold |
 | Lead journey | One lead's story: origin (import row and batch), eight stages with state, details, incidents and vendor calls, built by `services/journey.py` from existing rows; read-only (`GET /api/companies/{id}/journey`), no schema change |
 | Runs | Start, watch or cancel a run; spend against budget |
 | Settings | Sender profile, campaigns, country policies, suppression list, mailbox with DNS check |
@@ -288,6 +288,8 @@ These summarise the research. They are not legal advice: a lawyer confirms the p
 | CA | CASL: implied consent via conspicuous publication | Only with `publicly_published` or `operator_given` provenance |
 | IN | DPDP: consent-based | Held unless consent is recorded (for example, an expo card) |
 | Unknown | — | Held as `country_unknown` |
+
+Consent belongs to a person. Before a recipient is chosen (the gate, the runner's guard), anyone's consent at the company keeps the lead moving; once the email, copy or deliver step names the recipient, only *that person's* consent counts, so someone else's consent never allows writing to them.
 
 Operator tasks: keep a legitimate-interests assessment on file, name a grievance contact for India, and record every consent with its evidence.
 

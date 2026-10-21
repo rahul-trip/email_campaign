@@ -18,6 +18,7 @@ from outbound.api.schemas import (
     NoteOut,
     PersonIn,
     PersonPatch,
+    RecipientIn,
     ReleaseIn,
     TimelineOut,
     WaterfallOut,
@@ -100,6 +101,13 @@ def requalify(company_id: str, svc: Annotated[Services, Depends(services)]) -> C
     return CompanyOut.model_validate(svc.leads.requalify(company_id))
 
 
+@router.post("/companies/{company_id}/change-recipient", response_model=CompanyOut)
+def change_recipient(
+    company_id: str, body: RecipientIn, svc: Annotated[Services, Depends(services)]
+) -> CompanyOut:
+    return CompanyOut.model_validate(svc.leads.change_recipient(company_id, body.contact_id))
+
+
 @router.post("/companies/{company_id}/people", response_model=ContactOut, status_code=201)
 def add_person(
     company_id: str, body: PersonIn, svc: Annotated[Services, Depends(services)]
@@ -136,3 +144,8 @@ def consent(
     return ConsentOut.model_validate(
         svc.leads.record_consent(contact_id, body.basis, body.evidence)
     )
+
+
+@router.delete("/contacts/{contact_id}", status_code=204)
+def remove_person(contact_id: str, svc: Annotated[Services, Depends(services)]) -> None:
+    svc.leads.remove_person(contact_id)

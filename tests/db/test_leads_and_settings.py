@@ -12,7 +12,9 @@ from outbound.domain.enums import (
     CompanyStatus,
     ConsentBasis,
     ContactSource,
+    EntityType,
     HoldReason,
+    MessageState,
     PolicyRule,
     Provenance,
     RunStatus,
@@ -315,8 +317,12 @@ def test_a_person_with_a_one_word_name_can_be_corrected(
     assert "full_name" in fixed.contact.manual_fields  # the engine will not overwrite it
     with_address = service.update_person(person.id, email="Sonal@acme.com")
     assert [e.email for e in with_address.emails] == ["sonal@acme.com"]
-    with pytest.raises(InvalidInput, match="already has an address"):
-        service.update_person(person.id, email="other@acme.com")
+    replaced = service.update_person(person.id, email="other@acme.com")
+    # The new address is the one written to; the old one stays as history.
+    assert [(e.email, e.is_primary) for e in replaced.emails] == [
+        ("other@acme.com", True),
+        ("sonal@acme.com", False),
+    ]
 
 
 def test_a_person_cannot_be_added_to_another_workspaces_lead(
@@ -383,6 +389,154 @@ def test_consent_needs_its_evidence_and_is_recorded(factory: UnitOfWorkFactory, 
     assert consent.active
     with factory(ws) as uow:
         assert uow.consents.has_active(contact.id)
+
+
+def test_recording_the_same_consent_twice_keeps_one(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "rebase.energy")
+    with factory(ws) as uow:
+        contact = uow.contacts.add(company.id, rank=2, source=ContactSource.SITE)
+        uow.commit()
+    service = leads(factory, ws)
+    first = service.record_consent(contact.id, ConsentBasis.EXPRESS, "said yes")
+    again = service.record_consent(contact.id, ConsentBasis.EXPRESS, "said yes again")
+    assert again.id == first.id
+    with factory(ws) as uow:
+        assert len(uow.consents.for_contact(contact.id)) == 1
+        assert uow.contacts.get(contact.id).rank == 1  # the person who consented comes first
+
+
+def rebase(factory: UnitOfWorkFactory, ws: str) -> tuple[Company, str, str]:
+    """The real case: a CTO found by a finder, and the CEO the operator gave consent for."""
+    with factory(ws) as uow:
+        uow.policies.upsert(CountryPolicy("SE", PolicyRule.CONSENT_REQUIRED))
+        uow.commit()
+    company = make(
+        factory, ws, "rebase.energy", path=(C.RESEARCHED, C.QUALIFIED), country_code="SE"
+    )
+    with factory(ws) as uow:
+        cto = uow.contacts.add(
+            company.id, rank=1, source=ContactSource.SITE, full_name="Mihai Chiru"
+        )
+        ceo = uow.contacts.add(
+            company.id, rank=2, source=ContactSource.SITE, full_name="Sebastian Haglund"
+        )
+        uow.emails.add(cto.id, "mihai@rebase.energy", Provenance.API_DATABASE, is_primary=True)
+        uow.consents.add(ceo.id, ConsentBasis.EXPRESS, "met at a conference", "operator")
+        uow.commit()
+    return company, cto.id, ceo.id
+
+
+def test_someone_elses_consent_does_not_allow_writing_to_this_person(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company, cto, ceo = rebase(factory, ws)
+    with factory(ws) as uow:
+        current = uow.companies.get(company.id)
+        # Before a recipient is known, anyone's consent keeps the lead moving...
+        assert policy_decision_for(uow, current).outcome is PolicyOutcome.ALLOW
+        # ...but once the recipient is named, only their own consent counts.
+        assert policy_decision_for(uow, current, recipient_id=ceo).outcome is PolicyOutcome.ALLOW
+        to_cto = policy_decision_for(uow, current, recipient_id=cto)
+    assert (to_cto.outcome, to_cto.hold_reason) == (
+        PolicyOutcome.HOLD,
+        HoldReason.CONSENT_REQUIRED,
+    )
+
+
+def test_adding_the_same_person_again_updates_them_instead_of_a_second_card(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "tilt-energy.com")
+    service = leads(factory, ws)
+    first = service.add_person(company.id, full_name="Romain", email="romain@tilt-energy.com")
+    again = service.add_person(
+        company.id, full_name="Romain Serres", title="CEO", email="romain.serres@tilt-energy.com"
+    )
+    assert again.contact.id == first.contact.id
+    assert (again.contact.full_name, again.contact.title) == ("Romain Serres", "CEO")
+    assert [(e.email, e.is_primary) for e in again.emails] == [
+        ("romain.serres@tilt-energy.com", True),
+        ("romain@tilt-energy.com", False),
+    ]
+    with factory(ws) as uow:
+        assert len(uow.contacts.for_company(company.id)) == 1
+
+
+def test_a_person_added_after_ranking_is_put_first(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "acme.com")
+    with factory(ws) as uow:
+        for rank in (1, 2):
+            uow.contacts.add(
+                company.id, rank=rank, source=ContactSource.SITE, full_name=f"P {rank}"
+            )
+        uow.commit()
+    added = leads(factory, ws).add_person(company.id, full_name="Asha Rao")
+    with factory(ws) as uow:
+        people = uow.contacts.for_company(company.id)
+    assert (people[0].id, people[0].rank) == (added.contact.id, 1)
+    assert [p.rank for p in people] == [1, 2, 3]
+
+
+def test_a_person_matched_by_mistake_can_be_removed(factory: UnitOfWorkFactory, ws: str) -> None:
+    company = make(factory, ws, "amperon.co")
+    with factory(ws) as uow:
+        wrong = uow.contacts.add(
+            company.id,
+            rank=1,
+            source=ContactSource.SEARCH,
+            full_name="Dan Roth",
+            linkedin_url="https://www.linkedin.com/in/danielproth",
+        )
+        uow.commit()
+    service = leads(factory, ws)
+    service.remove_person(wrong.id)
+    with factory(ws) as uow:
+        assert uow.contacts.for_company(company.id) == []
+        removed = [e.type for e in uow.events.for_entities([(EntityType.COMPANY, company.id)])]
+    assert "person_removed" in removed
+
+
+def test_a_person_already_written_to_cannot_be_removed(factory: UnitOfWorkFactory, ws: str) -> None:
+    company, cto, _ = rebase(factory, ws)
+    with factory(ws) as uow:
+        address = uow.emails.for_contact(cto)[0]
+        uow.messages.create(
+            company_id=company.id,
+            contact_id=cto,
+            contact_email_id=address.id,
+            step=0,
+            subject="hello",
+            generated_body="body",
+        )
+        uow.commit()
+    with pytest.raises(LeadError, match="already been written"):
+        leads(factory, ws).remove_person(cto)
+
+
+def test_the_draft_can_be_moved_to_another_person(factory: UnitOfWorkFactory, ws: str) -> None:
+    company, cto, ceo = rebase(factory, ws)
+    with factory(ws) as uow:
+        current = uow.companies.get(company.id)
+        version = current.row_version
+        for step in (C.CONTACTS_FOUND, C.EMAIL_READY, C.COPY_READY):
+            version = uow.companies.transition(
+                company.id, step, expected_version=version
+            ).row_version
+        address = uow.emails.for_contact(cto)[0]
+        draft = uow.messages.create(
+            company_id=company.id,
+            contact_id=cto,
+            contact_email_id=address.id,
+            step=0,
+            subject="hello",
+            generated_body="body",
+        )
+        uow.commit()
+    moved = leads(factory, ws).change_recipient(company.id, ceo)
+    assert moved.status is C.CONTACTS_FOUND
+    with factory(ws) as uow:
+        assert uow.messages.get(draft.id).state is MessageState.CANCELLED
+        assert uow.contacts.for_company(company.id)[0].id == ceo
 
 
 # ------------------------------------------------------------------ settings
