@@ -278,7 +278,9 @@ def test_a_policy_change_after_qualification_stops_the_lead_before_contacts(
         )
         uow.commit()
     run_contacts(factory, ws)
-    assert company(factory, ws, cid).status is C.SUPPRESSED
+    # Held for the operator, never suppressed: the rule may change back or be skipped.
+    stopped = company(factory, ws, cid)
+    assert (stopped.status, stopped.hold_reason) == (C.HELD, HoldReason.NEEDS_OPERATOR)
 
 
 @pytest.mark.parametrize("count", [1, 5])

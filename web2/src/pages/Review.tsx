@@ -5,7 +5,7 @@ import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, External
 import { useCallback, useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton } from "../components/ui";
 import { cx } from "../lib/cx";
 import { words } from "../lib/format";
 import { describe, emailStatus, isSafeToSend } from "../lib/status";
@@ -180,7 +180,10 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
   });
   const [text, setText] = useState(item.message.generated_body);
   const [rejecting, setRejecting] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
   const edited = text !== item.message.generated_body;
+  const skips = item.skips ?? [];
+  const blockedBySkips = skips.length > 0 && !acknowledged;
 
   const finished = () => {
     for (const key of ["review", "status", "companies", "lead"]) void queryClient.invalidateQueries({ queryKey: [key] });
@@ -191,7 +194,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
       ok(
         client.POST("/api/review/{message_id}/approve", {
           params: { path: { message_id: messageId } },
-          body: { edited_body: edited ? text : null, row_version: item.message.row_version },
+          body: { edited_body: edited ? text : null, row_version: item.message.row_version, acknowledge_skips: acknowledged },
         }),
       ),
     onSuccess: finished,
@@ -216,7 +219,10 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
                 <h2 className="truncate text-[15px] font-semibold">
                   To {item.contact.full_name ?? "unknown"} <span className="font-mono text-[13px] font-normal text-muted">&lt;{address?.email ?? "no address"}&gt;</span>
                 </h2>
-                {address && <StatusBadge status={describe(emailStatus, address.status)} title={isSafeToSend(address.status) ? "Safe to send" : "Not safe to send"} />}
+                {address && <StatusBadge status={describe(emailStatus, address.status)} title={isSafeToSend(address.status, address.verification_skipped) ? "Safe to send" : "Not safe to send"} />}
+                {address?.verification_skipped && (
+                  <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container">Not verified: you skipped the check</span>
+                )}
               </div>
               <p className="mt-1 text-xs text-muted">
                 Subject: <strong className="font-semibold text-ink">{item.message.subject}</strong>
@@ -246,7 +252,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !approve.isPending) approve.mutate();
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !approve.isPending && !blockedBySkips) approve.mutate();
               }}
               className="w-full resize-y rounded-lg border border-outline bg-surface p-3.5 text-[15px] leading-6 outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
             />
@@ -266,9 +272,24 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
             </div>
           )}
 
+          {skips.length > 0 && (
+            <div className="mt-4" data-tour="review-skips">
+              <Callout tone="attention" title="This email relies on checks you skipped">
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {skips.map((skip) => (
+                    <li key={skip.kind}>{skip.text.charAt(0).toUpperCase() + skip.text.slice(1)}.</li>
+                  ))}
+                </ul>
+                <div className="mt-2">
+                  <Checkbox checked={acknowledged} onChange={setAcknowledged} label="I know these checks were skipped, and I approve this email anyway" />
+                </div>
+              </Callout>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Button busy={approve.isPending} onClick={() => approve.mutate()}>
+              <Button busy={approve.isPending} disabled={blockedBySkips} onClick={() => approve.mutate()}>
                 <Check className="size-4" aria-hidden /> {edited ? "Approve with my edit" : "Approve"}
               </Button>
               <Button variant="secondary" disabled={!edited} onClick={() => setText(item.message.generated_body)}>

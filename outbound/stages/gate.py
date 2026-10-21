@@ -34,7 +34,7 @@ class GateStage:
                 CompanyStatus.DISQUALIFIED, reason=f"fit: {score}, the campaign needs {minimum}"
             )
 
-        decision = ctx.read(lambda uow: policy_decision_for(uow, company))
+        decision = ctx.read(lambda uow: policy_decision_for(uow, company, stage=self.name))
         recorded = {"policy_decision": decision.to_json()}
         reason = "; ".join(decision.reasons) or "allowed"
 

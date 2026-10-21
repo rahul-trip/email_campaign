@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-ro
 import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlock, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
+import { PolicySkip } from "../components/PolicySkip";
+import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   Button,
@@ -143,12 +145,13 @@ export function LeadDetailPage() {
         {company.status === "failed" && (
           <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
             {company.last_error}
-            {emailStepFailed && " If a person's name is incomplete, edit them below and the step is retried."}
+            {emailStepFailed &&
+              " Edit a person below to complete their name or give their work email, and the step is retried. If you know an address works even though the check could not prove it, press Skip the check next to it."}
           </Callout>
         )}
         {company.status === "disqualified" && countryBlocked && (
           <Callout tone="attention" title="This country's rule blocks contact">
-            There is no override for a block. To go ahead, add a person who has given consent; or change the rule under Policies and privacy.
+            To go ahead, add a person who has given consent, skip the country rule for this lead under <em>Country rule</em>, or change the rule under Policies and privacy.
           </Callout>
         )}
         {company.status === "disqualified" && !countryBlocked && company.fit_reason && (
@@ -287,6 +290,9 @@ export function LeadDetailPage() {
         </div>
 
         <div className="flex flex-col gap-5">
+          <Card tour="lead-policy" title="Country rule" subtitle={`Rule for ${company.country_code ?? "an unknown country"}. You can skip it for this lead.`}>
+            <PolicySkip key={`${company.row_version}`} company={company} heldAt={lead.data.held_at} />
+          </Card>
           <EditLead key={company.row_version} company={company} campaigns={campaigns.data ?? []} onSaved={refresh} />
           {notes.length > 0 && (
             <Card title="Notes">
@@ -361,7 +367,9 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
         )}
       </div>
       {suggestion && hold.action === "country" && <p className="mt-2 text-xs text-muted">Suggested from the research: {suggestion.evidence}. It is a suggestion, not proof.</p>}
-      <p className="mt-2 text-[11px] text-muted">The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed.</p>
+      <p className="mt-2 text-[11px] text-muted">
+        The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
+      </p>
       <Problem error={release.error ?? setCountry.error} className="mt-2" />
     </Card>
   );
@@ -398,6 +406,11 @@ function Person({
       onChanged();
     },
   });
+  const confirm = useMutation({
+    mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/confirm", { params: { path: { contact_id: contact.id } } })),
+    onSuccess: onChanged,
+  });
+  const unconfirmed = contact.status === "unconfirmed";
   const choose = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/change-recipient", { params: { path: { company_id: companyId } }, body: { contact_id: contact.id } })),
     onSuccess: () => {
@@ -422,7 +435,12 @@ function Person({
             <span className="flex size-6 items-center justify-center rounded-full bg-primary-fixed font-mono text-[11px] font-semibold text-primary">{contact.rank}</span>
             <span className="font-semibold">{contact.full_name ?? "(no name)"}</span>
             {contact.title && <span className="text-xs text-muted">{contact.title}</span>}
-            {contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
+            {unconfirmed && (
+              <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container" title="A search found this person, but their profile does not clearly say they work here.">
+                Unconfirmed: check they work here
+              </span>
+            )}
+            {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
             {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url && (
               <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
@@ -441,6 +459,7 @@ function Person({
                   {email.found_by && ` · found by ${email.found_by}`}
                   {email.verified_by && ` · checked by ${email.verified_by}`}
                 </span>
+                {!gone && WORKABLE.has(contact.status) && <SkipCheck email={email} personName={contact.full_name} />}
               </li>
             ))}
             {contact.emails.length === 0 && <li className="text-xs text-muted">No address yet.</li>}
@@ -448,6 +467,11 @@ function Person({
         </div>
         {!gone && (
           <div className="flex flex-wrap gap-1">
+            {unconfirmed && (
+              <Button size="sm" busy={confirm.isPending} onClick={() => confirm.mutate()}>
+                Confirm they work here
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "edit" ? null : "edit")}>
               Edit
             </Button>
@@ -489,6 +513,11 @@ function Person({
             onChanged();
           }}
         />
+      )}
+      {confirm.error && (
+        <div className="mt-2">
+          <Problem error={confirm.error} />
+        </div>
       )}
       {choosing && (
         <Confirm title={`Write to ${contact.full_name ?? "this person"} instead?`} confirmLabel="Write to them" busy={choose.isPending} error={choose.error} onClose={() => setChoosing(false)} onConfirm={() => choose.mutate()}>

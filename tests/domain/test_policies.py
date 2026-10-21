@@ -137,6 +137,7 @@ def test_the_decision_serialises_for_the_audit_column() -> None:
         "hold_reason": "entity_unknown",
         "policy_version": 1,
         "reasons": ["legal entity not confirmed as an incorporated company"],
+        "skipped": False,
     }
 
 

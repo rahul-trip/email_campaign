@@ -202,6 +202,21 @@ class ContactEmailRepository(ScopedRepository):
         )
         return [snapshot(row, ContactEmail) for row in self._session.scalars(stmt)]
 
+    def set_verification_skipped(
+        self, email_id: str, skipped: bool, *, actor: str, reason: str | None = None
+    ) -> ContactEmail:
+        """The operator writes to this address whatever a verifier says (or stops doing so)."""
+        row = self._row(ContactEmailRow, email_id)
+        if row.verification_skipped != skipped:
+            row.verification_skipped = skipped
+            self._flush()
+            detail: dict[str, Any] = {"status": row.status.value}
+            if reason:
+                detail["reason"] = reason
+            kind = "email_verification_skipped" if skipped else "email_verification_restored"
+            self._events.append(EntityType.CONTACT_EMAIL, row.id, kind, actor, detail)
+        return snapshot(row, ContactEmail)
+
     def set_primary(self, email_id: str) -> ContactEmail:
         """Make one address the contact's only primary one."""
         row = self._row(ContactEmailRow, email_id)

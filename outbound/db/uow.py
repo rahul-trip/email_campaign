@@ -11,7 +11,7 @@ Leaving the block without ``commit`` rolls everything back.
 from __future__ import annotations
 
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
@@ -88,6 +88,11 @@ class UnitOfWork:
 
     def rollback(self) -> None:
         self.session.rollback()
+
+    def workspace_settings(self) -> dict[str, Any]:
+        """This workspace's settings (its own row only), for checks deep inside a stage."""
+        workspace = WorkspaceRepository(self.session).get(self.workspace_id)
+        return dict(workspace.settings) if workspace else {}
 
 
 class AdminUnitOfWork:

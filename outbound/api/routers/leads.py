@@ -18,8 +18,10 @@ from outbound.api.schemas import (
     NoteOut,
     PersonIn,
     PersonPatch,
+    PolicySkipIn,
     RecipientIn,
     ReleaseIn,
+    SkipCheckIn,
     TimelineOut,
     WaterfallOut,
 )
@@ -40,6 +42,7 @@ def _lead(detail: LeadDetail) -> LeadOut:
         ],
         messages=[MessageOut.model_validate(m) for m in detail.messages],
         notes=[NoteOut.model_validate(n) for n in detail.notes],
+        held_at=detail.held_at.value if detail.held_at else None,
     )
 
 
@@ -101,6 +104,25 @@ def requalify(company_id: str, svc: Annotated[Services, Depends(services)]) -> C
     return CompanyOut.model_validate(svc.leads.requalify(company_id))
 
 
+@router.post("/companies/{company_id}/policy-skip", response_model=CompanyOut)
+def skip_policy(
+    company_id: str, body: PolicySkipIn, svc: Annotated[Services, Depends(services)]
+) -> CompanyOut:
+    return CompanyOut.model_validate(
+        svc.leads.skip_policy(company_id, body.from_stage, body.reason)
+    )
+
+
+@router.delete("/companies/{company_id}/policy-skip", response_model=CompanyOut)
+def revoke_policy_skip(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
+    return CompanyOut.model_validate(svc.leads.revoke_policy_skip(company_id))
+
+
+@router.post("/companies/release-policy-holds")
+def release_policy_holds(svc: Annotated[Services, Depends(services)]) -> dict[str, int]:
+    return {"released": svc.leads.release_policy_holds()}
+
+
 @router.post("/companies/{company_id}/change-recipient", response_model=CompanyOut)
 def change_recipient(
     company_id: str, body: RecipientIn, svc: Annotated[Services, Depends(services)]
@@ -149,3 +171,34 @@ def consent(
 @router.delete("/contacts/{contact_id}", status_code=204)
 def remove_person(contact_id: str, svc: Annotated[Services, Depends(services)]) -> None:
     svc.leads.remove_person(contact_id)
+
+
+@router.post("/contacts/{contact_id}/confirm", response_model=ContactOut)
+def confirm_person(contact_id: str, svc: Annotated[Services, Depends(services)]) -> ContactOut:
+    confirmed = svc.leads.confirm_person(contact_id)
+    return ContactOut.model_validate(
+        {
+            **confirmed.contact.__dict__,
+            "emails": [EmailOut.model_validate(e) for e in confirmed.emails],
+        }
+    )
+
+
+@router.post("/contact-emails/{email_id}/skip-verification", response_model=ContactOut)
+def skip_email_verification(
+    email_id: str, body: SkipCheckIn, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    person = svc.leads.skip_email_verification(email_id, body.reason)
+    return ContactOut.model_validate(
+        {**person.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in person.emails]}
+    )
+
+
+@router.delete("/contact-emails/{email_id}/skip-verification", response_model=ContactOut)
+def restore_email_verification(
+    email_id: str, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    person = svc.leads.restore_email_verification(email_id)
+    return ContactOut.model_validate(
+        {**person.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in person.emails]}
+    )

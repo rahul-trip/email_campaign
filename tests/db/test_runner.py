@@ -469,7 +469,8 @@ def test_a_country_that_forbids_cold_email_stops_a_lead_before_a_later_stage(
     stage = FakeStage("contacts", C.QUALIFIED, C.CONTACTS_FOUND, guard_policy=True)
     make_runner(factory, ws, [stage]).run_pipeline()
     assert stage.seen == []
-    assert status_of(factory, ws, cid) is C.SUPPRESSED
+    # Held, never suppressed: a block can be lifted (the rule changed, or skipped for the lead).
+    assert status_of(factory, ws, cid) is C.HELD
 
 
 def test_a_policy_that_now_needs_a_person_holds_the_lead_when_a_hold_is_possible(

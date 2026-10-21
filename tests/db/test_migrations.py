@@ -83,7 +83,7 @@ def _enum_columns() -> list[tuple[str, sa.Enum, str]]:
 
 
 def test_there_is_a_check_constraint_for_every_enum_column() -> None:
-    assert len(_enum_columns()) == 25
+    assert len(_enum_columns()) == 26
 
 
 @pytest.mark.parametrize(

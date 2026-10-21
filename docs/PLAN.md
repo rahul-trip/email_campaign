@@ -194,7 +194,7 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 - **A retry after `failed`** restores the input status of the stage that failed. Only research, gate, contacts, email and copy can fail a lead. Deliver and sync leave the lead where it is and try again an hour later.
 - **Back-off.** A failed lead waits 15 minutes times the number of attempts so far before `outbound tick` retries it, and is retried automatically at most 3 times. The operator can retry at once from the CLI or the lead page.
 - **A hold can start at `qualified`, `email_ready` and `approved` too.** If the country rules change after approval, or delivery finds the email is no longer safe (an opt-out, a bounce, a suppressed address), the lead is held with the reason and its approved email is withdrawn; once released it is checked again and gets a fresh first email. Nothing is retried silently.
-- **Guards before every stage.** A suppressed domain, or a country that now blocks, moves the lead to `suppressed`. A policy that now needs a person holds the lead where the lifecycle allows a hold, and otherwise defers it. A lead that has used its per-prospect budget fails with that reason.
+- **Guards before every stage.** A suppressed domain moves the lead to `suppressed`. A country rule that now blocks or needs a person holds the lead (`needs_operator` for a block) where the lifecycle allows a hold, and otherwise defers it: a rule can come back into force (a skip revoked, the workspace switch turned back on), so it never ends a lead for good. A lead that has used its per-prospect budget fails with that reason.
 
 **Message state:** `generated → approved | rejected → drafted → sent → bounced`. A message can become `cancelled` at any point before it is sent. In Phases 2–4, `sent` is set by the Sent-folder sync.
 
@@ -210,12 +210,16 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 | `unknown` | No |
 | `invalid` | No, and never retried |
 
+**The operator can skip the check for one address** (`contact_emails.verification_skipped`, with a reason in the `email_verification_skipped` event): the address is then sendable whatever its status, even `invalid`, and no verifier or finder is called for it. Suppression still applies.
+
+**Approval confirms every skip.** An email that relies on a skipped check (the country rule skipped for the lead or switched off for the workspace, an address used without proof, or a person a search could not place and the operator confirmed) is approved only with an explicit acknowledgement (`acknowledge_skips`; the Review screen's tick box, or `--acknowledge-skips` on the CLI), recorded in an `approved_with_skips` event. Approval also refuses a suppressed address. **Automatic sending (Phase 5) must never send a message that relies on a skipped check**; such a message always waits for a person.
+
 ## 8. Pipeline stages
 
 | Stage | Moves | What it does | Paid calls |
 |---|---|---|---|
 | 1 Intake | import row → `new` | A service, not a runner stage: called by `outbound targets`, the Targets screen and the webhook. Resolves the anchor to a root domain, normalises, deduplicates, checks suppression, and keeps operator notes and priority. Searches happen before the transaction; one transaction writes the batch | Tavily, only for rows with no domain |
-| 2 Research (LangGraph) | `new` → `researched` | A supervisor dispatches up to four workers. **Site and trigger:** home, about, team and news pages. **Compliance and legal entity:** ISO country; UK incorporation from the site footer, then Companies House. **Campaign signals:** the campaign's research questions plus hiring and tech-stack signals. **Persona discovery:** people with titles and LinkedIn URLs from the team page, or one public LinkedIn-title search if there is none; skipped if the operator gave a contact. Then fit is scored with a reason. The legal-entity worker is plain code, not a model | 2–4 Tavily credits, 1–4 LLM calls |
+| 2 Research (LangGraph) | `new` → `researched` | A supervisor dispatches up to four workers. **Site and trigger:** home, about, team and news pages. **Compliance and legal entity:** ISO country; UK incorporation from the site footer, then Companies House. **Campaign signals:** the campaign's research questions plus hiring and tech-stack signals. **Persona discovery:** people with titles and LinkedIn URLs from the team page (never from other sites' pages when the site could not be read), or one public LinkedIn-title search if there is none; skipped if the operator gave a contact. A searched person is *confirmed* only when their profile's employer is the company (its whole name or its website's name); one shared word is never enough. A person the result only mentions with the company is saved as `unconfirmed` and is not worked on until the operator confirms them; anyone else is dropped. The site worker runs first and returns the company's own name, which the engine saves (unless the operator set one) and the other workers search with. Then fit is scored with a reason. The legal-entity worker is plain code, not a model | 2–4 Tavily credits, 1–4 LLM calls |
 | 3 Gate | `researched` → `qualified` / `disqualified` / `held` | Applies the campaign fit minimum (manual leads bypass it) and the country policy | — |
 | 4 Contacts | `qualified` → `contacts_found` | Ranks the people found against the target titles, then by seniority. A person the operator chose (added them, gave their address, or recorded their consent) comes first, in the order the operator left them. Research has already made the one public search, so this stage spends nothing; with nobody to rank, the lead fails with a reason | — |
 | 5 Email | `contacts_found` → `email_ready` / `held` | Per contact, top 3: an address already held, then one published on the company site that fits the person, then the cached pattern (one address), then each finder in order, verifying every result. Invalid: next finder, then next contact. Catch-all: sent to the resolver. The chosen address's provenance is checked against the country policy before the lead moves on | Finder, verifier and resolver credits |
@@ -237,7 +241,7 @@ Cross-cutting rules:
 | Anchor | Resolution | Stages skipped |
 |---|---|---|
 | Domain or website | Reduced to the registrable root domain | None |
-| Company name, optionally with country or notes | One Tavily search for the official domain. If confidence is below 0.8, the row waits as `needs_confirmation` | None, once confirmed |
+| Company name, optionally with country or notes | One Tavily search for the official domain. The website's name must hold the whole company name ("tatapower.com" for Tata Power, not the group's "tata.com"); if confidence is below 0.8, the row waits as `needs_confirmation` | None, once confirmed |
 | Contact email | Domain taken from the address; stored as `operator_given`. A free-mail address is accepted only with `allow_personal_domain` | Email finding (the address is still verified) |
 | Person and company | Company resolved as above; the person is stored at rank 1 | Persona search |
 | LinkedIn profile URL | Stored, never scraped. A public search on the profile slug fills in name, title and company | Persona search |
@@ -247,7 +251,7 @@ Channels:
 - **Phase 2:** CLI (CSV/XLSX file, `--company`, `--validate-only`).
 - **Phase 3:** web quick-add, file upload with preview, domain confirmation, editing saved targets, and the signed intake webhook.
 
-Modes are `manual`, `discovery` and `mixed`. Suppression always wins. A re-submitted domain merges into the existing company: notes are appended, and conflicting values become events.
+Modes are `manual`, `discovery` and `mixed`. Discovery searches for companies (not articles) matching the campaign's ideal customer, asks for twice the wanted count, skips articles and documents (`.pdf`, `/blog/`, `/news/`, `/insights/`, `/report/` and similar), and stores only the website and the page it was found on: a search result's title is never used as the company's name. Suppression always wins. A re-submitted domain merges into the existing company: notes are appended, and conflicting values become events.
 
 ## 10. Frontend (Phase 3)
 
@@ -288,6 +292,8 @@ These summarise the research. They are not legal advice: a lawyer confirms the p
 | CA | CASL: implied consent via conspicuous publication | Only with `publicly_published` or `operator_given` provenance |
 | IN | DPDP: consent-based | Held unless consent is recorded (for example, an expo card) |
 | Unknown | — | Held as `country_unknown` |
+
+**The operator can switch the country rules.** For one lead, `companies.policy_skip_from` skips the rule from a stage onward (`gate`, `contacts`, `email`, `copy`, `deliver`); a tail, never an arbitrary set, so no stage contradicts a later one. A lead the rule stopped resumes at the stage that stopped it; the skip can start there or earlier. For the workspace, `settings.country_policy_enabled` (default on) switches them all off. Either way the decision is ALLOW with `skipped` recorded, suppression still applies, and the footer follows `settings.footer_enabled` (default on): the country's footer, or a short default with the sender's address and an opt-out line. Every country-rule change, removal and skip is an event.
 
 Consent belongs to a person. Before a recipient is chosen (the gate, the runner's guard), anyone's consent at the company keeps the lead moving; once the email, copy or deliver step names the recipient, only *that person's* consent counts, so someone else's consent never allows writing to them.
 

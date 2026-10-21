@@ -129,7 +129,8 @@ The first screen after signing in.
 This is where you spend most of your time.
 
 - **Left:** the emails waiting. A *Flagged* tag means the application's own checks found a problem. On a narrow screen the list is hidden; use the arrows and *1 of N* at the top.
-- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send, where it came from and which vendor checked it.
+- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send (*Not verified: you skipped the check* if you did), where it came from and which vendor checked it.
+- **Skipped checks:** if the email relies on a check you skipped (the country rule for this lead or for the workspace, an address used without proof, or a person you confirmed works there), an amber panel lists them. **Approve** stays greyed out until you tick *I know these checks were skipped, and I approve this email anyway*. What you confirmed is recorded.
 - **Right, "Why this lead":** the fit score and its reason, what the research found, the answers to your research questions, and any notes you added.
 - **Right, "Checks":** each quality check (length, subject, reading level, one question, no links, no address, no banned phrases, footer present) with a tick or a warning and the reason, then the country, the company type and the country rule with the version used.
 
@@ -168,7 +169,7 @@ Three tabs.
 | You know | Fill in | What the application does |
 |---|---|---|
 | The website | Website or domain | Uses it directly |
-| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** under *Websites to confirm* |
+| Only the name | Company name | Searches the web once for the official site. If it is not sure (below 80%), it **asks you** under *Websites to confirm*. A site whose name holds only part of the company's (the group's site for one of its companies) always asks |
 | A work email | Known work email | Takes the company from the address; still verifies the address |
 | A person and a company | Person + Company name | Finds the company; keeps the person as your first choice |
 | A LinkedIn profile | LinkedIn profile URL | Never opens it. A public search of the profile finds the name and company |
@@ -202,9 +203,11 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 - for a **held** lead, a panel that says why and what fixes it, with **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume. For consent and company-type holds it points you to **Add a person with consent**;
 - **People and addresses:** each person in rank order, each address with its status, where it came from, which vendor found it and which one checked it. *The email is to this person* marks who the waiting email is written to. A person you added, gave an address to, or recorded consent for always comes first, whatever the campaign's job titles prefer, and only that person's own consent lets them be written to. Each person has:
   - **Edit:** correct the name or title, or give a work email. A new address replaces the old one as the one written to; the old one stays as history. On a lead whose email step failed, saving also retries that step;
+  - **Confirm they work here:** shown on a person marked *Unconfirmed: check they work here*. A public search found them, but their profile does not clearly say they work at this company, so they are never looked up or written to until you confirm them. Remove them if they do not;
   - **Record consent:** choose the basis and write where it came from. Recording the same basis twice keeps one record;
   - **Write to this person instead:** when the email is going to the wrong person. The waiting (or approved, not yet drafted) email is cancelled, this person is put first and the lead goes back to the email step;
   - **Remove:** for someone who does not work here, such as a wrong match from a search. It is refused once anything has been written to them;
+  - **Skip the check** (next to an address the check could not prove: *unknown*, *invalid*, a catch-all, or not checked yet): if you know the address works, write why and confirm. It becomes the address written to, no more checks are paid for it, and a lead stopped at the email step goes on. An *invalid* address will probably bounce, so use it only when you are sure. **Check it again** undoes it until the email is approved. The same button is in the journey's *Email address* stage when the lead is stuck there;
   - **Suppress:** never contact them again; their unsent emails are cancelled;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
 - **Emails:** each email written, its state, how much you edited it and when it was sent;
@@ -226,7 +229,7 @@ It only shows; to act, use **Open the lead to act on it**.
 
 ### 5.6 Runs
 
-- **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it.
+- **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it. A discovered company is named from its own website during research, never from the article or report that led to it, and articles and documents in the search results are skipped.
 - **Leads per stage.** At most this many companies are handled by each step in one run (default 50).
 
 A run moves every company as far as it can go and lists, per step, how many moved on, were held or failed, plus the time it took and the money spent. **Cancel** stops a run between companies; **Details** shows when it was queued, started and finished and its settings. The list updates by itself while a run is queued or running.
@@ -249,7 +252,7 @@ Record a mailbox and press **Check DNS** to see whether its domain has SPF, DKIM
 
 | Tab | What it holds |
 |---|---|
-| **Country rules** | The rule (allow, allow with footer, consent required, block) and footer for each country, *Incorporated companies only*, and who reviewed it. A change to the rule, the companies-only box or the footer saves a new version, and every decision records the version it used. Add a country with its two letters; it starts as blocked |
+| **Country rules** | At the top, the switch for the whole workspace: **Switch country rules off…** (it asks first) means no lead is held, blocked or asked for consent because of its country; a red banner then shows on every page, and **Switch country rules back on** undoes it. The do-not-contact list still applies either way. **Release leads the rules no longer hold** lets held leads go on once nothing holds them. Below, the rule (allow, allow with footer, consent required, block) and footer for each country, *Incorporated companies only*, *Only addresses from* (where an address must have come from; none ticked means any), and who reviewed it. A change saves a new version, and every decision records the version it used. **Add country** takes its two letters and a rule; **Remove** deletes a rule, after which that country's leads are held for you. Every change is recorded |
 | **Do not contact** | Add an address or a whole domain. It is stored only as a fingerprint, never as text, and asks you to confirm because it cannot be removed |
 | **Forget a person** | Erases a person on request (section 10): the address goes on the do-not-contact list, unsent emails are cancelled, drafts are deleted, and their name, title and address are removed |
 
@@ -261,7 +264,7 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
 | **Sender profile** | Who you are, in three parts: the legal identity printed in footers, your signature, and what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
-| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, and *Only send to proven addresses* (leave this on) |
+| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
 
 Automatic sending cannot be switched on in this version.
 
@@ -309,6 +312,8 @@ A held company is waiting. **Release hold** puts it back at the step that held i
 
 For the three holds that come from the country rule (*country unknown*, *entity unknown*, *consent required*) **Release hold** is refused while nothing has changed, and the message says what to do. Releasing without fixing the cause would only be held again, so the page does not let it loop. Releasing a hold is not the same as giving consent: consent belongs to a person and is recorded against them.
 
+**Skipping the country rule for one lead.** On the lead page (card *Country rule*) or in its journey at the stage that held it: choose the step to skip it from (*Qualify*, *Find people*, *Find the email address*, *Write the email*, *Draft it in the mailbox*), write why, and press **Skip the country rule**. The rule is then not applied to this lead from that step on; a lead it held goes straight on from where it stopped. You can only skip from the step that stopped it or an earlier one. The do-not-contact list still applies, the footer follows Settings → Limits, and approving the email asks you to confirm the skip. **Apply the country rule again** undoes it until the email is approved. Who skipped it, when and why are in the timeline.
+
 | Hold reason | Meaning | What to do |
 |---|---|---|
 | country unknown | The country could not be worked out, and the rules depend on it | Set the country under **Edit this lead** (or **Use XX and release** if one was suggested), then release |
@@ -321,7 +326,7 @@ For the three holds that come from the country rule (*country unknown*, *entity 
 ### 7.2 Disqualified
 
 - **Fit too low:** the research judged the company a poor match. If you disagree, **Override and qualify** on the lead's page.
-- **Country forbids cold email** (by default Germany and Austria): it stays disqualified. Pressing *Override and qualify* will not get it through, because the country check runs again before the next step and stops it. Only consent changes that: add the person who agreed to be contacted with **Add a person** on the lead page, ticking that they have consented.
+- **Country forbids cold email** (by default Germany and Austria): it stays disqualified, and *Override and qualify* is not offered. To go ahead, add the person who agreed to be contacted with **Add a person** (ticking that they have consented), or skip the country rule for this lead from *Qualify* (section 7.1). If a country's rule changes to block after a lead was qualified, the lead is **held** at its next step, never ended for good.
 
 ### 7.3 Failed
 
@@ -329,7 +334,7 @@ A failed lead shows the step and the reason. The application retries automatical
 
 | Message | Meaning | What to do |
 |---|---|---|
-| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | Nothing to retry. If you know someone there, use **Add a person** on the lead page with their work email; or **Edit** a person who has no address and give it |
+| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | If you know the right address, **Edit** the person and give it (the step is retried), or **Add a person** with their work email. If you know an address the check could not prove does work, press **Skip the check** next to it. A person with only a first name cannot be looked up by the finders (they need a full name), but an address you give is used as it is |
 | no decision-maker was found | The site named nobody and the search found nobody | Add a person yourself |
 | the sender profile needs: legal_name, postal_address … | The footer cannot be filled | Fill in those fields in Settings → Sender profile, then Retry |
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |
@@ -354,6 +359,8 @@ These are working defaults, **not legal advice**. Have a lawyer review them befo
 | India | Held unless consent is recorded |
 | Unknown country | Held until the country is known |
 | Any other country | Held until a policy is added |
+
+You can change all of this: edit or remove any country's rule, add any country with any rule, skip the rule for a single lead, or switch country rules off for the workspace (Policies and privacy → Country rules).
 
 The country is taken from what you entered, otherwise from the site (a stated registration, the domain ending, a phone prefix, a UK postcode).
 

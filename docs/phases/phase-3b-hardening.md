@@ -184,6 +184,47 @@ Found by the operator in use (2026-10-19): on rebase.energy the operator gave th
 
 **Tests:** ranking with a chosen CEO against a wanted CTO; recipient-only consent; idempotent consent; same-name dedupe; rank after a late add; remove and its refusal; change recipient with the email cancelled; the API for both; the state-machine table.
 
+### 3b.13 Real company names and the right people (added during the work)
+
+Found by the operator in use (2026-10-19): a discovery run named every company after the search hit's page title ("6 Grid Trends to Watch in 2026" for amperon.co, "AI Foresight Trends Report" for ltm.com), and the LinkedIn search then used that title and accepted anyone sharing one word with it ("foresight", "grid", even "the"). Six people at other companies were attached to three leads. "tata power" resolved to the group's tata.com without asking.
+
+- Discovery stores the website and the page it was found on, never a name; it asks for companies, takes twice the hits and skips articles and documents.
+- Research runs the site worker first; it returns the company's own name, which is saved (operator names are kept) and used by the legal, signals, persona and fit workers.
+- `search_people` confirms a person only when the profile's employer is the company (whole name or website name); a mention only gives `unconfirmed` (new contact status, migration 0003), anyone else is dropped. `read_profile_title` reads "Title at Company", keeps the title, and strips emoji. No people are taken from other sites' pages when the site could not be read. Research dedupes people by name too.
+- `match_confidence` needs the whole name in the website's name; a partial one ("tata" for "tata power") asks the operator.
+- **Confirm they work here** on the lead page (`POST /api/contacts/{id}/confirm`); the contacts stage says so when only unconfirmed people were found.
+
+**Tests:** the real LinkedIn results (Dan Roth, Jigar Shah, Adam Shaw, Damian Płaza, Isak Bergset); one shared word is not enough; name from the site, used by the search and fit; operator name kept; unconfirmed saved; no people from a thin site; profile-title parsing; website matching (tata); discovery without names and without documents; confirm; migration 0003 up and down on both databases.
+
+### 3b.14 Country rules you can configure and skip (added during the work)
+
+Asked for by the operator (2026-10-20): skip the country rule for one lead at chosen stages, from the lead or journey page, or switch it off for the workspace; and configure the rules fully.
+
+- `companies.policy_skip_from` (migration 0004): the rule is skipped from that stage onward. `policy_decision_for(..., stage=...)` returns ALLOW with `skipped` when the workspace switch `country_policy_enabled` is off or the lead's skip covers the stage. Suppression is separate and always applies.
+- A guard that finds a block now **holds** the lead (`needs_operator`) instead of suppressing it, so revoking a skip or switching the rules back on never ends a lead.
+- `LeadService.skip_policy` (reason required, `policy_skip_granted` event) moves a lead the rule stopped back to where it stopped; a later start is refused. `revoke_policy_skip` until approval; `release_policy_holds` after switching the rules off.
+- The footer is its own setting, `footer_enabled` (default on): the country's footer, or a default one, also when the rule is skipped.
+- Country rules: add any country with any rule, edit *Only addresses from*, remove a rule; `policy_changed` and `policy_deleted` events.
+- Screens: *Country rule* card on the lead page, the same control in the journey's stage panel, the switch and bulk release on Policies and privacy, a red banner while the rules are off, the footer switch under Limits.
+
+**Tests:** the skip rule per stage; rules off qualifies a blocked country; suppression still wins; a block at the gate and a hold at contacts each resume where they stopped; a later start refused; revoke until approval; release after switching off and holding again after switching on; the country's footer kept; the default footer and no footer; policy change and removal events; the API.
+
+### 3b.15 Skip the email and person checks, confirmed at approval (added during the work)
+
+Asked for by the operator (2026-10-20): the email check and the person check should be skippable for a lead, provided the operator confirms it when approving. On tilt-energy.com the operator's address for the CEO came back *unknown*, and the lead could only move on by adding a second card for the same person.
+
+- `contact_emails.verification_skipped` (migration 0005), set by **Skip the check** with a reason (`email_verification_skipped` event), for any status including *invalid*. `is_sendable` treats such an address as sendable in the waterfall (no verifier or finder call), the copy step and deliver; suppression still wins. A lead failed at the email step or held on a catch-all goes back to the email step and on.
+- The person check is the *unconfirmed* status from 3b.13; **Confirm they work here** is the skip. The first-and-last-name rule only stops the paid finders, never an address the operator gives, so it needs no skip; the screens say so.
+- `ReviewService.approve(acknowledge_skips=...)` refuses an email that relies on a skipped check (country rule skipped or off, address without proof, confirmed person) unless acknowledged, records `approved_with_skips`, and refuses a suppressed address. Review shows the list and a required tick box; the CLI takes `--acknowledge-skips`.
+
+**Tests:** the waterfall uses a skipped address of every status without paying; suppression still wins; the Tilt case through the email step; reason required; refused for a suppressed address; approval refused without, recorded with; every kind of skip listed; restore until approval; a browser test from a held lead to an acknowledged approval.
+
+### 3b.16 Clean up the first discovery run's data (added during the work)
+
+`scripts/fix_discovery_data.py`, run once after 3b.12 to 3b.15 are deployed. It goes through the services, so every change writes its event, and it prints its plan without changing anything unless given `--apply`. It renames the discovered leads after their own sites (as the engine, not as an operator edit), removes the six people a search attached to the wrong companies, replaces the tata.com lead with tatapower.com, and moves the rebase.energy draft from the CTO to the CEO who gave consent; `--rerun-research` also sends amperon.co back to research. Each step finds its lead by domain and person by name and skips itself once done.
+
+**Tests:** a seeded copy of the live data: the plan, the result of applying it, and an empty plan on a second run.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

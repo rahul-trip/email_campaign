@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/release-policy-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release Policy Holds */
+        post: operations["release_policy_holds_api_companies_release_policy_holds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}": {
         parameters: {
             query?: never;
@@ -156,6 +173,24 @@ export interface paths {
         /** Add Person */
         post: operations["add_person_api_companies__company_id__people_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/policy-skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Policy */
+        post: operations["skip_policy_api_companies__company_id__policy_skip_post"];
+        /** Revoke Policy Skip */
+        delete: operations["revoke_policy_skip_api_companies__company_id__policy_skip_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -266,6 +301,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contact-emails/{email_id}/skip-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Email Verification */
+        post: operations["skip_email_verification_api_contact_emails__email_id__skip_verification_post"];
+        /** Restore Email Verification */
+        delete: operations["restore_email_verification_api_contact_emails__email_id__skip_verification_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}": {
         parameters: {
             query?: never;
@@ -282,6 +335,23 @@ export interface paths {
         head?: never;
         /** Edit Person */
         patch: operations["edit_person_api_contacts__contact_id__patch"];
+        trace?: never;
+    };
+    "/api/contacts/{contact_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Person */
+        post: operations["confirm_person_api_contacts__contact_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/contacts/{contact_id}/consents": {
@@ -633,7 +703,8 @@ export interface paths {
         /** Save Policy */
         put: operations["save_policy_api_settings_policies__country_code__put"];
         post?: never;
-        delete?: never;
+        /** Delete Policy */
+        delete: operations["delete_policy_api_settings_policies__country_code__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -787,6 +858,11 @@ export interface components {
     schemas: {
         /** ApproveIn */
         ApproveIn: {
+            /**
+             * Acknowledge Skips
+             * @default false
+             */
+            acknowledge_skips?: boolean;
             /** Edited Body */
             edited_body?: string | null;
             /** Row Version */
@@ -903,6 +979,8 @@ export interface components {
             policy_decision: {
                 [key: string]: unknown;
             } | null;
+            /** Policy Skip From */
+            policy_skip_from?: string | null;
             /** Priority */
             priority: number;
             /** Research */
@@ -1052,6 +1130,11 @@ export interface components {
             provenance: components["schemas"]["Provenance"];
             /** Status */
             status: string;
+            /**
+             * Verification Skipped
+             * @default false
+             */
+            verification_skipped?: boolean;
             /** Verified By */
             verified_by: string | null;
         };
@@ -1115,6 +1198,8 @@ export interface components {
             company: components["schemas"]["CompanyOut"];
             /** Contacts */
             contacts: components["schemas"]["ContactOut"][];
+            /** Held At */
+            held_at?: string | null;
             /** Messages */
             messages: components["schemas"]["MessageOut"][];
             /** Notes */
@@ -1276,6 +1361,22 @@ export interface components {
          * @enum {string}
          */
         PolicyRule: "allow" | "allow_with_footer" | "consent_required" | "block";
+        /** PolicySkipIn */
+        PolicySkipIn: {
+            from_stage: components["schemas"]["PolicyStage"];
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * PolicyStage
+         * @description The stages that check the country policy, in pipeline order.
+         *
+         *     The operator can skip the policy for a lead *from* one of them onward
+         *     (``companies.policy_skip_from``); a tail cannot contradict itself the way an arbitrary set
+         *     could (copy skipped but deliver not would write an email deliver then withdraws).
+         * @enum {string}
+         */
+        PolicyStage: "gate" | "contacts" | "email" | "copy" | "deliver";
         /** PrivacyOut */
         PrivacyOut: {
             /** Drafts Deleted */
@@ -1342,6 +1443,11 @@ export interface components {
             /** Flagged */
             flagged: boolean;
             message: components["schemas"]["MessageOut"];
+            /**
+             * Skips
+             * @default []
+             */
+            skips?: components["schemas"]["SkipOut"][];
         };
         /** RowOut */
         RowOut: {
@@ -1450,6 +1556,18 @@ export interface components {
             technologies?: string[] | null;
             /** Value Propositions */
             value_propositions?: string[] | null;
+        };
+        /** SkipCheckIn */
+        SkipCheckIn: {
+            /** Reason */
+            reason: string;
+        };
+        /** SkipOut */
+        SkipOut: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
         };
         /** StageOut */
         StageOut: {
@@ -1624,8 +1742,12 @@ export interface components {
         WorkspaceSettingsIn: {
             /** Budget Per Prospect Micro Usd */
             budget_per_prospect_micro_usd?: number | null;
+            /** Country Policy Enabled */
+            country_policy_enabled?: boolean | null;
             /** Few Shot Examples */
             few_shot_examples?: number | null;
+            /** Footer Enabled */
+            footer_enabled?: boolean | null;
             /** Safe To Send Only */
             safe_to_send_only?: boolean | null;
             /** Timezone */
@@ -1743,6 +1865,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_policy_holds_api_companies_release_policy_holds_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -1949,6 +2093,72 @@ export interface operations {
             };
         };
     };
+    skip_policy_api_companies__company_id__policy_skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicySkipIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_policy_skip_api_companies__company_id__policy_skip_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     release_hold_api_companies__company_id__release_hold_post: {
         parameters: {
             query?: never;
@@ -2139,6 +2349,72 @@ export interface operations {
             };
         };
     };
+    skip_email_verification_api_contact_emails__email_id__skip_verification_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SkipCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_email_verification_api_contact_emails__email_id__skip_verification_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                email_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     remove_person_api_contacts__contact_id__delete: {
         parameters: {
             query?: never;
@@ -2182,6 +2458,37 @@ export interface operations {
                 "application/json": components["schemas"]["PersonPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_person_api_contacts__contact_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -2850,6 +3157,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PolicyOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_policy_api_settings_policies__country_code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                country_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

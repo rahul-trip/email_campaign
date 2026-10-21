@@ -192,6 +192,8 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"  hook: {hook}")
         for note in detail.notes:
             typer.echo(f"  note: {note}")
+        for skip in item.skips:
+            typer.echo(f"  SKIPPED CHECK: {skip.text} (approve with --acknowledge-skips)")
 
     @review_app.command("approve")
     def review_approve(
@@ -202,13 +204,25 @@ def register(app: typer.Typer) -> None:
                 "--edit", exists=True, dir_okay=False, help="File with your edited email."
             ),
         ] = None,
+        acknowledge_skips: Annotated[
+            bool,
+            typer.Option(
+                "--acknowledge-skips",
+                help="Confirm the checks you skipped for this lead (country rule, email check,"
+                " works-here); shown by `review show`.",
+            ),
+        ] = False,
         workspace: WorkspaceName = defaults.DEFAULT_WORKSPACE_NAME,
         database_url: DatabaseUrl = None,
     ) -> None:
         """Approve an email, optionally with your edited version of the whole text."""
         service = _review(database_url, workspace)
         body = edit.read_text() if edit else None
-        message = _guard(lambda: service.approve(service.resolve(ref), edited_body=body))
+        message = _guard(
+            lambda: service.approve(
+                service.resolve(ref), edited_body=body, acknowledge_skips=acknowledge_skips
+            )
+        )
         suffix = " with your edit" if message.final_body is not None else ""
         typer.echo(f"approved{suffix}: {message.id[:8]}")
 

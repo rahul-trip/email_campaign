@@ -12,6 +12,7 @@ from outbound.domain.enums import (
     ConsentBasis,
     HoldReason,
     PolicyRule,
+    PolicyStage,
     Provenance,
     SuppressionKind,
     SuppressionReason,
@@ -61,6 +62,7 @@ class CompanyOut(Out):
     research: dict[str, Any] | None
     research_answers: dict[str, Any] | None
     policy_decision: dict[str, Any] | None
+    policy_skip_from: str | None = None
     manual_fields: list[str]
     next_action_at: datetime | None
     row_version: int
@@ -81,6 +83,7 @@ class EmailOut(Out):
     is_primary: bool
     found_by: str | None
     verified_by: str | None
+    verification_skipped: bool = False
 
 
 class ContactOut(Out):
@@ -123,6 +126,7 @@ class LeadOut(Out):
     contacts: list[ContactOut]
     messages: list[MessageOut]
     notes: list[NoteOut]
+    held_at: str | None = None  # the stage whose country check held the lead
 
 
 class TimelineOut(Out):
@@ -206,6 +210,15 @@ class RecipientIn(In):
     contact_id: str
 
 
+class SkipCheckIn(In):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class PolicySkipIn(In):
+    from_stage: PolicyStage
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class PersonIn(In):
     full_name: str = Field(min_length=1, max_length=200)
     title: str | None = Field(default=None, max_length=200)
@@ -279,11 +292,17 @@ class ConfirmIn(In):
 # ------------------------------------------------------------------ review
 
 
+class SkipOut(Out):
+    kind: str
+    text: str
+
+
 class ReviewItemOut(Out):
     message: MessageOut
     company: CompanyOut
     contact: ContactOut
     flagged: bool
+    skips: list[SkipOut] = []
 
 
 class ReviewDetailOut(Out):
@@ -294,6 +313,7 @@ class ReviewDetailOut(Out):
 class ApproveIn(In):
     edited_body: str | None = None
     row_version: int | None = None
+    acknowledge_skips: bool = False  # required when the email relies on skipped checks
 
 
 class RejectIn(In):
@@ -308,6 +328,8 @@ class WorkspaceSettingsIn(In):
     budget_per_prospect_micro_usd: int | None = Field(default=None, ge=0, le=100_000_000)
     few_shot_examples: int | None = Field(default=None, ge=0, le=20)
     timezone: str | None = Field(default=None, max_length=64)
+    country_policy_enabled: bool | None = None
+    footer_enabled: bool | None = None
 
 
 class SenderProfileIn(In):

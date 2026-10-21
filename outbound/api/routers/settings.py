@@ -46,7 +46,13 @@ def update_workspace_settings(
 ) -> dict[str, Any]:
     changes = body.model_dump(exclude_unset=True)
     # Only the budget may be null (it means "no ceiling"); a null anywhere else means "unchanged".
-    for name in ("safe_to_send_only", "few_shot_examples", "timezone"):
+    for name in (
+        "safe_to_send_only",
+        "few_shot_examples",
+        "timezone",
+        "country_policy_enabled",
+        "footer_enabled",
+    ):
         if changes.get(name, "") is None:
             changes.pop(name)
     return svc.settings.update_workspace_settings(changes)
@@ -91,6 +97,11 @@ def save_policy(
         reviewer=body.reviewed_by,
     )
     return PolicyOut.model_validate(saved)
+
+
+@router.delete("/policies/{country_code}", status_code=204)
+def delete_policy(country_code: str, svc: Annotated[Services, Depends(services)]) -> None:
+    svc.settings.delete_policy(country_code)
 
 
 @router.get("/suppressions", response_model=list[SuppressionOut])

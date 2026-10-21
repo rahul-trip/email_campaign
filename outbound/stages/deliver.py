@@ -49,7 +49,11 @@ class DeliverStage:
             contact = uow.contacts.get(message.contact_id)
             address = uow.emails.get(message.contact_email_id)
             decision = policy_decision_for(
-                uow, company, email_provenance=address.provenance, recipient_id=contact.id
+                uow,
+                company,
+                stage=self.name,
+                email_provenance=address.provenance,
+                recipient_id=contact.id,
             )
             verdict = check_send(
                 email_status=address.status,
@@ -59,6 +63,7 @@ class DeliverStage:
                 domain_suppressed=uow.suppressions.is_domain_suppressed(company.domain),
                 policy_decision=decision,
                 safe_to_send_only=safe_only,
+                verification_skipped=address.verification_skipped,
             )
             return message, address, verdict, decision.hold_reason
 

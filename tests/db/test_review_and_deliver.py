@@ -364,8 +364,9 @@ def test_a_policy_changed_to_block_between_approval_and_delivery_never_drafts(
     box = FakeMailbox()
     deliver(factory, ws, box)
     assert box.appends == 0
-    assert company(factory, ws, cid).status is C.SUPPRESSED
-    assert message(factory, ws, mid).state is MessageState.APPROVED
+    # Held, not suppressed, and the approval is withdrawn: once released it gets a fresh email.
+    assert company(factory, ws, cid).status is C.HELD
+    assert message(factory, ws, mid).state is MessageState.CANCELLED
 
 
 def test_a_policy_that_now_needs_consent_for_this_address_never_drafts(

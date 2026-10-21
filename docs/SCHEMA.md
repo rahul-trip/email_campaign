@@ -191,7 +191,9 @@ CREATE TABLE companies (
   email_pattern     TEXT,                          -- e.g. '{first}.{last}', cached once one address is valid
   research          JSON,                          -- summary, products, news, signals, hook candidates
   research_answers  JSON,                          -- answers to the campaign's questions
-  policy_decision   JSON,                          -- rule, policy version, reasons, decided_at
+  policy_decision   JSON,                          -- rule, policy version, reasons, skipped
+  policy_skip_from  TEXT CHECK (policy_skip_from IN ('gate','contacts','email','copy','deliver')),
+                                                   -- the operator skipped the country rule from this stage on (migration 0004)
   manual_fields     JSON NOT NULL DEFAULT '[]',
   row_version       INTEGER NOT NULL DEFAULT 1,
   UNIQUE (workspace_id, domain)
@@ -209,7 +211,9 @@ CREATE TABLE contacts (
   rank          INTEGER NOT NULL,                  -- 0 = referral, 1 = top choice
   source        TEXT NOT NULL CHECK (source IN ('operator','site','search','database','referral','ooo_alternate')),
   status        TEXT NOT NULL DEFAULT 'candidate'
-                CHECK (status IN ('candidate','active','bounced','referred_away','opted_out','forgotten')),
+                CHECK (status IN ('unconfirmed','candidate','active','bounced','referred_away','opted_out','forgotten')),
+                -- unconfirmed (migration 0003): found by a public search whose employer did not
+                -- clearly match the company; never worked on until the operator confirms them
   manual_fields JSON NOT NULL DEFAULT '[]'
 );
 CREATE UNIQUE INDEX ux_contacts_linkedin ON contacts (workspace_id, linkedin_url) WHERE linkedin_url IS NOT NULL;
@@ -226,6 +230,7 @@ CREATE TABLE contact_emails (
   resolution_ref TEXT,                             -- catch-all resolver job id while catch_all_pending
   verified_at    TIMESTAMP,
   is_primary     BOOLEAN NOT NULL DEFAULT FALSE,
+  verification_skipped BOOLEAN NOT NULL DEFAULT FALSE, -- the operator writes to it without proof (migration 0005)
   UNIQUE (workspace_id, email)
 );
 CREATE UNIQUE INDEX ux_contact_emails_primary ON contact_emails (contact_id) WHERE is_primary;
@@ -344,7 +349,7 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 
 A message may be drafted or sent only when **all** of the following hold:
 
-1. `contact_emails.status IN ('valid','catch_all_resolved')`. `catch_all_unverified` is also allowed, but only if `settings.safe_to_send_only` is false.
+1. `contact_emails.status IN ('valid','catch_all_resolved')`, or `contact_emails.verification_skipped` (the operator skipped the check; approval then needs an explicit acknowledgement). `catch_all_unverified` is also allowed, but only if `settings.safe_to_send_only` is false.
 2. Neither the email nor its domain hash is in `suppressions`.
 3. The company's country policy allows it under the current policy version:
    - for GB, `legal_entity_type = 'corporate_subscriber'`;
@@ -354,7 +359,7 @@ A message may be drafted or sent only when **all** of the following hold:
 
 ## 7. Value conventions the code relies on
 
-Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3. They did fix how some columns are used; these conventions are part of the schema contract.
+Phases 2 and 3 added no tables or columns; migration 0002 (Phase 3b) only changed uniqueness rules, listed in section 3, migration 0003 added `unconfirmed` to `contacts.status`, migration 0004 added `companies.policy_skip_from`, and migration 0005 added `contact_emails.verification_skipped`. The workspace settings `country_policy_enabled` and `footer_enabled` (both default true) live in `workspaces.settings`. They did fix how some columns are used; these conventions are part of the schema contract.
 
 | Column | Convention |
 |---|---|

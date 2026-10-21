@@ -16,7 +16,9 @@ SITE_SYSTEM_PROMPT = f"""\
 You read a company's own web pages and report what a salesperson needs before writing to them.
 {_GROUNDED}
 
-Return: {{"summary": "<2-3 sentences: what the company does and for whom>",
+Return: {{"company_name": "<the name the company calls itself on these pages, e.g. 'Amperon'
+or 'LTIMindtree'; never a page title, headline or slogan; empty if the pages do not say>",
+"summary": "<2-3 sentences: what the company does and for whom>",
 "products": ["<product or service>", ...],
 "news": ["<recent, specific, dated if the text dates it>", ...],
 "hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...]}}
@@ -34,7 +36,8 @@ Return: {{"answers": {{"<question exactly as asked>": "<short answer, or empty s
 
 PERSONA_SYSTEM_PROMPT = f"""\
 You extract the people listed on a company's team, leadership or about page.
-{_GROUNDED}
+{_GROUNDED} Only people who work at this company: leave out customers, partners, investors,
+authors of quoted articles and anyone the text does not place at the company.
 
 Return: {{"people": [{{"name": "<full name>", "title": "<job title>",
 "linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}

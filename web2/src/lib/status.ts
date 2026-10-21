@@ -40,9 +40,9 @@ export const emailStatus: Vocabulary = {
   invalid: s("Invalid", "error"),
 };
 
-/** Only these two are safe to send to (PLAN.md §7). */
-export const isSafeToSend = (status: string): boolean =>
-  status === "valid" || status === "catch_all_resolved";
+/** Proven safe (PLAN.md §7), or the operator chose to skip the check for this address. */
+export const isSafeToSend = (status: string, verificationSkipped = false): boolean =>
+  verificationSkipped || status === "valid" || status === "catch_all_resolved";
 
 export const messageState: Vocabulary = {
   generated: s("Waiting for review", "attention"),

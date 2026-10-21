@@ -5,7 +5,11 @@ what research found, with no checkpointer and no database access. Everything it 
 through the metered providers handed in, so each search and model call is cached, capped and
 costed like any other.
 
-    pages -> (supervisor picks) -> site | legal | signals | persona -> fit
+    pages -> site -> (supervisor picks) -> legal | signals | persona -> fit
+
+The site worker runs first because it reads the company's own name, and the later workers
+search with it: a discovered lead arrives with no name, and a search made with a page title
+instead finds the wrong people.
 
 The supervisor is plain code (``plan_workers``) so its routing rules are unit-tested.
 """
@@ -21,7 +25,12 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from outbound.domain.enums import LegalEntityType
-from outbound.domain.names import read_profile_title
+from outbound.domain.names import (
+    clean_person_name,
+    employer_matches,
+    mentions_company,
+    read_profile_title,
+)
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
 from outbound.providers.llm_json import ask_json as ask
@@ -65,6 +74,8 @@ class Person:
     title: str = ""
     linkedin_url: str | None = None
     source: str = "site"  # "site" or "search"
+    # False when a search found the person but their employer did not clearly match the company.
+    confirmed: bool = True
 
 
 @dataclass(frozen=True)
@@ -76,6 +87,7 @@ class ResearchOutput:
     fit_score: int | None
     fit_reason: str | None
     people: tuple[Person, ...] = field(default=())
+    company_name: str | None = None  # as the company's own pages call it
 
 
 # --------------------------------------------------------------------------- what a model returns
@@ -86,6 +98,7 @@ class _Reply(BaseModel):
 
 
 class SiteFacts(_Reply):
+    company_name: str = ""
     summary: str = ""
     products: list[str] = Field(default_factory=list)
     news: list[str] = Field(default_factory=list)
@@ -185,7 +198,13 @@ def published_addresses(pages: dict[str, str], domain: str) -> list[str]:
 
 
 def _clean_name(name: str) -> str:
-    return re.sub(r"\s+", " ", name).strip()
+    return clean_person_name(name)
+
+
+def _company(state: ResearchState) -> str:
+    """The name to search with: the one the site gave, else what was known before."""
+    site = state.get("site_facts")
+    return (site.company_name.strip() if site else "") or state["inp"].company_name
 
 
 @dataclass(frozen=True)
@@ -213,7 +232,8 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         return {"page_text": snippets, "thin": True}
 
     def supervisor(state: ResearchState) -> list[Hashable]:
-        return list[Hashable](plan_workers(state["inp"]))
+        later = [w for w in plan_workers(state["inp"]) if w != SITE]
+        return list[Hashable](later or ["fit"])
 
     def site_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
@@ -237,31 +257,34 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         entity: tuple[LegalEntityType, str] = (LegalEntityType.UNKNOWN, "not checked")
         if known.code == "GB":  # also for a suggestion, so confirming it needs no second hold
             match = None
+            name = _company(state)
             if deps.registry is not None:
-                entries = deps.registry.search(inp.company_name)
-                match = best_registry_match(inp.company_name, entries)
-            markers = find_incorporation_markers(text, inp.company_name, inp.domain)
+                entries = deps.registry.search(name)
+                match = best_registry_match(name, entries)
+            markers = find_incorporation_markers(text, name, inp.domain)
             entity = classify_legal_entity(markers, match)
         update["legal_facts"] = entity
         return update
 
     def signals_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
-        hits = deps.search.search(
-            f"{inp.company_name} {inp.domain} careers hiring technology", max_results=5
-        )
+        name = _company(state)
+        hits = deps.search.search(f"{name} {inp.domain} careers hiring technology", max_results=5)
         snippets = "\n".join(f"- {h.title}: {h.snippet}" for h in hits)
         user = prompts.build_signals_user_prompt(
-            inp.company_name, inp.questions, _joined(state["page_text"]), snippets
+            name, inp.questions, _joined(state["page_text"]), snippets
         )
         return {"signal_facts": ask(deps.llm, prompts.SIGNALS_SYSTEM_PROMPT, user, SignalFacts)}
 
     def persona_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
+        name = _company(state)
         people: list[Person] = []
-        team_text = _joined(state["page_text"], only=TEAM_HINTS)
+        # When the site could not be read the text is other sites' snippets: their people are
+        # not this company's, so only the public search below is used.
+        team_text = "" if state.get("thin") else _joined(state["page_text"], only=TEAM_HINTS)
         if len(team_text) > MIN_TEAM_TEXT:
-            user = prompts.build_persona_user_prompt(inp.company_name, team_text)
+            user = prompts.build_persona_user_prompt(name, team_text)
             team = ask(deps.llm, prompts.PERSONA_SYSTEM_PROMPT, user, TeamFacts)
             people = [
                 Person(_clean_name(m.name), m.title.strip(), m.linkedin_url.strip() or None)
@@ -269,7 +292,7 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
                 if len(_clean_name(m.name).split()) >= 2
             ]
         if not people and inp.target_titles:
-            people = search_people(deps.search, inp.company_name, inp.target_titles)
+            people = search_people(deps.search, name, inp.domain, inp.target_titles)
         return {"people_found": _unique(people)[:MAX_PEOPLE]}
 
     def fit_node(state: ResearchState) -> ResearchState:
@@ -280,7 +303,7 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         signals = state.get("signal_facts") or SignalFacts()
         answers = "\n".join(f"{q}: {a}" for q, a in signals.answers.items() if a)
         user = prompts.build_fit_user_prompt(
-            inp.icp, inp.company_name, site.summary, site.products, inp.notes, answers
+            inp.icp, _company(state), site.summary, site.products, inp.notes, answers
         )
         return {"fit_facts": ask(deps.llm, prompts.FIT_SYSTEM_PROMPT, user, FitFacts)}
 
@@ -292,33 +315,46 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
     graph.add_node(PERSONA, persona_node)
     graph.add_node("fit", fit_node)
     graph.add_edge(START, "pages")
+    graph.add_edge("pages", SITE)
     graph.add_conditional_edges(
-        "pages", supervisor, {name: name for name in (SITE, LEGAL, SIGNALS, PERSONA)}
+        SITE, supervisor, {name: name for name in (LEGAL, SIGNALS, PERSONA, "fit")}
     )
-    for worker in (SITE, LEGAL, SIGNALS, PERSONA):
+    for worker in (LEGAL, SIGNALS, PERSONA):
         graph.add_edge(worker, "fit")
     graph.add_edge("fit", END)
     return graph.compile()
 
 
 def search_people(
-    search: SearchProvider, company_name: str, target_titles: Sequence[str]
+    search: SearchProvider, company_name: str, domain: str, target_titles: Sequence[str]
 ) -> list[Person]:
-    """People found by a public search on LinkedIn profile titles; profiles are never fetched."""
+    """People found by a public search on LinkedIn profile titles; profiles are never fetched.
+
+    A person is *confirmed* when the employer on their profile is this company (its whole name,
+    or its website's name), and *unconfirmed* when the result only mentions the company. Anyone
+    else is dropped: sharing one word ("Grid", "Energy") with the company is not enough.
+    """
     titles = " OR ".join(f'"{t}"' for t in target_titles[:4])
     hits = search.search(f'site:linkedin.com/in "{company_name}" ({titles})', max_results=5)
-    wanted = {t for t in re.findall(r"[a-z0-9]+", company_name.lower()) if len(t) > 2}
     people: list[Person] = []
     for hit in hits:
         if "linkedin.com/in/" not in hit.url:
             continue
-        name, title, company = read_profile_title(hit.title)
-        if len(name.split()) < 2 or not company:
+        name, title, employer = read_profile_title(hit.title)
+        if len(name.split()) < 2:
             continue
-        if wanted and not wanted & set(re.findall(r"[a-z0-9]+", company.lower())):
-            continue  # a profile for someone at a different company
+        # "Head of Sales, Volue Power Grid": the employer is often the end of the headline.
+        tail = title.rsplit(",", 1)[-1] if "," in title else ""
+        if employer_matches(employer, company_name, domain) or employer_matches(
+            tail, company_name, domain
+        ):
+            confirmed = True
+        elif not employer and mentions_company(f"{hit.title} {hit.snippet}", company_name, domain):
+            confirmed = False
+        else:
+            continue  # someone at a different company
         url = hit.url.split("?")[0].split("#")[0].rstrip("/")
-        people.append(Person(_clean_name(name), title, url, "search"))
+        people.append(Person(name, title, url, "search", confirmed))
     return people
 
 
@@ -366,4 +402,5 @@ def run_research(graph: Any, inp: ResearchInput) -> ResearchOutput:
         fit_score=fit.score if fit else None,
         fit_reason=fit.reason if fit else None,
         people=people,
+        company_name=(site.company_name.strip() or None),
     )

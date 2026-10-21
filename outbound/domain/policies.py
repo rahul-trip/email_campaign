@@ -20,6 +20,7 @@ from outbound.domain.enums import (
     HoldReason,
     LegalEntityType,
     PolicyRule,
+    PolicyStage,
     Provenance,
 )
 
@@ -43,6 +44,9 @@ class PolicyDecision:
     rule: PolicyRule | None = None
     footer_template: str | None = None
     policy_version: int | None = None
+    # True when the operator skipped the country rule (for this lead from a stage onward, or
+    # for the whole workspace): the outcome is ALLOW and ``reasons`` says who skipped it.
+    skipped: bool = False
 
     def to_json(self) -> dict[str, Any]:
         """The shape stored in ``companies.policy_decision`` for later audit."""
@@ -52,7 +56,34 @@ class PolicyDecision:
             "hold_reason": self.hold_reason.value if self.hold_reason else None,
             "policy_version": self.policy_version,
             "reasons": list(self.reasons),
+            "skipped": self.skipped,
         }
+
+
+def policy_skipped_at(stage: str | None, skip_from: PolicyStage | None) -> bool:
+    """Whether a lead whose policy is skipped from ``skip_from`` onward skips it at ``stage``.
+
+    ``stage`` is None for checks that are not a stage (releasing a hold): they skip it whenever
+    any skip is set, since the lead would otherwise be held again where the skip applies.
+    """
+    if skip_from is None:
+        return False
+    if stage is None:
+        return True
+    order = list(PolicyStage)
+    return stage in order and order.index(PolicyStage(stage)) >= order.index(skip_from)
+
+
+def skipped_decision(reason: str, policy: CountryPolicy | None) -> PolicyDecision:
+    """ALLOW because the operator skipped the rule. The country's footer still travels with it."""
+    return PolicyDecision(
+        PolicyOutcome.ALLOW,
+        (reason,),
+        rule=policy.rule if policy else None,
+        footer_template=policy.footer_template if policy else None,
+        policy_version=policy.version if policy else None,
+        skipped=True,
+    )
 
 
 def decide_country_policy(
@@ -143,6 +174,17 @@ def is_safe_email_status(status: EmailStatus, *, safe_to_send_only: bool = True)
     return status is EmailStatus.CATCH_ALL_UNVERIFIED and not safe_to_send_only
 
 
+def is_sendable(
+    status: EmailStatus, *, verification_skipped: bool = False, safe_to_send_only: bool = True
+) -> bool:
+    """Whether an address may be written to: proven safe, or the operator skipped the check.
+
+    A skip covers any verifier answer, even ``invalid``: the operator knows the address (and
+    approving the email asks them to confirm that they skipped it).
+    """
+    return verification_skipped or is_safe_email_status(status, safe_to_send_only=safe_to_send_only)
+
+
 @dataclass(frozen=True)
 class SendVerdict:
     ok: bool
@@ -157,10 +199,15 @@ def check_send(
     domain_suppressed: bool,
     policy_decision: PolicyDecision,
     safe_to_send_only: bool = True,
+    verification_skipped: bool = False,
 ) -> SendVerdict:
     """All four conditions of the safe-to-send rule; every failing reason is reported."""
     reasons: list[str] = []
-    if not is_safe_email_status(email_status, safe_to_send_only=safe_to_send_only):
+    if not is_sendable(
+        email_status,
+        verification_skipped=verification_skipped,
+        safe_to_send_only=safe_to_send_only,
+    ):
         reasons.append(f"email status is {email_status.value}")
     if email_suppressed:
         reasons.append("email address is suppressed")

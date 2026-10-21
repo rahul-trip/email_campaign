@@ -915,3 +915,26 @@ def test_the_email_can_go_to_someone_else_and_a_wrong_match_be_removed(
     written_to = api.get(f"/api/companies/{cid}").json()["messages"][0]["contact_id"]
     refused = api.delete(f"/api/contacts/{written_to}")
     assert refused.status_code in (409, 422) and "already been written" in refused.json()["detail"]
+
+
+def test_the_country_rule_can_be_skipped_for_a_lead_and_switched_off_for_the_workspace(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "acme.com", C.RESEARCHED, C.QUALIFIED)
+    refused = api.post(f"/api/companies/{cid}/policy-skip", json={"from_stage": "later"})
+    assert refused.status_code == 422
+    skipped = api.post(
+        f"/api/companies/{cid}/policy-skip", json={"from_stage": "contacts", "reason": "known"}
+    )
+    assert skipped.status_code == 200 and skipped.json()["policy_skip_from"] == "contacts"
+    assert api.get(f"/api/companies/{cid}").json()["company"]["policy_skip_from"] == "contacts"
+    assert api.delete(f"/api/companies/{cid}/policy-skip").json()["policy_skip_from"] is None
+
+    off = api.put("/api/settings/workspace", json={"country_policy_enabled": False})
+    assert off.status_code == 200 and off.json()["country_policy_enabled"] is False
+    assert api.post("/api/companies/release-policy-holds").json() == {"released": 0}
+    assert api.put("/api/settings/workspace", json={"footer_enabled": False}).status_code == 200
+
+    assert api.put("/api/settings/policies/SE", json={"rule": "block"}).status_code == 200
+    assert api.delete("/api/settings/policies/SE").status_code == 204
+    assert api.delete("/api/settings/policies/SE").status_code == 404

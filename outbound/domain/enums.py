@@ -50,6 +50,9 @@ class LegalEntityType(StrEnum):
 
 
 class ContactStatus(StrEnum):
+    # Found by a public search whose employer could not be confirmed. Never worked on (no paid
+    # lookups, no email) until the operator confirms the person works there.
+    UNCONFIRMED = "unconfirmed"
     CANDIDATE = "candidate"
     ACTIVE = "active"
     BOUNCED = "bounced"
@@ -219,3 +222,18 @@ class EntityType(StrEnum):
     MAILBOX = "mailbox"
     WORKSPACE = "workspace"
     IMPORT_ROW = "import_row"
+
+
+class PolicyStage(StrEnum):
+    """The stages that check the country policy, in pipeline order.
+
+    The operator can skip the policy for a lead *from* one of them onward
+    (``companies.policy_skip_from``); a tail cannot contradict itself the way an arbitrary set
+    could (copy skipped but deliver not would write an email deliver then withdraws).
+    """
+
+    GATE = "gate"
+    CONTACTS = "contacts"
+    EMAIL = "email"
+    COPY = "copy"
+    DELIVER = "deliver"
