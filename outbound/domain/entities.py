@@ -114,6 +114,8 @@ class ContactEmail:
     verified_by: str | None = None
     resolution_ref: str | None = None
     verified_at: datetime | None = None
+    # The operator chose to write to this address without (or despite) a verifier's answer.
+    verification_skipped: bool = False
 
 
 @dataclass(frozen=True)

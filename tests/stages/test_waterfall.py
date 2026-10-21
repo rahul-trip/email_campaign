@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from outbound.domain.entities import Contact, ContactEmail
 from outbound.domain.enums import ContactSource, ContactStatus, EmailStatus, Provenance
 from outbound.providers.errors import ProviderError
@@ -392,3 +394,29 @@ def test_a_held_address_that_is_now_suppressed_is_not_reused() -> None:
     )
     assert out.verdict is Verdict.NONE
     assert any("do-not-contact" in p for p in out.problems)
+
+
+def skipped(email: str, status: EmailStatus) -> ContactEmail:
+    from dataclasses import replace
+
+    return replace(held(email, status), verification_skipped=True)
+
+
+@pytest.mark.parametrize(
+    "status", [E.UNVERIFIED, E.UNKNOWN, E.INVALID, E.CATCH_ALL_UNVERIFIED, E.CATCH_ALL_PENDING]
+)
+def test_an_address_the_operator_skipped_the_check_for_is_used_as_it_is(
+    status: EmailStatus,
+) -> None:
+    verifier = FakeVerifier({})
+    finder = FakeFinder("hunter", "jane@acme.com")
+    out = run([finder], verifier, emails=[skipped("romain@acme.com", status)])
+    assert out.verdict is Verdict.READY
+    assert out.chosen is not None and out.chosen.email == "romain@acme.com"
+    assert verifier.checked == [] and finder.calls == 0  # nothing paid for
+
+
+def test_a_skipped_check_never_overrides_the_do_not_contact_list() -> None:
+    target = Target(domain="acme.com", name="Acme", is_blocked=lambda a: a == "romain@acme.com")
+    out = run([], FakeVerifier({}), emails=[skipped("romain@acme.com", E.VALID)], target=target)
+    assert out.verdict is not Verdict.READY

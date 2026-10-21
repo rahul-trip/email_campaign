@@ -129,7 +129,8 @@ The first screen after signing in.
 This is where you spend most of your time.
 
 - **Left:** the emails waiting. A *Flagged* tag means the application's own checks found a problem. On a narrow screen the list is hidden; use the arrows and *1 of N* at the top.
-- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send, where it came from and which vendor checked it.
+- **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send (*Not verified: you skipped the check* if you did), where it came from and which vendor checked it.
+- **Skipped checks:** if the email relies on a check you skipped (the country rule for this lead or for the workspace, an address used without proof, or a person you confirmed works there), an amber panel lists them. **Approve** stays greyed out until you tick *I know these checks were skipped, and I approve this email anyway*. What you confirmed is recorded.
 - **Right, "Why this lead":** the fit score and its reason, what the research found, the answers to your research questions, and any notes you added.
 - **Right, "Checks":** each quality check (length, subject, reading level, one question, no links, no address, no banned phrases, footer present) with a tick or a warning and the reason, then the country, the company type and the country rule with the version used.
 
@@ -206,6 +207,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
   - **Record consent:** choose the basis and write where it came from. Recording the same basis twice keeps one record;
   - **Write to this person instead:** when the email is going to the wrong person. The waiting (or approved, not yet drafted) email is cancelled, this person is put first and the lead goes back to the email step;
   - **Remove:** for someone who does not work here, such as a wrong match from a search. It is refused once anything has been written to them;
+  - **Skip the check** (next to an address the check could not prove: *unknown*, *invalid*, a catch-all, or not checked yet): if you know the address works, write why and confirm. It becomes the address written to, no more checks are paid for it, and a lead stopped at the email step goes on. An *invalid* address will probably bounce, so use it only when you are sure. **Check it again** undoes it until the email is approved. The same button is in the journey's *Email address* stage when the lead is stuck there;
   - **Suppress:** never contact them again; their unsent emails are cancelled;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
 - **Emails:** each email written, its state, how much you edited it and when it was sent;
@@ -332,7 +334,7 @@ A failed lead shows the step and the reason. The application retries automatical
 
 | Message | Meaning | What to do |
 |---|---|---|
-| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | Nothing to retry. If you know someone there, use **Add a person** on the lead page with their work email; or **Edit** a person who has no address and give it |
+| no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | If you know the right address, **Edit** the person and give it (the step is retried), or **Add a person** with their work email. If you know an address the check could not prove does work, press **Skip the check** next to it. A person with only a first name cannot be looked up by the finders (they need a full name), but an address you give is used as it is |
 | no decision-maker was found | The site named nobody and the search found nobody | Add a person yourself |
 | the sender profile needs: legal_name, postal_address … | The footer cannot be filled | Fill in those fields in Settings → Sender profile, then Retry |
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |

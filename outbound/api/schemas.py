@@ -83,6 +83,7 @@ class EmailOut(Out):
     is_primary: bool
     found_by: str | None
     verified_by: str | None
+    verification_skipped: bool = False
 
 
 class ContactOut(Out):
@@ -209,6 +210,10 @@ class RecipientIn(In):
     contact_id: str
 
 
+class SkipCheckIn(In):
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class PolicySkipIn(In):
     from_stage: PolicyStage
     reason: str = Field(min_length=1, max_length=1000)
@@ -287,11 +292,17 @@ class ConfirmIn(In):
 # ------------------------------------------------------------------ review
 
 
+class SkipOut(Out):
+    kind: str
+    text: str
+
+
 class ReviewItemOut(Out):
     message: MessageOut
     company: CompanyOut
     contact: ContactOut
     flagged: bool
+    skips: list[SkipOut] = []
 
 
 class ReviewDetailOut(Out):
@@ -302,6 +313,7 @@ class ReviewDetailOut(Out):
 class ApproveIn(In):
     edited_body: str | None = None
     row_version: int | None = None
+    acknowledge_skips: bool = False  # required when the email relies on skipped checks
 
 
 class RejectIn(In):

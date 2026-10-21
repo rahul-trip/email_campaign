@@ -4,6 +4,11 @@
       "ApproveIn": {
         "additionalProperties": false,
         "properties": {
+          "acknowledge_skips": {
+            "default": false,
+            "title": "Acknowledge Skips",
+            "type": "boolean"
+          },
           "edited_body": {
             "anyOf": [
               {
@@ -951,6 +956,11 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "verification_skipped": {
+            "default": false,
+            "title": "Verification Skipped",
+            "type": "boolean"
           },
           "verified_by": {
             "anyOf": [
@@ -1948,6 +1958,14 @@
           },
           "message": {
             "$ref": "#/components/schemas/MessageOut"
+          },
+          "skips": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SkipOut"
+            },
+            "title": "Skips",
+            "type": "array"
           }
         },
         "required": [
@@ -2380,6 +2398,40 @@
           }
         },
         "title": "SenderProfileIn",
+        "type": "object"
+      },
+      "SkipCheckIn": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "SkipCheckIn",
+        "type": "object"
+      },
+      "SkipOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "SkipOut",
         "type": "object"
       },
       "StageOut": {
@@ -3857,6 +3909,98 @@
           }
         },
         "summary": "Waterfall",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/contact-emails/{email_id}/skip-verification": {
+      "delete": {
+        "operationId": "restore_email_verification_api_contact_emails__email_id__skip_verification_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email_id",
+            "required": true,
+            "schema": {
+              "title": "Email Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Email Verification",
+        "tags": [
+          "leads"
+        ]
+      },
+      "post": {
+        "operationId": "skip_email_verification_api_contact_emails__email_id__skip_verification_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "email_id",
+            "required": true,
+            "schema": {
+              "title": "Email Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkipCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skip Email Verification",
         "tags": [
           "leads"
         ]

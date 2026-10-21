@@ -103,7 +103,7 @@ export const SECTIONS: Section[] = [
       {
         target: "review-editor",
         title: "Read, edit, approve",
-        body: "The email exactly as it will be drafted, footer included. Edit it if you like: your changes are shown and kept, and the writer learns from them. Approve makes a draft on the next run; Reject needs a reason.",
+        body: "The email exactly as it will be drafted, footer included. Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Reject needs a reason.",
       },
       {
         target: "review-checks",

@@ -4,6 +4,7 @@ import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlo
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { PolicySkip } from "../components/PolicySkip";
+import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   Button,
@@ -144,7 +145,8 @@ export function LeadDetailPage() {
         {company.status === "failed" && (
           <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
             {company.last_error}
-            {emailStepFailed && " If a person's name is incomplete, edit them below and the step is retried."}
+            {emailStepFailed &&
+              " Edit a person below to complete their name or give their work email, and the step is retried. If you know an address works even though the check could not prove it, press Skip the check next to it."}
           </Callout>
         )}
         {company.status === "disqualified" && countryBlocked && (
@@ -457,6 +459,7 @@ function Person({
                   {email.found_by && ` · found by ${email.found_by}`}
                   {email.verified_by && ` · checked by ${email.verified_by}`}
                 </span>
+                {!gone && WORKABLE.has(contact.status) && <SkipCheck email={email} personName={contact.full_name} />}
               </li>
             ))}
             {contact.emails.length === 0 && <li className="text-xs text-muted">No address yet.</li>}

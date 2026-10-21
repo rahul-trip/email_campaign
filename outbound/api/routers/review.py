@@ -14,6 +14,7 @@ from outbound.api.schemas import (
     RejectIn,
     ReviewDetailOut,
     ReviewItemOut,
+    SkipOut,
 )
 from outbound.services.review import QueueItem
 
@@ -29,6 +30,7 @@ def _item(item: QueueItem) -> ReviewItemOut:
         company=CompanyOut.model_validate(item.company),
         contact=contact,
         flagged=item.flagged,
+        skips=[SkipOut.model_validate(s) for s in item.skips],
     )
 
 
@@ -48,7 +50,10 @@ def approve(
     message_id: str, body: ApproveIn, svc: Annotated[Services, Depends(services)]
 ) -> MessageOut:
     message = svc.review.approve(
-        message_id, edited_body=body.edited_body, expected_version=body.row_version
+        message_id,
+        edited_body=body.edited_body,
+        expected_version=body.row_version,
+        acknowledge_skips=body.acknowledge_skips,
     )
     return MessageOut.model_validate(message)
 

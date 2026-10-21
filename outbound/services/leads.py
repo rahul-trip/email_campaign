@@ -563,6 +563,71 @@ class LeadService:
             uow.commit()
         return released
 
+    def skip_email_verification(
+        self, email_id: str, reason: str, *, actor: str = OPERATOR
+    ) -> ContactWithEmails:
+        """Write to this address whatever the verifier said (even *invalid*), or before it is
+        checked. The address becomes the one written to and its person is put first; a lead
+        stopped at the email step goes on to writing. Approving the email asks you to confirm.
+        """
+        why = " ".join(reason.split())
+        if not why:
+            raise InvalidInput("say why the check is skipped: it is kept with the record")
+        with self._uow(self._workspace_id) as uow:
+            address = uow.emails.get(email_id)  # NotFound unless it is in this workspace
+            contact = uow.contacts.get(address.contact_id)
+            if not address.email:
+                raise LeadError("this address was erased")
+            if uow.suppressions.blocks(address.email):
+                raise LeadError("that address or its domain is on the do-not-contact list")
+            if contact.status not in WORKABLE_CONTACT_STATUSES:
+                raise LeadError(
+                    f"this person is {contact.status.value}: confirm them first"
+                    if contact.status is ContactStatus.UNCONFIRMED
+                    else f"this person is {contact.status.value} and cannot be written to"
+                )
+            uow.emails.set_verification_skipped(email_id, True, actor=actor, reason=why)
+            uow.emails.set_primary(email_id)
+            uow.contacts.make_first(contact.id)
+            company = uow.companies.get(contact.company_id)
+            if _stopped_at_email(company):
+                uow.companies.transition(
+                    company.id,
+                    CompanyStatus.CONTACTS_FOUND,
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason="email check skipped by the operator",
+                    next_action_at=None,
+                )
+            uow.commit()
+            return ContactWithEmails(
+                uow.contacts.get(contact.id), uow.emails.for_contact(contact.id)
+            )
+
+    def restore_email_verification(
+        self, email_id: str, *, actor: str = OPERATOR
+    ) -> ContactWithEmails:
+        """Check this address again like any other. Refused once its email is approved."""
+        with self._uow(self._workspace_id) as uow:
+            address = uow.emails.get(email_id)
+            approved = [
+                m
+                for m in uow.messages.for_contact(address.contact_id)
+                if m.contact_email_id == email_id
+                and m.state
+                not in (MessageState.GENERATED, MessageState.CANCELLED, MessageState.REJECTED)
+            ]
+            if approved:
+                raise LeadError(
+                    "An email to this address was approved with the check skipped. Reject it"
+                    " first if it should be checked."
+                )
+            uow.emails.set_verification_skipped(email_id, False, actor=actor)
+            uow.commit()
+            return ContactWithEmails(
+                uow.contacts.get(address.contact_id), uow.emails.for_contact(address.contact_id)
+            )
+
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
         with self._uow(self._workspace_id) as uow:
@@ -624,6 +689,16 @@ def _stopped_by_policy_at(uow: UnitOfWork, company: Company) -> PolicyStage | No
     if company.hold_reason not in _POLICY_HOLDS | {HoldReason.NEEDS_OPERATOR}:
         return None  # a catch-all hold is about the address, not the country
     return _held_at(uow, company)
+
+
+def _stopped_at_email(company: Company) -> bool:
+    """A lead the email step failed, or held over an unproven catch-all address."""
+    if company.status is CompanyStatus.FAILED:
+        return company.failed_stage == "email"
+    return company.status is CompanyStatus.HELD and company.hold_reason in (
+        HoldReason.CATCH_ALL_UNVERIFIED,
+        HoldReason.CATCH_ALL_RESOLVING,
+    )
 
 
 def _give_address(uow: UnitOfWork, contact_id: str, address: str, actor: str) -> None:
