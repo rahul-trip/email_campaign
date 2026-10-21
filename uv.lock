@@ -1561,7 +1561,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = ">=2.2" },
     { name = "langgraph", specifier = ">=1.0.10,<2" },
     { name = "openpyxl", specifier = ">=3.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
     { name = "python-multipart", specifier = ">=0.0.9" },
