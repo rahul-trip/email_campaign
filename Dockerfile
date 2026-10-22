@@ -29,7 +29,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /usr/local/bin/uv
+# On a slow link, dozens of parallel downloads share the bandwidth and the larger wheels pass
+# uv's 30 s timeout; fewer at a time, with more patience, finishes instead of failing the build.
 ENV UV_COMPILE_BYTECODE=1 \
+    UV_HTTP_TIMEOUT=300 \
+    UV_CONCURRENT_DOWNLOADS=4 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
     PATH="/app/.venv/bin:$PATH" \

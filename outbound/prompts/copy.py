@@ -65,9 +65,9 @@ CRITIC_SYSTEM_PROMPT = (
 You check a cold email before it goes to a person. Answer two questions.
 
 grounded: is every fact about the recipient's company, every date and every number in the
-email supported by the research notes, and every claim about the sender supported by the sender
-facts? If the research notes list a recent dated news item or market development, does the
-email open with one of them and state it correctly?
+email supported by the research notes, and every claim about the sender supported by what is
+said about the sender and the sender facts? If the research notes list a recent dated news
+item or market development, does the email open with one of them and state it correctly?
 
 human: does it read as typed by a person to a peer? It does not if it has stock phrases (a
 "hope you are well" opening, "reaching out", "synergies", "strong potential"), flattery,
@@ -165,7 +165,11 @@ def build_critic_user_prompt(
     facts = _list(
         [*map(str, sender.get("value_propositions", [])), *map(str, sender.get("case_studies", []))]
     )
+    # Who the sender is counts as supported too: the writer is told the same, so "I'm at
+    # Quantra" or what the narrative says they do must not be flagged as invented.
+    about = f"{sender.get('company_name', '')}\n{sender.get('narrative', '')}".strip()
     return (
         f"## Company\n{company}\n\n## Research notes (from the web)\n{research_notes(research)}"
+        f"\n\n## The sender\n{about or '(not given)'}"
         f"\n\n## Sender facts\n{facts}\n\n## The email to check\n{body}"
     )

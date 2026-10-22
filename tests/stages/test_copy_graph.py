@@ -240,3 +240,11 @@ def test_only_facts_from_the_sender_profile_are_offered_as_proof() -> None:
 def test_a_reply_that_cannot_be_used_is_a_provider_error(reply: Any) -> None:
     with pytest.raises(ProviderError):
         run_copy(ScriptedLlm([reply]), inp())
+
+
+def test_the_checker_knows_who_the_sender_is_so_naming_them_is_not_an_invention() -> None:
+    llm = ScriptedLlm([GOOD_DRAFT], [FINE])
+    run_copy(llm, inp())
+    checked = llm.prompts["critic"][0]
+    assert "## The sender\nQuantra\nWe forecast renewable output." in checked
+    assert "Cuts forecast error 20-35%" in checked
