@@ -428,6 +428,11 @@ def _research(data: JourneyData, stage: StageView) -> tuple[list[Fact], str]:
     for label, key in (("Products", "products"), ("In the news", "news"), ("Hooks", "hooks")):
         if research.get(key):
             facts.append(Fact(label, _joined(research[key])))
+    for label, key in (("Recent company news", "news_items"), ("Market news", "triggers")):
+        for item in research.get(key) or []:
+            if isinstance(item, dict) and item.get("headline"):
+                dated = f"{item['date']} · " if item.get("date") else ""
+                facts.append(Fact(label, f"{dated}{item['headline']} ({item.get('url', '')})"))
     for label, key in (("Hiring", "hiring"), ("Technology", "tech")):
         if research.get(key):
             facts.append(Fact(label, _joined(research[key])))

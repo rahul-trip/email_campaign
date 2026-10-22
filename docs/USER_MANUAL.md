@@ -211,7 +211,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
   - **Suppress:** never contact them again; their unsent emails are cancelled;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
 - **Emails:** each email written, its state, how much you edited it and when it was sent;
-- **Research:** the summary, the fit reason, the findings, your research questions' answers and the country rule;
+- **Research:** the summary, the fit reason, **recent news about the company** and **market news that may matter to it** (each a dated link to its source), the findings, your research questions' answers and the country rule;
 - **Vendor calls:** every vendor call made for this company: when, which vendor, what, the result and the cost. *Cache hit, free* means a stored answer was reused;
 - **Your values kept:** only appears if the engine found a different value for something you set. Yours was kept; theirs is shown;
 - **Timeline:** everything that happened, in order, and whether you or the engine did it;
@@ -275,7 +275,7 @@ Automatic sending cannot be switched on in this version.
 | # | Step | What it does | Where it can stop |
 |---|---|---|---|
 | 1 | Intake | Works out the company's website and rejects unusable rows | needs confirmation |
-| 2 | Research | Reads the home, about, team, news and contact pages; finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit | failed |
+| 2 | Research | Reads the home, about, team, news and contact pages; searches the news for recent, dated stories about the company and its market (two searches, a few cents); finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit | failed |
 | 3 | Gate | Compares fit with the campaign minimum, then applies the country rule | **disqualified**, **held** |
 | 4 | Contacts | Ranks the people against your wanted titles, then by seniority | failed (nobody found) |
 | 5 | Email | For the best people in turn: tries an address you gave, one published on the company's site, the company's usual pattern, then each finder in order. **Every address is verified at once** | held, failed |
@@ -372,7 +372,7 @@ The country is taken from what you entered, otherwise from the site (a stated re
 
 - The ceiling is **$0.50 per company** by default (Settings → Limits and budget). Before every paid call the application checks the company's spend so far and refuses the call if it would go over.
 - Every call is recorded with its cost. A stored answer is reused instead of buying it again: web searches for 30 days, addresses and checks for 90 days. **Running the same targets again costs nothing.**
-- Approximate default prices the application assumes (change them in `.env` with `PROVIDER_PRICES`): a web search or page read about $0.008, an address found by Hunter about $0.025, by ZeroBounce about $0.16, a MyEmailVerifier check $0.0025. Model use is billed by your model provider.
+- Approximate default prices the application assumes (change them in `.env` with `PROVIDER_PRICES`): a web search or page read about $0.008 (research now makes two extra news searches per company, about $0.016 more), an address found by Hunter about $0.025, by ZeroBounce about $0.16, a MyEmailVerifier check $0.0025. Model use is billed by your model provider.
 - To stop one vendor overspending in a month, set `MONTHLY_CAPS_MICRO_USD` in `.env` (amounts in millionths of a dollar).
 - In the first live test, two companies cost $0.051 in total.
 

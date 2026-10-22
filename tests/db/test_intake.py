@@ -49,7 +49,9 @@ class FakeSearch:
         self._answers = answers or {}
         self._fail = fail
 
-    def search(self, query: str, *, max_results: int = 5) -> list[SearchHit]:
+    def search(
+        self, query: str, *, max_results: int = 5, topic: str = "general", days: int | None = None
+    ) -> list[SearchHit]:
         self.queries.append(query)
         if self._fail:
             raise ProviderError("fake", "down")

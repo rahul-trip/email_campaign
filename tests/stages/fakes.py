@@ -35,6 +35,7 @@ class FakeLlm:
         "answer a salesperson's research questions": "signals",
         "extract the people listed": "persona",
         "judge how well a company matches": "fit",
+        "pick the news worth opening": "news",
         "You write the first cold email": "actor",
         "You check one thing about a cold email": "critic",
     }
@@ -44,6 +45,7 @@ class FakeLlm:
         self.users: dict[str, str] = {}
         self.replies: dict[str, Any] = {
             "site": {
+                "sector": "grid forecasting software",
                 "summary": "Acme builds grid forecasting software for utilities.",
                 "products": ["Forecaster"],
                 "news": ["Opened a Leeds office"],
@@ -61,6 +63,7 @@ class FakeLlm:
                 ]
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
+            "news": {"company": [], "market": []},
             "actor": GOOD_SNIPPETS,
             "critic": {"specific": True, "problem": ""},
         }
@@ -90,13 +93,23 @@ class FakeSearch:
         self,
         pages: dict[str, str] | None = None,
         hits: list[SearchHit] | None = None,
+        news: list[SearchHit] | None = None,
+        market_news: list[SearchHit] | None = None,
     ) -> None:
         self.pages = {} if pages is None else pages
         self.hits = hits or []
-        self.searches: list[str] = []
+        self.news = news or []  # answers the search for the company's own news
+        self.market_news = market_news or []  # answers the search for its market (has "OR")
+        self.searches: list[str] = []  # general searches only
+        self.news_searches: list[tuple[str, int | None]] = []  # (query, days)
         self.extracted: list[list[str]] = []
 
-    def search(self, query: str, *, max_results: int = 5) -> list[SearchHit]:
+    def search(
+        self, query: str, *, max_results: int = 5, topic: str = "general", days: int | None = None
+    ) -> list[SearchHit]:
+        if topic == "news":
+            self.news_searches.append((query, days))
+            return self.market_news if " OR " in query else self.news
         self.searches.append(query)
         return self.hits
 

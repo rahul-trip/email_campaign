@@ -235,6 +235,17 @@ Found by the operator (2026-10-21): research failed on a free reasoning model wi
 
 **Tests:** a broken then good reply, two broken replies, a cut-off reply and a rate limit; the temperature on both tries; the effort sent only when set; settings give a separate writer model; the pipeline writes with it.
 
+### 3b.18 Recent news in research (added during the work)
+
+Asked for by the operator (2026-10-22): the emails should open with something recent from the news, not the company's own website. Nothing searched for news; `research.news` was only what the site's `/news` page said.
+
+- `SearchProvider.search(topic, days)` and `SearchHit.published_date`; Tavily sends `topic`, `start_date` and `filter_by_published_date` (it has no `days`), and news is cached for 7 days.
+- A news worker after the site worker: the site names its `sector`; two news searches (company by name, 180 days; market terms by sector, 90 days). Undated, old or other-company hits never reach the model; the model picks hits by number, so dates, headlines and links are always the search result's. A failed search never fails the lead; a budget error does.
+- `research.news_items` and `research.triggers` (and `sector`) are saved in the existing JSON column. The lead page lists them as links, the journey as facts. No migration.
+- About $0.016 more per lead (two basic searches) plus one model call.
+
+**Tests:** the adapter request and mapping (new fixture); the metered cache key and 7-day TTL; real-shaped hits kept, old, undated and other-company hits dropped; invented numbers ignored; no dated news means no model call; search failure versus budget error; the stage saves the items; API shows them on the lead and the journey.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

@@ -208,3 +208,38 @@ def test_a_person_a_search_could_not_place_here_is_saved_unconfirmed(
     with factory(ws) as uow:
         people = uow.contacts.for_company(cid)
     assert [(p.full_name, p.status) for p in people] == [("Sam Lee", ContactStatus.UNCONFIRMED)]
+
+
+def test_dated_news_found_by_search_is_saved_with_the_research(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    cid = add(factory, ws, "acme.co.uk", name="Acme Energy")
+    when = (datetime.now(UTC) - timedelta(days=9)).date().isoformat()
+    news = [
+        SearchHit(
+            url="https://news.example.com/acme-leeds",
+            title="Acme Energy wins Leeds grid contract",
+            snippet="Acme Energy signed a three-year deal.",
+            published_date=when,
+        )
+    ]
+    llm = FakeLlm()
+    llm.replies["news"] = {
+        "company": [{"n": 1, "detail": "Acme won a Leeds contract."}],
+        "market": [],
+    }
+    runner_for(factory, ws, FakeSearch(PAGES, news=news), llm=llm).run_pipeline()
+    with factory(ws) as uow:
+        research = uow.companies.get(cid).research or {}
+    assert research["news_items"] == [
+        {
+            "date": when,
+            "headline": "Acme Energy wins Leeds grid contract",
+            "detail": "Acme won a Leeds contract.",
+            "matters": "",
+            "url": "https://news.example.com/acme-leeds",
+        }
+    ]
+    assert research["triggers"] == []

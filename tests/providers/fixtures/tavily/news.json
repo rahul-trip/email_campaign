@@ -1,0 +1,21 @@
+{
+  "query": "Acme",
+  "results": [
+    {
+      "title": "Acme wins Leeds contract",
+      "url": "https://news.example.com/acme-leeds",
+      "content": "Acme signed a three-year grid forecasting deal.",
+      "score": 0.88,
+      "published_date": "2026-10-10"
+    },
+    {
+      "title": "Acme named a Gartner cool vendor",
+      "url": "https://news.example.com/acme-gartner",
+      "content": "Analyst recognition.",
+      "score": 0.7,
+      "published_date": null
+    }
+  ],
+  "response_time": 0.9,
+  "request_id": "r2"
+}

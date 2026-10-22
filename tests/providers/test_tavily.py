@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 
 import httpx
 import pytest
@@ -14,7 +15,7 @@ from tests.providers.helpers import Handler, always, mock_client, respond
 
 class TestTavilySearch(SearchProviderContract):
     def build(self, handler: Handler, api_key: str = SECRET) -> TavilySearch:
-        return TavilySearch(api_key, client=mock_client(handler))
+        return TavilySearch(api_key, client=mock_client(handler), today=lambda: date(2026, 10, 22))
 
     def search_response(self) -> httpx.Response:
         return respond("tavily/search.json")
@@ -60,3 +61,34 @@ class TestTavilySearch(SearchProviderContract):
     def test_vendor_plan_limits_are_reported_as_budget_exceeded(self, status: int) -> None:
         with pytest.raises(BudgetExceeded):
             self.build(always(httpx.Response(status))).search("q")
+
+    def test_a_news_search_asks_for_news_since_a_date_and_maps_the_published_date(self) -> None:
+        seen: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return respond("tavily/news.json")
+
+        hits = self.build(handler).search("Acme", topic="news", days=180)
+        body = json.loads(seen[0].read())
+        assert (body["topic"], body["start_date"], body["filter_by_published_date"]) == (
+            "news",
+            "2026-04-25",
+            True,
+        )
+        assert [(h.title, h.published_date) for h in hits] == [
+            ("Acme wins Leeds contract", "2026-10-10"),
+            ("Acme named a Gartner cool vendor", None),
+        ]
+
+    def test_a_general_search_sends_no_topic_or_dates(self) -> None:
+        seen: list[httpx.Request] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return self.search_response()
+
+        self.build(handler).search("q")
+        assert not {"topic", "start_date", "filter_by_published_date"} & set(
+            json.loads(seen[0].read())
+        )

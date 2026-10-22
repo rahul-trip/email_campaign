@@ -104,7 +104,9 @@ class FakeSearch:
         self.extracts = 0
         self._hits = [SearchHit(url="https://acme.com")] if hits is None else hits
 
-    def search(self, query: str, *, max_results: int = 5) -> list[SearchHit]:
+    def search(
+        self, query: str, *, max_results: int = 5, topic: str = "general", days: int | None = None
+    ) -> list[SearchHit]:
         self.searches += 1
         return self._hits
 
@@ -365,6 +367,25 @@ def test_a_search_with_no_results_is_a_cached_miss(factory: UnitOfWorkFactory, w
     assert search.search("nothing") == []
     assert inner.searches == 1
     assert ledger(factory, ws)[0][1] is CallOutcome.MISS
+
+
+def test_a_news_search_is_cached_apart_from_a_general_one_and_for_only_a_week(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    inner = FakeSearch()
+    start = datetime.now(UTC)
+    search = MeteredSearch(inner, meter(factory, ws, clock=start))
+    search.search("Acme energy")
+    search.search("Acme energy", topic="news", days=180)
+    search.search("Acme energy", topic="news", days=90)  # a different window is a different search
+    assert inner.searches == 3
+    search.search("acme energy", topic="news", days=180)
+    assert inner.searches == 3  # the same news search a moment later is answered from the ledger
+    # A week and a day later the news is looked up again; the general search is still cached.
+    later = MeteredSearch(inner, meter(factory, ws, clock=start + timedelta(days=8)))
+    later.search("Acme energy", topic="news", days=180)
+    later.search("Acme energy")
+    assert inner.searches == 4
 
 
 # ------------------------------------------------------------------ language model

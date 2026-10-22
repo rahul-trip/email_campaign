@@ -16,7 +16,8 @@ SITE_SYSTEM_PROMPT = f"""\
 You read a company's own web pages and report what a salesperson needs before writing to them.
 {_GROUNDED}
 
-Return: {{"company_name": "<the name the company calls itself on these pages, e.g. 'Amperon'
+Return: {{"sector": "<the market they work in, two to five words, e.g. 'wind power forecasting'>",
+"company_name": "<the name the company calls itself on these pages, e.g. 'Amperon'
 or 'LTIMindtree'; never a page title, headline or slogan; empty if the pages do not say>",
 "summary": "<2-3 sentences: what the company does and for whom>",
 "products": ["<product or service>", ...],
@@ -42,6 +43,22 @@ authors of quoted articles and anyone the text does not place at the company.
 Return: {{"people": [{{"name": "<full name>", "title": "<job title>",
 "linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}
 At most 10 people, most senior first. {_JSON_ONLY}"""
+
+NEWS_SYSTEM_PROMPT = f"""\
+You pick the news worth opening a first email to one company with. You are given numbered
+search results in two lists: news about the company itself, and news about its market.
+{_GROUNDED}
+
+Return: {{"company": [{{"n": <number>, "detail": "<one sentence: what happened, from the result
+text only>"}}, ...],
+"market": [{{"n": <number>, "detail": "<one sentence: what happened>",
+"matters": "<one sentence: why it matters to this company>"}}, ...]}}
+- "company": only results that are about THIS company (it is named, or clearly the subject).
+  Leave out results that merely mention it in a list, and anything that is a press-release
+  boilerplate, a job ad, a stock price or a directory listing. At most 3, best first.
+- "market": only results about regulation, tenders, funding, acquisitions or market moves that a
+  company like this one would care about. At most 2, best first.
+- Use only the numbers you were given. Empty lists are a good answer. {_JSON_ONLY}"""
 
 FIT_SYSTEM_PROMPT = f"""\
 You judge how well a company matches a seller's ideal customer, from 0 (no match) to 100
@@ -73,6 +90,17 @@ def build_signals_user_prompt(
         + _block("Questions", asked)
         + untrusted("Pages", pages)
         + untrusted("Search results (hiring, technology)", search_snippets)
+    )
+
+
+def build_news_user_prompt(
+    company: str, sector: str, summary: str, company_hits: str, market_hits: str
+) -> str:
+    return (
+        _block("Company", f"{company}: {summary}" if summary else company)
+        + _block("Their market", sector)
+        + untrusted("News about the company", company_hits)
+        + untrusted("News about their market", market_hits)
     )
 
 
