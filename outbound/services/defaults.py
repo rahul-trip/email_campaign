@@ -51,6 +51,11 @@ def default_sender_profile() -> dict[str, Any]:
         ],
         "target_verticals": ["Grid operators", "Energy trading desks"],
         "case_studies": [],
+        # How the emails are written: how they open, what you want from them, and emails you
+        # have sent that show your voice (reference only; see the copy prompt).
+        "greeting": "Hi",
+        "outreach_goal": "",
+        "style_examples": [],
         "geographic_focus": "UK, Europe, India",
         "signature_name": "[Your Name]",
         "signature_title": "CPO & Founder",
@@ -75,4 +80,6 @@ def default_workspace_settings() -> dict[str, Any]:
         "timezone": "UTC",
         "country_policy_enabled": True,
         "footer_enabled": True,
+        "email_min_words": 120,  # the first email's length, set under Settings → Limits
+        "email_max_words": 200,
     }

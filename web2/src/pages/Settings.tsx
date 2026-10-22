@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Lock } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
-import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Tabs, Textarea } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Tabs, Textarea } from "../components/ui";
 import { lines, when } from "../lib/format";
 
 type Tab = "setup" | "profile" | "limits";
@@ -169,16 +169,21 @@ function SenderProfile() {
   const [draft, setDraft] = useState<Profile>({});
   // The one-per-line boxes keep exactly what was typed, so Enter makes a new line straight away.
   const [typed, setTyped] = useState<Record<string, string>>({});
+  // Up to four emails the operator has sent: each is several paragraphs, so one box each.
+  const [examples, setExamples] = useState<string[]>(["", "", "", ""]);
   useEffect(() => {
     const loaded = profile.data as Profile | undefined;
     if (!loaded) return;
     setDraft(loaded);
+    const sent = (loaded.style_examples as string[] | undefined) ?? [];
+    setExamples([0, 1, 2, 3].map((i) => sent[i] ?? ""));
     setTyped(Object.fromEntries(LISTS.map(([key]) => [key, ((loaded[key] as string[] | undefined) ?? []).join("\n")])));
   }, [profile.data]);
   const save = useMutation({
     mutationFn: () => {
       const listed = Object.fromEntries(LISTS.map(([key]) => [key, lines(typed[key] ?? "")]));
-      return ok(client.PUT("/api/settings/sender-profile", { body: { ...draft, ...listed } }));
+      const style_examples = examples.map((e) => e.trim()).filter(Boolean);
+      return ok(client.PUT("/api/settings/sender-profile", { body: { ...draft, ...listed, style_examples } }));
     },
     onSuccess: () => {
       for (const key of ["sender", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
@@ -237,6 +242,36 @@ function SenderProfile() {
                   <Field label="About you" hint="Background, voice and what sets you apart. The copywriter reads all of it." className="sm:col-span-2">
                     <Textarea rows={6} value={text("narrative")} onChange={set("narrative")} />
                   </Field>
+                </div>
+              </Card>
+              <Card tour="settings-voice" title="4. How you write" subtitle="How the emails sound and what you want from them.">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Greeting" hint="Code adds it, so every email opens the same way.">
+                    <Select value={text("greeting") || "Hi"} onChange={set("greeting")}>
+                      <option value="Hi">Hi Jane,</option>
+                      <option value="Hello">Hello Jane,</option>
+                      <option value="Dear">Dear Jane,</option>
+                    </Select>
+                  </Field>
+                  <Field label="What you want from these emails" hint="For example: explore a partnership, or book a demo. The closing ask follows it.">
+                    <Textarea rows={2} value={text("outreach_goal")} onChange={set("outreach_goal")} placeholder="a short call to explore working together" />
+                  </Field>
+                </div>
+                <Label className="mb-1 mt-4">Emails you have sent before (optional, up to four)</Label>
+                <p className="mb-2 text-xs text-muted">
+                  The writer reads these for what you offer and how direct you are. They are a reference, not a template: it will not copy their wording, greeting or bullet lists. Corrections you make on Review teach it more than these do.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {examples.map((example, i) => (
+                    <Textarea
+                      key={i}
+                      rows={6}
+                      aria-label={`Past email ${i + 1}`}
+                      value={example}
+                      onChange={(e) => setExamples(examples.map((old, j) => (j === i ? e.target.value : old)))}
+                      placeholder={`Past email ${i + 1}`}
+                    />
+                  ))}
                 </div>
               </Card>
               <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/95 px-4 py-3 backdrop-blur">
@@ -305,6 +340,8 @@ function Limits() {
   const [budget, setBudget] = useState("0.50");
   const [examples, setExamples] = useState(5);
   const [footer, setFooter] = useState(true);
+  const [minWords, setMinWords] = useState(120);
+  const [maxWords, setMaxWords] = useState(200);
   useEffect(() => {
     const s = settings.data;
     if (!s) return;
@@ -313,6 +350,8 @@ function Limits() {
     setBudget(s.budget_per_prospect_micro_usd == null ? "" : (Number(s.budget_per_prospect_micro_usd) / 1_000_000).toFixed(2));
     setExamples(Number(s.few_shot_examples ?? 5));
     setFooter(s.footer_enabled !== false);
+    setMinWords(Number(s.email_min_words ?? 120));
+    setMaxWords(Number(s.email_max_words ?? 200));
   }, [settings.data]);
   const save = useMutation({
     mutationFn: () =>
@@ -323,11 +362,14 @@ function Limits() {
             budget_per_prospect_micro_usd: budget.trim() === "" ? null : Math.round(Number(budget) * 1_000_000),
             few_shot_examples: examples,
             footer_enabled: footer,
+            email_min_words: minWords,
+            email_max_words: maxWords,
           },
         }),
       ),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["workspace-settings"] }),
   });
+  const badLength = minWords < 40 || maxWords > 600 || minWords > maxWords;
   const badBudget = budget.trim() !== "" && (Number.isNaN(Number(budget)) || Number(budget) < 0);
   return (
     <QueryState query={settings}>
@@ -336,6 +378,12 @@ function Limits() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Budget per prospect (USD)" hint="No paid call is made once a lead has spent this. Blank means no limit; 0 means no paid calls at all.">
               <Input type="number" step="0.01" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="no limit" />
+            </Field>
+            <Field label="Shortest first email (words)" hint="The writer is asked for this many at least; the check flags anything shorter. 40 to 600.">
+              <Input type="number" min={40} max={600} value={minWords} onChange={(e) => setMinWords(Number(e.target.value))} />
+            </Field>
+            <Field label="Longest first email (words)" hint="Greeting, sign-off and footer are not counted. 120 to 200 reads like a real note.">
+              <Input type="number" min={40} max={600} value={maxWords} onChange={(e) => setMaxWords(Number(e.target.value))} />
             </Field>
             <Field label="Earlier edits shown to the writer" hint="Your last N corrected emails in the campaign teach the writer your style (0 to 20).">
               <Input type="number" min={0} max={20} value={examples} onChange={(e) => setExamples(Number(e.target.value))} />
@@ -354,7 +402,7 @@ function Limits() {
           </div>
           <p className="mt-4 text-xs text-muted">Automatic sending is off and cannot be switched on until the sending phase. Approved emails are saved as drafts.</p>
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-            <Button busy={save.isPending} disabled={badBudget} onClick={() => save.mutate()}>
+            <Button busy={save.isPending} disabled={badBudget || badLength} onClick={() => save.mutate()}>
               Save limits
             </Button>
             <SaveNote mutation={save} />

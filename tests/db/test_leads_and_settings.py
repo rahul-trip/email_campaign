@@ -741,3 +741,34 @@ def test_a_new_workspace_ships_no_claims_for_the_writer_to_quote() -> None:
     text = str(profile["narrative"])
     assert "%" not in text and "GBP" not in text and "proven" not in text.lower()
     assert "reviewed_at" not in profile and profile["signature_name"].startswith("[")
+
+
+def test_the_first_email_length_is_a_setting_and_cannot_be_back_to_front(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    service = settings(factory, ws)
+    assert (
+        service.update_workspace_settings({"email_min_words": 100, "email_max_words": 160})[
+            "email_max_words"
+        ]
+        == 160
+    )
+    with pytest.raises(SettingsError, match="cannot be longer"):
+        service.update_workspace_settings({"email_min_words": 300})  # above the saved maximum
+    assert service.workspace_settings()["email_min_words"] == 100  # the refusal changed nothing
+
+
+def test_how_you_write_is_part_of_the_sender_profile(factory: UnitOfWorkFactory, ws: str) -> None:
+    service = settings(factory, ws)
+    saved = service.update_sender_profile(
+        {
+            "greeting": "Dear",
+            "outreach_goal": "explore a partnership",
+            "style_examples": ["Dear Ted, ..."],
+        }
+    )
+    assert (saved["greeting"], saved["outreach_goal"], saved["style_examples"]) == (
+        "Dear",
+        "explore a partnership",
+        ["Dear Ted, ..."],
+    )

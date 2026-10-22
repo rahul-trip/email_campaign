@@ -58,6 +58,17 @@ def approve(
     return MessageOut.model_validate(message)
 
 
+@router.post("/{message_id}/rewrite", response_model=CompanyOut)
+def rewrite(message_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
+    """Throw this email away and have the next run write a new one to the same person.
+
+    The email is cancelled and the lead goes back to the email step, which reuses the address it
+    already has at no cost; the copy step then writes it again under the current rules and news.
+    """
+    item = svc.review.show(message_id).item
+    return CompanyOut.model_validate(svc.leads.change_recipient(item.company.id, item.contact.id))
+
+
 @router.post("/{message_id}/reject", response_model=MessageOut)
 def reject(
     message_id: str, body: RejectIn, svc: Annotated[Services, Depends(services)]

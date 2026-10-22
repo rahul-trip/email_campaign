@@ -19,10 +19,10 @@ from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner
 from outbound.stages.copy.stage import CopyStage
-from tests.stages.fakes import GOOD_SNIPPETS, ScriptedLlm
+from tests.stages.fakes import GOOD_DRAFT, ScriptedLlm
 
 C = CompanyStatus
-SPECIFIC = {"specific": True, "problem": ""}
+FINE = {"grounded": True, "human": True, "problem": ""}
 PROFILE = {
     "reviewed_at": "2026-10-18T00:00:00+00:00",
     "company_name": "Quantra",
@@ -106,14 +106,14 @@ def test_touch_one_is_saved_as_a_generated_message_with_its_working(
 ) -> None:
     set_profile(factory, ws)
     cid = lead(factory, ws)
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     assert company(factory, ws, cid).status is C.COPY_READY
     with factory(ws) as uow:
         [message] = uow.messages.for_company(cid)
     assert (message.step, message.state) == (0, MessageState.GENERATED)
     assert message.subject == "leeds solar forecasts"
     assert message.generated_body.startswith("Hi Jane,")
-    assert message.snippets is not None and message.snippets["hook"].startswith("I saw that Acme")
+    assert message.snippets is not None and message.snippets["subject"] == "leeds solar forecasts"
     assert message.lint_report is not None and message.lint_report["flagged"] is False
     assert message.final_body is None
 
@@ -123,7 +123,7 @@ def test_the_country_footer_is_filled_from_the_sender_profile(
 ) -> None:
     set_profile(factory, ws)
     cid = lead(factory, ws)
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     with factory(ws) as uow:
         [message] = uow.messages.for_company(cid)
     assert message.generated_body.endswith(
@@ -136,7 +136,7 @@ def test_a_blank_sender_field_the_footer_needs_fails_the_lead_with_the_field_nam
 ) -> None:
     set_profile(factory, ws, legal_name="", postal_address="")
     cid = lead(factory, ws)
-    llm = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    llm = ScriptedLlm([GOOD_DRAFT], [FINE])
     run_copy_stage(factory, ws, llm)
     after = company(factory, ws, cid)
     assert (after.status, after.failed_stage) == (C.FAILED, "copy")
@@ -147,7 +147,7 @@ def test_a_blank_sender_field_the_footer_needs_fails_the_lead_with_the_field_nam
 def test_a_placeholder_signature_fails_the_lead(factory: UnitOfWorkFactory, ws: str) -> None:
     set_profile(factory, ws, signature_name="[Your Name]")
     cid = lead(factory, ws)
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     after = company(factory, ws, cid)
     assert after.status is C.FAILED and "signature_name" in (after.last_error or "")
 
@@ -157,7 +157,7 @@ def test_a_lead_whose_address_is_not_safe_cannot_be_written_to(
 ) -> None:
     set_profile(factory, ws)
     cid = lead(factory, ws, status=EmailStatus.UNKNOWN)
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     after = company(factory, ws, cid)
     assert after.status is C.FAILED and "safe to send" in (after.last_error or "")
 
@@ -167,7 +167,7 @@ def test_a_draft_that_cannot_pass_the_linter_is_still_handed_over_flagged(
 ) -> None:
     set_profile(factory, ws)
     cid = lead(factory, ws)
-    short = {**GOOD_SNIPPETS, "value": "We help.", "relevance": "It matters."}
+    short = {**GOOD_DRAFT, "body": "Short. Would a call help?"}
     run_copy_stage(factory, ws, ScriptedLlm([short]))
     assert company(factory, ws, cid).status is C.COPY_READY
     with factory(ws) as uow:
@@ -180,7 +180,7 @@ def test_recent_operator_edits_in_the_same_campaign_become_examples(
 ) -> None:
     set_profile(factory, ws)
     first = lead(factory, ws)
-    llm_first = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    llm_first = ScriptedLlm([GOOD_DRAFT], [FINE])
     run_copy_stage(factory, ws, llm_first)
     assert "Earlier drafts" not in llm_first.prompts["actor"][0]
 
@@ -204,7 +204,7 @@ def test_recent_operator_edits_in_the_same_campaign_become_examples(
         )
         uow.commit()
     _advance_to_email_ready(factory, ws, second.id)
-    llm_second = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    llm_second = ScriptedLlm([GOOD_DRAFT], [FINE])
     run_copy_stage(factory, ws, llm_second)
     prompt = llm_second.prompts["actor"][0]
     assert "Hi Jane, much shorter." in prompt and "Earlier drafts" in prompt
@@ -235,7 +235,7 @@ def test_asking_for_zero_examples_turns_the_feature_off(
 ) -> None:
     set_profile(factory, ws)
     lead(factory, ws)
-    llm = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    llm = ScriptedLlm([GOOD_DRAFT], [FINE])
     run_copy_stage(factory, ws, llm, examples=0)
     assert "Earlier drafts" not in llm.prompts["actor"][0]
 
@@ -252,7 +252,7 @@ def test_nothing_is_written_until_the_operator_has_reviewed_the_profile(
         row.sender_profile = {k: v for k, v in row.sender_profile.items() if k != "reviewed_at"}
         uow.commit()
     cid = lead(factory, ws)
-    llm = ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC])
+    llm = ScriptedLlm([GOOD_DRAFT], [FINE])
     run_copy_stage(factory, ws, llm)
     after = company(factory, ws, cid)
     assert after.status is C.FAILED and "review and save your sender profile" in (
@@ -279,7 +279,7 @@ def test_a_lead_released_after_its_email_was_withdrawn_gets_a_fresh_first_email(
             state=MessageState.CANCELLED,
         )
         uow.commit()
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     assert company(factory, ws, cid).status is C.COPY_READY
     with factory(ws) as uow:
         states = sorted(m.state.value for m in uow.messages.for_company(cid))
@@ -302,7 +302,7 @@ def test_a_skipped_country_rule_still_gets_a_footer_the_default_one_if_the_count
     set_profile(factory, ws)
     set_settings(factory, ws, country_policy_enabled=False)
     cid = lead(factory, ws, country="DE")  # a blocking country, with no footer of its own
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     assert company(factory, ws, cid).status is C.COPY_READY
     with factory(ws) as uow:
         [message] = uow.messages.for_company(cid)
@@ -316,8 +316,61 @@ def test_with_footers_switched_off_no_footer_is_added(factory: UnitOfWorkFactory
     set_profile(factory, ws)
     set_settings(factory, ws, footer_enabled=False)
     cid = lead(factory, ws)
-    run_copy_stage(factory, ws, ScriptedLlm([GOOD_SNIPPETS], [SPECIFIC]))
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
     with factory(ws) as uow:
         [message] = uow.messages.for_company(cid)
     assert "\n--\n" not in message.generated_body
     assert "unsubscribe" not in message.generated_body
+
+
+def test_the_first_email_length_comes_from_the_workspace_setting(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    set_profile(factory, ws)
+    set_settings(factory, ws, email_min_words=300, email_max_words=400)
+    cid = lead(factory, ws)
+    llm = ScriptedLlm([GOOD_DRAFT], [FINE])
+    run_copy_stage(factory, ws, llm)
+    assert "300 to 400 words" in llm.systems["actor"][0]
+    with factory(ws) as uow:
+        [message] = uow.messages.for_company(cid)
+    assert message.lint_report is not None
+    assert "length" in {i["rule"] for i in message.lint_report["issues"]}
+
+
+def test_the_greeting_is_the_one_in_the_sender_profile(factory: UnitOfWorkFactory, ws: str) -> None:
+    set_profile(factory, ws, greeting="Dear")
+    cid = lead(factory, ws)
+    run_copy_stage(factory, ws, ScriptedLlm([GOOD_DRAFT], [FINE]))
+    with factory(ws) as uow:
+        [message] = uow.messages.for_company(cid)
+    assert message.generated_body.startswith("Dear Jane,\n\n")
+
+
+def test_the_news_item_the_email_opened_with_is_saved_for_the_review_screen(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    set_profile(factory, ws)
+    cid = lead(factory, ws)
+    item = {
+        "date": "2026-10-10",
+        "headline": "Acme wins Leeds grid contract",
+        "detail": "A three-year deal.",
+        "matters": "",
+        "url": "https://news.example.com/acme",
+    }
+    with factory(ws) as uow:
+        current = uow.companies.get(cid)
+        uow.companies.update_fields(
+            cid,
+            {"research": {"summary": "Solar fleet operator", "news_items": [item], "triggers": []}},
+            actor="system",
+            expected_version=current.row_version,
+        )
+        uow.commit()
+    draft = {**GOOD_DRAFT, "based_on": item["url"]}
+    run_copy_stage(factory, ws, ScriptedLlm([draft], [FINE]))
+    with factory(ws) as uow:
+        [message] = uow.messages.for_company(cid)
+    assert message.snippets is not None
+    assert message.snippets["opening"] == item and message.snippets["based_on"] == item["url"]

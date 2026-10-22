@@ -2240,6 +2240,22 @@
             ],
             "title": "Geographic Focus"
           },
+          "greeting": {
+            "anyOf": [
+              {
+                "enum": [
+                  "Hi",
+                  "Hello",
+                  "Dear"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Greeting"
+          },
           "industry": {
             "anyOf": [
               {
@@ -2287,6 +2303,18 @@
               }
             ],
             "title": "Narrative"
+          },
+          "outreach_goal": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outreach Goal"
           },
           "postal_address": {
             "anyOf": [
@@ -2347,6 +2375,22 @@
               }
             ],
             "title": "Signature Title"
+          },
+          "style_examples": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                "maxItems": 6,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style Examples"
           },
           "target_verticals": {
             "anyOf": [
@@ -2979,6 +3023,32 @@
               }
             ],
             "title": "Country Policy Enabled"
+          },
+          "email_max_words": {
+            "anyOf": [
+              {
+                "maximum": 600.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Max Words"
+          },
+          "email_min_words": {
+            "anyOf": [
+              {
+                "maximum": 500.0,
+                "minimum": 40.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Min Words"
           },
           "few_shot_examples": {
             "anyOf": [
@@ -4548,6 +4618,49 @@
           }
         },
         "summary": "Reject",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/review/{message_id}/rewrite": {
+      "post": {
+        "description": "Throw this email away and have the next run write a new one to the same person.\n\nThe email is cancelled and the lead goes back to the email step, which reuses the address it\nalready has at no cost; the copy step then writes it again under the current rules and news.",
+        "operationId": "rewrite_api_review__message_id__rewrite_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rewrite",
         "tags": [
           "review"
         ]

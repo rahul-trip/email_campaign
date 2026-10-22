@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -330,6 +330,8 @@ class WorkspaceSettingsIn(In):
     timezone: str | None = Field(default=None, max_length=64)
     country_policy_enabled: bool | None = None
     footer_enabled: bool | None = None
+    email_min_words: int | None = Field(default=None, ge=40, le=500)
+    email_max_words: int | None = Field(default=None, ge=40, le=600)
 
 
 class SenderProfileIn(In):
@@ -351,6 +353,10 @@ class SenderProfileIn(In):
     technologies: list[str] | None = Field(default=None, max_length=30)
     target_verticals: list[str] | None = Field(default=None, max_length=30)
     case_studies: list[str] | None = Field(default=None, max_length=30)
+    greeting: Literal["Hi", "Hello", "Dear"] | None = None
+    outreach_goal: str | None = Field(default=None, max_length=500)
+    # Emails the operator has sent: reference for voice and substance, not a template.
+    style_examples: list[str] | None = Field(default=None, max_length=6)
     reviewed_at: str | None = None
 
 

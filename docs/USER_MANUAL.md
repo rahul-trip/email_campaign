@@ -131,6 +131,7 @@ This is where you spend most of your time.
 - **Left:** the emails waiting. A *Flagged* tag means the application's own checks found a problem. On a narrow screen the list is hidden; use the arrows and *1 of N* at the top.
 - **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send (*Not verified: you skipped the check* if you did), where it came from and which vendor checked it.
 - **Skipped checks:** if the email relies on a check you skipped (the country rule for this lead or for the workspace, an address used without proof, or a person you confirmed works there), an amber panel lists them. **Approve** stays greyed out until you tick *I know these checks were skipped, and I approve this email anyway*. What you confirmed is recorded.
+- **Opens with:** above the email, the dated news item it starts from, linked to its source. Open it and check it is real and stated correctly before approving. If research found no dated news about the company, it says the email opens with a fact from their site instead.
 - **Right, "Why this lead":** the fit score and its reason, what the research found, the answers to your research questions, and any notes you added.
 - **Right, "Checks":** each quality check (length, subject, reading level, one question, no links, no address, no banned phrases, footer present) with a tick or a warning and the reason, then the country, the company type and the country rule with the version used.
 
@@ -139,6 +140,7 @@ This is where you spend most of your time.
 | **Approve** | Accepts the email as written |
 | **Approve with my edit** | Accepts your edited text. Both versions are kept, and how much you changed is recorded |
 | **Undo my edits** | Puts the original text back |
+| **Write it again** | Throws this email away and has the next run write a new one to the same person, under the current rules and news. Use it when the email misses the point |
 | **Reject…** | Ends work on this company. A reason is required and is kept |
 
 Keyboard: **J** and **K** move through the queue, **Ctrl+Enter** in the text approves, **?** lists the shortcuts.
@@ -211,7 +213,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
   - **Suppress:** never contact them again; their unsent emails are cancelled;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
 - **Emails:** each email written, its state, how much you edited it and when it was sent;
-- **Research:** the summary, the fit reason, the findings, your research questions' answers and the country rule;
+- **Research:** the summary, the fit reason, **recent news about the company** and **market news that may matter to it** (each a dated link to its source), the findings, your research questions' answers and the country rule;
 - **Vendor calls:** every vendor call made for this company: when, which vendor, what, the result and the cost. *Cache hit, free* means a stored answer was reused;
 - **Your values kept:** only appears if the engine found a different value for something you set. Yours was kept; theirs is shown;
 - **Timeline:** everything that happened, in order, and whether you or the engine did it;
@@ -263,8 +265,8 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 | Tab | What it holds |
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
-| **Sender profile** | Who you are, in three parts: the legal identity printed in footers, your signature, and what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
-| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
+| **Sender profile** | Who you are, in four parts: the legal identity printed in footers, your signature, what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**, and *How you write*: the greeting (Hi, Hello or Dear), what you want from these emails (the closing ask follows it), and up to four emails you have sent before. Those are read for what you offer and how direct you are, never copied: their wording, greeting and bullet lists are not reused. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
+| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), the shortest and longest first email in words (120 and 200 by default; greeting, sign-off and footer are not counted), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
 
 Automatic sending cannot be switched on in this version.
 
@@ -275,11 +277,11 @@ Automatic sending cannot be switched on in this version.
 | # | Step | What it does | Where it can stop |
 |---|---|---|---|
 | 1 | Intake | Works out the company's website and rejects unusable rows | needs confirmation |
-| 2 | Research | Reads the home, about, team, news and contact pages; finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit | failed |
+| 2 | Research | Reads the home, about, team, news and contact pages; searches the news for recent, dated stories about the company and its market (two searches, a few cents); finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit | failed |
 | 3 | Gate | Compares fit with the campaign minimum, then applies the country rule | **disqualified**, **held** |
 | 4 | Contacts | Ranks the people against your wanted titles, then by seniority | failed (nobody found) |
 | 5 | Email | For the best people in turn: tries an address you gave, one published on the company's site, the company's usual pattern, then each finder in order. **Every address is verified at once** | held, failed |
-| 6 | Copy | Writes the five parts of the email, assembles it, adds the footer, checks it, rewrites up to twice | failed |
+| 6 | Copy | Writes the email body (120–200 words by default) opening with the most recent dated news it found, adds your greeting, signature and footer, checks it (length, no lists or stock phrases, every fact backed by the research, reads like a person), rewrites up to twice | failed |
 | 7 | Review | **You** | rejected |
 | 8 | Deliver | Checks everything again and saves a draft in your mailbox | stays *approved* and retries |
 | 9 | Sent sync | Notices which drafts you actually sent | |
@@ -372,7 +374,7 @@ The country is taken from what you entered, otherwise from the site (a stated re
 
 - The ceiling is **$0.50 per company** by default (Settings → Limits and budget). Before every paid call the application checks the company's spend so far and refuses the call if it would go over.
 - Every call is recorded with its cost. A stored answer is reused instead of buying it again: web searches for 30 days, addresses and checks for 90 days. **Running the same targets again costs nothing.**
-- Approximate default prices the application assumes (change them in `.env` with `PROVIDER_PRICES`): a web search or page read about $0.008, an address found by Hunter about $0.025, by ZeroBounce about $0.16, a MyEmailVerifier check $0.0025. Model use is billed by your model provider.
+- Approximate default prices the application assumes (change them in `.env` with `PROVIDER_PRICES`): a web search or page read about $0.008 (research now makes two extra news searches per company, about $0.016 more), an address found by Hunter about $0.025, by ZeroBounce about $0.16, a MyEmailVerifier check $0.0025. Model use is billed by your model provider.
 - To stop one vendor overspending in a month, set `MONTHLY_CAPS_MICRO_USD` in `.env` (amounts in millionths of a dollar).
 - In the first live test, two companies cost $0.051 in total.
 

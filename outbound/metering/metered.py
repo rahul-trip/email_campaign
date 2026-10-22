@@ -50,6 +50,7 @@ FINDER_TTL = timedelta(days=90)
 VERIFIER_TTL = timedelta(days=90)
 RESOLVER_TTL = timedelta(days=90)
 SEARCH_TTL = timedelta(days=30)
+NEWS_TTL = timedelta(days=7)  # "recent" must stay recent when a lead is researched again
 
 log = get_logger(__name__)
 
@@ -398,16 +399,28 @@ class MeteredSearch:
         self._ttl = ttl
         self.name = inner.name
 
-    def search(self, query: str, *, max_results: int = 5) -> list[SearchHit]:
+    def search(
+        self,
+        query: str,
+        *,
+        max_results: int = 5,
+        topic: str = "general",
+        days: int | None = None,
+    ) -> list[SearchHit]:
+        request: dict[str, object] = {"query": query, "max_results": max_results}
+        if topic != "general":  # only when set, so earlier cached searches still match
+            request["topic"] = topic
+        if days:
+            request["days"] = days
         return self._meter.call(
             provider=self.name,
             operation="search",
-            request={"query": query, "max_results": max_results},
-            run=lambda: self._inner.search(query, max_results=max_results),
+            request=request,
+            run=lambda: self._inner.search(query, max_results=max_results, topic=topic, days=days),
             encode=lambda hits: {"items": [h.model_dump(mode="json") for h in hits]},
             decode=lambda stored: [SearchHit.model_validate(i) for i in stored["items"]],
             found=bool,
-            ttl=self._ttl,
+            ttl=NEWS_TTL if topic == "news" else self._ttl,
         )
 
     def extract(self, urls: list[str]) -> list[PageText]:

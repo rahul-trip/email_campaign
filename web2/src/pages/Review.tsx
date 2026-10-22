@@ -17,14 +17,20 @@ type Lint = { word_count?: number; reading_grade?: number; issues?: { rule: stri
  * The checks the server runs on every first email (outbound/domain/copy_lint.py), in the order an
  * operator reads them. Each passes unless the server's lint report names its rule.
  */
-const CHECKS: [string, string][] = [
-  ["length", "Length 50–85 words, footer excluded"],
-  ["subject", "Subject 2–5 words, lower case"],
-  ["reading_level", "Reading grade 6.5 or lower"],
-  ["call_to_action", "Exactly one question"],
+const checksFor = (low: number, high: number): [string, string][] => [
+  ["length", `Length ${low}–${high} words, greeting, sign-off and footer excluded`],
+  ["subject", "Subject 2–6 words, lower case"],
+  ["reading_level", "Reading grade 10 or lower"],
+  ["call_to_action", "One or two questions, with a clear ask at the end"],
+  ["bullets", "Paragraphs, no bullet lists"],
+  ["dashes", "At most one em dash"],
   ["links", "No links in the first email"],
   ["address_in_body", "No email address in the body"],
-  ["banned_phrase", "No banned phrases"],
+  ["banned_phrase", "No stock or machine-sounding phrases"],
+  ["source", "The news it opens with is a real source from the research"],
+  ["opening", "Opens with the recent news when there is some"],
+  ["grounded", "Every fact is in the research notes or your facts"],
+  ["human", "Reads like a person wrote it"],
   ["footer", "Country footer present"],
 ];
 
@@ -183,12 +189,17 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const edited = text !== item.message.generated_body;
   const skips = item.skips ?? [];
+  const opening = (item.message.snippets as { opening?: { headline: string; date?: string; url: string } | null } | null)?.opening;
   const blockedBySkips = skips.length > 0 && !acknowledged;
 
   const finished = () => {
     for (const key of ["review", "status", "companies", "lead"]) void queryClient.invalidateQueries({ queryKey: [key] });
     onDone();
   };
+  const rewrite = useMutation({
+    mutationFn: () => ok(client.POST("/api/review/{message_id}/rewrite", { params: { path: { message_id: messageId } } })),
+    onSuccess: finished,
+  });
   const approve = useMutation({
     mutationFn: () =>
       ok(
@@ -240,6 +251,21 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               Open lead <ExternalLink className="size-3" aria-hidden />
             </Link>
           </div>
+
+          {opening ? (
+            <p data-tour="review-opening" className="mt-3 rounded-lg bg-surface-low px-3 py-2 text-xs">
+              <strong className="text-ink">Opens with:</strong>{" "}
+              <a href={opening.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                {opening.headline}
+              </a>
+              {opening.date && <span className="ml-1 font-mono text-[11px] text-muted">({opening.date})</span>}
+              <span className="text-muted"> · check it is right before you approve</span>
+            </p>
+          ) : (
+            <p data-tour="review-opening" className="mt-3 rounded-lg bg-surface-low px-3 py-2 text-xs text-muted">
+              Opens with a fact from their own site: research found no dated news about them.
+            </p>
+          )}
 
           <label className="mt-3 block">
             <span className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -296,12 +322,17 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
                 <RotateCcw className="size-3.5" aria-hidden /> Undo my edits
               </Button>
             </div>
-            <Button variant="danger-ghost" onClick={() => setRejecting(true)}>
-              <X className="size-4" aria-hidden /> Reject…
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" busy={rewrite.isPending} onClick={() => rewrite.mutate()} title="Cancel this email and have the next run write a new one to the same person">
+                <RotateCcw className="size-3.5" aria-hidden /> Write it again
+              </Button>
+              <Button variant="danger-ghost" onClick={() => setRejecting(true)}>
+                <X className="size-4" aria-hidden /> Reject…
+              </Button>
+            </div>
           </div>
           <p className="mt-2 text-[11px] text-muted">Approving does not send anything: the next run saves it as a draft in your mailbox.</p>
-          <Problem error={approve.error} className="mt-3" />
+          <Problem error={approve.error ?? rewrite.error} className="mt-3" />
         </Card>
 
         <div className="xl:hidden">
@@ -337,6 +368,8 @@ function Context({
   flagged: boolean;
   decision: { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
 }) {
+  const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
+  const checks = checksFor(Number(settings.data?.email_min_words ?? 120), Number(settings.data?.email_max_words ?? 200));
   const research = (company.research ?? {}) as Record<string, unknown>;
   return (
     <div data-tour="review-checks" className="flex flex-col gap-4">
@@ -381,7 +414,7 @@ function Context({
 
       <Card title="Checks" actions={flagged ? <span className="rounded bg-attention-container px-1.5 py-0.5 text-[11px] font-semibold text-on-attention-container">Flagged</span> : undefined}>
         <ul className="space-y-1.5 text-[13px]">
-          {CHECKS.map(([rule, label]) => {
+          {checks.map(([rule, label]) => {
             const bad = failing.has(rule);
             return (
               <li key={rule} className="flex items-start gap-2">
