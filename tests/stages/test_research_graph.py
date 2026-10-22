@@ -467,3 +467,17 @@ def test_no_people_are_taken_from_other_sites_when_the_site_could_not_be_read() 
     assert out.research["thin"] is True
     assert "persona" not in llm.calls
     assert out.people == ()
+
+
+def test_research_reads_facts_at_a_low_temperature() -> None:
+    seen: list[float | None] = []
+
+    class Spy(FakeLlm):
+        def complete(self, system, user, *, json_mode=False, temperature=None, max_tokens=None):  # type: ignore[no-untyped-def]
+            seen.append(temperature)
+            return super().complete(
+                system, user, json_mode=json_mode, temperature=temperature, max_tokens=max_tokens
+            )
+
+    run(base(questions=("Do they trade power?",)), llm=Spy())
+    assert seen and set(seen) == {0.2}

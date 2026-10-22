@@ -73,6 +73,7 @@ class Providers:
     resolver: CatchAllResolver | None = None
     registry: CompanyRegistry | None = None
     mailbox: Mailbox | None = None
+    copy_llm: LlmClient | None = None  # the writer's model; None means ``llm``
 
 
 @dataclass(frozen=True)
@@ -110,6 +111,9 @@ def real_providers(settings: Settings) -> Providers:
             resolver=resolver,
             registry=build_company_registry(settings),
             mailbox=mailbox,
+            copy_llm=build_llm(settings, model=settings.llm_copy_model)
+            if settings.llm_copy_model
+            else None,
         )
     except ProviderError as error:
         raise NotConfigured(str(error)) from None
@@ -149,6 +153,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     llm_prices = {**DEFAULT_LLM_PRICES, **settings.llm_prices}
     search = MeteredSearch(providers.search, meter)
     llm = MeteredLlm(providers.llm, meter, prices=llm_prices)
+    writer = MeteredLlm(providers.copy_llm, meter, prices=llm_prices) if providers.copy_llm else llm
     registry = MeteredRegistry(providers.registry, meter) if providers.registry else None
     finders = [MeteredFinder(f, meter) for f in providers.finders]
     verifier = MeteredVerifier(providers.verifier, meter)
@@ -159,7 +164,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         GateStage(),
         ContactsStage(),
         EmailStage(EmailDeps(finders, verifier, resolver)),
-        CopyStage(llm),
+        CopyStage(writer),
     ]
     jobs: list[Job] = []
     if resolver is not None:

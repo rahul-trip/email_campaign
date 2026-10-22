@@ -40,7 +40,7 @@ Copy `.env.example` to `.env` and fill it in. `.env` is git-ignored; never commi
 | Needed for | Variables |
 |---|---|
 | Research and search | `TAVILY_API_KEY` |
-| Writing (research summaries, fit, copy) | `LLM_PROVIDER`, `LLM_MODEL` and that provider's key, for example `ANTHROPIC_API_KEY` |
+| Writing (research summaries, fit, copy) | `LLM_PROVIDER`, `LLM_MODEL` and that provider's key, for example `ANTHROPIC_API_KEY`. Optional: `LLM_COPY_MODEL` (a stronger model for the email only), `LLM_REASONING_EFFORT`, `LLM_MAX_TOKENS` |
 | Email finding and verification | The keys for every name in `FINDER_CHAIN` and `VERIFIER` |
 | Catch-all resolution (optional) | `CATCH_ALL_RESOLVER` and its key; without one, catch-all addresses are held |
 | UK legal-entity check (optional, free) | `COMPANIES_HOUSE_API_KEY` |

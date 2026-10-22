@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     llm_base_url: str = ""  # only for openai_compatible (Groq, Together, ...) or a proxy
     llm_temperature: float = 0.7
     llm_max_tokens: int = 4_000  # reasoning models need room to think before answering
+    # Writer model for the first email; blank means LLM_MODEL (same provider, key and address).
+    # Research can stay on a cheap model while the email is written by a stronger one.
+    llm_copy_model: str = ""
+    # "low", "medium" or "high" for a reasoning model that accepts it (OpenRouter's
+    # ``reasoning.effort``); blank sends nothing. Reasoning tokens count against LLM_MAX_TOKENS,
+    # so a reasoning model with no limit can use the whole budget thinking and cut its answer.
+    llm_reasoning_effort: str = ""
     llm_api_key: SecretStr = SecretStr("")  # used by openai_compatible, or as a fallback
     anthropic_api_key: SecretStr = SecretStr("")
     openai_api_key: SecretStr = SecretStr("")
