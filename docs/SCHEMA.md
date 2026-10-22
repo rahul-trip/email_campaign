@@ -263,7 +263,7 @@ CREATE TABLE messages (
   mailbox_id        TEXT REFERENCES mailboxes(id),
   step              INTEGER NOT NULL CHECK (step BETWEEN 0 AND 2),   -- 0 = touch 1
   subject           TEXT NOT NULL,
-  snippets          JSON,           -- hook, relevance, value, ask
+  snippets          JSON,           -- subject, based_on (source url), opening (the news item)
   generated_body    TEXT NOT NULL,
   final_body        TEXT,           -- after an operator edit, or as found in the Sent folder
   edit_distance     REAL,           -- 0 = sent unedited; feeds the quality gate and few-shot selection

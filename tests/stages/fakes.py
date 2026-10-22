@@ -12,16 +12,19 @@ from outbound.providers.ports import (
     SearchHit,
 )
 
-GOOD_SNIPPETS = {
-    "hook": "I saw that Acme opened a new Leeds office to run its solar fleet.",
-    "relevance": "Forecast errors on a fleet that size turn straight into trading losses.",
-    "value": (
-        "We cut forecast error by about a quarter for a UK trader, using the data they "
-        "already held. It plugs into dispatch tools in days."
-    ),
-    "ask": "Would a short call next week make sense?",
-    "subject": "leeds solar forecasts",
-}
+GOOD_BODY = (
+    "Acme's Leeds office opened last month, and from the outside it looks like the solar fleet "
+    "is about to get a lot bigger. That usually shows up first in the forecasts. Once a fleet "
+    "runs across more sites, a small miss at each one adds up to a real imbalance bill, and the "
+    "people running dispatch end up second-guessing the numbers they are given.\n\n"
+    "We work on exactly that. For a UK trader we cut day-ahead forecast error by about a "
+    "quarter using the data they already held, and the models plug into existing dispatch tools "
+    "in days, not months. Nothing there needs a new platform or a long procurement.\n\n"
+    "I don't know how you handle forecasting today, so this may be off the mark. If it isn't, "
+    "I would value twenty minutes to show you what we did and hear where it would not fit. "
+    "Would one of the next two weeks work for a short call?"
+)
+GOOD_DRAFT = {"subject": "leeds solar forecasts", "body": GOOD_BODY, "based_on": ""}
 
 
 class FakeLlm:
@@ -36,8 +39,8 @@ class FakeLlm:
         "extract the people listed": "persona",
         "judge how well a company matches": "fit",
         "pick the news worth opening": "news",
-        "You write the first cold email": "actor",
-        "You check one thing about a cold email": "critic",
+        "You write the first email from one person": "actor",
+        "You check a cold email before it goes": "critic",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
@@ -64,8 +67,8 @@ class FakeLlm:
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
             "news": {"company": [], "market": []},
-            "actor": GOOD_SNIPPETS,
-            "critic": {"specific": True, "problem": ""},
+            "actor": GOOD_DRAFT,
+            "critic": {"grounded": True, "human": True, "problem": ""},
         }
         self.replies.update(replies or {})
 
@@ -148,14 +151,15 @@ class ScriptedLlm:
     name = "scripted"
     model = "scripted-model"
     ROLES = (
-        ("You write the first cold email", "actor"),
-        ("You check one thing about a cold email", "critic"),
+        ("You write the first email from one person", "actor"),
+        ("You check a cold email before it goes", "critic"),
     )
 
     def __init__(self, actor: list[Any], critic: list[Any] | None = None) -> None:
         self._script = {"actor": list(actor), "critic": list(critic or [])}
         self.calls: list[str] = []
         self.prompts: dict[str, list[str]] = {"actor": [], "critic": []}
+        self.systems: dict[str, list[str]] = {"actor": [], "critic": []}
 
     def complete(
         self,
@@ -169,6 +173,7 @@ class ScriptedLlm:
         role = next(r for needle, r in self.ROLES if needle in system)
         self.calls.append(role)
         self.prompts[role].append(user)
+        self.systems[role].append(system)
         queue = self._script[role]
         reply = queue.pop(0) if len(queue) > 1 else queue[0]
         text = reply if isinstance(reply, str) else json.dumps(reply)

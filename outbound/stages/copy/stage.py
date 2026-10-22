@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from outbound.db.uow import UnitOfWork
+from outbound.domain.copy_lint import LintRules
 from outbound.domain.entities import Contact, ContactEmail
 from outbound.domain.enums import (
     WORKABLE_CONTACT_STATUSES,
@@ -16,6 +19,9 @@ from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.copy.graph import CopyInput, CopyOutput, run_copy
 from outbound.stages.policy import policy_decision_for
+
+DEFAULT_MIN_WORDS = 120
+DEFAULT_MAX_WORDS = 200
 
 
 class CopyStage:
@@ -105,6 +111,7 @@ class CopyStage:
                     (m.generated_body, m.final_body) for m in shots if m.final_body is not None
                 ),
                 footer=footer,
+                rules=_rules(ctx.workspace.settings),
             ),
         )
         return StageResult(
@@ -112,6 +119,13 @@ class CopyStage:
             reason=_summary(output),
             write=lambda uow: _save(uow, company.id, contact, address, output),
         )
+
+
+def _rules(settings: dict[str, Any]) -> LintRules:
+    """The default rules with the workspace's first-email length (Settings → Limits)."""
+    low = int(settings.get("email_min_words") or DEFAULT_MIN_WORDS)
+    high = int(settings.get("email_max_words") or DEFAULT_MAX_WORDS)
+    return LintRules.with_length(low, max(low, high))
 
 
 def _chosen_address(

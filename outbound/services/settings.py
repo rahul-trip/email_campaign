@@ -25,7 +25,7 @@ SENDER_FIELDS = frozenset(
         "company_name", "domain", "industry", "mission", "value_propositions", "technologies",
         "target_verticals", "case_studies", "geographic_focus", "signature_name",
         "signature_title", "legal_name", "postal_address", "registration_details",
-        "contact_info", "narrative",
+        "contact_info", "narrative", "greeting", "outreach_goal", "style_examples",
     }
 )  # fmt: skip
 REVIEWED_KEY = "reviewed_at"
@@ -37,6 +37,8 @@ SETTING_FIELDS = frozenset(
         "timezone",
         "country_policy_enabled",  # off: no country rule is applied anywhere (suppression is)
         "footer_enabled",  # off: no footer is added to any email
+        "email_min_words",
+        "email_max_words",
     }
 )
 
@@ -108,6 +110,11 @@ class SettingsService:
         with self._uow.admin() as admin:
             workspace = self._workspace(admin)
             merged = {**workspace.settings, **changes}
+            low, high = merged.get("email_min_words", 120), merged.get("email_max_words", 200)
+            if low > high:
+                raise SettingsError(
+                    f"the shortest email ({low} words) cannot be longer than the longest ({high})"
+                )
             admin.workspaces.set_settings(self._workspace_id, merged)
             admin.commit()
         self._record_change("settings_changed", changes)

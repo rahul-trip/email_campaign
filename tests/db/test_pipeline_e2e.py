@@ -99,7 +99,9 @@ def test_a_targets_list_becomes_drafts_and_a_rerun_costs_nothing(
     waiting = pipeline.review.queue()
     assert len(waiting) == 2
     first, second = waiting
-    edited = first.message.generated_body.replace("Would a short call", "Is a short call")
+    edited = first.message.generated_body.replace(
+        "Would one of the next two weeks", "Could one of the next two weeks"
+    )
     pipeline.review.approve(first.message.id, edited_body=edited)
     pipeline.review.approve(second.message.id)
 
