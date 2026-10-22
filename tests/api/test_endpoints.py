@@ -1005,3 +1005,16 @@ def test_email_length_greeting_and_past_emails_are_settings_with_limits(api: Api
     assert api.put("/api/settings/sender-profile", json={"greeting": "Yo"}).status_code == 422
     too_many = api.put("/api/settings/sender-profile", json={"style_examples": ["x"] * 7})
     assert too_many.status_code == 422
+
+
+def test_a_runs_leads_and_research_again_through_the_api(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    run = api.post("/api/runs", json={}).json()
+    assert api.get(f"/api/runs/{run['id']}/leads").json() == []
+    assert api.get("/api/runs/nope/leads").status_code == 404
+    cid = seed_company(factory, ws, "acme.com", C.RESEARCHED, C.QUALIFIED)
+    again = api.post(f"/api/companies/{cid}/research-again")
+    assert again.status_code == 200 and again.json()["status"] == "new"
+    refused = api.post(f"/api/companies/{cid}/research-again")
+    assert refused.status_code in (409, 422) and "not been researched" in refused.json()["detail"]

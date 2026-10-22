@@ -64,6 +64,14 @@ export function LeadDetailPage() {
 
   const retry = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/retry", path)), onSuccess: refresh });
   const requalify = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/requalify", path)), onSuccess: refresh });
+  const [researching, setResearching] = useState(false);
+  const researchAgain = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/{company_id}/research-again", path)),
+    onSuccess: () => {
+      setResearching(false);
+      refresh();
+    },
+  });
 
   // Links such as "Add a person with consent" point at a section of this page.
   const hash = useRouterState({ select: (state) => state.location.hash });
@@ -119,6 +127,11 @@ export function LeadDetailPage() {
             <Link to="/leads/$companyId/journey" params={{ companyId }} className={buttonClass("secondary")}>
               <GitFork className="size-3.5" aria-hidden /> Journey
             </Link>
+            {!NOT_RESEARCHABLE.has(company.status) && (
+              <Button data-tour="lead-research-again" variant="secondary" onClick={() => setResearching(true)}>
+                <RefreshCw className="size-3.5" aria-hidden /> Research again
+              </Button>
+            )}
             {company.status === "failed" && (
               <Button busy={retry.isPending} onClick={() => retry.mutate()}>
                 <RefreshCw className="size-3.5" aria-hidden /> Retry
@@ -132,6 +145,22 @@ export function LeadDetailPage() {
           </>
         }
       />
+
+      {researching && (
+        <Confirm
+          title={`Research ${company.name ?? company.domain} again?`}
+          confirmLabel="Research again"
+          busy={researchAgain.isPending}
+          error={researchAgain.error}
+          onClose={() => setResearching(false)}
+          onConfirm={() => researchAgain.mutate()}
+        >
+          <p>The next run reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
+          <p className="mt-2">
+            An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
+          </p>
+        </Confirm>
+      )}
 
       <div data-tour="lead-header" className="mb-5 flex flex-wrap items-center gap-2">
         <StatusBadge status={describe(leadStatus, company.status)} />
@@ -374,6 +403,9 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
     </Card>
   );
 }
+
+// Not offered for a lead not yet researched, or one whose email has already left.
+const NOT_RESEARCHABLE = new Set(["new", "in_sequence", "replied", "completed", "rejected", "suppressed"]);
 
 // A lead in one of these can be pointed at a different person before the email reaches the mailbox.
 const RECIPIENT_CHANGEABLE = new Set(["contacts_found", "email_ready", "copy_ready", "approved", "failed", "held"]);

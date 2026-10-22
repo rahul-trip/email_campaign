@@ -179,8 +179,12 @@ class CompanyRepository(ScopedRepository):
         failed_stage: str | None = None,
         last_error: str | None = None,
         next_action_at: datetime | Unset | None = UNSET,
+        run_id: str | None = None,
     ) -> Company:
         """Move a company to a new status through the state machine and log the move.
+
+        ``run_id`` is recorded on the event when a run made the move, so a run can list what it
+        did to each lead.
 
         Moving to ``held`` needs a ``hold_reason``; moving to ``failed`` needs a known
         ``failed_stage``. Leaving either state clears its detail columns.
@@ -215,6 +219,8 @@ class CompanyRepository(ScopedRepository):
         if row.failed_stage:
             detail["failed_stage"] = row.failed_stage
             detail["error"] = last_error
+        if run_id:
+            detail["run_id"] = run_id
         self._events.append(EntityType.COMPANY, row.id, "status_changed", actor, detail)
         return snapshot(row, Company)
 

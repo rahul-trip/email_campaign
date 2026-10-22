@@ -411,6 +411,23 @@ class RunOut(Out):
     created_at: datetime
 
 
+class RunStepOut(Out):
+    at: datetime
+    kind: str
+    from_status: str | None
+    to_status: str | None
+    detail: str | None
+
+
+class RunLeadOut(Out):
+    company_id: str
+    domain: str
+    name: str | None
+    status: str
+    outcome: str
+    steps: list[RunStepOut]
+
+
 class StatusOut(Out):
     by_status: dict[str, int]
     held: dict[str, int]

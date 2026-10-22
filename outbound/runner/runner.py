@@ -87,6 +87,7 @@ class Runner:
         self._max_attempts = max_attempts
         self._read = Reader(uow_factory, workspace_id)
         self._now = now
+        self._run_id: str | None = None  # the run whose lead is being processed, for its events
 
     # ------------------------------------------------------------------ pipeline
 
@@ -175,6 +176,7 @@ class Runner:
         company: Company | None = None
         result: StageResult | None = None
         bind(company_id=company_id, stage=stage.name)
+        self._run_id = run_id
         try:
             with self._uow(self._workspace_id) as uow:
                 company = uow.companies.get(company_id)
@@ -207,6 +209,7 @@ class Runner:
                 return Outcome.SKIPPED
             return self._record_failure(stage, company, error)
         finally:
+            self._run_id = None
             unbind("company_id", "stage")
 
     def _exists(self, company_id: str) -> bool:
@@ -246,6 +249,7 @@ class Runner:
                 reason=result.reason,
                 hold_reason=result.hold_reason,
                 next_action_at=result.next_action_at,
+                run_id=self._run_id,
             )
             uow.commit()
         log.info(
@@ -268,6 +272,7 @@ class Runner:
                         CompanyStatus.SUPPRESSED,
                         expected_version=company.row_version,
                         reason=refusal.reason,
+                        run_id=self._run_id,
                     )
                     outcome = Outcome.SUPPRESSED
                 elif refusal.kind is RefusalKind.HOLD:
@@ -281,6 +286,7 @@ class Runner:
                         expected_version=company.row_version,
                         reason=refusal.reason,
                         hold_reason=refusal.hold_reason or HoldReason.NEEDS_OPERATOR,
+                        run_id=self._run_id,
                     )
                     outcome = Outcome.HELD
                 elif refusal.kind is RefusalKind.BUDGET and stage.name in STAGE_INPUT_STATUS:
@@ -331,6 +337,7 @@ class Runner:
             failed_stage=stage.name,
             last_error=message,
             next_action_at=self._now() + wait,
+            run_id=self._run_id,
         )
 
     @staticmethod
@@ -362,9 +369,10 @@ class Runner:
             e for e in uow.events.for_entity(EntityType.COMPANY, company.id) if e.type == "deferred"
         ]
         if not previous or previous[-1].data.get("reason") != reason:
-            uow.events.append(
-                EntityType.COMPANY, company.id, "deferred", SYSTEM, {"reason": reason}
-            )
+            detail: dict[str, Any] = {"reason": reason}
+            if self._run_id:
+                detail["run_id"] = self._run_id
+            uow.events.append(EntityType.COMPANY, company.id, "deferred", SYSTEM, detail)
 
     # ------------------------------------------------------------------ retries
 

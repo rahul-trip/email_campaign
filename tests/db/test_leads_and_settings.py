@@ -772,3 +772,53 @@ def test_how_you_write_is_part_of_the_sender_profile(factory: UnitOfWorkFactory,
         "explore a partnership",
         ["Dear Ted, ..."],
     )
+
+
+def test_research_again_cancels_the_waiting_email_and_starts_the_lead_over(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company, cto, _ = rebase(factory, ws)
+    with factory(ws) as uow:
+        version = uow.companies.get(company.id).row_version
+        for step in (C.CONTACTS_FOUND, C.EMAIL_READY, C.COPY_READY):
+            version = uow.companies.transition(
+                company.id, step, expected_version=version
+            ).row_version
+        address = uow.emails.for_contact(cto)[0]
+        draft = uow.messages.create(
+            company_id=company.id,
+            contact_id=cto,
+            contact_email_id=address.id,
+            step=0,
+            subject="hello",
+            generated_body="body",
+        )
+        uow.commit()
+    service = leads(factory, ws)
+    assert service.research_again(company.id).status is C.NEW
+    with factory(ws) as uow:
+        assert uow.messages.get(draft.id).state is MessageState.CANCELLED
+        assert len(uow.contacts.for_company(company.id)) == 2  # people and addresses are kept
+    with pytest.raises(LeadError, match="not been researched yet"):
+        service.research_again(company.id)
+
+
+def test_a_lead_whose_email_has_left_is_not_researched_again(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(
+        factory,
+        ws,
+        "sent.com",
+        path=(
+            C.RESEARCHED,
+            C.QUALIFIED,
+            C.CONTACTS_FOUND,
+            C.EMAIL_READY,
+            C.COPY_READY,
+            C.APPROVED,
+            C.IN_SEQUENCE,
+        ),
+    )
+    with pytest.raises(LeadError, match="already left"):
+        leads(factory, ws).research_again(company.id)

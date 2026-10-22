@@ -99,6 +99,11 @@ def release_hold(
     return CompanyOut.model_validate(svc.leads.release_hold(company_id, resume_to=body.resume_to))
 
 
+@router.post("/companies/{company_id}/research-again", response_model=CompanyOut)
+def research_again(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
+    return CompanyOut.model_validate(svc.leads.research_again(company_id))
+
+
 @router.post("/companies/{company_id}/requalify", response_model=CompanyOut)
 def requalify(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     return CompanyOut.model_validate(svc.leads.requalify(company_id))

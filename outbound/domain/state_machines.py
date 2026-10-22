@@ -66,20 +66,23 @@ STAGE_INPUT_STATUS: Mapping[str, CompanyStatus] = {
     "copy": C.EMAIL_READY,
 }
 
+# Every status before the mailbox may go back to NEW: the operator asked to research the lead
+# again (fresh news, a changed site). What the operator set by hand is kept.
 COMPANY = StateMachine(
     "company",
     {
         C.NEW: _row(C.RESEARCHED, C.FAILED, C.SUPPRESSED),
-        C.RESEARCHED: _row(C.QUALIFIED, C.DISQUALIFIED, C.HELD, C.FAILED, C.SUPPRESSED),
-        C.QUALIFIED: _row(C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
+        C.RESEARCHED: _row(C.NEW, C.QUALIFIED, C.DISQUALIFIED, C.HELD, C.FAILED, C.SUPPRESSED),
+        C.QUALIFIED: _row(C.NEW, C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
         # An operator can override a low fit score.
-        C.DISQUALIFIED: _row(C.QUALIFIED, C.SUPPRESSED),
-        C.CONTACTS_FOUND: _row(C.EMAIL_READY, C.HELD, C.FAILED, C.SUPPRESSED),
+        C.DISQUALIFIED: _row(C.NEW, C.QUALIFIED, C.SUPPRESSED),
+        C.CONTACTS_FOUND: _row(C.NEW, C.EMAIL_READY, C.HELD, C.FAILED, C.SUPPRESSED),
         # Back to CONTACTS_FOUND when the operator picks a different person to write to.
-        C.EMAIL_READY: _row(C.COPY_READY, C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
+        C.EMAIL_READY: _row(C.NEW, C.COPY_READY, C.CONTACTS_FOUND, C.HELD, C.FAILED, C.SUPPRESSED),
         # Released back to where the hold came from; see ``resume_status_for``. QUALIFIED and
         # EMAIL_READY are for a country rule skipped where the contacts or copy step held it.
         C.HELD: _row(
+            C.NEW,
             C.RESEARCHED,
             C.QUALIFIED,
             C.CONTACTS_FOUND,
@@ -88,8 +91,8 @@ COMPANY = StateMachine(
             C.FAILED,
             C.SUPPRESSED,
         ),
-        C.COPY_READY: _row(C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED),
-        C.APPROVED: _row(C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
+        C.COPY_READY: _row(C.NEW, C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED),
+        C.APPROVED: _row(C.NEW, C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
         # A bounce or a referral sends the lead back for the next contact.
         C.IN_SEQUENCE: _row(C.REPLIED, C.COMPLETED, C.CONTACTS_FOUND, C.SUPPRESSED),
         # A retry restores the input status of the stage that failed.

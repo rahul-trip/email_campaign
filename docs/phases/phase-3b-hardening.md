@@ -257,6 +257,16 @@ Found by the operator (2026-10-22): every email was the same 3-liner (what they 
 
 **Tests:** assembly and greeting choice; the length from settings reaches the writer and the checker; the old 3-liner now fails on length; bullets, dashes and stock phrases caught without a model; a made-up source rejected; recent news must be the opening; the operator's past emails and goal reach the prompt; the opening item is saved; the settings and their limits; rewrite through the API and the browser.
 
+### 3b.20 Run pages, Research again, and Review from the journey (added during the work)
+
+Asked for by the operator (2026-10-22).
+
+- **A page per run** (`/runs/{id}`, `GET /api/runs/{id}/leads`): every lead the run moved, held, failed or deferred, with each step and its reason or error, each linking to the lead and its journey; it refreshes while the run is going. No new table: the runner now writes `run_id` into the `status_changed` (and `deferred`) events it records, and `EventRepository.for_run` reads them back (a JSON field query that works on SQLite and Postgres).
+- **Research again** on the lead page (`POST /api/companies/{id}/research-again`): any status before the mailbox may go back to `new`; a waiting or approved email is cancelled; operator values, people and addresses are kept. Refused for a lead not yet researched or whose email has left.
+- **Open in Review** on a copy-ready lead's journey: `/review?message=<id>` opens that email.
+
+**Tests:** a pipeline run lists both leads with each step and a quiet second run lists none; a failed lead carries its error; research again cancels the email and keeps the people, and is refused before research and after the email left; the API for both; browser tests for the run page and its links, Open in Review, and Research again.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.
