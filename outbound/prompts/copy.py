@@ -173,3 +173,37 @@ def build_critic_user_prompt(
         f"\n\n## The sender\n{about or '(not given)'}"
         f"\n\n## Sender facts\n{facts}\n\n## The email to check\n{body}"
     )
+
+
+REVISE_SYSTEM_PROMPT = (
+    """\
+You revise a cold email exactly as its sender asks. The sender's instructions come first: they
+may change the tone, the length, the structure, the ask, or add information. Anything the sender
+states in the instructions is true and may be used. Keep every other fact as it is in the email
+or the research notes; never invent a number, customer, event or claim.
+
+Unless the instructions say otherwise: keep the greeting line and the signature as they are,
+keep it plain text, write like a person (no bullet lists, no stock phrases such as "I hope this
+finds you well" or "reaching out", no hype words). Do not add a footer, links or email addresses.
+
+Return one JSON object and nothing else:
+{"body": "<the whole revised email, from the greeting to the signature, paragraphs separated by
+a blank line>"}
+"""
+    + UNTRUSTED_RULE
+)
+
+
+def build_revise_user_prompt(
+    *, email: str, instructions: str, research: Mapping[str, Any], sender: Mapping[str, Any]
+) -> str:
+    facts = _list(
+        [*map(str, sender.get("value_propositions", [])), *map(str, sender.get("case_studies", []))]
+    )
+    about = f"{sender.get('company_name', '')}\n{sender.get('narrative', '')}".strip()
+    return (
+        f"## The sender's instructions\n{instructions.strip()}\n\n"
+        f"## The email as it is now\n{email.strip()}\n\n"
+        f"## The sender\n{about or '(not given)'}\n\n## Sender facts\n{facts}\n\n"
+        f"## Research notes (from the web)\n{research_notes(research)}"
+    )

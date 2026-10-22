@@ -1977,6 +1977,53 @@
         "title": "ReviewItemOut",
         "type": "object"
       },
+      "ReviseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "current_body": {
+            "anyOf": [
+              {
+                "maxLength": 20000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Body"
+          },
+          "instructions": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Instructions",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instructions"
+        ],
+        "title": "ReviseIn",
+        "type": "object"
+      },
+      "RevisionOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "lint_report": {
+            "additionalProperties": true,
+            "title": "Lint Report",
+            "type": "object"
+          }
+        },
+        "required": [
+          "body",
+          "lint_report"
+        ],
+        "title": "RevisionOut",
+        "type": "object"
+      },
       "RowOut": {
         "properties": {
           "domain": {
@@ -4763,6 +4810,59 @@
           }
         },
         "summary": "Reject",
+        "tags": [
+          "review"
+        ]
+      }
+    },
+    "/api/review/{message_id}/revise": {
+      "post": {
+        "description": "Rewrite the email as the operator asks. Nothing is saved until they approve it.",
+        "operationId": "revise_api_review__message_id__revise_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "title": "Message Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revise",
         "tags": [
           "review"
         ]

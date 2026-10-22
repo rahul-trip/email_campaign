@@ -177,7 +177,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),
-        review=ReviewService(uow, workspace_id),
+        review=ReviewService(uow, workspace_id, writer),
         runs=RunService(uow, workspace_id),
         intake=IntakeService(uow, workspace_id, search),
         meter=meter,
@@ -220,6 +220,20 @@ def discover_companies(
         campaign_id=campaign.id,
     )
     return report.count(ImportRowStatus.ACCEPTED)
+
+
+def metered_writer_or_none(container: Container, workspace_id: str) -> LlmClient | None:
+    """The writer model behind the meter, for revisions asked for on Review; None if no model
+    is configured (Review then says so instead of failing at start-up)."""
+    from outbound.providers.errors import ProviderError
+
+    settings = container.settings
+    try:
+        llm = build_llm(settings, model=settings.llm_copy_model)
+    except ProviderError:
+        return None
+    prices = {**DEFAULT_LLM_PRICES, **settings.llm_prices}
+    return MeteredLlm(llm, build_meter(container, workspace_id), prices=prices)
 
 
 def metered_search_or_none(container: Container, workspace_id: str) -> SearchProvider | None:

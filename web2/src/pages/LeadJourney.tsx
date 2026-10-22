@@ -42,8 +42,6 @@ export function LeadJourneyPage() {
 
   const { company, contacts, messages } = lead.data;
   const trail = journey.data;
-  // The email waiting for review, if the lead is at that point.
-  const waiting = company.status === "copy_ready" ? messages.find((m) => m.state === "generated") : undefined;
   const selected = trail.stages.find((s) => s.key === (picked ?? firstStage(trail.stages))) ?? trail.stages[0];
   const finished = trail.stages.filter((s) => s.state === "done").length;
   const blocked = trail.stages.some((s) => ["held", "failed", "stopped", "waiting"].includes(s.state));
@@ -66,16 +64,9 @@ export function LeadJourneyPage() {
         title={`Journey: ${company.name ?? company.domain}`}
         subtitle={`${company.domain} · country ${company.country_code ?? "unknown"} · fit ${company.fit_score ?? "?"}/100`}
         actions={
-          <>
-            {waiting && (
-              <Link data-tour="journey-review" to="/review" search={{ message: waiting.id }} className={buttonClass("primary")}>
-                Open in Review
-              </Link>
-            )}
-            <Link to="/leads/$companyId" params={{ companyId }} className={buttonClass(waiting ? "secondary" : "primary")}>
-              Open the lead to act on it
-            </Link>
-          </>
+          <Link to="/leads/$companyId" params={{ companyId }} className={buttonClass("primary")}>
+            Open the lead to act on it
+          </Link>
         }
       />
 

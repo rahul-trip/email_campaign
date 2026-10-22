@@ -27,7 +27,8 @@ from outbound.config import Settings
 from outbound.db import migrate
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.pipeline import assemble
+from outbound.metering.metered import MeteredLlm
+from outbound.pipeline import assemble, build_meter
 from outbound.services.seed import seed_defaults
 from outbound.worker import Worker
 from tests.stages.world import PROFILE, World
@@ -55,9 +56,12 @@ def build() -> tuple[FastAPI, Worker]:
         session_secret=SecretStr("e2e-session-secret-0123456789"),
     )
     container = Container(settings, engine, factory)
-    pipeline = assemble(container, workspace.id, World().providers())
+    world = World()
+    pipeline = assemble(container, workspace.id, world.providers())
     web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST
-    app = create_app(build_services(container, workspace.id), web_dist=web_dist)
+    # Revisions on Review use the fake world's model too, metered like the real one.
+    writer = MeteredLlm(world.llm, build_meter(container, workspace.id))
+    app = create_app(build_services(container, workspace.id, writer=writer), web_dist=web_dist)
     return app, Worker(container, workspace.id, pipeline)
 
 

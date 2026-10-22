@@ -263,9 +263,17 @@ Asked for by the operator (2026-10-22).
 
 - **A page per run** (`/runs/{id}`, `GET /api/runs/{id}/leads`): every lead the run moved, held, failed or deferred, with each step and its reason or error, each linking to the lead and its journey; it refreshes while the run is going. No new table: the runner now writes `run_id` into the `status_changed` (and `deferred`) events it records, and `EventRepository.for_run` reads them back (a JSON field query that works on SQLite and Postgres).
 - **Research again** on the lead page (`POST /api/companies/{id}/research-again`): any status before the mailbox may go back to `new`; a waiting or approved email is cancelled; operator values, people and addresses are kept. Refused for a lead not yet researched or whose email has left.
-- **Open in Review** on a copy-ready lead's journey: `/review?message=<id>` opens that email.
+- **Open in Review** next to an email waiting for review in the lead page's Emails section (moved there from the journey at the operator's request): `/review?message=<id>` opens that email.
 
 **Tests:** a pipeline run lists both leads with each step and a quiet second run lists none; a failed lead carries its error; research again cancels the email and keeps the people, and is refused before research and after the email left; the API for both; browser tests for the run page and its links, Open in Review, and Research again.
+
+### 3b.21 Ask for changes on Review (added during the work)
+
+Asked for by the operator (2026-10-22): change the final copy in any way (tone, more information, a full rewrite) without editing by hand.
+
+- **Ask for changes** under the email on Review: free-text instructions (with one-click starters), **Rewrite with these changes** rewrites the text as it is in the editor. `ReviewService.revise` / `POST /api/review/{id}/revise` call the writer model (`metered_writer_or_none`, through the meter, attributed to the lead) with `REVISE_SYSTEM_PROMPT`: the operator's instructions come first and their facts count as true; the footer is cut off before the model and put back by code. The result and its lint report go back to the editor, unsaved; approving stores it as the operator's version. Each request is a `revision_asked` event.
+
+**Tests:** revised as asked with the operator's edits and without the footer reaching the model; nothing saved until approval, which records it as an edit; refused without instructions, without a writer, or once approved; the API; a browser test from a one-click starter to approval.
 
 ## 5. Effect on the schema and the documents
 

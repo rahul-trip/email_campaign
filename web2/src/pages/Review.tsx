@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import { diffWords } from "diff";
-import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Keyboard, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Keyboard, RotateCcw, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton, Textarea } from "../components/ui";
 import { cx } from "../lib/cx";
 import { words } from "../lib/format";
 import { describe, emailStatus, isSafeToSend } from "../lib/status";
@@ -17,6 +17,9 @@ type Lint = { word_count?: number; reading_grade?: number; issues?: { rule: stri
  * The checks the server runs on every first email (outbound/domain/copy_lint.py), in the order an
  * operator reads them. Each passes unless the server's lint report names its rule.
  */
+// One click puts a common request into the "Ask for changes" box; it can be edited before sending.
+const SUGGESTIONS = ["More formal.", "Warmer and more personal.", "Shorter.", "More specific about what we offer.", "Softer ask."];
+
 const checksFor = (low: number, high: number): [string, string][] => [
   ["length", `Length ${low}–${high} words, greeting, sign-off and footer excluded`],
   ["subject", "Subject 2–6 words, lower case"],
@@ -198,6 +201,23 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
     for (const key of ["review", "status", "companies", "lead"]) void queryClient.invalidateQueries({ queryKey: [key] });
     onDone();
   };
+  // "Ask for changes": the writer revises the text as it stands in the editor, as the operator asks.
+  const [instructions, setInstructions] = useState("");
+  const [revisedLint, setRevisedLint] = useState<Lint | null>(null);
+  const revise = useMutation({
+    mutationFn: () =>
+      ok(
+        client.POST("/api/review/{message_id}/revise", {
+          params: { path: { message_id: messageId } },
+          body: { instructions: instructions.trim(), current_body: text },
+        }),
+      ),
+    onSuccess: (revision) => {
+      setText(revision.body);
+      setRevisedLint(revision.lint_report as Lint);
+      setInstructions("");
+    },
+  });
   const rewrite = useMutation({
     mutationFn: () => ok(client.POST("/api/review/{message_id}/rewrite", { params: { path: { message_id: messageId } } })),
     onSuccess: finished,
@@ -299,6 +319,47 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               </pre>
             </div>
           )}
+
+          <div data-tour="review-revise" className="mt-4 rounded-lg border border-line bg-surface-low p-3">
+            <Label className="mb-1">Ask for changes</Label>
+            <p className="mb-2 text-xs text-muted">
+              Say how to change it: the tone, the length, what to stress, or facts to add. The text above, with your own edits, is rewritten; you can ask again, edit by hand, then approve. Nothing is saved until you approve.
+            </p>
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setInstructions(instructions.trim() ? `${instructions.trim()} ${suggestion}` : suggestion)}
+                  className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] hover:border-primary-container hover:text-primary"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+            <Textarea
+              aria-label="Instructions for the rewrite"
+              rows={3}
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder="For example: more formal; mention we already work with two Nordic TSOs; ask for a call in November"
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Button size="sm" variant="secondary" busy={revise.isPending} disabled={!instructions.trim()} onClick={() => revise.mutate()}>
+                <Wand2 className="size-3.5" aria-hidden /> Rewrite with these changes
+              </Button>
+              {revise.isPending && <span className="text-xs text-muted">Rewriting… this can take a few seconds.</span>}
+              <Problem error={revise.error} />
+            </div>
+            {revisedLint && (revisedLint.issues ?? []).length > 0 && (
+              <Callout tone="attention" className="mt-2" title="The rewrite does not pass every check">
+                <ul className="list-disc space-y-0.5 pl-4">
+                  {revisedLint.issues?.map((issue) => <li key={issue.rule + issue.message}>{issue.message}</li>)}
+                </ul>
+                <p className="mt-1">You can still approve it: your instructions come first.</p>
+              </Callout>
+            )}
+          </div>
 
           {skips.length > 0 && (
             <div className="mt-4" data-tour="review-skips">

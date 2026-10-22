@@ -14,6 +14,8 @@ from outbound.api.schemas import (
     RejectIn,
     ReviewDetailOut,
     ReviewItemOut,
+    ReviseIn,
+    RevisionOut,
     SkipOut,
 )
 from outbound.services.review import QueueItem
@@ -67,6 +69,15 @@ def rewrite(message_id: str, svc: Annotated[Services, Depends(services)]) -> Com
     """
     item = svc.review.show(message_id).item
     return CompanyOut.model_validate(svc.leads.change_recipient(item.company.id, item.contact.id))
+
+
+@router.post("/{message_id}/revise", response_model=RevisionOut)
+def revise(
+    message_id: str, body: ReviseIn, svc: Annotated[Services, Depends(services)]
+) -> RevisionOut:
+    """Rewrite the email as the operator asks. Nothing is saved until they approve it."""
+    revision = svc.review.revise(message_id, body.instructions, current=body.current_body)
+    return RevisionOut(body=revision.body, lint_report=revision.report.to_json())
 
 
 @router.post("/{message_id}/reject", response_model=MessageOut)

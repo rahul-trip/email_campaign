@@ -37,6 +37,7 @@ from outbound.db.repositories.workspaces import (
     MailboxRepository,
     WorkspaceRepository,
 )
+from outbound.domain.entities import Workspace
 
 
 class UnitOfWork:
@@ -89,9 +90,13 @@ class UnitOfWork:
     def rollback(self) -> None:
         self.session.rollback()
 
+    def workspace(self) -> Workspace | None:
+        """This workspace's own row (sender profile and settings), read in this session."""
+        return WorkspaceRepository(self.session).get(self.workspace_id)
+
     def workspace_settings(self) -> dict[str, Any]:
         """This workspace's settings (its own row only), for checks deep inside a stage."""
-        workspace = WorkspaceRepository(self.session).get(self.workspace_id)
+        workspace = self.workspace()
         return dict(workspace.settings) if workspace else {}
 
 

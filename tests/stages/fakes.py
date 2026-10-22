@@ -24,6 +24,11 @@ GOOD_BODY = (
     "I would value twenty minutes to show you what we did and hear where it would not fit. "
     "Would one of the next two weeks work for a short call?"
 )
+# What the fake writer returns when the operator asks for changes on Review.
+REVISED_EMAIL = (
+    "Dear Jane,\n\nA shorter, warmer note: your Leeds office opened last month, and we would"
+    " like to help with the forecasting behind it.\n\nWould a call next week work?\n\nSam Lee"
+)
 GOOD_DRAFT = {"subject": "leeds solar forecasts", "body": GOOD_BODY, "based_on": ""}
 
 
@@ -39,6 +44,7 @@ class FakeLlm:
         "extract the people listed": "persona",
         "judge how well a company matches": "fit",
         "pick the news worth opening": "news",
+        "You revise a cold email exactly": "revise",
         "You write the first email from one person": "actor",
         "You check a cold email before it goes": "critic",
     }
@@ -67,6 +73,7 @@ class FakeLlm:
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
             "news": {"company": [], "market": []},
+            "revise": {"body": REVISED_EMAIL},
             "actor": GOOD_DRAFT,
             "critic": {"grounded": True, "human": True, "problem": ""},
         }

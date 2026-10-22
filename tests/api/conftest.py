@@ -28,6 +28,7 @@ from tests.db.conftest import (  # noqa: F401  (fixtures used by name)
     other_ws,
     ws,
 )
+from tests.stages.fakes import FakeLlm
 
 PASSWORD = "correct horse battery staple"
 WEBHOOK_SECRET = "whsec-test-secret"
@@ -74,7 +75,9 @@ def make_app(container: Container, ws: str) -> Callable[..., tuple[FastAPI, Serv
         settings_service = SettingsService(
             container.uow, ws, dns_lookup=dns_lookup or (lambda name: [])
         )
-        services = build_services(container, ws, settings_service=settings_service)
+        services = build_services(
+            container, ws, settings_service=settings_service, writer=FakeLlm()
+        )
         return create_app(services, web_dist=None), services
 
     return build
