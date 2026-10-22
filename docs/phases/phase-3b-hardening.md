@@ -225,6 +225,16 @@ Asked for by the operator (2026-10-20): the email check and the person check sho
 
 **Tests:** a seeded copy of the live data: the plan, the result of applying it, and an empty plan on a second run.
 
+### 3b.17 Model calls that do not break the run (added during the work)
+
+Found by the operator (2026-10-21): research failed on a free reasoning model with *not valid JSON* (a reply of `{"people":{ "people": []}`), *cut off at the token limit* after about two minutes of thinking, and 429s.
+
+- `ask_json` asks once more, with a reminder, after a broken, mis-shaped, empty or cut-off reply; a rate limit is left to the HTTP client. Extraction calls (site, signals, persona, fit) run at temperature 0.2 instead of 0.7.
+- `LLM_REASONING_EFFORT` sends OpenRouter's `reasoning.effort` when set. Reasoning tokens count against `LLM_MAX_TOKENS` (OpenRouter's docs), which is why a high limit alone only made the model think longer.
+- `LLM_COPY_MODEL` runs the email on its own model (same provider, key and address) while research stays on `LLM_MODEL`; the ledger records the model per call.
+
+**Tests:** a broken then good reply, two broken replies, a cut-off reply and a rate limit; the temperature on both tries; the effort sent only when set; settings give a separate writer model; the pipeline writes with it.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

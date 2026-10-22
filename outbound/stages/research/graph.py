@@ -50,6 +50,7 @@ PAGE_CHARS = 6_000
 TOTAL_CHARS = 18_000
 TEAM_HINTS = ("team", "leadership", "people", "about", "management")
 MAX_PEOPLE = 5
+EXTRACTION_TEMPERATURE = 0.2  # reading facts out of text, not writing: no flourishes
 MIN_TEAM_TEXT = 100  # less than this is a menu, not a team page
 
 
@@ -240,7 +241,15 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         user = prompts.build_site_user_prompt(
             inp.company_name, inp.domain, _joined(state["page_text"])
         )
-        return {"site_facts": ask(deps.llm, prompts.SITE_SYSTEM_PROMPT, user, SiteFacts)}
+        return {
+            "site_facts": ask(
+                deps.llm,
+                prompts.SITE_SYSTEM_PROMPT,
+                user,
+                SiteFacts,
+                temperature=EXTRACTION_TEMPERATURE,
+            )
+        }
 
     def legal_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
@@ -274,7 +283,15 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         user = prompts.build_signals_user_prompt(
             name, inp.questions, _joined(state["page_text"]), snippets
         )
-        return {"signal_facts": ask(deps.llm, prompts.SIGNALS_SYSTEM_PROMPT, user, SignalFacts)}
+        return {
+            "signal_facts": ask(
+                deps.llm,
+                prompts.SIGNALS_SYSTEM_PROMPT,
+                user,
+                SignalFacts,
+                temperature=EXTRACTION_TEMPERATURE,
+            )
+        }
 
     def persona_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
@@ -285,7 +302,13 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         team_text = "" if state.get("thin") else _joined(state["page_text"], only=TEAM_HINTS)
         if len(team_text) > MIN_TEAM_TEXT:
             user = prompts.build_persona_user_prompt(name, team_text)
-            team = ask(deps.llm, prompts.PERSONA_SYSTEM_PROMPT, user, TeamFacts)
+            team = ask(
+                deps.llm,
+                prompts.PERSONA_SYSTEM_PROMPT,
+                user,
+                TeamFacts,
+                temperature=EXTRACTION_TEMPERATURE,
+            )
             people = [
                 Person(_clean_name(m.name), m.title.strip(), m.linkedin_url.strip() or None)
                 for m in team.people
@@ -305,7 +328,15 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         user = prompts.build_fit_user_prompt(
             inp.icp, _company(state), site.summary, site.products, inp.notes, answers
         )
-        return {"fit_facts": ask(deps.llm, prompts.FIT_SYSTEM_PROMPT, user, FitFacts)}
+        return {
+            "fit_facts": ask(
+                deps.llm,
+                prompts.FIT_SYSTEM_PROMPT,
+                user,
+                FitFacts,
+                temperature=EXTRACTION_TEMPERATURE,
+            )
+        }
 
     graph = StateGraph(ResearchState)
     graph.add_node("pages", pages_node)

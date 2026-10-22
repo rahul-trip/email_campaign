@@ -6,6 +6,7 @@ replaces only the outside world (search, model, finders, verifier, mailbox).
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Engine, select
@@ -29,13 +30,19 @@ from outbound.providers.ports import (
 )
 from outbound.runner.runner import Outcome
 from outbound.services.reports import ReportService
+from tests.stages.fakes import FakeLlm
 from tests.stages.world import PROFILE, SiteSearch, World
 
 C = CompanyStatus
 
 
 def build(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str, world: World
+    engine: Engine,
+    factory: UnitOfWorkFactory,
+    ws: str,
+    world: World,
+    *,
+    providers: Providers | None = None,
 ) -> tuple[Pipeline, Container]:
     with factory(ws) as uow:
         for policy in DEFAULT_COUNTRY_POLICIES:
@@ -48,7 +55,7 @@ def build(
         )
         uow.commit()
     container = Container(Settings(_env_file=None), engine, factory)
-    return assemble(container, ws, world.providers()), container
+    return assemble(container, ws, providers or world.providers()), container
 
 
 def paid_calls(factory: UnitOfWorkFactory, ws: str) -> int:
@@ -208,3 +215,19 @@ def test_the_pipeline_stops_cleanly_at_approved_when_no_mailbox_is_configured(
     pipeline.review.approve(pipeline.review.queue()[0].message.id)
     pipeline.runner.run_pipeline()
     assert statuses(factory, ws) == {"acme.co.uk": C.APPROVED}
+
+
+def test_the_email_is_written_by_the_writer_model_when_one_is_set(
+    engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    """Research stays on LLM_MODEL; only the copy step uses LLM_COPY_MODEL."""
+    world = World()
+    writer = FakeLlm()
+    writer.model = "strong/writer-model"
+    pipeline, _ = build(
+        engine, factory, ws, world, providers=replace(world.providers(), copy_llm=writer)
+    )
+    pipeline.intake.run(ROWS)
+    pipeline.runner.run_pipeline()
+    assert "site" in world.llm.calls and "actor" not in world.llm.calls
+    assert "actor" in writer.calls and "site" not in writer.calls

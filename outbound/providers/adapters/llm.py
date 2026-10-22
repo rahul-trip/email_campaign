@@ -54,6 +54,7 @@ class OpenAiCompatibleLlm:
         base_url: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4_000,
+        reasoning_effort: str = "",
         client: httpx.Client | None = None,
     ) -> None:
         self.name = preset
@@ -74,6 +75,7 @@ class OpenAiCompatibleLlm:
         self._json_mode = selected.json_mode
         self._temperature = temperature
         self._max_tokens = max_tokens
+        self._reasoning_effort = reasoning_effort.strip().lower()
         self._http = HttpClient(
             preset,
             address,
@@ -102,6 +104,8 @@ class OpenAiCompatibleLlm:
         }
         if json_mode and self._json_mode:
             body["response_format"] = {"type": "json_object"}
+        if self._reasoning_effort:
+            body["reasoning"] = {"effort": self._reasoning_effort}
         payload = self._http.post_object("/chat/completions", body)
         return self._parse(payload)
 

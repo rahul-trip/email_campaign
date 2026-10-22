@@ -21,6 +21,7 @@ def build(
     base_url: str = "",
     temperature: float = 0.7,
     max_tokens: int = 1_000,
+    reasoning_effort: str = "",
 ) -> OpenAiCompatibleLlm:
     return OpenAiCompatibleLlm(
         preset,
@@ -29,6 +30,7 @@ def build(
         base_url=base_url,
         temperature=temperature,
         max_tokens=max_tokens,
+        reasoning_effort=reasoning_effort,
         client=mock_client(handler),
     )
 
@@ -190,3 +192,29 @@ def test_json_is_found_inside_fences_and_commentary(text: str) -> None:
 def test_text_without_a_json_object_is_an_error(text: str) -> None:
     with pytest.raises(ProviderError):
         parse_json_object("llm", text)
+
+
+def test_reasoning_effort_is_sent_only_when_it_is_set() -> None:
+    seen, handler = capture()
+    build(handler, "openai_compatible", base_url="https://openrouter.ai/api/v1").complete("s", "u")
+    build(
+        handler,
+        "openai_compatible",
+        base_url="https://openrouter.ai/api/v1",
+        reasoning_effort="Low",
+    ).complete("s", "u")
+    assert "reasoning" not in json.loads(seen[0].read())
+    assert json.loads(seen[1].read())["reasoning"] == {"effort": "low"}
+
+
+def test_the_reasoning_effort_and_a_separate_writer_model_come_from_settings() -> None:
+    settings = Settings(
+        _env_file=None,
+        llm_provider="openai_compatible",
+        llm_base_url="https://openrouter.ai/api/v1",
+        llm_model="cheap/research-model",
+        llm_api_key=SECRET,
+        llm_reasoning_effort="low",
+    )
+    assert build_llm(settings).model == "cheap/research-model"
+    assert build_llm(settings, model="strong/writer-model").model == "strong/writer-model"

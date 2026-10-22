@@ -340,7 +340,9 @@ A failed lead shows the step and the reason. The application retries automatical
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |
 | no contact has an address that is safe to send to | The chosen address is no longer usable | Check the lead's People section |
 | per-prospect budget used up | The company hit its spend ceiling | Raise it in Settings → Limits and budget if you accept the cost |
-| the reply was cut off at the token limit | The model ran out of room | Raise `LLM_MAX_TOKENS` in `.env` |
+| the reply was cut off at the token limit | The model ran out of room, even after one more try (a reasoning model can spend the whole limit thinking) | Raise `LLM_MAX_TOKENS`; for a reasoning model also set `LLM_REASONING_EFFORT=low`, or use a model that does not think at length |
+| the model's reply was not valid JSON / did not have the expected shape | The model answered badly twice in a row (it is asked once more automatically). Free models do this often | Retry; or use a stronger model in `LLM_MODEL`. The emails alone can use a separate model: `LLM_COPY_MODEL` |
+| a 429 from the model | The model's provider is rate-limiting you (common on free models) | Wait and retry, or switch to a paid model |
 | a vendor error such as 401 or 429 | A key is wrong or a limit was hit | Check the key and your plan, then Retry |
 
 ---

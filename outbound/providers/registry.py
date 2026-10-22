@@ -144,8 +144,12 @@ def build_resolver(settings: Settings, client: httpx.Client | None = None) -> Ca
     return _build(_RESOLVERS, [settings.catch_all_resolver], settings, client)[0]
 
 
-def build_llm(settings: Settings, client: httpx.Client | None = None) -> LlmClient:
-    """The configured chat model. The key comes from the vendor's own variable, else LLM_API_KEY."""
+def build_llm(
+    settings: Settings, client: httpx.Client | None = None, *, model: str = ""
+) -> LlmClient:
+    """The configured chat model, or ``model`` on the same provider (the writer's, for example).
+
+    The key comes from the vendor's own variable, else LLM_API_KEY."""
     own = {
         "anthropic": settings.anthropic_api_key,
         "openai": settings.openai_api_key,
@@ -154,11 +158,12 @@ def build_llm(settings: Settings, client: httpx.Client | None = None) -> LlmClie
     }.get(settings.llm_provider, settings.llm_api_key)
     return OpenAiCompatibleLlm(
         settings.llm_provider,
-        settings.llm_model,
+        model or settings.llm_model,
         _key(own) or _key(settings.llm_api_key),
         base_url=settings.llm_base_url,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
+        reasoning_effort=settings.llm_reasoning_effort,
         client=client,
     )
 
