@@ -46,8 +46,8 @@ test("targets to review to draft, and an unapproved lead is never drafted", asyn
   await expect(page.getByText("Waiting (2)")).toBeVisible();
   const text = page.getByLabel("Email text");
   const original = await text.inputValue();
-  await text.fill(original.replace("Would a short call", "Is a short call"));
-  await expect(page.getByLabel("Changes")).toContainText("Is");
+  await text.fill(original.replace("Would one of the next two weeks", "Could one of the next two weeks"));
+  await expect(page.getByLabel("Changes")).toContainText("Could");
   await page.getByRole("button", { name: "Approve with my edit" }).click();
   await expect(page.getByText("Waiting (1)")).toBeVisible();
 
