@@ -704,20 +704,47 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   );
 }
 
+type NewsItem = { date?: string; headline: string; detail?: string; matters?: string; url: string };
+
+function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <Label className="mb-1 mt-3">{title}</Label>
+      <ul className="space-y-1.5 text-[13px]">
+        {items.map((item) => (
+          <li key={item.url}>
+            <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+              {item.headline}
+            </a>
+            {item.date && <span className="ml-2 font-mono text-[11px] text-muted">{item.date}</span>}
+            {item.detail && <div className="text-xs text-muted">{item.detail}</div>}
+            {item.matters && <div className="text-xs text-muted">Why it matters: {item.matters}</div>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function Research({ company }: { company: Company }) {
   const research = (company.research ?? {}) as Record<string, unknown>;
   const hooks = (research.hooks as string[] | undefined) ?? [];
+  const newsItems = (research.news_items as NewsItem[] | undefined) ?? [];
+  const triggers = (research.triggers as NewsItem[] | undefined) ?? [];
   const answers = Object.entries(company.research_answers ?? {});
   const decision = (company.policy_decision ?? {}) as { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
-  if (!research.summary && hooks.length === 0 && answers.length === 0 && !company.fit_reason) return null;
+  if (!research.summary && hooks.length === 0 && answers.length === 0 && !company.fit_reason && newsItems.length === 0) return null;
   return (
-    <Card title="Research">
+    <Card tour="lead-research" title="Research">
       {Boolean(research.summary) && <p className="text-[13px] leading-relaxed">{String(research.summary)}</p>}
       {company.fit_reason && (
         <p className="mt-2 text-xs text-muted">
           <strong className="text-ink">Fit {company.fit_score}/100:</strong> {company.fit_reason}
         </p>
       )}
+      <NewsList title="Recent news about them" items={newsItems} />
+      <NewsList title="Market news that may matter to them" items={triggers} />
       {hooks.length > 0 && (
         <>
           <Label className="mb-1 mt-3">Findings</Label>

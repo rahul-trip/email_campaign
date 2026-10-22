@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from outbound.domain.enums import LegalEntityType
-from outbound.providers.errors import ProviderError
+from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.ports import RegistryEntry, SearchHit
 from outbound.stages.research.facts import (
     CORPORATE_TYPES,
@@ -17,6 +19,7 @@ from outbound.stages.research.facts import (
 )
 from outbound.stages.research.graph import (
     LEGAL,
+    NEWS,
     PERSONA,
     SIGNALS,
     SITE,
@@ -481,3 +484,136 @@ def test_research_reads_facts_at_a_low_temperature() -> None:
 
     run(base(questions=("Do they trade power?",)), llm=Spy())
     assert seen and set(seen) == {0.2}
+
+
+# ------------------------------------------------------------------ recent news
+
+TODAY = datetime.now(UTC).date()
+
+
+def days_ago(n: int) -> str:
+    return (TODAY - timedelta(days=n)).isoformat()
+
+
+def news_hit(
+    slug: str, title: str, snippet: str, age: int | None, host: str = "news.example.com"
+) -> SearchHit:
+    return SearchHit(
+        url=f"https://{host}/{slug}",
+        title=title,
+        snippet=snippet,
+        published_date=days_ago(age) if age is not None else None,
+    )
+
+
+COMPANY_NEWS = [
+    news_hit("a", "Acme Energy wins Leeds grid contract", "Acme Energy signed a 3-year deal.", 12),
+    news_hit("b", "Acme Energy appoints new CTO", "Acme Energy named Sam Lee CTO.", 40),
+    news_hit("old", "Acme Energy opens first office", "Acme Energy opened in Leeds.", 400),
+    news_hit("nodate", "Acme Energy in talks", "Acme Energy is in talks.", None),
+    news_hit("other", "Acme Corp announces results", "A different Acme sells anvils.", 5),
+]
+MARKET_NEWS = [
+    news_hit(
+        "m1", "UK regulator opens half-hourly settlement tender", "Ofgem tender for forecasts.", 20
+    ),
+]
+
+
+def news_run(
+    llm: FakeLlm,
+    news: list[SearchHit],
+    market: list[SearchHit] | None = None,
+    **kwargs: object,
+) -> tuple[ResearchOutput, FakeLlm, FakeSearch]:
+    return run(base(**kwargs), llm=llm, search=FakeSearch(PAGES, news=news, market_news=market))
+
+
+def test_the_news_worker_always_runs() -> None:
+    assert NEWS in plan_workers(base(country_code="US", has_operator_contact=True))
+
+
+def test_recent_dated_news_about_the_company_and_its_market_is_kept_with_its_sources() -> None:
+    llm = FakeLlm(
+        {
+            "news": {
+                "company": [
+                    {"n": 1, "detail": "Acme won a three-year Leeds grid contract."},
+                    {"n": 2, "detail": "Acme named Sam Lee as CTO."},
+                ],
+                "market": [
+                    {"n": 3, "detail": "Ofgem opened a tender.", "matters": "Acme sells forecasts."}
+                ],
+            }
+        }
+    )
+    out, _, search = news_run(llm, COMPANY_NEWS, MARKET_NEWS)
+    items = out.research["news_items"]
+    assert [(i["date"], i["headline"], i["url"]) for i in items] == [
+        (days_ago(12), "Acme Energy wins Leeds grid contract", "https://news.example.com/a"),
+        (days_ago(40), "Acme Energy appoints new CTO", "https://news.example.com/b"),
+    ]
+    assert items[0]["detail"] == "Acme won a three-year Leeds grid contract."
+    triggers = out.research["triggers"]
+    assert [(t["headline"], t["matters"]) for t in triggers] == [
+        ("UK regulator opens half-hourly settlement tender", "Acme sells forecasts.")
+    ]
+    assert out.research["sector"] == "grid forecasting software"
+    # Two searches, both for news, the company's by name and the market by sector.
+    assert search.news_searches == [
+        ('"Acme Energy"', 180),
+        (
+            "grid forecasting software (regulation OR tender OR market OR funding OR acquisition)",
+            90,
+        ),
+    ]
+
+
+def test_undated_old_and_other_companys_news_never_reaches_the_model() -> None:
+    llm = FakeLlm({"news": {"company": [{"n": 1, "detail": "x"}], "market": []}})
+    _, llm, _ = news_run(llm, COMPANY_NEWS)
+    prompt = llm.users["news"]
+    assert "Leeds grid contract" in prompt and "new CTO" in prompt
+    assert "first office" not in prompt  # 400 days old
+    assert "in talks" not in prompt  # no date
+    assert "anvils" not in prompt  # does not name this company
+
+
+def test_a_number_the_model_made_up_is_ignored() -> None:
+    llm = FakeLlm(
+        {
+            "news": {
+                "company": [
+                    {"n": 9, "detail": "Acme bought a rocket."},
+                    {"n": 1, "detail": "Real news."},
+                ],
+                "market": [{"n": 1, "detail": "Wrong list.", "matters": "x"}],
+            }
+        }
+    )
+    out, _, _ = news_run(llm, COMPANY_NEWS)
+    assert [i["detail"] for i in out.research["news_items"]] == ["Real news."]
+    assert out.research["triggers"] == []  # number 1 belongs to the company list
+
+
+def test_no_dated_news_means_no_model_call() -> None:
+    out, llm, _ = news_run(FakeLlm(), [COMPANY_NEWS[3]])
+    assert "news" not in llm.calls
+    assert out.research["news_items"] == [] and out.research["triggers"] == []
+
+
+def test_a_failed_news_search_does_not_fail_the_lead_but_a_budget_error_does() -> None:
+    class Failing(FakeSearch):
+        def __init__(self, error: Exception) -> None:
+            super().__init__(PAGES)
+            self.error = error
+
+        def search(self, query, *, max_results=5, topic="general", days=None):  # type: ignore[no-untyped-def]
+            if topic == "news":
+                raise self.error
+            return super().search(query, max_results=max_results, topic=topic, days=days)
+
+    ok, _, _ = run(base(), search=Failing(ProviderError("tavily", "down")))
+    assert ok.research["news_items"] == []
+    with pytest.raises(BudgetExceeded):
+        run(base(), search=Failing(BudgetExceeded("tavily", "cap")))

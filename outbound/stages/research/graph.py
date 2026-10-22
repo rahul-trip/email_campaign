@@ -19,6 +19,8 @@ from __future__ import annotations
 import re
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -33,8 +35,9 @@ from outbound.domain.names import (
 )
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
+from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.llm_json import ask_json as ask
-from outbound.providers.ports import CompanyRegistry, LlmClient, SearchProvider
+from outbound.providers.ports import CompanyRegistry, LlmClient, SearchHit, SearchProvider
 from outbound.stages.research.facts import (
     CountryInference,
     best_registry_match,
@@ -50,6 +53,9 @@ PAGE_CHARS = 6_000
 TOTAL_CHARS = 18_000
 TEAM_HINTS = ("team", "leadership", "people", "about", "management")
 MAX_PEOPLE = 5
+COMPANY_NEWS_DAYS = 180
+MARKET_NEWS_DAYS = 90
+MARKET_TERMS = "(regulation OR tender OR market OR funding OR acquisition)"
 EXTRACTION_TEMPERATURE = 0.2  # reading facts out of text, not writing: no flourishes
 MIN_TEAM_TEXT = 100  # less than this is a menu, not a team page
 
@@ -99,11 +105,23 @@ class _Reply(BaseModel):
 
 
 class SiteFacts(_Reply):
+    sector: str = ""
     company_name: str = ""
     summary: str = ""
     products: list[str] = Field(default_factory=list)
     news: list[str] = Field(default_factory=list)
     hooks: list[str] = Field(default_factory=list)
+
+
+class _NewsPick(_Reply):
+    n: int = 0
+    detail: str = ""
+    matters: str = ""
+
+
+class NewsFacts(_Reply):
+    company: list[_NewsPick] = Field(default_factory=list)
+    market: list[_NewsPick] = Field(default_factory=list)
 
 
 class SignalFacts(_Reply):
@@ -136,12 +154,12 @@ class FitFacts(_Reply):
 
 # --------------------------------------------------------------------------- the supervisor
 
-SITE, LEGAL, SIGNALS, PERSONA = "site", "legal", "signals", "persona"
+SITE, LEGAL, SIGNALS, PERSONA, NEWS = "site", "legal", "signals", "persona", "news"
 
 
 def plan_workers(inp: ResearchInput) -> list[str]:
     """Which workers run for this company. Deterministic, so every rule has a test."""
-    workers = [SITE]
+    workers = [SITE, NEWS]
     if inp.country_code in (None, "GB"):
         workers.append(LEGAL)
     if inp.questions:
@@ -163,6 +181,8 @@ class ResearchState(TypedDict, total=False):
     country_suggestion: tuple[str, str]
     legal_facts: tuple[LegalEntityType, str]
     signal_facts: SignalFacts
+    news_items: list[dict[str, str]]
+    triggers: list[dict[str, str]]
     people_found: list[Person]
     fit_facts: FitFacts | None
 
@@ -275,6 +295,81 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         update["legal_facts"] = entity
         return update
 
+    def news_node(state: ResearchState) -> ResearchState:
+        name = _company(state)
+        site = state.get("site_facts") or SiteFacts()
+        try:
+            company_hits = _dated(
+                deps.search.search(
+                    f'"{name}"', max_results=8, topic="news", days=COMPANY_NEWS_DAYS
+                ),
+                COMPANY_NEWS_DAYS,
+            )
+            # A news hit must use the company's whole name. The website's name alone is not enough
+            # here: "Acme" matches every Acme in the news, and a wrong story is worse than none.
+            company_hits = [
+                h for h in company_hits if mentions_company(f"{h.title} {h.snippet}", name, "")
+            ]
+            market_hits = (
+                _dated(
+                    deps.search.search(
+                        f"{site.sector.strip()} {MARKET_TERMS}",
+                        max_results=6,
+                        topic="news",
+                        days=MARKET_NEWS_DAYS,
+                    ),
+                    MARKET_NEWS_DAYS,
+                )
+                if site.sector.strip()
+                else []
+            )
+        except BudgetExceeded:
+            raise
+        except ProviderError as error:
+            # News makes the email better but is not worth failing the lead for.
+            log.warning("news_search_failed", reason=str(error)[:200])
+            return {"news_items": [], "triggers": []}
+        if not company_hits and not market_hits:
+            return {"news_items": [], "triggers": []}
+        user = prompts.build_news_user_prompt(
+            name,
+            site.sector,
+            site.summary,
+            _numbered(company_hits),
+            _numbered(market_hits, start=len(company_hits) + 1),
+        )
+        picked = ask(
+            deps.llm,
+            prompts.NEWS_SYSTEM_PROMPT,
+            user,
+            NewsFacts,
+            temperature=EXTRACTION_TEMPERATURE,
+        )
+        everything = [*company_hits, *market_hits]  # numbering is continuous across both lists
+
+        def items(picks: list[_NewsPick], allowed: range) -> list[dict[str, str]]:
+            found: list[dict[str, str]] = []
+            for pick in picks:
+                if pick.n in allowed and pick.detail.strip():
+                    hit = everything[pick.n - 1]
+                    found.append(
+                        {
+                            "date": _iso_date(hit.published_date) or "",
+                            "headline": hit.title.strip(),
+                            "detail": " ".join(pick.detail.split()),
+                            "matters": " ".join(pick.matters.split()),
+                            "url": hit.url,
+                        }
+                    )
+            return found
+
+        company_range = range(1, len(company_hits) + 1)
+        market_range = range(len(company_hits) + 1, len(everything) + 1)
+        return {
+            "news_items": items(picked.company, company_range)[:3],
+            "triggers": items(picked.market, market_range)[:2],
+        }
+
     def signals_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
         name = _company(state)
@@ -342,15 +437,16 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
     graph.add_node("pages", pages_node)
     graph.add_node(SITE, site_node)
     graph.add_node(LEGAL, legal_node)
+    graph.add_node(NEWS, news_node)
     graph.add_node(SIGNALS, signals_node)
     graph.add_node(PERSONA, persona_node)
     graph.add_node("fit", fit_node)
     graph.add_edge(START, "pages")
     graph.add_edge("pages", SITE)
     graph.add_conditional_edges(
-        SITE, supervisor, {name: name for name in (LEGAL, SIGNALS, PERSONA, "fit")}
+        SITE, supervisor, {name: name for name in (LEGAL, SIGNALS, PERSONA, NEWS, "fit")}
     )
-    for worker in (LEGAL, SIGNALS, PERSONA):
+    for worker in (LEGAL, SIGNALS, PERSONA, NEWS):
         graph.add_edge(worker, "fit")
     graph.add_edge("fit", END)
     return graph.compile()
@@ -389,6 +485,42 @@ def search_people(
     return people
 
 
+def _iso_date(value: str | None) -> str | None:
+    """A vendor's date ("2026-10-18", "Sun, 18 Oct 2026 09:00:00 GMT", ...) as YYYY-MM-DD."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        pass
+    try:
+        return parsedate_to_datetime(text).date().isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
+def _dated(hits: Sequence[SearchHit], days: int) -> list[SearchHit]:
+    """Only hits with a date that is within the window (not undated, not in the future)."""
+    today = datetime.now(UTC).date()
+    kept: list[SearchHit] = []
+    for hit in hits:
+        iso = _iso_date(hit.published_date)
+        if iso is None:
+            continue
+        age = (today - date.fromisoformat(iso)).days
+        if 0 <= age <= days + 1:
+            kept.append(hit)
+    return kept
+
+
+def _numbered(hits: Sequence[SearchHit], *, start: int = 1) -> str:
+    return "\n".join(
+        f"{i}. [{_iso_date(h.published_date)}] {h.title.strip()}: {h.snippet.strip()[:300]}"
+        for i, h in enumerate(hits, start=start)
+    )
+
+
 def _unique(people: Sequence[Person]) -> list[Person]:
     seen: set[str] = set()
     unique: list[Person] = []
@@ -414,6 +546,9 @@ def run_research(graph: Any, inp: ResearchInput) -> ResearchOutput:
             "summary": site.summary,
             "products": site.products,
             "news": site.news,
+            "news_items": state.get("news_items") or [],
+            "triggers": state.get("triggers") or [],
+            "sector": site.sector.strip(),
             "hooks": site.hooks,
             "hiring": signals.hiring,
             "tech": signals.tech,

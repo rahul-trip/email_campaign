@@ -938,3 +938,35 @@ def test_the_country_rule_can_be_skipped_for_a_lead_and_switched_off_for_the_wor
     assert api.put("/api/settings/policies/SE", json={"rule": "block"}).status_code == 200
     assert api.delete("/api/settings/policies/SE").status_code == 204
     assert api.delete("/api/settings/policies/SE").status_code == 404
+
+
+def test_dated_news_is_shown_on_the_lead_and_in_its_journey(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = seed_company(factory, ws, "acme.com", C.RESEARCHED)
+    item = {
+        "date": "2026-10-10",
+        "headline": "Acme wins Leeds contract",
+        "detail": "A three-year deal.",
+        "matters": "",
+        "url": "https://news.example.com/acme",
+    }
+    with factory(ws) as uow:
+        current = uow.companies.get(cid)
+        uow.companies.update_fields(
+            cid,
+            {"research": {"summary": "Acme", "news_items": [item], "triggers": []}},
+            actor="system",
+            expected_version=current.row_version,
+        )
+        uow.commit()
+    assert api.get(f"/api/companies/{cid}").json()["company"]["research"]["news_items"] == [item]
+    research = next(
+        s
+        for s in api.get(f"/api/companies/{cid}/journey").json()["stages"]
+        if s["key"] == "research"
+    )
+    assert {
+        "label": "Recent company news",
+        "value": "2026-10-10 · Acme wins Leeds contract (https://news.example.com/acme)",
+    } in research["facts"]

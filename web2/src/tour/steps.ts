@@ -189,6 +189,11 @@ export const SECTIONS: Section[] = [
         body: "Someone you know at the company, with a first and last name or their work email. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on.",
       },
       {
+        target: "lead-research",
+        title: "What research found",
+        body: "What the company does, how well it fits, your research questions' answers, and recent dated news about the company and its market, each a link to its source. The email opens with one of them when there is one.",
+      },
+      {
         target: "lead-policy",
         title: "Country rule",
         body: "Skip the country's rule for this lead from a step onward, with a reason that is kept. A lead it held goes straight on. The do-not-contact list still applies, and approving the email asks you to confirm.",

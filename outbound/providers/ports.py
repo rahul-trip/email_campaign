@@ -124,6 +124,7 @@ class SearchHit(_Model):
     title: str = ""
     snippet: str = ""
     score: float | None = None
+    published_date: str | None = None  # as the vendor gives it; news searches only
 
 
 class PageText(_Model):
@@ -134,7 +135,17 @@ class PageText(_Model):
 class SearchProvider(Protocol):
     name: str
 
-    def search(self, query: str, *, max_results: int = 5) -> list[SearchHit]: ...
+    def search(
+        self,
+        query: str,
+        *,
+        max_results: int = 5,
+        topic: str = "general",
+        days: int | None = None,
+    ) -> list[SearchHit]:
+        """Web search. ``topic="news"`` searches news sources and dates each hit; ``days`` keeps
+        only what was published in the last that many days."""
+        ...
 
     def extract(self, urls: list[str]) -> list[PageText]:
         """Fetch page text. URLs the vendor could not fetch are left out, not raised."""
