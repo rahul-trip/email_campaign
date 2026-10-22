@@ -201,7 +201,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 **A lead's page** (click its name) shows:
 
 - the status, hold reason, company type, country, fit score and priority, and which values you set yourself;
-- buttons that appear when they apply: **Journey**, **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
+- buttons that appear when they apply: **Journey**, **Research again** (any researched lead whose email has not left: the next run reads the site and searches the news afresh, then checks fit, people and address and writes the email again; an email waiting for review or approved is cancelled; what you set yourself is kept and addresses already found are reused at no cost), **Retry** (failed), **Override and qualify** (disqualified, except where a country rule blocks contact: record a person's consent instead);
 - for a **held** lead, a panel that says why and what fixes it, with **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume. For consent and company-type holds it points you to **Add a person with consent**;
 - **People and addresses:** each person in rank order, each address with its status, where it came from, which vendor found it and which one checked it. *The email is to this person* marks who the waiting email is written to. A person you added, gave an address to, or recorded consent for always comes first, whatever the campaign's job titles prefer, and only that person's own consent lets them be written to. Each person has:
   - **Edit:** correct the name or title, or give a work email. A new address replaces the old one as the one written to; the old one stays as history. On a lead whose email step failed, saving also retries that step;
@@ -220,7 +220,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 - **Edit this lead** (right): name, country, priority and campaign. What you save is marked as yours and kept. If something changed the lead meanwhile, you are asked to reload;
 - **Danger zone** (right, red): **Suppress this domain** for everyone at the company, and **Delete permanently…**, which removes the lead for good with its people, addresses, emails, notes and history, and any draft waiting in your mailbox. You must type the lead's domain before the button works, and the server checks it again. You can tick *Also never contact this domain again*. A lead that has already been emailed **cannot** be deleted: suppress it instead. Money already spent stays in the cost totals.
 
-**A lead's journey** (the *Journey* link) tells the whole story of one company:
+**A lead's journey** (the *Journey* link) tells the whole story of one company. When its email is waiting for review, **Open in Review** takes you straight to that email:
 
 - what state the lead is in and **what happens next** (and whether the next move is yours), how many of the eight stages are finished, what has been spent on it, and how many people and emails there are;
 - the **stage bar** of the eight stages: Intake, Research, Qualification, People, Email address, Copy, Review, and Draft and outreach. Green is done, blue is next for the engine, amber is held or waiting for you, red is failed or stopped, grey is not reached. Click a stage (or use the arrow keys) to read it. The page opens on the stage that needs attention;
@@ -234,7 +234,7 @@ It only shows; to act, use **Open the lead to act on it**.
 - **What to run.** *Only my targets* (the usual), *Discover new companies* (the application searches the web for companies matching a campaign's ideal-customer description; choose which campaign and how many), or both. Discovered companies must pass the fit minimum; ones you added by hand skip it. A discovered company is named from its own website during research, never from the article or report that led to it, and articles and documents in the search results are skipped.
 - **Leads per stage.** At most this many companies are handled by each step in one run (default 50).
 
-A run moves every company as far as it can go and lists, per step, how many moved on, were held or failed, plus the time it took and the money spent. **Cancel** stops a run between companies; **Details** shows when it was queued, started and finished and its settings. The list updates by itself while a run is queued or running.
+A run moves every company as far as it can go and lists, per step, how many moved on, were held or failed, plus the time it took and the money spent. **Cancel** stops a run between companies. Click a run's time, or **Open**, for its own page: what it was asked to do, its counts per step and spend, and **every lead it moved on, held, failed or will retry**, with each step it took and the reason or error, failures first. Each lead's name opens the lead, and **Journey** its journey. A lead the run looked at and left alone is not listed. The page fills in while the run is going. The list updates by itself while a run is queued or running.
 
 Run states: *Queued* (waiting for the worker), *Running*, *Succeeded*, *Failed* (the run itself broke; individual companies failing does not make a run fail), *Cancelled*.
 

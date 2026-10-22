@@ -2077,6 +2077,54 @@
         "title": "RunIn",
         "type": "object"
       },
+      "RunLeadOut": {
+        "properties": {
+          "company_id": {
+            "title": "Company Id",
+            "type": "string"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RunStepOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company_id",
+          "domain",
+          "name",
+          "status",
+          "outcome",
+          "steps"
+        ],
+        "title": "RunLeadOut",
+        "type": "object"
+      },
       "RunMode": {
         "enum": [
           "manual",
@@ -2170,6 +2218,61 @@
           "created_at"
         ],
         "title": "RunOut",
+        "type": "object"
+      },
+      "RunStepOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Status"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "from_status",
+          "to_status",
+          "detail"
+        ],
+        "title": "RunStepOut",
         "type": "object"
       },
       "SenderProfileIn": {
@@ -3807,6 +3910,48 @@
         ]
       }
     },
+    "/api/companies/{company_id}/research-again": {
+      "post": {
+        "operationId": "research_again_api_companies__company_id__research_again_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research Again",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/{company_id}/retry": {
       "post": {
         "operationId": "retry_api_companies__company_id__retry_post",
@@ -4810,6 +4955,53 @@
           }
         },
         "summary": "Cancel",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/leads": {
+      "get": {
+        "description": "Every lead the run moved, held, failed or deferred, each with its steps.",
+        "operationId": "run_leads_api_runs__run_id__leads_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunLeadOut"
+                  },
+                  "title": "Response Run Leads Api Runs  Run Id  Leads Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Leads",
         "tags": [
           "runs"
         ]

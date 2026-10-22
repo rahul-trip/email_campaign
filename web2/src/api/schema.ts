@@ -230,6 +230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/research-again": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Research Again */
+        post: operations["research_again_api_companies__company_id__research_again_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/retry": {
         parameters: {
             query?: never;
@@ -622,6 +639,26 @@ export interface paths {
         put?: never;
         /** Cancel */
         post: operations["cancel_api_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/leads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Leads
+         * @description Every lead the run moved, held, failed or deferred, each with its steps.
+         */
+        get: operations["run_leads_api_runs__run_id__leads_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1507,6 +1544,21 @@ export interface components {
             /** Only */
             only?: string[];
         };
+        /** RunLeadOut */
+        RunLeadOut: {
+            /** Company Id */
+            company_id: string;
+            /** Domain */
+            domain: string;
+            /** Name */
+            name: string | null;
+            /** Outcome */
+            outcome: string;
+            /** Status */
+            status: string;
+            /** Steps */
+            steps: components["schemas"]["RunStepOut"][];
+        };
         /**
          * RunMode
          * @enum {string}
@@ -1539,6 +1591,22 @@ export interface components {
             started_at: string | null;
             /** Status */
             status: string;
+        };
+        /** RunStepOut */
+        RunStepOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Detail */
+            detail: string | null;
+            /** From Status */
+            from_status: string | null;
+            /** Kind */
+            kind: string;
+            /** To Status */
+            to_status: string | null;
         };
         /**
          * SenderProfileIn
@@ -2228,6 +2296,37 @@ export interface operations {
         };
     };
     requalify_api_companies__company_id__requalify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    research_again_api_companies__company_id__research_again_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -2991,6 +3090,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_leads_api_runs__run_id__leads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunLeadOut"][];
                 };
             };
             /** @description Validation Error */

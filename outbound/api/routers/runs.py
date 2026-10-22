@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, services
-from outbound.api.schemas import CostOut, QualityOut, RunIn, RunOut, StatusOut
+from outbound.api.schemas import CostOut, QualityOut, RunIn, RunLeadOut, RunOut, StatusOut
 from outbound.db.types import utcnow
 from outbound.services.runs import RunRequest
 
@@ -34,6 +34,12 @@ def recent_runs(svc: Annotated[Services, Depends(services)]) -> list[RunOut]:
 @router.get("/runs/{run_id}", response_model=RunOut)
 def run(run_id: str, svc: Annotated[Services, Depends(services)]) -> RunOut:
     return RunOut.model_validate(svc.runs.get(run_id))
+
+
+@router.get("/runs/{run_id}/leads", response_model=list[RunLeadOut])
+def run_leads(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[RunLeadOut]:
+    """Every lead the run moved, held, failed or deferred, each with its steps."""
+    return [RunLeadOut.model_validate(lead) for lead in svc.runs.leads(run_id)]
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunOut)

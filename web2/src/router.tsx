@@ -49,15 +49,24 @@ const leads = createRoute({
   }),
 });
 
+// Review can open on one email, e.g. from a lead's journey.
+const review = createRoute({
+  getParentRoute: () => root,
+  path: "/review",
+  component: lazy(() => import("./pages/Review"), "ReviewPage"),
+  validateSearch: (search: Record<string, unknown>): { message?: string } => ({ message: text(search.message) }),
+});
+
 const routeTree = root.addChildren([
   page("/", DashboardPage),
-  page("/review", lazy(() => import("./pages/Review"), "ReviewPage")),
+  review,
   page("/attention", lazy(() => import("./pages/Attention"), "AttentionPage")),
   leads,
   page("/leads/$companyId", lazy(() => import("./pages/LeadDetail"), "LeadDetailPage")),
   page("/leads/$companyId/journey", lazy(() => import("./pages/LeadJourney"), "LeadJourneyPage")),
   page("/targets", lazy(() => import("./pages/Targets"), "TargetsPage")),
   page("/runs", lazy(() => import("./pages/Runs"), "RunsPage")),
+  page("/runs/$runId", lazy(() => import("./pages/RunDetail"), "RunDetailPage")),
   page("/campaigns", lazy(() => import("./pages/Campaigns"), "CampaignsPage")),
   page("/mailboxes", lazy(() => import("./pages/Mailboxes"), "MailboxesPage")),
   page("/reports", lazy(() => import("./pages/Reports"), "ReportsPage")),

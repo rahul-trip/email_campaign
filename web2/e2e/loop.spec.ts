@@ -110,3 +110,42 @@ test("an email can be written again, and the new one is waiting for review", asy
   await page.goto("/review");
   await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(1);
 });
+
+test("a run has its own page listing the leads it touched, each one a link", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("run-page");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto("/runs");
+  await page.getByRole("link", { name: "Open" }).first().click();
+  await expect(page).toHaveURL(/\/runs\/[0-9a-f-]+$/);
+  const row = page.getByRole("row").filter({ hasText: domain });
+  await expect(row).toContainText("Moved on");
+  await row.getByRole("link").first().click();
+  await expect(page).toHaveURL(/\/leads\/[0-9a-f-]+$/);
+});
+
+test("from a copy-ready lead's journey, Open in Review shows that email", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("journey-review");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto(`/leads/${await leadId(page, domain)}/journey`);
+  await page.getByRole("link", { name: "Open in Review" }).click();
+  await expect(page).toHaveURL(/\/review\?message=/);
+  await expect(page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(domain) })).toHaveAttribute("aria-current", "true");
+});
+
+test("Research again sends a lead back to the start and cancels its waiting email", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("research-again");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto(`/leads/${await leadId(page, domain)}`);
+  await page.getByRole("button", { name: "Research again" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Research again" }).click();
+  await expect(page.locator("[data-tour=lead-header]")).toContainText("New");
+  await runEngine(page);
+  await page.reload();
+  await expect(page.locator("[data-tour=lead-header]")).toContainText("Copy ready");
+});

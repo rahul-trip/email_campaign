@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useSearch } from "@tanstack/react-router";
 import { diffWords } from "diff";
 import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Keyboard, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -36,7 +36,9 @@ const checksFor = (low: number, high: number): [string, string][] => [
 
 export function ReviewPage() {
   const queue = useQuery({ queryKey: ["review"], queryFn: () => ok(client.GET("/api/review")), refetchInterval: 10000 });
-  const [selected, setSelected] = useState<string | null>(null);
+  // A link such as the journey's "Open in Review" names the email to show first.
+  const { message } = useSearch({ from: "/review" });
+  const [selected, setSelected] = useState<string | null>(message ?? null);
   const [showKeys, setShowKeys] = useState(false);
   const items = queue.data ?? [];
   const index = Math.max(0, items.findIndex((item) => item.message.id === selected));

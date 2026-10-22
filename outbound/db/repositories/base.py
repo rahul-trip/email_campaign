@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
@@ -76,6 +76,19 @@ class EventRepository:
                         for kind, ident in entities
                     )
                 ),
+            )
+            .order_by(EventRow.created_at, EventRow.id)
+        )
+        return [snapshot(row, Event) for row in self._session.scalars(stmt)]
+
+    def for_run(self, run_id: str, types: Collection[str]) -> list[Event]:
+        """Events a run recorded (their data carries its ``run_id``), oldest first."""
+        stmt = (
+            select(EventRow)
+            .where(
+                EventRow.workspace_id == self._workspace_id,
+                EventRow.type.in_(list(types)),
+                EventRow.data["run_id"].as_string() == run_id,
             )
             .order_by(EventRow.created_at, EventRow.id)
         )

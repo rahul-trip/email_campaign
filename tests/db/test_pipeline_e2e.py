@@ -30,6 +30,7 @@ from outbound.providers.ports import (
 )
 from outbound.runner.runner import Outcome
 from outbound.services.reports import ReportService
+from outbound.services.runs import RunService
 from tests.stages.fakes import FakeLlm
 from tests.stages.world import PROFILE, SiteSearch, World
 
@@ -233,3 +234,39 @@ def test_the_email_is_written_by_the_writer_model_when_one_is_set(
     pipeline.runner.run_pipeline()
     assert "site" in world.llm.calls and "actor" not in world.llm.calls
     assert "actor" in writer.calls and "site" not in writer.calls
+
+
+def test_a_run_lists_every_lead_it_moved_held_or_failed_with_each_step(
+    engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    world = World()
+    pipeline, _ = build(engine, factory, ws, world)
+    pipeline.intake.run(ROWS)
+    run = pipeline.runner.run_pipeline()
+    leads = RunService(factory, ws).leads(run.run_id)
+    assert sorted(lead.domain for lead in leads) == ["acme.co.uk", "beta.com"]
+    first = next(lead for lead in leads if lead.domain == "beta.com")
+    assert [(s.from_status, s.to_status) for s in first.steps] == [
+        ("new", "researched"),
+        ("researched", "qualified"),
+        ("qualified", "contacts_found"),
+        ("contacts_found", "email_ready"),
+        ("email_ready", "copy_ready"),
+    ]
+    assert (first.status, first.outcome) == ("copy_ready", "moved")
+    # A second run that has nothing to do lists nothing: only what a run itself did is its own.
+    again = pipeline.runner.run_pipeline()
+    assert RunService(factory, ws).leads(again.run_id) == []
+
+
+def test_a_lead_the_run_failed_is_listed_with_the_error(
+    engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    world = World()
+    world.llm.replies["site"] = "not json at all"
+    pipeline, _ = build(engine, factory, ws, world)
+    pipeline.intake.run(ROWS[:1])
+    run = pipeline.runner.run_pipeline()
+    [lead] = RunService(factory, ws).leads(run.run_id)
+    assert lead.outcome == "failed"
+    assert lead.steps[-1].to_status == "failed" and "JSON" in (lead.steps[-1].detail or "")

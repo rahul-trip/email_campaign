@@ -86,7 +86,7 @@ export const SECTIONS: Section[] = [
       {
         target: "recent-runs",
         title: "Watch it work",
-        body: "Progress and spend update while a run is going. Cancel stops it between companies. If a run stays queued, the worker is not running.",
+        body: "Progress and spend update while a run is going. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run to see every lead it moved on, held, failed or will retry, with each step; click a lead to go to it.",
       },
     ],
   },
@@ -154,7 +154,7 @@ export const SECTIONS: Section[] = [
       {
         target: "journey-header",
         title: "Where this lead is",
-        body: "Its state and what happens next, including whether the next move is yours.",
+        body: "Its state and what happens next, including whether the next move is yours. When its email is waiting for review, Open in Review takes you straight to it.",
       },
       {
         target: "journey-stages",
@@ -181,7 +181,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-header",
         title: "Status and next actions",
-        body: "A failed lead can be retried. A held lead explains why and offers the fix. A disqualified lead can be overridden unless a country rule blocks it.",
+        body: "A failed lead can be retried. A held lead explains why and offers the fix. A disqualified lead can be overridden unless a country rule blocks it. Research again reads the site and the news afresh and rewrites the email (a waiting email is cancelled).",
       },
       {
         target: "lead-people",

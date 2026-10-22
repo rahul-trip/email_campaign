@@ -628,6 +628,33 @@ class LeadService:
                 uow.contacts.get(address.contact_id), uow.emails.for_contact(address.contact_id)
             )
 
+    def research_again(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+        """Send a lead back to research, to pick up fresh news or a changed site.
+
+        Everything after research runs again too: the gate, people, the email (addresses already
+        found are reused at no cost) and the copy. An email waiting for review or approved but
+        not yet in the mailbox is cancelled, so the new one replaces it. What you set by hand
+        (name, country, people, addresses, consent) is kept.
+        """
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            if company.status is CompanyStatus.NEW:
+                raise LeadError("the lead has not been researched yet: the next run does it")
+            if company.status in _AFTER_THE_MAILBOX:
+                raise LeadError(
+                    f"the lead is {company.status.value}: its email has already left, so it is"
+                    " not researched again"
+                )
+            for message in uow.messages.for_company(company_id):
+                if message.state in (MessageState.GENERATED, MessageState.APPROVED):
+                    uow.messages.transition(
+                        message.id,
+                        MessageState.CANCELLED,
+                        expected_version=message.row_version,
+                        actor=actor,
+                    )
+            return self._move(uow, company, CompanyStatus.NEW, actor, "research again")
+
     def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
         with self._uow(self._workspace_id) as uow:

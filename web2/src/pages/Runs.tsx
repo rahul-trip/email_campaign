@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, Square } from "lucide-react";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../components/ui";
+import { Button, Callout, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th, buttonClass } from "../components/ui";
 import { ago, duration, usd, when } from "../lib/format";
 import { describe, runStatus } from "../lib/status";
 import { RunCounts } from "./Dashboard";
@@ -22,7 +23,6 @@ export function RunsPage() {
   const [limit, setLimit] = useState(50);
   const [discover, setDiscover] = useState(10);
   const [campaign, setCampaign] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
 
   const runs = useQuery({
     queryKey: ["runs"],
@@ -126,7 +126,9 @@ export function RunsPage() {
                     return (
                       <tr key={run.id} className="align-top hover:bg-surface-low">
                         <Td className="whitespace-nowrap">
-                          <div className="text-[13px]">{ago(run.started_at ?? run.created_at)}</div>
+                          <Link to="/runs/$runId" params={{ runId: run.id }} className="text-[13px] font-semibold text-primary hover:underline">
+                            {ago(run.started_at ?? run.created_at)}
+                          </Link>
                           <div className="text-[11px] text-muted" title={when(run.created_at)}>
                             {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
                           </div>
@@ -140,15 +142,14 @@ export function RunsPage() {
                         <Td className="hidden whitespace-nowrap text-xs text-muted md:table-cell">{run.started_at ? duration(run.started_at, run.finished_at) : "not started"}</Td>
                         <Td className="text-right font-mono text-xs">{usd(run.cost_micro_usd)}</Td>
                         <Td className="whitespace-nowrap text-right">
-                          {live ? (
+                          {live && (
                             <Button variant="danger-ghost" size="sm" busy={cancel.isPending && cancel.variables === run.id} onClick={() => cancel.mutate(run.id)}>
                               <Square className="size-3" aria-hidden /> Cancel
                             </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" onClick={() => setOpen(open === run.id ? null : run.id)} aria-expanded={open === run.id}>
-                              {open === run.id ? "Hide" : "Details"}
-                            </Button>
                           )}
+                          <Link to="/runs/$runId" params={{ runId: run.id }} className={buttonClass("ghost", "sm")}>
+                            Open
+                          </Link>
                         </Td>
                       </tr>
                     );
@@ -158,37 +159,7 @@ export function RunsPage() {
             )
           }
         </QueryState>
-        {open && <RunDetail run={runs.data?.find((r) => r.id === open)} />}
       </Card>
     </>
-  );
-}
-
-function RunDetail({ run }: { run?: { id: string; params?: Record<string, unknown> | null; counts?: Record<string, unknown> | null; created_at: string; started_at?: string | null; finished_at?: string | null; cost_micro_usd: number; status: string } }) {
-  if (!run) return null;
-  const counts = Object.entries(run.counts ?? {}).filter(([, v]) => typeof v !== "object");
-  return (
-    <div className="border-t border-line bg-surface-low p-4 text-xs">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <div className="text-muted">Queued</div>
-          {when(run.created_at)}
-        </div>
-        <div>
-          <div className="text-muted">Started</div>
-          {when(run.started_at) || "–"}
-        </div>
-        <div>
-          <div className="text-muted">Finished</div>
-          {when(run.finished_at) || "–"}
-        </div>
-        <div>
-          <div className="text-muted">Run id</div>
-          <span className="font-mono">{run.id}</span>
-        </div>
-      </div>
-      <div className="mt-3 text-muted">Settings: {Object.entries(run.params ?? {}).map(([k, v]) => `${k} ${Array.isArray(v) ? v.join(", ") || "all" : String(v)}`).join(" · ")}</div>
-      {counts.length > 0 && <div className="mt-1 text-muted">{counts.map(([k, v]) => `${k}: ${String(v)}`).join(" · ")}</div>}
-    </div>
   );
 }
