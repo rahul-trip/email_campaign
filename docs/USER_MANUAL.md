@@ -140,6 +140,7 @@ This is where you spend most of your time.
 | **Approve** | Accepts the email as written |
 | **Approve with my edit** | Accepts your edited text. Both versions are kept, and how much you changed is recorded |
 | **Undo my edits** | Puts the original text back |
+| **Ask for changes** (box under the email) | Type how to change it: the tone, the length, what to stress, or facts to add (one click on *More formal*, *Shorter* and the like starts you off). **Rewrite with these changes** rewrites the text as it is in the box, with your own edits, and puts the result there; the diff shows what changed. Ask again as often as you like, edit by hand, then approve: approving keeps it as your version, which teaches the writer like any edit. Your facts are used as given; the legal footer is kept exactly. If the rewrite breaks a check (say, too long) it says so, but you can still approve. Nothing is saved until you approve; what you asked for is kept in the email's history |
 | **Write it again** | Throws this email away and has the next run write a new one to the same person, under the current rules and news. Use it when the email misses the point |
 | **Reject…** | Ends work on this company. A reason is required and is kept |
 
@@ -212,7 +213,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
   - **Skip the check** (next to an address the check could not prove: *unknown*, *invalid*, a catch-all, or not checked yet): if you know the address works, write why and confirm. It becomes the address written to, no more checks are paid for it, and a lead stopped at the email step goes on. An *invalid* address will probably bounce, so use it only when you are sure. **Check it again** undoes it until the email is approved. The same button is in the journey's *Email address* stage when the lead is stuck there;
   - **Suppress:** never contact them again; their unsent emails are cancelled;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
-- **Emails:** each email written, its state, how much you edited it and when it was sent;
+- **Emails:** each email written, its state, how much you edited it and when it was sent. One waiting for review has **Open in Review**, which opens Review on that email;
 - **Research:** the summary, the fit reason, **recent news about the company** and **market news that may matter to it** (each a dated link to its source), the findings, your research questions' answers and the country rule;
 - **Vendor calls:** every vendor call made for this company: when, which vendor, what, the result and the cost. *Cache hit, free* means a stored answer was reused;
 - **Your values kept:** only appears if the engine found a different value for something you set. Yours was kept; theirs is shown;
@@ -220,7 +221,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 - **Edit this lead** (right): name, country, priority and campaign. What you save is marked as yours and kept. If something changed the lead meanwhile, you are asked to reload;
 - **Danger zone** (right, red): **Suppress this domain** for everyone at the company, and **Delete permanently…**, which removes the lead for good with its people, addresses, emails, notes and history, and any draft waiting in your mailbox. You must type the lead's domain before the button works, and the server checks it again. You can tick *Also never contact this domain again*. A lead that has already been emailed **cannot** be deleted: suppress it instead. Money already spent stays in the cost totals.
 
-**A lead's journey** (the *Journey* link) tells the whole story of one company. When its email is waiting for review, **Open in Review** takes you straight to that email:
+**A lead's journey** (the *Journey* link) tells the whole story of one company:
 
 - what state the lead is in and **what happens next** (and whether the next move is yours), how many of the eight stages are finished, what has been spent on it, and how many people and emails there are;
 - the **stage bar** of the eight stages: Intake, Research, Qualification, People, Email address, Copy, Review, and Draft and outreach. Green is done, blue is next for the engine, amber is held or waiting for you, red is failed or stopped, grey is not reached. Click a stage (or use the arrow keys) to read it. The page opens on the stage that needs attention;

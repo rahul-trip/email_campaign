@@ -212,6 +212,8 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 
 **The operator can skip the check for one address** (`contact_emails.verification_skipped`, with a reason in the `email_verification_skipped` event): the address is then sendable whatever its status, even `invalid`, and no verifier or finder is called for it. Suppression still applies.
 
+**Revisions on Review.** The operator can ask the writer model to rewrite a waiting email with free-text instructions (tone, length, facts to add; `POST /api/review/{id}/revise`). It revises the text as it stands in the editor, never sees or changes the footer (code puts it back), treats the operator's facts as true, and returns the text and its lint report without saving; approval stores it as the operator's version (`final_body`, with its edit distance). The request is recorded as a `revision_asked` event; the call goes through the meter, attributed to the lead.
+
 **Approval confirms every skip.** An email that relies on a skipped check (the country rule skipped for the lead or switched off for the workspace, an address used without proof, or a person a search could not place and the operator confirmed) is approved only with an explicit acknowledgement (`acknowledge_skips`; the Review screen's tick box, or `--acknowledge-skips` on the CLI), recorded in an `approved_with_skips` event. Approval also refuses a suppressed address. **Automatic sending (Phase 5) must never send a message that relies on a skipped check**; such a message always waits for a person.
 
 ## 8. Pipeline stages

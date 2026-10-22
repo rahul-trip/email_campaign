@@ -228,6 +228,17 @@ export function LeadDetailPage() {
                       <StatusBadge status={describe(messageState, m.state)} />
                       {m.edit_distance != null && <span className="text-[11px] text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
                       {m.sent_at && <span className="text-[11px] text-muted">sent {ago(m.sent_at)}</span>}
+                      {m.state === "generated" && (
+                        <Link
+                          data-tour="lead-open-review"
+                          to="/review"
+                          search={{ message: m.id }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={buttonClass("primary", "sm")}
+                        >
+                          Open in Review
+                        </Link>
+                      )}
                     </summary>
                     <pre className="whitespace-pre-wrap border-t border-line bg-surface-low p-3 font-sans text-[13px] leading-relaxed">{m.final_body ?? m.generated_body}</pre>
                   </details>

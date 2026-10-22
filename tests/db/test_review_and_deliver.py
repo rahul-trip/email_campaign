@@ -30,6 +30,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Outcome, Runner
 from outbound.services.review import ReviewError, ReviewService, footer_of
 from outbound.stages.deliver import DeliverStage, draft_message_id
+from tests.stages.fakes import REVISED_EMAIL, FakeLlm
 
 C = CompanyStatus
 FOOTER = 'Quantra Inc, 1 Main St. Reply "unsubscribe" and we will stop.'
@@ -407,3 +408,62 @@ def test_an_address_that_turned_out_invalid_blocks_the_draft(
     box = FakeMailbox()
     deliver(factory, ws, box)
     assert box.appends == 0
+
+
+# ------------------------------------------------------------------ revisions asked for on Review
+
+
+def writer_review(
+    factory: UnitOfWorkFactory, ws: str, llm: Any = None
+) -> tuple[ReviewService, Any]:
+    llm = llm or FakeLlm()
+    return ReviewService(factory, ws, llm), llm
+
+
+def test_an_email_is_revised_as_asked_with_the_footer_kept_and_nothing_saved(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    _, mid = copy_ready(factory, ws)
+    service, llm = writer_review(factory, ws)
+    edited = BODY.replace("Would a call help?", "Could we talk?")
+    revision = service.revise(mid, "Warmer, and say we work with UK traders.", current=edited)
+    assert revision.body == f"{REVISED_EMAIL}\n\n--\n{FOOTER}"
+    prompt = llm.users["revise"]
+    assert "Warmer, and say we work with UK traders." in prompt
+    assert "Could we talk?" in prompt  # the operator's edits are what gets revised
+    assert FOOTER not in prompt  # the legal footer is never handed to the model
+    assert revision.report.word_count > 0
+    assert message(factory, ws, mid).state is MessageState.GENERATED  # nothing approved
+    assert message(factory, ws, mid).final_body is None  # nothing saved
+    with factory(ws) as uow:
+        events = [
+            e
+            for e in uow.events.for_entities([(EntityType.MESSAGE, mid)])
+            if e.type == "revision_asked"
+        ]
+    assert [e.data for e in events] == [
+        {"instructions": "Warmer, and say we work with UK traders."}
+    ]
+
+
+def test_the_revision_is_approved_like_an_edit(factory: UnitOfWorkFactory, ws: str) -> None:
+    _, mid = copy_ready(factory, ws)
+    service, _ = writer_review(factory, ws)
+    revised = service.revise(mid, "Shorter.").body
+    approved = service.approve(mid, edited_body=revised)
+    assert approved.final_body == revised
+    assert approved.edit_distance is not None and approved.edit_distance > 0
+
+
+def test_a_revision_needs_instructions_a_writer_and_a_waiting_email(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    _, mid = copy_ready(factory, ws)
+    service, _ = writer_review(factory, ws)
+    with pytest.raises(ReviewError, match="say what to change"):
+        service.revise(mid, "   ")
+    with pytest.raises(ReviewError, match="no writer model"):
+        ReviewService(factory, ws).revise(mid, "Shorter.")
+    service.approve(mid)
+    with pytest.raises(ReviewError):
+        service.revise(mid, "Shorter.")

@@ -244,3 +244,54 @@ def run_copy(llm: LlmClient, inp: CopyInput) -> CopyOutput:
         report=report,
         attempts=state["attempt"],
     )
+
+
+# ------------------------------------------------------------------ the operator's revisions
+
+FOOTER_MARK = "\n\n--\n"
+
+
+class _Revision(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    body: str
+
+    @field_validator("body")
+    @classmethod
+    def _tidy(cls, value: str) -> str:
+        return re.sub(r"\n{3,}", "\n\n", value.replace("\r\n", "\n")).strip()
+
+
+@dataclass(frozen=True)
+class Revision:
+    body: str  # the whole email again, footer included exactly as it was
+    report: LintReport
+
+
+def revise_email(
+    llm: LlmClient,
+    *,
+    email: str,
+    instructions: str,
+    sender: dict[str, Any],
+    research: dict[str, Any],
+    subject: str,
+    rules: LintRules,
+) -> Revision:
+    """Rewrite an email the way the operator asks; the legal footer is put back untouched.
+
+    The operator's instructions win over the usual style rules, so the result is checked (and the
+    report shown) but never rewritten again by the engine.
+    """
+    main, mark, footer = email.partition(FOOTER_MARK)
+    revised = ask(
+        llm,
+        prompts.REVISE_SYSTEM_PROMPT,
+        prompts.build_revise_user_prompt(
+            email=main, instructions=instructions, research=research, sender=sender
+        ),
+        _Revision,
+    )
+    body = f"{revised.body}{mark}{footer}" if mark else revised.body
+    report = lint(body=body, subject=subject, step=0, footer=footer.strip() or None, rules=rules)
+    return Revision(body, report)

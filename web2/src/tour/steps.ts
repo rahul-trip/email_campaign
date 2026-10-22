@@ -154,7 +154,7 @@ export const SECTIONS: Section[] = [
       {
         target: "journey-header",
         title: "Where this lead is",
-        body: "Its state and what happens next, including whether the next move is yours. When its email is waiting for review, Open in Review takes you straight to it.",
+        body: "Its state and what happens next, including whether the next move is yours.",
       },
       {
         target: "journey-stages",
@@ -181,7 +181,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-header",
         title: "Status and next actions",
-        body: "A failed lead can be retried. A held lead explains why and offers the fix. A disqualified lead can be overridden unless a country rule blocks it. Research again reads the site and the news afresh and rewrites the email (a waiting email is cancelled).",
+        body: "A failed lead can be retried. A held lead explains why and offers the fix. A disqualified lead can be overridden unless a country rule blocks it. Research again reads the site and the news afresh and rewrites the email (a waiting email is cancelled). An email waiting for review has Open in Review, under Emails.",
       },
       {
         target: "lead-people",

@@ -316,6 +316,17 @@ class ApproveIn(In):
     acknowledge_skips: bool = False  # required when the email relies on skipped checks
 
 
+class ReviseIn(In):
+    instructions: str = Field(min_length=1, max_length=4000)
+    # The text in the editor, with the operator's edits so far; blank means the engine's text.
+    current_body: str | None = Field(default=None, max_length=20000)
+
+
+class RevisionOut(Out):
+    body: str
+    lint_report: dict[str, Any]
+
+
 class RejectIn(In):
     reason: str
 

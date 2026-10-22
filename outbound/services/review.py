@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
+from outbound.domain.copy_lint import LintRules
 from outbound.domain.editing import edit_distance
 from outbound.domain.entities import Company, Contact, ContactEmail, Message
 from outbound.domain.enums import (
@@ -22,6 +23,9 @@ from outbound.domain.enums import (
     EntityType,
     MessageState,
 )
+from outbound.metering.metered import call_scope
+from outbound.providers.ports import LlmClient
+from outbound.stages.copy.graph import Revision, revise_email
 
 FOOTER_MARK = "\n\n--\n"
 
@@ -63,9 +67,12 @@ def footer_of(body: str) -> str | None:
 
 
 class ReviewService:
-    def __init__(self, uow_factory: UnitOfWorkFactory, workspace_id: str) -> None:
+    def __init__(
+        self, uow_factory: UnitOfWorkFactory, workspace_id: str, writer: LlmClient | None = None
+    ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
+        self._writer = writer  # the metered writer model, for revisions the operator asks for
 
     def queue(self, limit: int = 100) -> list[QueueItem]:
         with self._uow(self._workspace_id) as uow:
@@ -155,6 +162,54 @@ class ReviewService:
             self._move_company(uow, message.company_id, CompanyStatus.APPROVED, actor, "approved")
             uow.commit()
             return approved
+
+    def revise(
+        self,
+        message_id: str,
+        instructions: str,
+        *,
+        current: str | None = None,
+        actor: str = OPERATOR,
+    ) -> Revision:
+        """Rewrite an email waiting for review the way the operator asks (tone, length, facts).
+
+        ``current`` is the text in the editor, with any edits already made; without it the
+        engine's text is revised. Nothing is saved: the result goes back into the editor, and
+        approving it stores it as the operator's version (so it teaches the writer like an edit).
+        The request is kept in the message's history.
+        """
+        ask_for = " ".join(instructions.split())
+        if not ask_for:
+            raise ReviewError("say what to change: the tone, the length, something to add...")
+        if self._writer is None:
+            raise ReviewError("no writer model is configured (LLM_MODEL or LLM_COPY_MODEL)")
+        with self._uow(self._workspace_id) as uow:
+            message = self._pending(uow, message_id)
+            company = uow.companies.get(message.company_id)
+            workspace = uow.workspace()
+            sender = dict(workspace.sender_profile) if workspace else {}
+            settings = dict(workspace.settings) if workspace else {}
+        low = int(settings.get("email_min_words") or 120)
+        high = int(settings.get("email_max_words") or 200)
+        with call_scope(company_id=message.company_id, contact_id=message.contact_id):
+            revision = revise_email(
+                self._writer,
+                email=(current or message.generated_body).strip(),
+                instructions=instructions.strip(),
+                sender=sender,
+                research=company.research or {},
+                subject=message.subject,
+                rules=LintRules.with_length(low, max(low, high)),
+            )
+        footer = footer_of(message.generated_body)
+        if footer and footer not in revision.body:  # code puts it back, but never trust that
+            raise ReviewError("the revision lost the required footer; try again")
+        with self._uow(self._workspace_id) as uow:
+            uow.events.append(
+                EntityType.MESSAGE, message.id, "revision_asked", actor, {"instructions": ask_for}
+            )
+            uow.commit()
+        return revision
 
     def reject(self, message_id: str, reason: str, *, actor: str = OPERATOR) -> Message:
         if not reason.strip():

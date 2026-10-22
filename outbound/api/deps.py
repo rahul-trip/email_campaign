@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from outbound.bootstrap import Container
-from outbound.providers.ports import Mailbox, SearchProvider
+from outbound.providers.ports import LlmClient, Mailbox, SearchProvider
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
 from outbound.services.privacy import PrivacyService
@@ -38,6 +38,7 @@ def build_services(
     *,
     search: SearchProvider | None = None,
     mailbox: Mailbox | None = None,
+    writer: LlmClient | None = None,
     settings_service: SettingsService | None = None,
 ) -> Services:
     uow = container.uow
@@ -46,7 +47,7 @@ def build_services(
         container=container,
         workspace_id=workspace_id,
         intake=intake,
-        review=ReviewService(uow, workspace_id),
+        review=ReviewService(uow, workspace_id, writer),
         leads=LeadService(uow, workspace_id),
         runs=RunService(uow, workspace_id),
         settings=settings_service or SettingsService(uow, workspace_id),

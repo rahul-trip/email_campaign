@@ -1018,3 +1018,15 @@ def test_a_runs_leads_and_research_again_through_the_api(
     assert again.status_code == 200 and again.json()["status"] == "new"
     refused = api.post(f"/api/companies/{cid}/research-again")
     assert refused.status_code in (409, 422) and "not been researched" in refused.json()["detail"]
+
+
+def test_the_operator_can_ask_for_an_email_to_be_rewritten(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    _, mid = seed_review(factory, ws)
+    revised = api.post(f"/api/review/{mid}/revise", json={"instructions": "More formal, please."})
+    assert revised.status_code == 200
+    data = revised.json()
+    assert data["body"].startswith("Dear Jane,") and data["body"].endswith(FOOTER)
+    assert "word_count" in data["lint_report"]
+    assert api.post(f"/api/review/{mid}/revise", json={"instructions": ""}).status_code == 422

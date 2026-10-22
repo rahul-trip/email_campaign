@@ -567,6 +567,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review/{message_id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revise
+         * @description Rewrite the email as the operator asks. Nothing is saved until they approve it.
+         */
+        post: operations["revise_api_review__message_id__revise_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review/{message_id}/rewrite": {
         parameters: {
             query?: never;
@@ -1508,6 +1528,22 @@ export interface components {
              * @default []
              */
             skips?: components["schemas"]["SkipOut"][];
+        };
+        /** ReviseIn */
+        ReviseIn: {
+            /** Current Body */
+            current_body?: string | null;
+            /** Instructions */
+            instructions: string;
+        };
+        /** RevisionOut */
+        RevisionOut: {
+            /** Body */
+            body: string;
+            /** Lint Report */
+            lint_report: {
+                [key: string]: unknown;
+            };
         };
         /** RowOut */
         RowOut: {
@@ -2944,6 +2980,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revise_api_review__message_id__revise_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"];
                 };
             };
             /** @description Validation Error */

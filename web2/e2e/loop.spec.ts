@@ -125,12 +125,12 @@ test("a run has its own page listing the leads it touched, each one a link", asy
   await expect(page).toHaveURL(/\/leads\/[0-9a-f-]+$/);
 });
 
-test("from a copy-ready lead's journey, Open in Review shows that email", async ({ page }) => {
+test("from a lead's Emails section, Open in Review shows that email", async ({ page }) => {
   await signIn(page);
-  const domain = unique("journey-review");
+  const domain = unique("lead-review");
   await addTarget(page, { website: domain, country: "US" });
   await runEngine(page);
-  await page.goto(`/leads/${await leadId(page, domain)}/journey`);
+  await page.goto(`/leads/${await leadId(page, domain)}`);
   await page.getByRole("link", { name: "Open in Review" }).click();
   await expect(page).toHaveURL(/\/review\?message=/);
   await expect(page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(domain) })).toHaveAttribute("aria-current", "true");
@@ -148,4 +148,21 @@ test("Research again sends a lead back to the start and cancels its waiting emai
   await runEngine(page);
   await page.reload();
   await expect(page.locator("[data-tour=lead-header]")).toContainText("Copy ready");
+});
+
+test("on Review the operator asks for changes, sees them, and approves the rewritten email", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("ask-changes");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto("/review");
+  const queue = page.getByRole("navigation", { name: "Emails waiting" });
+  await queue.getByRole("button", { name: new RegExp(domain) }).click();
+  await page.getByRole("button", { name: "More formal." }).click();
+  await expect(page.getByLabel("Instructions for the rewrite")).toHaveValue("More formal.");
+  await page.getByRole("button", { name: "Rewrite with these changes" }).click();
+  await expect(page.getByLabel("Email text")).toHaveValue(/^Dear Jane,/);
+  await expect(page.getByLabel("Changes")).toBeVisible(); // the diff against the engine's text
+  await page.getByRole("button", { name: "Approve with my edit" }).click();
+  await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
 });
