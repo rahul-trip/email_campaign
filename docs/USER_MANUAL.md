@@ -131,6 +131,7 @@ This is where you spend most of your time.
 - **Left:** the emails waiting. A *Flagged* tag means the application's own checks found a problem. On a narrow screen the list is hidden; use the arrows and *1 of N* at the top.
 - **Centre:** the email, exactly as it will be drafted, **including the footer**. The text box is editable. When you change something, a *Your changes* panel shows additions in green and deletions in red. Above it: who it goes to, whether the address is safe to send (*Not verified: you skipped the check* if you did), where it came from and which vendor checked it.
 - **Skipped checks:** if the email relies on a check you skipped (the country rule for this lead or for the workspace, an address used without proof, or a person you confirmed works there), an amber panel lists them. **Approve** stays greyed out until you tick *I know these checks were skipped, and I approve this email anyway*. What you confirmed is recorded.
+- **Opens with:** above the email, the dated news item it starts from, linked to its source. Open it and check it is real and stated correctly before approving. If research found no dated news about the company, it says the email opens with a fact from their site instead.
 - **Right, "Why this lead":** the fit score and its reason, what the research found, the answers to your research questions, and any notes you added.
 - **Right, "Checks":** each quality check (length, subject, reading level, one question, no links, no address, no banned phrases, footer present) with a tick or a warning and the reason, then the country, the company type and the country rule with the version used.
 
@@ -139,6 +140,7 @@ This is where you spend most of your time.
 | **Approve** | Accepts the email as written |
 | **Approve with my edit** | Accepts your edited text. Both versions are kept, and how much you changed is recorded |
 | **Undo my edits** | Puts the original text back |
+| **Write it again** | Throws this email away and has the next run write a new one to the same person, under the current rules and news. Use it when the email misses the point |
 | **Reject…** | Ends work on this company. A reason is required and is kept |
 
 Keyboard: **J** and **K** move through the queue, **Ctrl+Enter** in the text approves, **?** lists the shortcuts.
@@ -263,8 +265,8 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 | Tab | What it holds |
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
-| **Sender profile** | Who you are, in three parts: the legal identity printed in footers, your signature, and what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
-| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
+| **Sender profile** | Who you are, in four parts: the legal identity printed in footers, your signature, what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**, and *How you write*: the greeting (Hi, Hello or Dear), what you want from these emails (the closing ask follows it), and up to four emails you have sent before. Those are read for what you offer and how direct you are, never copied: their wording, greeting and bullet lists are not reused. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
+| **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), the shortest and longest first email in words (120 and 200 by default; greeting, sign-off and footer are not counted), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
 
 Automatic sending cannot be switched on in this version.
 
@@ -279,7 +281,7 @@ Automatic sending cannot be switched on in this version.
 | 3 | Gate | Compares fit with the campaign minimum, then applies the country rule | **disqualified**, **held** |
 | 4 | Contacts | Ranks the people against your wanted titles, then by seniority | failed (nobody found) |
 | 5 | Email | For the best people in turn: tries an address you gave, one published on the company's site, the company's usual pattern, then each finder in order. **Every address is verified at once** | held, failed |
-| 6 | Copy | Writes the five parts of the email, assembles it, adds the footer, checks it, rewrites up to twice | failed |
+| 6 | Copy | Writes the email body (120–200 words by default) opening with the most recent dated news it found, adds your greeting, signature and footer, checks it (length, no lists or stock phrases, every fact backed by the research, reads like a person), rewrites up to twice | failed |
 | 7 | Review | **You** | rejected |
 | 8 | Deliver | Checks everything again and saves a draft in your mailbox | stays *approved* and retries |
 | 9 | Sent sync | Notices which drafts you actually sent | |

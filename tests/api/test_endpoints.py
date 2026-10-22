@@ -970,3 +970,38 @@ def test_dated_news_is_shown_on_the_lead_and_in_its_journey(
         "label": "Recent company news",
         "value": "2026-10-10 · Acme wins Leeds contract (https://news.example.com/acme)",
     } in research["facts"]
+
+
+def test_an_email_can_be_thrown_away_and_written_again_to_the_same_person(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid, mid = seed_review(factory, ws)
+    moved = api.post(f"/api/review/{mid}/rewrite")
+    assert moved.status_code == 200 and moved.json()["status"] == "contacts_found"
+    assert api.get("/api/review").json() == []  # nothing is waiting for review any more
+    lead = api.get(f"/api/companies/{cid}").json()
+    assert [m["state"] for m in lead["messages"]] == ["cancelled"]
+    assert lead["contacts"][0]["full_name"] == "Jane Doe"  # still the same person
+    unknown = api.post("/api/review/nope/rewrite")
+    assert unknown.status_code == 409 and "no message" in unknown.json()["detail"]
+
+
+def test_email_length_greeting_and_past_emails_are_settings_with_limits(api: Api) -> None:
+    ok = api.put("/api/settings/workspace", json={"email_min_words": 100, "email_max_words": 150})
+    assert ok.status_code == 200 and ok.json()["email_max_words"] == 150
+    backwards = api.put("/api/settings/workspace", json={"email_min_words": 400})
+    assert backwards.status_code == 422 and "cannot be longer" in backwards.json()["detail"]
+    assert api.put("/api/settings/workspace", json={"email_max_words": 5000}).status_code == 422
+
+    profile = api.put(
+        "/api/settings/sender-profile",
+        json={
+            "greeting": "Dear",
+            "outreach_goal": "a partnership",
+            "style_examples": ["Dear Ted, hi."],
+        },
+    )
+    assert profile.status_code == 200 and profile.json()["greeting"] == "Dear"
+    assert api.put("/api/settings/sender-profile", json={"greeting": "Yo"}).status_code == 422
+    too_many = api.put("/api/settings/sender-profile", json={"style_examples": ["x"] * 7})
+    assert too_many.status_code == 422

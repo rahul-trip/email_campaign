@@ -103,7 +103,12 @@ export const SECTIONS: Section[] = [
       {
         target: "review-editor",
         title: "Read, edit, approve",
-        body: "The email exactly as it will be drafted, footer included. Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Reject needs a reason.",
+        body: "The email exactly as it will be drafted, footer included. Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Write it again throws this one away and the next run writes a fresh one; Reject needs a reason.",
+      },
+      {
+        target: "review-opening",
+        title: "What it opens with",
+        body: "The dated news item the email starts from, linked to its source, so you can check it is real and right before approving. Without recent news it opens with a fact from their own site.",
       },
       {
         target: "review-checks",
@@ -230,7 +235,7 @@ export const SECTIONS: Section[] = [
       {
         target: "settings-tabs",
         title: "Setup, profile, limits",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect and the footer switch.",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from.",
       },
       {
         target: "setup-check",

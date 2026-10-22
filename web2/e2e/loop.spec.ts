@@ -24,8 +24,8 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
   await page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(approved) }).click();
   const text = page.getByLabel("Email text");
   const original = await text.inputValue();
-  await text.fill(original.replace("Would a short call", "Is a short call"));
-  await expect(page.getByLabel("Changes")).toContainText("Is");
+  await text.fill(original.replace("Would one of the next two weeks", "Could one of the next two weeks"));
+  await expect(page.getByLabel("Changes")).toContainText("Could");
   await page.getByRole("button", { name: "Approve with my edit" }).click();
   await expect(page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(approved) })).toHaveCount(0);
 
@@ -93,4 +93,20 @@ test("a lead held by its country rule goes on once the rule is skipped, and appr
   await page.getByText("I know these checks were skipped").click();
   await approve.click();
   await expect(page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
+});
+
+test("an email can be written again, and the new one is waiting for review", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("rewrite-me");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto("/review");
+  const queue = page.getByRole("navigation", { name: "Emails waiting" });
+  await queue.getByRole("button", { name: new RegExp(domain) }).click();
+  await expect(page.locator("[data-tour=review-opening]")).toBeVisible();
+  await page.getByRole("button", { name: "Write it again" }).click();
+  await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
+  await runEngine(page);
+  await page.goto("/review");
+  await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(1);
 });

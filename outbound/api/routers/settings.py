@@ -52,6 +52,8 @@ def update_workspace_settings(
         "timezone",
         "country_policy_enabled",
         "footer_enabled",
+        "email_min_words",
+        "email_max_words",
     ):
         if changes.get(name, "") is None:
             changes.pop(name)

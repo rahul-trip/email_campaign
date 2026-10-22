@@ -550,6 +550,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/review/{message_id}/rewrite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rewrite
+         * @description Throw this email away and have the next run write a new one to the same person.
+         *
+         *     The email is cancelled and the lead goes back to the email step, which reuses the address it
+         *     already has at no cost; the copy step then writes it again under the current rules and news.
+         */
+        post: operations["rewrite_api_review__message_id__rewrite_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs": {
         parameters: {
             query?: never;
@@ -1532,6 +1555,8 @@ export interface components {
             domain?: string | null;
             /** Geographic Focus */
             geographic_focus?: string | null;
+            /** Greeting */
+            greeting?: ("Hi" | "Hello" | "Dear") | null;
             /** Industry */
             industry?: string | null;
             /** Legal Name */
@@ -1540,6 +1565,8 @@ export interface components {
             mission?: string | null;
             /** Narrative */
             narrative?: string | null;
+            /** Outreach Goal */
+            outreach_goal?: string | null;
             /** Postal Address */
             postal_address?: string | null;
             /** Registration Details */
@@ -1550,6 +1577,8 @@ export interface components {
             signature_name?: string | null;
             /** Signature Title */
             signature_title?: string | null;
+            /** Style Examples */
+            style_examples?: string[] | null;
             /** Target Verticals */
             target_verticals?: string[] | null;
             /** Technologies */
@@ -1744,6 +1773,10 @@ export interface components {
             budget_per_prospect_micro_usd?: number | null;
             /** Country Policy Enabled */
             country_policy_enabled?: boolean | null;
+            /** Email Max Words */
+            email_max_words?: number | null;
+            /** Email Min Words */
+            email_min_words?: number | null;
             /** Few Shot Examples */
             few_shot_examples?: number | null;
             /** Footer Enabled */
@@ -2812,6 +2845,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rewrite_api_review__message_id__rewrite_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyOut"];
                 };
             };
             /** @description Validation Error */

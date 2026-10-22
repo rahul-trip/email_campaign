@@ -246,6 +246,17 @@ Asked for by the operator (2026-10-22): the emails should open with something re
 
 **Tests:** the adapter request and mapping (new fixture); the metered cache key and 7-day TTL; real-shaped hits kept, old, undated and other-company hits dropped; invented numbers ignored; no dated news means no model call; search failure versus budget error; the stage saves the items; API shows them on the lead and the journey.
 
+### 3b.19 Emails that read like a person wrote them (added during the work)
+
+Found by the operator (2026-10-22): every email was the same 3-liner (what they do, what we do, short call?), about 50 words, opening with the company's own website. Code joined five one-sentence parts; the prompt asked for 48 to 72 words; the checker wanted 50 to 85 words and reading grade 6.5.
+
+- The writer returns `{subject, body, based_on}`; code adds the greeting (`sender_profile.greeting`), signature and footer. A new brief: open with the most recent dated news (company, then market, then a site fact), give a view, one relevant thing the sender has done, one clear ask fitting `sender_profile.outreach_goal`; 2 to 4 paragraphs in a person's voice; no lists, flattery or hype; nothing invented.
+- The operator's past emails (`sender_profile.style_examples`, up to four) are given as voice reference, labelled not to be copied; corrections on Review still teach most.
+- The checker: length from `settings.email_min_words`/`email_max_words` (120–200 by default) on the body alone; grade 10; one or two questions; new rules for bullet lists and em dashes; a much longer list of stock and machine-sounding phrases (every tell in the operator's past emails). Code also checks `based_on` is a url research found, and that recent news is used when there is some. Then one model check: grounded and human. A rewrite sees its last draft.
+- Review shows **Opens with:** (the news item, linked) and **Write it again** (`POST /api/review/{id}/rewrite`: cancel and write afresh to the same person). Settings gain the email length and the *How you write* card.
+
+**Tests:** assembly and greeting choice; the length from settings reaches the writer and the checker; the old 3-liner now fails on length; bullets, dashes and stock phrases caught without a model; a made-up source rejected; recent news must be the opening; the operator's past emails and goal reach the prompt; the opening item is saved; the settings and their limits; rewrite through the API and the browser.
+
 ## 5. Effect on the schema and the documents
 
 - **No new tables or columns.** `sender_profile.reviewed_at`, `retention_days`, and the run heartbeat live in existing JSON columns. The new lifecycle edges are code, not database constraints. Update the value conventions in [SCHEMA.md](../SCHEMA.md) §7.

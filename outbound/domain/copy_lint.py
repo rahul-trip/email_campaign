@@ -1,8 +1,9 @@
 """Deterministic checks on a draft email: rules first, taste second.
 
-Word counts include the greeting and sign-off but exclude the footer, which is legal text the
-writer cannot shorten. A report with any issue is "flagged": the copy stage still hands the
-draft to the operator, but with the reasons attached.
+Length, reading level, questions and style are measured on the paragraphs the writer produced
+(``core``). Greeting, sign-off and footer are added by code, so the writer cannot shorten or
+change them. A report with any issue is "flagged": the copy stage still hands the draft to the
+operator, but with the reasons attached.
 """
 
 from __future__ import annotations
@@ -11,33 +12,67 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+# Phrases that mark a message as written by a model (or by a mass mailer). Matched anywhere,
+# lower case, so "synerg" catches synergy and synergies, "seamless" catches seamlessly.
 BANNED_PHRASES = (
     "i hope this email finds you well",
     "i hope this finds you well",
     "hope you're well",
+    "hope you are well",
     "in today's fast-paced",
+    "ever-evolving",
+    "at the forefront",
+    "in the realm of",
     "revolutionary",
     "delighted to connect",
-    "synergy",
+    "synerg",
     "leverage",
     "cutting-edge",
     "game-changer",
+    "game changer",
     "i wanted to reach out",
+    "i'm reaching out",
+    "i am reaching out",
     "reaching out",
     "touch base",
     "circle back",
     "pick your brain",
     "just checking in",
+    "i came across",
+    "caught my eye",
+    "i noticed",
+    "we believe",
+    "strong potential",
+    "seamless",
+    "empower",
+    "enhanced intelligence",
+    "excellent track record",
+    "we admire",
+    "greatly admire",
+    "impressive",
+    "delve",
+    "unlock",
+    "robust",
+    "streamline",
+    "partnership opportunit",
+    "tapestry",
 )
 
 
 @dataclass(frozen=True)
 class LintRules:
-    first_touch_words: tuple[int, int] = (50, 85)
+    first_touch_words: tuple[int, int] = (120, 200)
     follow_up_words: tuple[int, int] = (25, 50)
-    subject_words: tuple[int, int] = (2, 5)
-    max_reading_grade: float = 6.5
+    subject_words: tuple[int, int] = (2, 6)
+    max_reading_grade: float = 10.0
+    questions: tuple[int, int] = (1, 2)
+    max_dashes: int = 1  # em dashes; a person uses one now and then, a model uses many
     banned_phrases: tuple[str, ...] = BANNED_PHRASES
+
+    @classmethod
+    def with_length(cls, low: int, high: int) -> LintRules:
+        """The default rules with the workspace's first-email length."""
+        return cls(first_touch_words=(low, high))
 
 
 @dataclass(frozen=True)
@@ -69,6 +104,7 @@ class LintReport:
         return "\n".join(f"- {issue.message}" for issue in self.issues)
 
 
+_BULLET = re.compile(r"^\s*(?:[•\u2022\-*\u2013]|\d+[.)])\s+\S", re.MULTILINE)
 _EMAIL_ADDRESS = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _URL = re.compile(r"https?://|www\.|\b[a-z0-9-]+\.(?:com|io|co|net|org|ai|uk|de)/", re.IGNORECASE)
 _WORDS = re.compile(r"[A-Za-z0-9][A-Za-z0-9'\u2019-]*")
@@ -107,10 +143,19 @@ def lint(
     subject: str,
     step: int,
     footer: str | None = None,
+    core: str | None = None,
     rules: LintRules = LintRules(),  # noqa: B008 - frozen, so safe to share
 ) -> LintReport:
-    """``body`` is the whole email as it will be saved, footer included."""
-    main = body.replace(footer, "").strip() if footer else body.strip()
+    """``body`` is the whole email as it will be saved, footer included.
+
+    ``core`` is just the paragraphs the writer produced. When given, length and style are
+    measured on it; otherwise on ``body`` without the footer.
+    """
+    main = (
+        core.strip()
+        if core is not None
+        else (body.replace(footer, "").strip() if footer else body.strip())
+    )
     issues: list[LintIssue] = []
 
     low, high = rules.first_touch_words if step == 0 else rules.follow_up_words
@@ -141,11 +186,26 @@ def lint(
         )
 
     questions = main.count("?")
-    if questions != 1:
+    low_q, high_q = rules.questions
+    if not low_q <= questions <= high_q:
         issues.append(
             LintIssue(
                 "call_to_action",
-                f"The email has {questions} questions; it needs exactly one, as the closing ask.",
+                f"The email has {questions} question marks; it needs {low_q} to {high_q}, with"
+                " a clear ask at the end.",
+            )
+        )
+
+    if _BULLET.search(main):
+        issues.append(
+            LintIssue("bullets", "Write paragraphs, not a list: remove every bullet or number.")
+        )
+
+    if main.count("\u2014") > rules.max_dashes:
+        issues.append(
+            LintIssue(
+                "dashes",
+                f"Use at most {rules.max_dashes} em dash; use full stops and commas instead.",
             )
         )
 
