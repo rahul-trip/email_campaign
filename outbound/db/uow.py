@@ -16,6 +16,7 @@ from typing import Any, Self
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.orm.exc import StaleDataError
 
+from outbound.db.crypto import Keyring
 from outbound.db.errors import ConcurrencyConflict
 from outbound.db.repositories.audit import ProviderCallRepository, RunRepository
 from outbound.db.repositories.base import EventRepository
@@ -34,6 +35,7 @@ from outbound.db.repositories.reports import ReportRepository
 from outbound.db.repositories.suppressions import SuppressionRepository
 from outbound.db.repositories.workspaces import (
     CampaignRepository,
+    CredentialRepository,
     MailboxRepository,
     OwnWorkspaceRepository,
 )
@@ -44,11 +46,17 @@ class UnitOfWork:
     session: Session
 
     def __init__(
-        self, session_factory: sessionmaker[Session], workspace_id: str, *, read_only: bool = False
+        self,
+        session_factory: sessionmaker[Session],
+        workspace_id: str,
+        *,
+        read_only: bool = False,
+        keyring: Keyring | None = None,
     ) -> None:
         self._factory = session_factory
         self.workspace_id = workspace_id
         self.read_only = read_only
+        self._keyring = keyring or Keyring({})
 
     def __enter__(self) -> Self:
         # Read by the session's ``after_begin`` listener: the row-level-security key.
@@ -68,6 +76,7 @@ class UnitOfWork:
         self.policies = CountryPolicyRepository(*args)
         self.campaigns = CampaignRepository(*args)
         self.mailboxes = MailboxRepository(*args)
+        self.credentials = CredentialRepository(*args, self._keyring)
         self.runs = RunRepository(*args)
         self.calls = ProviderCallRepository(*args)
         self.erasure = ErasureRepository(*args)
@@ -109,14 +118,24 @@ class UnitOfWork:
 
 class UnitOfWorkFactory:
     """Units of work for one workspace each. ``read_only`` (a superadmin viewing a workspace)
-    makes every transaction READ ONLY on Postgres, whatever the code above tries."""
+    makes every transaction READ ONLY on Postgres, whatever the code above tries. ``keyring``
+    seals and opens the workspace's credentials (``SECRETS_KEYS``)."""
 
-    def __init__(self, session_factory: sessionmaker[Session], *, read_only: bool = False) -> None:
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        *,
+        read_only: bool = False,
+        keyring: Keyring | None = None,
+    ) -> None:
         self._factory = session_factory
         self._read_only = read_only
+        self._keyring = keyring
 
     def __call__(self, workspace_id: str) -> UnitOfWork:
-        return UnitOfWork(self._factory, workspace_id, read_only=self._read_only)
+        return UnitOfWork(
+            self._factory, workspace_id, read_only=self._read_only, keyring=self._keyring
+        )
 
     def reading_only(self) -> UnitOfWorkFactory:
-        return UnitOfWorkFactory(self._factory, read_only=True)
+        return UnitOfWorkFactory(self._factory, read_only=True, keyring=self._keyring)

@@ -122,3 +122,24 @@ def test_a_bad_log_level_is_refused_when_settings_load(monkeypatch: pytest.Monke
         Settings(_env_file=None)
     monkeypatch.setenv("LOG_LEVEL", "debug")
     assert Settings(_env_file=None).log_level == "DEBUG"
+
+
+def test_mailbox_tokens_and_oauth_codes_never_reach_the_log() -> None:
+    """Phase 6c: what an OAuth flow and a stored credential carry is masked wherever it shows."""
+    from outbound.logging import redact
+
+    line = redact(
+        None,
+        "info",
+        {
+            "event": "oauth_callback",
+            "grant": {"access_token": "ya29.abc", "refresh_token": "1//xyz", "expires_in": 3599},
+            "code_verifier": "pkce-verifier-value",
+            "url": "https://app.example/oauth/callback?code=4/0Aabc&state=s1&client_secret=cs",
+            "body": "grant_type=refresh_token&refresh_token=1//xyz&client_id=id",
+        },
+    )
+    text = str(line)
+    for secret in ("ya29.abc", "1//xyz", "pkce-verifier-value", "4/0Aabc", "=cs"):
+        assert secret not in text, secret
+    assert line["grant"]["expires_in"] == 3599 and "state=s1" in line["url"]

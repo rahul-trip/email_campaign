@@ -18,6 +18,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -37,6 +38,7 @@ from outbound.domain.enums import (
     ConsentBasis,
     ContactSource,
     ContactStatus,
+    CredentialPurpose,
     EmailStatus,
     EntityType,
     HoldReason,
@@ -110,6 +112,7 @@ class CampaignRow(Mutable, Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
         UniqueConstraint("workspace_id", "name"),
+        _tenant_fk("campaigns", "mailbox_id", "mailboxes"),
         CheckConstraint("min_fit_score BETWEEN 0 AND 100", name="min_fit_score_range"),
     )
 
@@ -122,6 +125,7 @@ class CampaignRow(Mutable, Base):
     status: Mapped[CampaignStatus] = mapped_column(
         enum_type(CampaignStatus, "campaign_status"), default=CampaignStatus.ACTIVE
     )
+    mailbox_id: Mapped[str | None] = mapped_column(String(36))  # its sender; else the default
 
 
 class MailboxRow(Mutable, Base):
@@ -129,11 +133,27 @@ class MailboxRow(Mutable, Base):
     __table_args__ = (
         UniqueConstraint("workspace_id", "address"),
         UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        # One default sender per workspace (migration 0011).
+        Index(
+            "ux_mailboxes_one_default",
+            "workspace_id",
+            unique=True,
+            sqlite_where=text("is_default"),
+            postgresql_where=text("is_default"),
+        ),
     )
 
     address: Mapped[str] = mapped_column(String(320))
     gateway: Mapped[MailboxGateway] = mapped_column(enum_type(MailboxGateway, "mailbox_gateway"))
-    credentials_ref: Mapped[str] = mapped_column(String(200))  # a secret's name, never the secret
+    # The name of its credential (``credentials.name``), never the secret; none before connecting.
+    credentials_ref: Mapped[str | None] = mapped_column(String(200))
+    owner_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    # The person who signs from it: name, title, signature, greeting, style examples.
+    sender: Mapped[dict[str, Any] | None] = mapped_column(Json)
+    # How to reach it: IMAP host, port and folders; nothing secret.
+    connection: Mapped[dict[str, Any] | None] = mapped_column(Json)
+    last_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     sending_domain: Mapped[str] = mapped_column(String(255))
     dns_check: Mapped[dict[str, Any] | None] = mapped_column(Json)
     warmup_started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
@@ -141,6 +161,28 @@ class MailboxRow(Mutable, Base):
     status: Mapped[MailboxStatus] = mapped_column(
         enum_type(MailboxStatus, "mailbox_status"), default=MailboxStatus.ACTIVE
     )
+
+
+class CredentialRow(Mutable, Base):
+    """A workspace's secret, encrypted (AES-256-GCM, ``outbound.db.crypto``). The database only
+    ever holds ciphertext; the key is in the environment (``SECRETS_KEYS``)."""
+
+    __tablename__ = "credentials"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "name"),
+        UniqueConstraint("workspace_id", "id"),
+    )
+
+    name: Mapped[str] = mapped_column(String(200))
+    purpose: Mapped[CredentialPurpose] = mapped_column(
+        enum_type(CredentialPurpose, "credential_purpose")
+    )
+    key_version: Mapped[int] = mapped_column(Integer)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary(12))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    version: Mapped[int] = mapped_column(Integer, default=1)  # compare-and-swap on refresh
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    details: Mapped[dict[str, Any] | None] = mapped_column(Json)  # not secret: scopes, account
 
 
 class CountryPolicyRow(Mutable, Base):

@@ -37,7 +37,7 @@
 
 ### 6c.1 Migration 0011
 
-- [ ] **`mailboxes`:**
+- [x] **`mailboxes`:**
   - `gateway` gains `gmail` and `graph`, beside `imap` (the `MailboxGateway` enum);
   - `owner_user_id`;
   - `is_default`, with a partial unique index (one default per workspace);
@@ -46,22 +46,22 @@
   - `connection` (JSON: host, port, folders);
   - `last_checked_at`.
   - `credentials_ref` becomes nullable and names a credential.
-- [ ] **`credentials`** (a tenant table):
+- [x] **`credentials`** (a tenant table):
   - `name`, unique per workspace;
   - `purpose` (`mailbox_oauth`, `mailbox_password`, `intake_webhook`);
   - `key_version`, `nonce`, `ciphertext`;
   - `version`, for compare-and-swap;
-  - `expires_at`, `metadata` (JSON: scopes).
-- [ ] **`campaigns.mailbox_id`:** the sender for that campaign.
+  - `expires_at`, `details` (JSON: scopes). Named `details`: `metadata` is reserved by SQLAlchemy.
+- [x] **`campaigns.mailbox_id`:** the sender for that campaign.
 
 ### 6c.2 Encrypted credentials
 
-- [ ] **`outbound/db/crypto.py`:** AES-256-GCM through the `cryptography` library.
+- [x] **`outbound/db/crypto.py`:** AES-256-GCM through the `cryptography` library.
   - The associated data is `workspace_id|credential_id`, so a ciphertext copied into another row fails to decrypt.
   - Keys come from `SECRETS_KEYS` in Doppler, shaped `{version: key}`.
   - `outbound secrets rotate` re-encrypts everything under the newest key.
-- [ ] **`CredentialRepository`** (scoped to the workspace): get, put, and compare-and-swap on `version`.
-- [ ] **Secrets never reach logs.** A redaction test checks this.
+- [x] **`CredentialRepository`** (scoped to the workspace): get, put, and compare-and-swap on `version`.
+- [x] **Secrets never reach logs.** A redaction test checks this.
 
 ### 6c.3 Harden the IMAP adapter (`providers/adapters/imap_mailbox.py`)
 

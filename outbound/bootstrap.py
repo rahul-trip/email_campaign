@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, inspect
 
 from outbound.config import Settings
+from outbound.db.crypto import Keyring
 from outbound.db.identity import IdentityUnitOfWorkFactory
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
@@ -59,7 +60,9 @@ def container_for(
     return Container(
         settings,
         engine,
-        UnitOfWorkFactory(sessions),
+        UnitOfWorkFactory(
+            sessions, keyring=Keyring.from_setting(settings.secrets_keys.get_secret_value())
+        ),
         PlatformUnitOfWorkFactory(platform_sessions),
         IdentityUnitOfWorkFactory(sessions),
     )

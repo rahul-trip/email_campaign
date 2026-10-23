@@ -1,4 +1,4 @@
-"""Workspaces and the campaigns and mailboxes inside them.
+"""Workspaces and the campaigns, mailboxes and credentials inside them.
 
 ``WorkspaceRepository`` sees every workspace and is reached only through the platform unit of
 work. A tenant unit of work holds ``OwnWorkspaceRepository``, which sees its own row only.
@@ -10,14 +10,22 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
+from outbound.db.crypto import Keyring, Sealed, associated_data
 from outbound.db.errors import NotFound
-from outbound.db.models import CampaignRow, MailboxRow, WorkspaceRow
-from outbound.db.repositories.base import ScopedRepository, snapshot
+from outbound.db.models import CampaignRow, CredentialRow, MailboxRow, WorkspaceRow
+from outbound.db.repositories.base import EventRepository, ScopedRepository, snapshot
+from outbound.db.types import utcnow
 from outbound.domain.entities import Campaign, Workspace
-from outbound.domain.enums import MailboxGateway, MailboxStatus, WorkspaceStatus
+from outbound.domain.enums import (
+    CredentialPurpose,
+    MailboxGateway,
+    MailboxStatus,
+    WorkspaceStatus,
+)
+from outbound.domain.ids import new_id
 from outbound.domain.slugs import unique_slug
 from outbound.domain.state_machines import WORKSPACE
 
@@ -217,12 +225,17 @@ class MailboxView:
     id: str
     address: str
     gateway: MailboxGateway
-    credentials_ref: str
+    credentials_ref: str | None
     sending_domain: str
     dns_check: dict[str, Any] | None
     daily_cap: int
     status: MailboxStatus
     warmup_started_at: datetime | None
+    owner_user_id: str | None = None
+    is_default: bool = False
+    sender: dict[str, Any] | None = None
+    connection: dict[str, Any] | None = None
+    last_checked_at: datetime | None = None
 
 
 class MailboxRepository(ScopedRepository):
@@ -276,4 +289,148 @@ class MailboxRepository(ScopedRepository):
             row.daily_cap,
             row.status,
             row.warmup_started_at,
+            row.owner_user_id,
+            row.is_default,
+            dict(row.sender) if row.sender else None,
+            dict(row.connection) if row.connection else None,
+            row.last_checked_at,
+        )
+
+
+@dataclass(frozen=True)
+class Credential:
+    """A stored secret's description; the secret itself only comes from ``reveal``."""
+
+    id: str
+    name: str
+    purpose: CredentialPurpose
+    version: int
+    expires_at: datetime | None
+    details: dict[str, Any]
+    updated_at: datetime
+
+
+class CredentialRepository(ScopedRepository):
+    """This workspace's secrets, sealed with the keyring on the way in and opened on the way out.
+
+    A refresh token that rotates is replaced with ``swap``: it writes only if the row is still
+    at the version the caller read, so two refreshes racing cannot lose a token.
+    """
+
+    def __init__(
+        self, session: Session, workspace_id: str, events: EventRepository, keyring: Keyring
+    ) -> None:
+        super().__init__(session, workspace_id, events)
+        self._keyring = keyring
+
+    def put(
+        self,
+        name: str,
+        purpose: CredentialPurpose,
+        secret: str,
+        *,
+        expires_at: datetime | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> Credential:
+        """Store a secret under ``name``, replacing any there (its version goes up)."""
+        row = self._find(name)
+        if row is None:
+            row = CredentialRow(id=new_id(), workspace_id=self._workspace_id, name=name, version=0)
+            self._session.add(row)
+        row.purpose = purpose
+        self._seal(row, secret)
+        row.version += 1
+        row.expires_at = expires_at
+        row.details = details or {}
+        self._session.flush()
+        return self._view(row)
+
+    def get(self, name: str) -> Credential | None:
+        row = self._find(name)
+        return self._view(row) if row else None
+
+    def reveal(self, name: str) -> tuple[Credential, str]:
+        row = self._find(name)
+        if row is None:
+            raise NotFound(f"credential {name}")
+        sealed = Sealed(row.key_version, row.nonce, row.ciphertext)
+        return self._view(row), self._keyring.open(
+            sealed, associated_data(row.workspace_id, row.id)
+        )
+
+    def swap(
+        self, name: str, expected_version: int, secret: str, *, expires_at: datetime | None = None
+    ) -> bool:
+        """Replace the secret only if nobody else did since ``expected_version`` was read."""
+        row = self._find(name)
+        if row is None or row.version != expected_version:
+            return False
+        sealed = self._keyring.seal(secret, associated_data(row.workspace_id, row.id))
+        changed = self._session.execute(
+            update(CredentialRow)
+            .where(
+                CredentialRow.id == row.id,
+                CredentialRow.workspace_id == self._workspace_id,
+                CredentialRow.version == expected_version,
+            )
+            .values(
+                key_version=sealed.key_version,
+                nonce=sealed.nonce,
+                ciphertext=sealed.ciphertext,
+                version=expected_version + 1,
+                expires_at=expires_at,
+                updated_at=utcnow(),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        return bool(getattr(changed, "rowcount", 0))
+
+    def delete(self, name: str) -> bool:
+        row = self._find(name)
+        if row is None:
+            return False
+        self._session.delete(row)
+        self._session.flush()
+        return True
+
+    def reseal_all(self) -> int:
+        """Seal every secret again under the newest key (``outbound secrets rotate``)."""
+        newest = self._keyring.newest
+        rows = self._session.scalars(
+            select(CredentialRow).where(
+                CredentialRow.workspace_id == self._workspace_id,
+                CredentialRow.key_version != newest,
+            )
+        ).all()
+        for row in rows:
+            aad = associated_data(row.workspace_id, row.id)
+            secret = self._keyring.open(Sealed(row.key_version, row.nonce, row.ciphertext), aad)
+            self._seal(row, secret)
+        self._session.flush()
+        return len(rows)
+
+    def _seal(self, row: CredentialRow, secret: str) -> None:
+        sealed = self._keyring.seal(secret, associated_data(self._workspace_id, row.id))
+        row.key_version, row.nonce, row.ciphertext = (
+            sealed.key_version,
+            sealed.nonce,
+            sealed.ciphertext,
+        )
+
+    def _find(self, name: str) -> CredentialRow | None:
+        stmt = select(CredentialRow).where(
+            CredentialRow.workspace_id == self._workspace_id, CredentialRow.name == name
+        )
+        return self._session.scalars(stmt).one_or_none()
+
+    @staticmethod
+    def _view(row: CredentialRow) -> Credential:
+        return Credential(
+            row.id,
+            row.name,
+            row.purpose,
+            row.version,
+            row.expires_at,
+            dict(row.details or {}),
+            row.updated_at,
         )

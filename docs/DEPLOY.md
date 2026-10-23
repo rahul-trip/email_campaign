@@ -134,6 +134,7 @@ Migrations are additive. A rollback to an older commit does not undo them, and t
 2. Add every key from [`.env.example`](../.env.example) that you use, plus:
    - `POSTGRES_URL`, the Supabase URL from 1.2;
    - `APP_BASE_URL`, the app's public address (invitation and reset links start with it);
+   - `SECRETS_KEYS`, which encrypts the mailbox passwords and tokens customers connect: `{"1": "<output of uv run outbound secrets new-key>"}`. Keep a copy outside Doppler; without it every mailbox must be connected again. To rotate, add `"2"`, deploy, run `outbound secrets rotate` in the `api` container, then remove `"1"`;
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `EMAIL_FROM` for invitations and password resets. In production the API refuses to start without `SMTP_HOST`. The sending domain needs SPF, DKIM and DMARC.
    From a filled-in local `.env`: `doppler secrets upload --project outbound --config prd .env`. Then remove keys that are only for your laptop.
 3. Do **not** put `DATABASE_BACKEND`, `ENVIRONMENT`, `LOG_FORMAT`, `API_HOST`, `API_PORT`, `COOKIE_SECURE` or `FORWARDED_ALLOW_IPS` there. `deploy/compose.yml` sets them, and the compose values win.
