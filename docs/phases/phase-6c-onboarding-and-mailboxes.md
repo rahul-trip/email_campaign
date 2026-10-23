@@ -79,8 +79,8 @@
 
 ### 6c.4 Microsoft Graph adapter (`providers/adapters/ms_graph.py`)
 
-- [ ] **OAuth:** authorization code with PKCE, through `providers/oauth.py`. Scopes: `Mail.ReadWrite offline_access User.Read`.
-- [ ] **The `Mailbox` port** (`providers/ports.py:235-252`):
+- [x] **OAuth:** authorization code with PKCE, through `providers/oauth.py`. Scopes: `Mail.ReadWrite offline_access User.Read`.
+- [x] **The `Mailbox` port** (`providers/ports.py:235-252`):
   - `append_draft`: `POST /me/messages`, tagged with a single-value extended property that holds our message id;
   - `draft_exists`: a filter on that property;
   - `delete_draft`;
@@ -95,8 +95,8 @@
 
 ### 6c.5 Gmail adapter (`providers/adapters/gmail_api.py`)
 
-- [ ] **Scopes:** `gmail.compose` and `gmail.readonly`.
-- [ ] **Operations:**
+- [x] **Scopes:** `gmail.compose` and `gmail.readonly`.
+- [x] **Operations:**
   - `drafts.create` with the raw message;
   - `draft_exists`: an `rfc822msgid:` search. If the live check shows Gmail does not keep our Message-ID, fall back to the stored provider draft id;
   - `drafts.delete`;

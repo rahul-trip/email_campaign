@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from tenacity import (
@@ -106,6 +107,15 @@ class HttpClient:
     def post_object(self, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         return self._object("POST", path, self._request("POST", path, json=body))
 
+    def request(
+        self, method: str, path: str, *, headers: dict[str, str] | None = None, **kwargs: Any
+    ) -> Any:
+        """Any call: ``headers`` are added to the client's own for this request only (an OAuth
+        access token that changes), ``kwargs`` go to httpx (``params``, ``json``, ``data``).
+        ``path`` may also be a full URL on the same base, as APIs give for the next page.
+        An empty answer (204) is ``None``."""
+        return self._request(method, path, extra_headers=headers or {}, **kwargs)
+
     def _object(self, method: str, path: str, payload: Any) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise ProviderError(
@@ -138,10 +148,14 @@ class HttpClient:
         )
 
     def _once(self, method: str, path: str, **kwargs: Any) -> Any:
-        url = f"{self._base_url}/{path.lstrip('/')}"
+        headers = {**self._headers, **kwargs.pop("extra_headers", {})}
+        if path.startswith(self._base_url + "/"):  # a next-page link: same API, never elsewhere
+            url, path = path, urlsplit(path).path
+        else:
+            url = f"{self._base_url}/{path.lstrip('/')}"
         try:
             with _gate(self._provider):  # held for the request only, never across a retry wait
-                response = self._client.request(method, url, headers=self._headers, **kwargs)
+                response = self._client.request(method, url, headers=headers, **kwargs)
         except httpx.TransportError as exc:
             raise ProviderError(
                 self._provider, f"{method} {path}: {type(exc).__name__}", retryable=True
@@ -170,6 +184,8 @@ class HttpClient:
             )
         if status >= 400:
             raise ProviderError(self._provider, f"{where}: {status}", status_code=status)
+        if status == 204 or not response.content:
+            return None
         try:
             return response.json()
         except ValueError:
