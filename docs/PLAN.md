@@ -149,7 +149,6 @@ outbound/
   pipeline.py  wires stages to metered providers (real ones, or fakes in tests)
   worker.py    executes runs queued by the API
 web2/          React app (served from web2/dist); its API client is generated from the OpenAPI document.
-web/           the first React app, kept until it is deleted
 ```
 
 **How one lead moves.** The runner reads a company due in a stage's input status, runs the guards (suppression, country policy after the gate, per-prospect budget), then calls the stage with no transaction open. The stage may call vendors (always through the meter) and returns a `StageResult`: the next status, engine-written fields, and any child rows to add. The runner writes all of it in one short transaction that checks `row_version`. A failure is recorded on the company with its stage and error, and the run moves on.

@@ -70,7 +70,7 @@ addopts = "-ra --disable-socket --allow-unix-socket --allow-hosts=127.0.0.1,::1,
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["agent", "web", "docs", "test_keys.py"]
+extend-exclude = ["agent", "docs", "test_keys.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF", "S", "BLE", "TID"]

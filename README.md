@@ -24,7 +24,7 @@ It is built for 5–50 new prospects a week at no more than $0.50 each.
 | Path | What it is |
 |---|---|
 | `outbound/` | The engine: domain core, database layer, providers and the meter, stages, runner, services, CLI and API |
-| `web/` | The React web app. FastAPI serves its build |
+| `web2/` | The React web app. FastAPI serves its build |
 | `scripts/` | The Phase 0 vendor bake-off, the OpenAPI export, a throwaway Postgres for tests, and the browser-test server |
 | `tests/` | Tests for `outbound/` and `scripts/`, all without network |
 | `agent/` | The legacy pipeline. It is deleted after the first live run; see [agent/README.md](agent/README.md) |
@@ -102,5 +102,4 @@ npx playwright test                      # browser tests (and the guided tour), 
 npm run dev                              # live-reloading app on :5174; API_TARGET=http://127.0.0.1:8765
                                          # points it at `uv run python -m scripts.e2e_server`
 
-# web/ is the first app, kept until it is deleted; its tests still run in CI.
 ```

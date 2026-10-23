@@ -23,7 +23,7 @@ from outbound.api.routers import auth, leads, privacy, review, runs, settings, t
 from outbound.bootstrap import Container
 from outbound.domain.errors import ConfigurationError
 
-# The built web app. web2 replaced the first app (web/), which is kept only until it is deleted.
+# The built web app.
 WEB_DIST = Path(__file__).resolve().parents[2] / "web2" / "dist"
 
 
