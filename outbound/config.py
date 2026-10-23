@@ -23,9 +23,13 @@ class Settings(BaseSettings):
     database_backend: Literal["sqlite", "postgres"] = "sqlite"
     sqlite_path: str = "outbound.db"
     postgres_url: str = ""  # e.g. Supabase's session pooler; postgresql:// is fine
+    # The role that reads across workspaces (the scheduler, the admin console). Blank: the same
+    # connection as POSTGRES_URL, which is right for SQLite and for development.
+    postgres_platform_url: str = ""
     # Set it to bypass the switch (the tests and --database-url do). Otherwise it is worked out
     # from the three settings above.
     database_url: str = ""
+    platform_database_url: str = ""  # worked out like database_url; see postgres_platform_url
     # Connections each process keeps open to Postgres. Supabase's session pooler allows few
     # clients in all (15 on the small plans), and the api, worker and CLI each have a pool.
     database_pool_size: int = 5
@@ -104,14 +108,17 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _pick_database(self) -> Settings:
-        if self.database_url:
-            return self
-        if self.database_backend == "sqlite":
-            self.database_url = f"sqlite:///{self.sqlite_path}"
-        elif self.postgres_url:
-            self.database_url = self.postgres_url
-        else:
-            raise ValueError("DATABASE_BACKEND is postgres but POSTGRES_URL is not set")
+        if not self.database_url:
+            if self.database_backend == "sqlite":
+                self.database_url = f"sqlite:///{self.sqlite_path}"
+            elif self.postgres_url:
+                self.database_url = self.postgres_url
+                self.platform_database_url = self.platform_database_url or (
+                    self.postgres_platform_url
+                )
+            else:
+                raise ValueError("DATABASE_BACKEND is postgres but POSTGRES_URL is not set")
+        self.platform_database_url = self.platform_database_url or self.database_url
         return self
 
     @field_validator("log_level")

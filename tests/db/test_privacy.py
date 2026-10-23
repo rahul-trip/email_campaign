@@ -66,18 +66,20 @@ def privacy(factory: UnitOfWorkFactory, ws: str, world: World) -> PrivacyService
 
 
 def test_before_forgetting_the_person_is_in_the_real_data(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    owner_engine: Engine, engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
     """Guards the scan below: it must find the person where real runs put them."""
     drafted_lead(engine, factory, ws, World())
-    assert "contact_emails.email" in occurrences(engine, ADDRESS)
-    assert "messages.generated_body" in occurrences(engine, "Hi Jane")
-    assert "provider_calls.response" in occurrences(engine, NAME)  # the team page and the reply
-    assert "provider_calls.response" in occurrences(engine, ADDRESS)  # the finder's answer
+    assert "contact_emails.email" in occurrences(owner_engine, ADDRESS)
+    assert "messages.generated_body" in occurrences(owner_engine, "Hi Jane")
+    assert "provider_calls.response" in occurrences(
+        owner_engine, NAME
+    )  # the team page and the reply
+    assert "provider_calls.response" in occurrences(owner_engine, ADDRESS)  # the finder's answer
 
 
 def test_forgetting_a_person_after_a_real_run_leaves_no_trace_anywhere(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    owner_engine: Engine, engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
     world = World()
     drafted_lead(engine, factory, ws, world)
@@ -88,11 +90,13 @@ def test_forgetting_a_person_after_a_real_run_leaves_no_trace_anywhere(
     assert (result.drafts_deleted, result.drafts_left) == (1, ())
     assert world.mailbox.drafts == {}  # the draft was removed from the mailbox too
     for needle in (ADDRESS, NAME, "jane.doe"):
-        assert occurrences(engine, needle) == [], f"{needle!r}: {occurrences(engine, needle)}"
+        assert occurrences(owner_engine, needle) == [], (
+            f"{needle!r}: {occurrences(owner_engine, needle)}"
+        )
 
 
 def test_a_mailbox_failure_never_undoes_the_erasure(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    owner_engine: Engine, engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
     world = World()
     world.mailbox = FailingMailbox()
@@ -103,7 +107,7 @@ def test_a_mailbox_failure_never_undoes_the_erasure(
 
     assert result.found and result.drafts_deleted == 0
     assert list(result.drafts_left) == draft_ids  # told to the operator to remove by hand
-    assert occurrences(engine, ADDRESS) == []
+    assert occurrences(owner_engine, ADDRESS) == []
 
 
 def test_forgetting_an_address_we_never_held_still_suppresses_it(

@@ -43,26 +43,30 @@ def lead(
 
 
 def test_before_deleting_the_data_really_is_in_many_places(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     """Guards the scan below: if this found little, a clean scan would prove nothing."""
     _, ids = lead(factory, ws)
     assert {"contact_emails.email", "messages.generated_body", "notes.body"} <= set(
-        occurrences(engine, PERSON) + occurrences(engine, "sailing") + occurrences(engine, NAME)
+        occurrences(owner_engine, PERSON)
+        + occurrences(owner_engine, "sailing")
+        + occurrences(owner_engine, NAME)
     )
-    assert len(occurrences(engine, ids["company"])) >= 6
+    assert len(occurrences(owner_engine, ids["company"])) >= 6
 
 
 def test_deleting_removes_the_lead_and_every_trace_of_its_people(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     service, ids = lead(factory, ws)
     result = service.delete_lead(ids["company"], confirm_domain=" ACME.com ")
     assert (result.domain, result.contacts_removed, result.messages_removed) == ("acme.com", 2, 3)
     for needle in (PERSON, NAME, "sam@acme.com", "Sam Roe", "forecast error at acme", "sailing"):
-        assert occurrences(engine, needle) == [], f"{needle!r}: {occurrences(engine, needle)}"
+        assert occurrences(owner_engine, needle) == [], (
+            f"{needle!r}: {occurrences(owner_engine, needle)}"
+        )
     # Nothing points at the lead any more except the one record that it was deleted.
-    assert set(occurrences(engine, ids["company"])) == {"events.entity_id"}
+    assert set(occurrences(owner_engine, ids["company"])) == {"events.entity_id"}
     with factory(ws) as uow:
         assert uow.companies.by_domain("acme.com") is None
 
@@ -86,20 +90,20 @@ def test_one_record_stays_that_it_happened_and_it_holds_no_personal_detail(
 
 
 def test_the_cost_ledger_keeps_its_rows_but_loses_the_link_and_the_vendor_answer(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     service, ids = lead(factory, ws)
-    with engine.connect() as connection:
+    with owner_engine.connect() as connection:
         before = connection.scalar(select(func.sum(ProviderCallRow.cost_micro_usd)))
     service.delete_lead(ids["company"], confirm_domain="acme.com")
-    with engine.connect() as connection:
+    with owner_engine.connect() as connection:
         assert connection.scalar(select(func.sum(ProviderCallRow.cost_micro_usd))) == before
         row = connection.execute(select(ProviderCallRow)).one()
     assert (row.company_id, row.contact_id, row.response) == (None, None, None)
 
 
 def test_another_lead_is_left_exactly_as_it_was(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     service, ids = lead(factory, ws)
     service.delete_lead(ids["company"], confirm_domain="acme.com")
@@ -108,7 +112,7 @@ def test_another_lead_is_left_exactly_as_it_was(
         assert kim.full_name == "Kim Lee"
         assert [e.email for e in uow.emails.for_contact(kim.id)] == ["kim@beta.io"]
         assert uow.companies.get(ids["other"]).name == "Beta"
-    assert occurrences(engine, "kim@beta.io") != []
+    assert occurrences(owner_engine, "kim@beta.io") != []
 
 
 def test_a_wrong_confirmation_deletes_nothing(factory: UnitOfWorkFactory, ws: str) -> None:

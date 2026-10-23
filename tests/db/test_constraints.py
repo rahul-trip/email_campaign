@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 from sqlalchemy import text
-from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from outbound.db.models import (
@@ -238,7 +238,8 @@ def test_a_row_cannot_point_at_a_missing_workspace(factory: UnitOfWorkFactory, w
                 workspace_id="no-such-workspace", country_code="GB", rule=PolicyRule.ALLOW
             )
         )
-        with pytest.raises(IntegrityError):
+        # Refused by the foreign key, and on Postgres first by row-level security.
+        with pytest.raises((IntegrityError, ProgrammingError)):
             uow.session.flush()
 
 
