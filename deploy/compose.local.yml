@@ -12,6 +12,8 @@ services:
       POSTGRES_DB: outbound
     volumes:
       - db:/var/lib/postgresql/data
+      # Runs on a new volume only; after upgrading from an older rehearsal: local-test.sh reset
+      - ./local-roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "outbound"]
       interval: 2s

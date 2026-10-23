@@ -34,6 +34,10 @@ x-app: &app
 services:
   migrate:
     <<: *app
+    # The tables' owner migrates (Phase 6a). With MIGRATE_ENV_FILE=doppler-migrate.env (set by
+    # remote-deploy.sh when that file exists) the owner's password lives in its own Doppler
+    # config, never in the api or worker environment.
+    env_file: ${OUTBOUND_HOME:-/opt/outbound}/${MIGRATE_ENV_FILE:-doppler.env}
     entrypoint: ["doppler", "run", "--fallback", "/doppler/migrate.json", "--"]
     command: ["sh", "-c", "outbound db upgrade && outbound seed"]
     restart: "no"

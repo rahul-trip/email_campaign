@@ -26,7 +26,11 @@ def settings_for(database_url: str | None) -> Settings:
     settings = Settings()
     if database_url:
         settings = settings.model_copy(
-            update={"database_url": database_url, "platform_database_url": database_url}
+            update={
+                "database_url": database_url,
+                "platform_database_url": database_url,
+                "migrate_database_url": database_url,
+            }
         )
     configure_logging(settings.log_level, settings.log_format, settings.environment)
     return settings
@@ -38,3 +42,9 @@ def workspace_id_or_exit(container: Container, name: str) -> str:
     except ConfigurationError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
+
+
+def as_owner(settings: Settings) -> Settings:
+    """The same settings connected as the tables' owner: migrations and seeding only."""
+    owner = settings.migrate_database_url
+    return settings.model_copy(update={"database_url": owner, "platform_database_url": owner})
