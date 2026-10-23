@@ -10,7 +10,7 @@ from outbound.bootstrap import build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
 from outbound.db.errors import NotFound
 from outbound.domain.errors import InvalidInput
-from outbound.providers.registry import build_mailbox_if_configured
+from outbound.pipeline import mailboxes_for
 from outbound.services import defaults
 from outbound.services.leads import LeadError
 from outbound.services.privacy import PrivacyResult, PrivacyService
@@ -18,11 +18,8 @@ from outbound.services.privacy import PrivacyResult, PrivacyService
 
 def _service(database_url: str | None, workspace: str) -> PrivacyService:
     container = build_container(settings_for(database_url))
-    return PrivacyService(
-        container.uow,
-        workspace_id_or_exit(container, workspace),
-        build_mailbox_if_configured(container.settings),
-    )
+    workspace_id = workspace_id_or_exit(container, workspace)
+    return PrivacyService(container.uow, workspace_id, mailboxes_for(container, workspace_id))
 
 
 def _report(result: PrivacyResult) -> None:
@@ -77,7 +74,7 @@ def register(app: typer.Typer) -> None:
                 typer.echo("not the same: nothing was deleted", err=True)
                 raise typer.Exit(1)
         service = PrivacyService(
-            container.uow, workspace_id, build_mailbox_if_configured(container.settings)
+            container.uow, workspace_id, mailboxes_for(container, workspace_id)
         )
         try:
             result = service.delete_lead(

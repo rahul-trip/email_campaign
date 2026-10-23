@@ -25,7 +25,7 @@ from outbound.domain.actors import OPERATOR
 from outbound.domain.enums import PlatformRole, WorkspaceStatus
 from outbound.domain.permissions import Permission, Principal, can
 from outbound.logging import bind, get_logger
-from outbound.providers.ports import LlmClient, Mailbox, SearchProvider
+from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.services.identity import CurrentUser, IdentityService
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
@@ -35,6 +35,7 @@ from outbound.services.review import ReviewService
 from outbound.services.runs import RunService
 from outbound.services.settings import SettingsService
 from outbound.services.webhook import WebhookService
+from outbound.stages.mailboxes import Mailboxes
 
 log = get_logger(__name__)
 WORKSPACE_HEADER = "x-workspace-id"
@@ -59,7 +60,7 @@ def build_services(
     workspace_id: str,
     *,
     search: SearchProvider | None = None,
-    mailbox: Mailbox | None = None,
+    mailboxes: Mailboxes | None = None,
     writer: LlmClient | None = None,
     settings_service: SettingsService | None = None,
     actor: str = OPERATOR,
@@ -77,7 +78,7 @@ def build_services(
         settings=settings_service or SettingsService(uow, workspace_id, actor=actor),
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),
-        privacy=PrivacyService(uow, workspace_id, mailbox, actor=actor),
+        privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),
     )
 
 
@@ -94,19 +95,18 @@ class ServicesFactory:
     container: Container
     search: SearchProvider | None = None  # raw; metered per workspace
     writer: LlmClient | None = None  # raw; metered per workspace
-    mailbox: Mailbox | None = None
 
     def for_tenant(
         self, workspace_id: str, *, actor: str = OPERATOR, read_only: bool = False
     ) -> Services:
-        from outbound.pipeline import meter_search, meter_writer
+        from outbound.pipeline import mailboxes_for, meter_search, meter_writer
 
         container = self.container
         return build_services(
             container,
             workspace_id,
             search=meter_search(container, workspace_id, self.search) if self.search else None,
-            mailbox=self.mailbox,
+            mailboxes=mailboxes_for(container, workspace_id),
             writer=meter_writer(container, workspace_id, self.writer) if self.writer else None,
             actor=actor,
             read_only=read_only,

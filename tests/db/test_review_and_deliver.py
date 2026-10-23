@@ -30,6 +30,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Outcome, Runner
 from outbound.services.review import ReviewError, ReviewService, footer_of
 from outbound.stages.deliver import DeliverStage, draft_message_id
+from outbound.stages.mailboxes import one
 from tests.stages.fakes import REVISED_EMAIL, FakeLlm
 
 C = CompanyStatus
@@ -254,7 +255,7 @@ def approved(factory: UnitOfWorkFactory, ws: str, **kwargs: Any) -> tuple[str, s
 
 
 def deliver(factory: UnitOfWorkFactory, ws: str, mailbox: FakeMailbox) -> Any:
-    return Runner(factory, ws, [DeliverStage(mailbox)], Guards()).run_pipeline()
+    return Runner(factory, ws, [DeliverStage(one(mailbox))], Guards()).run_pipeline()
 
 
 def test_an_approved_email_becomes_a_mailbox_draft_and_the_lead_goes_in_sequence(

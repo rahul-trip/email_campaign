@@ -22,7 +22,9 @@ from outbound.domain.editing import edit_distance
 from outbound.domain.entities import Message
 from outbound.domain.enums import EntityType, MessageState
 from outbound.logging import get_logger
-from outbound.providers.ports import Mailbox, SentMessage
+from outbound.providers.errors import ProviderError
+from outbound.providers.ports import SentMessage
+from outbound.stages.mailboxes import Mailboxes, MailboxUnavailable
 
 log = get_logger(__name__)
 
@@ -42,13 +44,13 @@ class SentSync:
         self,
         uow_factory: UnitOfWorkFactory,
         workspace_id: str,
-        mailbox: Mailbox,
+        mailboxes: Mailboxes,
         *,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
-        self._mailbox = mailbox
+        self._mailboxes = mailboxes
         self._now = now
 
     def run(self) -> dict[str, int]:
@@ -62,9 +64,14 @@ class SentSync:
             return counts
 
         earliest = min((m.updated_at for m, _ in drafts if m.updated_at), default=self._now())
-        sent = self._mailbox.list_sent(earliest - CLOCK_SKEW - LOOK_BACK)
+        sent_in = self._sent_by_mailbox(earliest - CLOCK_SKEW - LOOK_BACK)
+        everywhere = [s for sent in sent_in.values() for s in sent]
 
-        candidates = {m.id: [s for s in sent if _fits(m, address, s)] for m, address in drafts}
+        def pool(message: Message) -> list[SentMessage]:
+            # A draft from before Phase 6c names no mailbox: look in all of them.
+            return sent_in.get(message.mailbox_id, []) if message.mailbox_id else everywhere
+
+        candidates = {m.id: [s for s in pool(m) if _fits(m, address, s)] for m, address in drafts}
         claimed: dict[str, list[str]] = defaultdict(list)
         for message_id, found in candidates.items():
             for item in found:
@@ -81,6 +88,21 @@ class SentSync:
                 self._flag(message, [s.rfc_message_id for s in found])
                 counts["ambiguous"] += 1
         return counts
+
+    def _sent_by_mailbox(self, since: datetime) -> dict[str | None, list[SentMessage]]:
+        found: dict[str | None, list[SentMessage]] = {}
+        try:
+            opened = self._mailboxes.all_open()
+        except MailboxUnavailable:
+            return found
+        for mailbox_id, mailbox in opened:
+            try:
+                found[mailbox_id] = mailbox.list_sent(since)
+            except ProviderError as error:  # one broken mailbox must not stop the others
+                log.warning(
+                    "sent_sync_mailbox_failed", mailbox_id=mailbox_id, reason=str(error)[:200]
+                )
+        return found
 
     def _settle(self, message: Message, sent: SentMessage) -> None:
         with self._uow(self._workspace_id) as uow:

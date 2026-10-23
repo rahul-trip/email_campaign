@@ -22,6 +22,7 @@ from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
 from outbound.pipeline import Pipeline, assemble
 from outbound.providers.errors import ProviderError
 from outbound.services.privacy import PrivacyService
+from outbound.stages.mailboxes import one
 from tests.db.test_forget import occurrences
 from tests.stages.fakes import FakeMailbox
 from tests.stages.world import PROFILE, World
@@ -59,7 +60,7 @@ def drafted_lead(
 
 
 def privacy(factory: UnitOfWorkFactory, ws: str, world: World) -> PrivacyService:
-    return PrivacyService(factory, ws, world.mailbox)
+    return PrivacyService(factory, ws, one(world.mailbox))
 
 
 # ------------------------------------------------------------------ forget
@@ -193,7 +194,7 @@ def test_another_workspaces_people_and_companies_cannot_be_touched(
     _, company_id = drafted_lead(engine, factory, ws, world)
     with factory(ws) as uow:
         [contact] = uow.contacts.for_company(company_id)
-    intruder = PrivacyService(factory, other_ws, world.mailbox)
+    intruder = PrivacyService(factory, other_ws, one(world.mailbox))
     with pytest.raises(NotFound):
         intruder.suppress_contact(contact.id)
     with pytest.raises(NotFound):

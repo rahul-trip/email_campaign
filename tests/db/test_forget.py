@@ -218,7 +218,7 @@ def test_forgetting_cancels_unsent_messages_and_reports_drafts_to_delete(
         result = forget_email(uow, PERSON)
         uow.commit()
     assert result.messages_cancelled == 2
-    assert result.remote_draft_ids == ("draft-1",)
+    assert result.drafts == (("draft-1", None),)
     with factory(ws) as uow:
         jane = uow.contacts.for_company(uow.companies.by_domain("acme.com").id)[0]  # type: ignore[union-attr]
         states = {m.state for m in uow.messages.for_contact(jane.id)}

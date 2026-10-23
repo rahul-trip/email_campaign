@@ -24,9 +24,15 @@ from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import COMPANY, CONTACT
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
-from outbound.providers.ports import Mailbox
-from outbound.services.forget import forget_email, stop_contact, suppress_if_nobody_left
+from outbound.services.forget import (
+    DraftRef,
+    drafts_of,
+    forget_email,
+    stop_contact,
+    suppress_if_nobody_left,
+)
 from outbound.services.leads import LeadError
+from outbound.stages.mailboxes import Mailboxes, MailboxUnavailable
 
 log = get_logger(__name__)
 
@@ -54,13 +60,13 @@ class PrivacyService:
         self,
         uow_factory: UnitOfWorkFactory,
         workspace_id: str,
-        mailbox: Mailbox | None = None,
+        mailboxes: Mailboxes | None = None,
         *,
         actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
-        self._mailbox = mailbox
+        self._mailboxes = mailboxes
         self._actor = actor
 
     def forget(self, email: str, *, actor: str | None = None) -> PrivacyResult:
@@ -69,7 +75,7 @@ class PrivacyService:
         with self._uow(self._workspace_id) as uow:
             outcome = forget_email(uow, email, actor=actor)
             uow.commit()
-        deleted, left = self._delete_drafts(outcome.remote_draft_ids)
+        deleted, left = self._delete_drafts(outcome.drafts)
         # The address itself is deliberately not logged: erasure must not leave it in the logs.
         self._log("forget", actor, outcome.found, outcome.messages_cancelled, deleted, left)
         return PrivacyResult(outcome.found, outcome.messages_cancelled, deleted, left)
@@ -181,11 +187,7 @@ class PrivacyService:
                     "An email was sent to this lead, and the record of mail that has left must "
                     "stay. Use Suppress to stop all contact instead."
                 )
-            draft_ids = tuple(
-                m.remote_draft_id
-                for m in messages
-                if m.state is MessageState.DRAFTED and m.remote_draft_id
-            )
+            draft_ids = tuple(drafts_of(messages))
             contacts = uow.contacts.for_company(company_id)
             gone = uow.erasure.delete_company(
                 company_id,
@@ -248,7 +250,7 @@ class PrivacyService:
         )
 
     @staticmethod
-    def _stop_everyone(uow: UnitOfWork, company_id: str, actor: str) -> tuple[int, list[str]]:
+    def _stop_everyone(uow: UnitOfWork, company_id: str, actor: str) -> tuple[int, list[DraftRef]]:
         cancelled, draft_ids = 0, []
         for contact in uow.contacts.for_company(company_id):
             count, drafts = stop_contact(uow, contact.id, actor)
@@ -256,15 +258,18 @@ class PrivacyService:
             draft_ids += drafts
         return cancelled, draft_ids
 
-    def _delete_drafts(self, draft_ids: tuple[str, ...]) -> tuple[int, tuple[str, ...]]:
+    def _delete_drafts(self, drafts: tuple[DraftRef, ...]) -> tuple[int, tuple[str, ...]]:
+        """Delete each draft from the mailbox holding it. Any that cannot be reached are
+        returned, for the person to delete by hand."""
         deleted, left = 0, []
-        for draft_id in draft_ids:
-            if self._mailbox is None:
+        for draft_id, mailbox_id in drafts:
+            if self._mailboxes is None:
                 left.append(draft_id)
                 continue
             try:
-                deleted += self._mailbox.delete_draft(draft_id) > 0
-            except ProviderError as error:
+                _, mailbox = self._mailboxes.open(mailbox_id)
+                deleted += mailbox.delete_draft(draft_id) > 0
+            except (ProviderError, MailboxUnavailable) as error:
                 log.warning(
                     "draft_delete_failed", remote_draft_id=draft_id, reason=str(error)[:200]
                 )

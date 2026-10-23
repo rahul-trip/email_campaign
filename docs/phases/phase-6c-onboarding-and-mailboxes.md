@@ -75,7 +75,7 @@
   - require TLS.
 
   Built in `outbound/providers/netguard.py` and `guarded_connect` in the adapter. A server without UIDPLUS gets the draft flagged `\\Deleted` but not expunged, so nothing else in the folder is ever purged.
-- [ ] **Login** comes from the mailbox's credential, not from `Settings`.
+- [x] **Login** comes from the mailbox's credential, not from `Settings`.
 
 ### 6c.4 Microsoft Graph adapter (`providers/adapters/ms_graph.py`)
 
@@ -112,11 +112,11 @@
 - [ ] **`services/mailboxes.py`:** connect, test, pause, resume, set the default, disconnect (revoke at the provider, delete the credential) and reconnect.
   - OAuth returns to an app page, which posts `code` and `state` to the API.
   - `state` and the PKCE verifier live in the session row (`sessions.data`).
-- [ ] **`MailboxResolver`** replaces the single env mailbox, `Providers.mailbox` (`pipeline.py:105, 172-174`):
+- [x] **`MailboxResolver`** replaces the single env mailbox, `Providers.mailbox` (`pipeline.py:105, 172-174`):
   - `DeliverStage` uses the message's mailbox;
   - `SentSync` goes through each mailbox in the workspace;
   - `PrivacyService` (`api/app.py:150`) deletes drafts in the mailbox that holds them.
-- [ ] **Copy chooses the sender:** the campaign's `mailbox_id`, else the workspace default. It sets `messages.mailbox_id`, which is never set today. The signature comes from that mailbox's `sender` JSON, falling back to the workspace profile.
+- [x] **Copy chooses the sender:** the campaign's `mailbox_id`, else the workspace default. It sets `messages.mailbox_id`, which is never set today. The signature comes from that mailbox's `sender` JSON, falling back to the workspace profile.
 - [ ] **Health job** (part of the tick):
   - it refreshes tokens and marks `needs_reconnect`, with a banner and an email to the mailbox's owner and the workspace admins;
   - deliveries through that mailbox wait and resume after reconnecting;
