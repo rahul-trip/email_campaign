@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.engine.interfaces import ReflectedCheckConstraint
 
 from outbound.db import (
     migrate,
@@ -86,18 +87,36 @@ def test_there_is_a_check_constraint_for_every_enum_column() -> None:
     assert len(_enum_columns()) == 26
 
 
+@pytest.fixture(scope="module")
+def migrated_checks(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> dict[str, list[ReflectedCheckConstraint]]:
+    """Every table's check constraints, from one migrated database shared by the enum tests.
+
+    On Postgres the session database (already migrated by the ``engine`` fixture) is read.
+    """
+    from tests.db.conftest import TEST_DATABASE_URL
+
+    url = TEST_DATABASE_URL or f"sqlite:///{tmp_path_factory.mktemp('checks') / 'checks.db'}"
+    migrate.upgrade(url)
+    engine = create_engine(url)
+    try:
+        found = inspect(engine)
+        return {name: found.get_check_constraints(name) for name in EXPECTED_TABLES}
+    finally:
+        engine.dispose()
+
+
 @pytest.mark.parametrize(
     ("table", "enum", "column"), _enum_columns(), ids=lambda v: v if isinstance(v, str) else ""
 )
 def test_each_check_constraint_allows_exactly_the_values_of_its_enum(
-    fresh_url: str, table: str, enum: sa.Enum, column: str
+    migrated_checks: dict[str, list[ReflectedCheckConstraint]],
+    table: str,
+    enum: sa.Enum,
+    column: str,
 ) -> None:
-    migrate.upgrade(fresh_url)
-    engine = create_engine(fresh_url)
-    try:
-        checks = inspect(engine).get_check_constraints(table)
-    finally:
-        engine.dispose()
+    checks = migrated_checks[table]
     wanted_name = f"ck_{table}_{enum.name}"
     (check,) = [c for c in checks if c["name"] == wanted_name]
     allowed = set(re.findall(r"'([^']+)'", check["sqltext"]))
