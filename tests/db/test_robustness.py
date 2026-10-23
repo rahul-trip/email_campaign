@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import imaplib
+import socket
 from datetime import UTC, datetime
 from typing import Any
 
@@ -79,12 +79,18 @@ def test_a_meter_for_a_missing_workspace_says_what_is_wrong(
 def test_the_mailbox_connection_has_a_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, Any] = {}
 
-    def fake(host: str, port: int, **kwargs: Any) -> imaplib.IMAP4:
-        seen.update(kwargs)
+    def fake(address: tuple[str, int], timeout: float | None = None) -> socket.socket:
+        seen["timeout"] = timeout
         raise OSError("stop here")
 
-    monkeypatch.setattr(imaplib, "IMAP4_SSL", fake)
-    box = ImapMailbox(host="h", address="a@b.com", password="p", timeout=12.5)
+    monkeypatch.setattr(socket, "create_connection", fake)
+    box = ImapMailbox(
+        host="imap.customer.example",
+        address="a@b.com",
+        password="p",
+        timeout=12.5,
+        resolve=lambda host, port: ["93.184.216.34"],
+    )
     with pytest.raises(ProviderError):
         box.list_sent(datetime.now(UTC))
     assert seen["timeout"] == 12.5

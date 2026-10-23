@@ -65,14 +65,16 @@
 
 ### 6c.3 Harden the IMAP adapter (`providers/adapters/imap_mailbox.py`)
 
-- [ ] **Delete by UID:** search, store and `UID EXPUNGE`. Today's plain `EXPUNGE` (`:116-124`) removes *every* message flagged `\Deleted` in the folder.
-- [ ] **Folders:** find Drafts and Sent through SPECIAL-USE, falling back to the mailbox's `connection` settings.
-- [ ] **SSRF guard:**
+- [x] **Delete by UID:** search, store and `UID EXPUNGE`. Today's plain `EXPUNGE` (`:116-124`) removes *every* message flagged `\Deleted` in the folder.
+- [x] **Folders:** find Drafts and Sent through SPECIAL-USE, falling back to the mailbox's `connection` settings.
+- [x] **SSRF guard:**
   - resolve the host once;
   - refuse private, loopback, link-local and metadata ranges;
   - connect to the resolved IP with SNI;
   - allow only ports 993 and 143;
   - require TLS.
+
+  Built in `outbound/providers/netguard.py` and `guarded_connect` in the adapter. A server without UIDPLUS gets the draft flagged `\\Deleted` but not expunged, so nothing else in the folder is ever purged.
 - [ ] **Login** comes from the mailbox's credential, not from `Settings`.
 
 ### 6c.4 Microsoft Graph adapter (`providers/adapters/ms_graph.py`)
