@@ -91,6 +91,7 @@ Effort is rough: **S** is under half a day, **M** one to two days, **L** three d
 | E5 | **Phase 0's bake-off has not run**, so the finder chain is still a guess | Phase 0 gate | Needs the 30 known contacts from the operator | P1 | S |
 | E6 | **A LangGraph deprecation warning prints on every command** | `outbound/__init__.py` filter does not catch it | Filter by category at import time, before LangGraph loads | P2 | S |
 | E7 | **The API documentation page is open without a login** | `/api/docs` | Put it behind the login | P2 | S |
+| E8 | **The production tables are probably readable and writable through Supabase's Data API.** They are in the `public` schema with row-level security off. Supabase serves `public` through PostgREST and, by its default privileges, grants those tables to `anon` and `authenticated`, so anyone holding the project's anon/publishable key (public by design) can reach every lead, contact and email. The app never uses the Data API | Found by the SaaS planning review (2026-10-23); DEPLOY.md §1.2 | Data exposure | In the Supabase dashboard: check the Security Advisor ("RLS disabled in public"), turn the Data API off, and run `REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;` (also sequences, functions and default privileges). Phase 6a adds a catalog test that fails if those roles hold any grant | **P0** | S |
 
 ---
 
@@ -312,6 +313,21 @@ Asked for by the operator (2026-10-22): change the final copy in any way (tone, 
 ## 7. Deliberately left for Phase 4 or later
 
 Reading replies and stopping a sequence, follow-up emails, bounce handling, automatic sending, more than one mailbox, more than one user. The manual already says so.
+
+## 8. Before Phase 6a (the SaaS track)
+
+The SaaS track ([phase-6-saas-ready.md](phase-6-saas-ready.md)) builds on these. Finish them here so 6a can stay about tenancy.
+
+| Item | What 6a needs from it |
+|---|---|
+| **E8** Data API closed | No exposure while the tenancy work goes on. Do it first |
+| **B2** One run per workspace | A partial unique index, one `running` run per workspace (migration 0006). It also blocks a second CLI run. The multi-tenant scheduler relies on it |
+| **B3** Stale runs | `runs.heartbeat_at` (migration 0006) and recovery after 30 minutes without one |
+| **B4** Budget read live | The pipeline is assembled per run in 6a, and limits change at runtime in 6d |
+| **B5** Model prices | The LLM is now DeepSeek served by DeepInfra (OpenAI-compatible). Set its prices in `LLM_PRICES`: credits and margins (6d) are wrong while model calls cost $0 in the ledger |
+| **B7** Worker tick | A tick run queued per workspace every 15 minutes. 6a's scheduler claims it like any run, and 6d's automatic resume runs in it |
+| **E4** Delete `agent/` | Less to carry through the tenancy refactor |
+| `web/` deleted | Its CI job signs in with the old password form; 6b replaces sign-in |
 
 ## Gate record
 

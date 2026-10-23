@@ -2,6 +2,7 @@
 
 **Status:** approved by the team on 2026-10-16. Every decision below is final.
 **Build status (2026-10-18):** Phases 0–3 are code complete and tested with fake vendors; their gates wait on live runs with real keys. See [phases/README.md](phases/README.md). Where the build differs from the original wording, the text below has been updated and each phase document lists the differences.
+**SaaS (2026-10-23):** the team approved an invite-only SaaS alpha, Phase 6, split into 6a–6g. Its overview is [phases/phase-6-saas-ready.md](phases/phase-6-saas-ready.md); decisions 14–22 below summarise it.
 **Where it lives:** this file is the source of truth for building the engine. The team reviewed the
 [plan in Claude Docs](https://claude.ai/code/artifact/4cea76e3-1e09-442e-a719-22299ed78ece); any later change is made here, in the same PR as the code it affects.
 
@@ -15,7 +16,12 @@ Related documents:
 
 ## 1. Summary
 
-The engine accepts or finds target companies, researches each one, finds and verifies a decision-maker's email, writes a short personalised email, and drafts it in the mailbox once a human approves it. Later phases add reply handling, follow-ups, automatic sending and multiple workspaces.
+The engine accepts or finds target companies, researches each one, finds and verifies a decision-maker's email, writes a short personalised email, and drafts it in the mailbox once a human approves it. Later phases add reply handling, follow-ups and automatic sending.
+
+Phase 6 turns the engine into a multi-tenant product, starting with an invite-only alpha:
+- each customer has its own workspace, team, mailboxes and limits;
+- platform admins have a console;
+- a shared, verified lead directory cuts vendor cost.
 
 Development goes in this order: **schema, then relationships and integrity rules, then the backend engine, then the web app.**
 
@@ -33,11 +39,17 @@ Three research findings shaped the design:
 - Leads come from the operator (any partial detail), from search discovery, or both.
 - Never contact a company twice, anyone suppressed, or anyone the country policy blocks.
 - Resume after any failure without repeating a paid call.
-- Later: follow-ups, reply handling, automatic sending, and several workspaces (SaaS).
+- Later: follow-ups, reply handling, automatic sending.
+- **SaaS alpha (Phase 6):**
+  - invited companies, each isolated in its own workspace;
+  - per-step credits set by platform admins;
+  - vendor keys owned by the platform;
+  - a shared, verified lead directory checked before any paid vendor.
 
 **Non-goals**
 
 - A CRM. Positive replies go out to one by webhook or export.
+- In the alpha: payments, MFA, social sign-in and SSO (see Phases 6e and 6f).
 - Any channel other than email.
 - LinkedIn scraping. Only public search results are read.
 - Open or click tracking.
@@ -46,8 +58,8 @@ Three research findings shaped the design:
 
 | # | Decision | Choice |
 |---|---|---|
-| 1 | Users | One operator now; SaaS later |
-| 2 | Store | SQLite through SQLAlchemy 2 and Alembic; Supabase Postgres later; `workspace_id` on every table |
+| 1 | Users | One operator until Phase 6. Then an invite-only multi-tenant alpha: one company = one workspace (decisions 14–22) |
+| 2 | Store | SQLite through SQLAlchemy 2 and Alembic for development and tests; Supabase Postgres in production, with row-level security and least-privilege roles from 6a; `workspace_id` on every tenant table |
 | 3 | Orchestration | A plain Python runner moves each company through its statuses. LangGraph subgraphs run only inside Research and Copy |
 | 4 | Targets | A lead can start from one anchor: domain, website, company name, email, person and company, or LinkedIn profile URL |
 | 5 | Contact discovery | Persona first: names and titles come from the company's own pages and from public search (Tavily). The email is then found by name and domain |
@@ -55,10 +67,19 @@ Three research findings shaped the design:
 | 7 | Verification | Only `valid` and `catch_all_resolved` addresses are safe to send. Other catch-alls go to a resolver; unresolved ones are held |
 | 8 | Copy | The writer model returns the body as 2–4 paragraphs plus the subject and the url of the news item it opens with; code adds greeting, signature and footer. Body 120–200 words by default (a workspace setting), greeting, sign-off and footer excluded; follow-ups 25–50 words; reading grade ≤ 10; one or two questions; no bullet lists, at most one em dash, no stock or machine-sounding phrases; subject 2–6 lowercase words; no links in touch 1 |
 | 9 | Cadence | Touches on business days 1, 4 and 9. Each follow-up is written just before it is due. Sends go out Tuesday to Thursday, 08:00–10:30, in the prospect's time zone |
-| 10 | Mailbox | IMAP for now, with a Sent-folder sync. The sending gateway (EmailEngine, Smartlead or Instantly) is chosen before Phase 5 |
+| 10 | Mailbox | IMAP with a Sent-folder sync, from one mailbox in `.env`, until 6c. From 6c, each workspace connects its own mailboxes in Settings: Microsoft 365 (Graph, OAuth), Google (Gmail API, OAuth) or any IMAP account (app password). Phase 5 sends through the same adapters, so no separate gateway |
 | 11 | Compliance | ISO country codes. UK leads need a confirmed incorporated company; DE and AT are blocked; CA needs a published or operator-given email; IN is held unless the operator gave the contact |
 | 12 | Delivery order | Schema, then the engine on the CLI, then the API and web app |
-| 13 | Budget | $0.50 ceiling per prospect, enforced before every paid call |
+| 13 | Budget | $0.50 ceiling per prospect, enforced before every paid call. From 6d, a plan can lower its maximum, and "no limit" is not allowed |
+| 14 | Tenancy (2026-10-23) | Shared database and schema. Composite foreign keys. Postgres row-level security under `outbound_app`. Cross-workspace reads by `outbound_platform` without BYPASSRLS. The owner is used only to migrate. See [phase 6a](phases/phase-6a-tenancy-foundation.md) |
+| 15 | Sign-in | Email and password (Argon2id), invitations, password reset, server-side sessions, behind an `IdentityProvider` port. No MFA, social sign-in or SSO in the alpha ([6b](phases/phase-6b-identity-and-access.md)) |
+| 16 | Roles | Fixed RBAC. Workspace roles `admin` and `member`. Platform roles `admin` and an alpha-only `superadmin`, who reads every workspace. Every route declares its permission |
+| 17 | Plans and credits | Credits per pipeline step, charged once per lead. The free plan allows 5 discovered + 5 manually added leads a month. Admins set any limit, grant credits and extend access. A lead stopped by a limit waits in place and resumes when credits exist ([6d](phases/phase-6d-plans-limits-and-admin.md)) |
+| 18 | Vendor keys | Owned by the platform, stored encrypted in the database from 6d, and seen and replaced by admins in the console without a restart |
+| 19 | LLM | DeepSeek served by DeepInfra (OpenAI-compatible), replacing OpenRouter |
+| 20 | Admin console | `/admin`, nine screens: customers, limits and credits, users, plans, vendors and keys, directory, settings, audit log |
+| 21 | Lead directory | Shared verified facts (companies, people, LinkedIn profiles, emails), all shareable in the alpha. It is the free first link of the email waterfall, and customers may skip it when an admin allows ([6g](phases/phase-6g-lead-directory.md)) |
+| 22 | Payments | None in the alpha. Staff assign plans. Billing is [6e](phases/phase-6e-billing.md), after the alpha |
 
 ## 4. Research recommendations: verdicts
 
@@ -77,7 +98,7 @@ Three research findings shaped the design:
 | 11 | Copy limits, subject rules, no links in touch 1 | Adopt | Defaults enforced by the linter; the first-email length is a workspace setting |
 | 12 | Days 1/4/9, just-in-time follow-ups, send window | Adopt | Stored per campaign |
 | 13 | Sent-folder sync for real Message-ID and send time | Adopt | Phase 2, over IMAP |
-| 14 | EmailEngine, or Smartlead/Instantly | Defer | Chosen before Phase 5, behind the mailbox port |
+| 14 | EmailEngine, or Smartlead/Instantly | Superseded (2026-10-23) | Each workspace connects its own mailbox (6c), and Phase 5 sends through that adapter. EmailEngine stays an option if many IMAP connections become a burden |
 | 15 | ISO countries, UK legal entity, DE/AT block, CASL provenance, DPDP | Adopt | Columns in schema v1; a lawyer confirms the policy values |
 | 16 | Clay patterns: fit gate before paid enrichment, research questions, company/person tables, LinkedIn dedup, waterfall inspector | Adopt | Fits schema v1 with no extra tables |
 | 17 | Manual, discovered and effective columns for every field, plus a history table | Simplify | Child rows for facts that can have several values; `manual_fields` protects operator input; every change is an event |
@@ -150,6 +171,23 @@ web/           the first React app, kept until it is deleted
 
 1. No database transaction stays open across a network call.
 2. Every paid call commits its own `provider_calls` row, so its cost is recorded even if the stage then fails.
+
+**Tenant context (Phase 6).**
+- **Workspace identity on every request:**
+  - the SPA sends `X-Workspace-Id`, taken from the `/w/{slug}` URL;
+  - the `tenant()` dependency checks the session, the membership and role, and the access level;
+  - it then builds that request's services with `ServicesFactory.for_tenant(workspace_id, actor)`.
+- **Unit of work:** every unit of work is bound to one workspace, and a Session `after_begin` listener sets `app.workspace_id` in every transaction for Postgres row-level security.
+- **Reads across workspaces** (the admin console, the scheduler's "what is due", aggregates) go through `PlatformUnitOfWork` (`db/platform.py`), which tenant code may not import.
+- **The worker** claims runs for every workspace fairly, with a thread pool and one running run per workspace, and assembles a pipeline per run.
+- **Planned modules:**
+  - `domain`: `permissions.py`, `entitlements.py`, `directory.py`;
+  - `db`: `platform.py`, `crypto.py`;
+  - `providers/adapters`: `ms_graph.py`, `gmail_api.py`;
+  - `services`: `identity.py`, `members.py`, `mailboxes.py`, `workspaces.py`, `admin.py`;
+  - `api/routers/admin.py`.
+
+  The layer order does not change.
 
 **Deliberately not used:** Celery, Redis or any queue (status plus `next_action_at` is the queue, and the worker polls the `runs` table for runs the API queued), an event bus, CQRS, microservices, a plugin framework, and generic base-repository hierarchies.
 
@@ -268,13 +306,19 @@ Modes are `manual`, `discovery` and `mixed`. Discovery searches for companies (n
 | Runs | Start, watch or cancel a run; spend against budget |
 | Settings | Sender profile, campaigns, country policies, suppression list, mailbox with DNS check |
 | Replies (Phase 4) | Inbound messages by category, suggested answers, export of positive replies |
+| Sign-in, invitations, onboarding (6b, 6c) | Public pages outside the app shell. A wizard: workspace details, company profile, sender identity, mailbox with DNS health, first campaign, first leads |
+| Settings (6c onward) | Sections: Account (profile, password, sessions) and Workspace (general, company profile, mailboxes and senders, deliverability, compliance, team, plan and usage, integrations, data and privacy) |
+| Admin console (6d) | `/admin` for platform roles: overview, customers (limits and credits, access, features, members, mailboxes, activity), users, plans, vendors and keys, directory, settings, audit log |
 
 Rules:
 
 - No business rules in the browser.
 - Every write sends the `row_version` it read; a stale one gets HTTP 409.
 - The API client is generated from OpenAPI (`npm run gen:api`); CI fails if it is out of date.
-- One local login until Phase 6: an Argon2 hash in `OPERATOR_PASSWORD_HASH`, a signed HTTP-only SameSite=Strict cookie, and an `X-Requested-With` header on every write. Failed logins are throttled.
+- One local login until Phase 6b: an Argon2 hash in `OPERATOR_PASSWORD_HASH`, a signed HTTP-only SameSite=Strict cookie, and an `X-Requested-With` header on every write. Failed logins are throttled.
+- From 6b:
+  - users sign in with an email and password (Argon2id) into server-side sessions, using a `__Host-` HttpOnly SameSite=Strict cookie;
+  - app URLs carry the workspace (`/w/{slug}`), and every route declares its permission.
 - Errors are problem-details responses (RFC 9457) with stable codes.
 - The API never runs the pipeline in a request: it queues a run and `outbound worker` executes it.
 - FastAPI serves the built app, so production is two processes: `outbound serve` and `outbound worker`.
@@ -301,6 +345,16 @@ Consent belongs to a person. Before a recipient is chosen (the gate, the runner'
 
 Operator tasks: keep a legitimate-interests assessment on file, name a grievance contact for India, and record every consent with its evidence.
 
+**As a SaaS (Phase 6):**
+- **Roles:** the platform is each customer's *processor*, and the customer is the controller of its prospects' data.
+- **Before the first outside customer:** Terms, an Acceptable Use Policy, a Privacy Policy, a click-through DPA (GDPR Art. 28, with SCCs) that names the lead directory, and a sub-processor list (DeepInfra included).
+- **Country rules** stay each customer's decision, starting from our defaults.
+- **The lead directory (6g)** makes the platform its *controller*, and probably a data broker under some US laws. Before the public launch, counsel signs off on [6f](phases/phase-6f-launch-readiness.md):
+  - a legitimate-interests assessment and a DPIA;
+  - Art. 14 notices to each person;
+  - US broker registration and California DROP;
+  - vendor terms, Hunter's first.
+
 **Deliverability**
 
 - Use a separate sending domain.
@@ -320,10 +374,17 @@ The research estimated about $0.06–0.07 per prospect plus LLM tokens, but that
 | Finder | Hunter, ZeroBounce | Hunter: 50 free credits/month, then a monthly plan. ZeroBounce: 20 credits per address found; unknown results are free |
 | Verifier | MyEmailVerifier, OrbiSearch, ZeroBounce, Hunter | MyEmailVerifier: 100 free/day, then $0.0025. OrbiSearch: $0.0002 (0.2 credit), repeat checks free for 24 h. ZeroBounce: $0.008 |
 | Catch-all resolver | Scrubby first; Enrichley if real time is needed | Scrubby: 200 free credits, price otherwise not public; its public docs are partial. Enrichley: from $59 per 5,000 credits |
-| LLM | Any OpenAI-compatible endpoint: Anthropic (default), OpenAI, Gemini, Ollama, GitHub Copilot, or a custom host | Per token; prices per model in `LLM_PRICES` |
+| LLM | Any OpenAI-compatible endpoint: Anthropic, OpenAI, Gemini, Ollama, GitHub Copilot, or a custom host. **In use: DeepSeek served by DeepInfra** (`openai_compatible`; prompts held in memory only, no training, per DeepInfra's documentation) | Per token; prices per model in `LLM_PRICES` (3b B5: set them for the DeepSeek model) |
 | UK registry | Companies House | Free, rate-limited; optional (without it, UK leads rely on incorporation markers on the site) |
 
 Default prices live in `outbound/providers/pricing.py` and can be overridden with `PROVIDER_PRICES`; monthly caps per provider are set with `MONTHLY_CAPS_MICRO_USD`; the per-prospect ceiling is the workspace setting `budget_per_prospect_micro_usd`. The meter refuses a call before it would cross a cap and records the refusal.
+
+**From Phase 6d:**
+- Vendor keys, prices, caps, the finder chain and the model settings move from the environment into the database: `platform_credentials` is encrypted, and `platform_settings` holds the rest.
+- Admins see and replace them in the console, and a change applies without a restart.
+- Caps become per customer (the plan) and per platform (a tick job pauses a vendor at its cap).
+
+**From 6g:** the verified lead directory is the free first link of the email waterfall, so a verified, fresh address replaces a finder lookup.
 
 ## 13. Delivery phases
 
@@ -335,7 +396,16 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 | [3 API and web app](phases/phase-3-api-and-web-app.md) | FastAPI, React app, intake webhook | Nothing reaches the mailbox without approval in the web app |
 | [4 Close the loop](phases/phase-4-close-the-loop.md) | Follow-ups, reply triage, bounces, referrals, opt-outs, forget, reply webhook | A reply stops the sequence; a referral becomes a new contact |
 | [5 Automated sending](phases/phase-5-automated-sending.md) | Gateway, send window, breaker, preflight | Switch turns on only after gates 2 and 4, warm-up, and legal sign-off |
-| [6 SaaS-ready](phases/phase-6-saas-ready.md) | Supabase Postgres, auth, row-level security | A second workspace runs with no data crossover |
+| [6 SaaS alpha track](phases/phase-6-saas-ready.md) | Overview of 6a–6g | A second workspace runs with no data crossover, even with application scoping bypassed |
+| [6a Tenancy foundation](phases/phase-6a-tenancy-foundation.md) | Composite FKs, row-level security, least-privilege roles, services per request, multi-tenant worker | Isolation holds with scoping patched out; the suite passes as `outbound_app` |
+| [6b Identity and access](phases/phase-6b-identity-and-access.md) | Users, invitations, password reset, sessions, roles, superadmin, `/w/{slug}` | Every route tested against every role |
+| [6c Onboarding and mailboxes](phases/phase-6c-onboarding-and-mailboxes.md) | IMAP, Graph and Gmail adapters, encrypted credentials, sender identity, onboarding | A customer drafts into its own M365 and IMAP mailbox from the browser |
+| [6d Plans, limits and admin](phases/phase-6d-plans-limits-and-admin.md) | Per-step credits, grants, access time, resumable leads, vendor keys, admin console | Free plan 5+5 enforced and resumable; two pilot customers |
+| 4a (from Phase 4) | Opt-out and hard-bounce handling, before the alpha | Opt-outs and bounces suppress and cancel |
+| [6g Verified lead directory](phases/phase-6g-lead-directory.md) | Shared verified facts, first link of the waterfall, reports and reconfirmation | A verified fact saves another customer a paid lookup |
+| [6e Billing](phases/phase-6e-billing.md), [6f Launch readiness](phases/phase-6f-launch-readiness.md) | After the alpha: payments; MFA, support role, CASA, directory legal steps, penetration test | Their checklists |
+
+**Order:** 3b → 6a → 6b → 6c → 6d → 4a → **alpha** → 6g in parallel with the rest of 4 → after the alpha, 6e → 6f → 5.
 
 ## 14. Testing and quality bar
 
@@ -354,6 +424,14 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 - **Copy gate:** 8 of 10 touch-1 emails sent without edits, measured automatically by comparing `generated_body` with the body the Sent sync finds.
 - **Enrichment gate:** the share found, the share verified safe, wrong answers, and cost per safe email over 30 known contacts.
 - **Code gate:** ruff and mypy clean (strict on `domain`), typed public APIs, CI green before merge.
+- **SaaS gates (Phase 6):**
+  - an isolation suite calling every route with another workspace's ids;
+  - the whole Postgres suite run as `outbound_app`, also with application scoping patched out;
+  - a catalog test of every row-level-security policy and grant;
+  - a role × route permission matrix, failing any route without `require`;
+  - per-step charging and resume tests;
+  - mailbox adapter contract tests (IMAP, Graph, Gmail);
+  - privacy tests for the lead directory.
 
 ## 15. Risks
 
@@ -366,3 +444,9 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 | UK legal-entity detection misses a company | Companies House as a second source; operator can confirm by hand |
 | A country rule is misread | Lawyer review before Phase 5; anything unknown is held |
 | Scope creep | Deferred items stay deferred until a measured need appears |
+| Supabase's Data API exposes the tables (found 2026-10-23) | Data API off and anon grants revoked now (3b E8); a CI catalog test from 6a |
+| Row-level security silently bypassed | The app never connects as the owner; a startup self-check; the suite runs as `outbound_app` |
+| No MFA in the alpha, and the superadmin can read every workspace | Few platform accounts, long passwords, shorter staff sessions, audit of every view; MFA and the removal of superadmin come first after the alpha (6f) |
+| Vendor keys stored in the database | Encrypted, with the key in Doppler; platform-only access; reveals audited; versions kept for rollback |
+| Google restricted scopes need verification and CASA | The alpha fits the 100-user cap of an unverified app; IMAP fallback; apply during 6c |
+| The lead directory's legal footprint and vendor terms (Hunter) | Accepted for the alpha; source kept per fact; a switch stops sharing; counsel before the public launch (6f) |
