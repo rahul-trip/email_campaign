@@ -12,7 +12,7 @@ from pydantic import SecretStr
 from sqlalchemy import Engine
 from tenacity import RetryCallState, wait_none
 
-from outbound.bootstrap import Container
+from outbound.bootstrap import Container, container_for
 from outbound.config import Settings
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import (
@@ -34,7 +34,7 @@ from outbound.worker import Worker
 
 
 def container(engine: Engine, factory: UnitOfWorkFactory, **settings: Any) -> Container:
-    return Container(Settings(_env_file=None, **settings), engine, factory)
+    return container_for(Settings(_env_file=None, **settings), engine)
 
 
 # ------------------------------------------------------------------ one meter, with caps

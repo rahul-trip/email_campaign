@@ -128,7 +128,11 @@ class ImportRepository(ScopedRepository):
         """Every input row that led to the company, oldest first."""
         stmt = (
             select(ImportRowRow, ImportBatchRow)
-            .join(ImportBatchRow, ImportBatchRow.id == ImportRowRow.batch_id)
+            .join(
+                ImportBatchRow,
+                (ImportBatchRow.id == ImportRowRow.batch_id)
+                & (ImportBatchRow.workspace_id == ImportRowRow.workspace_id),
+            )
             .where(
                 ImportRowRow.workspace_id == self._workspace_id,
                 ImportRowRow.company_id == company_id,

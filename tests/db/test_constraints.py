@@ -18,6 +18,7 @@ from outbound.db.models import (
     CountryPolicyRow,
     SuppressionRow,
 )
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.enums import (
     CompanySource,
@@ -312,6 +313,6 @@ def test_file_imports_with_the_same_name_are_still_allowed(
         uow.session.flush()
 
 
-def test_workspace_names_are_unique(factory: UnitOfWorkFactory, ws: str) -> None:
-    with factory.admin() as admin, pytest.raises(IntegrityError):
-        admin.workspaces.create("acme", {}, {})  # the fixture already made one called "acme"
+def test_workspace_names_are_unique(platform: PlatformUnitOfWorkFactory, ws: str) -> None:
+    with platform() as directory, pytest.raises(IntegrityError):
+        directory.workspaces.create("acme", {}, {})  # the fixture already made one called "acme"

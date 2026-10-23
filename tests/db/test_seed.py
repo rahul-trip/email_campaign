@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import PolicyRule
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
@@ -8,9 +9,9 @@ from outbound.services.seed import seed_defaults
 
 
 def test_seeding_creates_the_workspace_campaign_and_every_policy(
-    factory: UnitOfWorkFactory,
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
-    result = seed_defaults(factory)
+    result = seed_defaults(factory, platform)
     assert result.workspace_created and result.campaign_created
     assert result.policies_created == len(DEFAULT_COUNTRY_POLICIES) == 11
     with factory(result.workspace_id) as uow:
@@ -22,20 +23,24 @@ def test_seeding_creates_the_workspace_campaign_and_every_policy(
         assert all(p.version == 1 and p.reviewed_by is None for p in uow.policies.all())
 
 
-def test_seeding_twice_leaves_exactly_one_of_everything(factory: UnitOfWorkFactory) -> None:
-    first = seed_defaults(factory)
-    second = seed_defaults(factory)
+def test_seeding_twice_leaves_exactly_one_of_everything(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    first = seed_defaults(factory, platform)
+    second = seed_defaults(factory, platform)
     assert second.workspace_id == first.workspace_id
     assert not second.workspace_created and not second.campaign_created
     assert second.policies_created == 0
-    with factory.admin() as admin:
-        assert len(admin.workspaces.all()) == 1
+    with platform() as directory:
+        assert len(directory.workspaces.all()) == 1
     with factory(first.workspace_id) as uow:
         assert len(uow.policies.all()) == 11
 
 
-def test_seeding_never_overwrites_a_policy_someone_edited(factory: UnitOfWorkFactory) -> None:
-    workspace_id = seed_defaults(factory).workspace_id
+def test_seeding_never_overwrites_a_policy_someone_edited(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    workspace_id = seed_defaults(factory, platform).workspace_id
     with factory(workspace_id) as uow:
         row = uow.policies.get("DE")
         assert row is not None and row.rule is PolicyRule.BLOCK
@@ -46,17 +51,19 @@ def test_seeding_never_overwrites_a_policy_someone_edited(factory: UnitOfWorkFac
             )
         )
         uow.commit()
-    seed_defaults(factory)
+    seed_defaults(factory, platform)
     with factory(workspace_id) as uow:
         edited = uow.policies.get("DE")
         assert edited is not None and edited.rule is PolicyRule.ALLOW_WITH_FOOTER
         assert edited.version == 2
 
 
-def test_the_default_workspace_keeps_automatic_sending_off(factory: UnitOfWorkFactory) -> None:
-    workspace_id = seed_defaults(factory).workspace_id
-    with factory.admin() as admin:
-        workspace = admin.workspaces.get(workspace_id)
+def test_the_default_workspace_keeps_automatic_sending_off(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    workspace_id = seed_defaults(factory, platform).workspace_id
+    with factory(workspace_id) as uow:
+        workspace = uow.workspace()
     assert workspace is not None
     assert workspace.settings["send_enabled"] is False
     assert workspace.settings["safe_to_send_only"] is True
@@ -66,8 +73,10 @@ def test_the_default_workspace_keeps_automatic_sending_off(factory: UnitOfWorkFa
     assert "Quantra Energy" in workspace.sender_profile["narrative"]
 
 
-def test_a_second_workspace_gets_its_own_policies(factory: UnitOfWorkFactory) -> None:
-    one = seed_defaults(factory, "one")
-    two = seed_defaults(factory, "two")
+def test_a_second_workspace_gets_its_own_policies(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    one = seed_defaults(factory, platform, "one")
+    two = seed_defaults(factory, platform, "two")
     assert one.workspace_id != two.workspace_id
     assert two.workspace_created and two.policies_created == 11

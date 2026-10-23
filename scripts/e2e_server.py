@@ -22,9 +22,10 @@ from pydantic import SecretStr
 from outbound.api.app import WEB_DIST, create_app
 from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
-from outbound.bootstrap import Container
+from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db import migrate
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.metering.metered import MeteredLlm
@@ -43,19 +44,21 @@ def build() -> tuple[FastAPI, Worker]:
     migrate.upgrade(url)
     engine = make_engine(url)
     factory = UnitOfWorkFactory(make_session_factory(engine))
-    seed_defaults(factory, "default")
-    with factory.admin() as admin:
-        workspace = admin.workspaces.by_name("default")
+    platform = PlatformUnitOfWorkFactory(make_session_factory(engine))
+    seed_defaults(factory, platform, "default")
+    with platform() as directory:
+        workspace = directory.workspaces.by_name("default")
         assert workspace is not None
-        admin.workspaces.set_sender_profile(workspace.id, {**workspace.sender_profile, **PROFILE})
-        admin.commit()
+    with factory(workspace.id) as uow:
+        uow.own_workspace.set_sender_profile({**workspace.sender_profile, **PROFILE})
+        uow.commit()
     settings = Settings(
         _env_file=None,
         database_url=url,
         operator_password_hash=hash_password(E2E_PASSWORD),
         session_secret=SecretStr("e2e-session-secret-0123456789"),
     )
-    container = Container(settings, engine, factory)
+    container = container_for(settings, engine)
     world = World()
     pipeline = assemble(container, workspace.id, world.providers())
     web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST

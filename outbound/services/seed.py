@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
 from outbound.services import defaults
@@ -18,18 +19,20 @@ class SeedResult:
 
 
 def seed_defaults(
-    factory: UnitOfWorkFactory, workspace_name: str = defaults.DEFAULT_WORKSPACE_NAME
+    factory: UnitOfWorkFactory,
+    platform: PlatformUnitOfWorkFactory,
+    workspace_name: str = defaults.DEFAULT_WORKSPACE_NAME,
 ) -> SeedResult:
-    with factory.admin() as admin:
-        workspace = admin.workspaces.by_name(workspace_name)
+    with platform() as directory:
+        workspace = directory.workspaces.by_name(workspace_name)
         created = workspace is None
         if workspace is None:
-            workspace = admin.workspaces.create(
+            workspace = directory.workspaces.create(
                 workspace_name,
                 defaults.default_sender_profile(),
                 defaults.default_workspace_settings(),
             )
-        admin.commit()
+        directory.commit()
 
     with factory(workspace.id) as uow:
         policies_created = sum(

@@ -62,7 +62,7 @@ def seed(
 ) -> None:
     """Create the default workspace, campaign and country policies. Safe to run again."""
     container = build_container(settings_for(database_url))
-    result = seed_defaults(container.uow, workspace)
+    result = seed_defaults(container.uow, container.platform, workspace)
     typer.echo(
         f"workspace {workspace!r} ({'created' if result.workspace_created else 'already there'}), "
         f"campaign {'created' if result.campaign_created else 'already there'}, "

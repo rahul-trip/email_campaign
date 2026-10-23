@@ -69,6 +69,7 @@ def fresh_url(tmp_path: Path) -> Iterator[str]:
 
 # ----------------------------------------------------------------------- repository fixtures
 
+from outbound.db.platform import PlatformUnitOfWorkFactory  # noqa: E402
 from outbound.db.session import make_session_factory  # noqa: E402
 from outbound.db.uow import UnitOfWorkFactory  # noqa: E402
 
@@ -78,18 +79,25 @@ def factory(engine: Engine) -> UnitOfWorkFactory:
     return UnitOfWorkFactory(make_session_factory(engine))
 
 
-def make_workspace(factory: UnitOfWorkFactory, name: str = "acme") -> str:
-    with factory.admin() as admin:
-        workspace = admin.workspaces.create(name, {"legal_name": name}, {"safe_to_send_only": True})
-        admin.commit()
+@pytest.fixture
+def platform(engine: Engine) -> PlatformUnitOfWorkFactory:
+    return PlatformUnitOfWorkFactory(make_session_factory(engine))
+
+
+def make_workspace(platform: PlatformUnitOfWorkFactory, name: str = "acme") -> str:
+    with platform() as directory:
+        workspace = directory.workspaces.create(
+            name, {"legal_name": name}, {"safe_to_send_only": True}
+        )
+        directory.commit()
     return workspace.id
 
 
 @pytest.fixture
-def ws(factory: UnitOfWorkFactory) -> str:
-    return make_workspace(factory)
+def ws(platform: PlatformUnitOfWorkFactory) -> str:
+    return make_workspace(platform)
 
 
 @pytest.fixture
-def other_ws(factory: UnitOfWorkFactory) -> str:
-    return make_workspace(factory, "other")
+def other_ws(platform: PlatformUnitOfWorkFactory) -> str:
+    return make_workspace(platform, "other")

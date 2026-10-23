@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Engine, select
 
-from outbound.bootstrap import Container
+from outbound.bootstrap import Container, container_for
 from outbound.config import Settings
 from outbound.db.models import ProviderCallRow, WorkspaceRow
 from outbound.db.uow import UnitOfWorkFactory
@@ -55,7 +55,7 @@ def build(
             "default", ["CTO", "VP of Sales"], icp_description="Utilities that need forecasts"
         )
         uow.commit()
-    container = Container(Settings(_env_file=None), engine, factory)
+    container = container_for(Settings(_env_file=None), engine)
     return assemble(container, ws, providers or world.providers()), container
 
 
@@ -211,7 +211,7 @@ def test_the_pipeline_stops_cleanly_at_approved_when_no_mailbox_is_configured(
         for policy in DEFAULT_COUNTRY_POLICIES:
             uow.policies.add_if_missing(policy)
         uow.commit()
-    pipeline = assemble(Container(Settings(_env_file=None), engine, factory), ws, no_mailbox)
+    pipeline = assemble(container_for(Settings(_env_file=None), engine), ws, no_mailbox)
     assert pipeline.has_mailbox is False and "deliver" not in pipeline.stage_names
     pipeline.intake.run(ROWS[:1])
     pipeline.runner.run_pipeline()

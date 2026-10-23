@@ -192,7 +192,11 @@ class ContactEmailRepository(ScopedRepository):
         """Addresses at this company still waiting for the catch-all resolver."""
         stmt = (
             select(ContactEmailRow)
-            .join(ContactRow, ContactRow.id == ContactEmailRow.contact_id)
+            .join(
+                ContactRow,
+                (ContactRow.id == ContactEmailRow.contact_id)
+                & (ContactRow.workspace_id == ContactEmailRow.workspace_id),
+            )
             .where(
                 ContactEmailRow.workspace_id == self._workspace_id,
                 ContactRow.company_id == company_id,

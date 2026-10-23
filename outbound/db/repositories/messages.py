@@ -124,7 +124,11 @@ class MessageRepository(ScopedRepository):
         """The most recent emails in a campaign that the operator changed before sending."""
         stmt = (
             select(MessageRow)
-            .join(CompanyRow, CompanyRow.id == MessageRow.company_id)
+            .join(
+                CompanyRow,
+                (CompanyRow.id == MessageRow.company_id)
+                & (CompanyRow.workspace_id == MessageRow.workspace_id),
+            )
             .where(
                 MessageRow.workspace_id == self._workspace_id,
                 CompanyRow.campaign_id == campaign_id,

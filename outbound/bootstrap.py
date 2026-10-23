@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, inspect
 
 from outbound.config import Settings
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.errors import ConfigurationError
@@ -21,6 +22,7 @@ class Container:
     settings: Settings
     engine: Engine
     uow: UnitOfWorkFactory
+    platform: PlatformUnitOfWorkFactory
 
     def workspace_id(self, name: str) -> str:
         """The id of the named workspace, or a ConfigurationError that says what to run.
@@ -35,14 +37,22 @@ class Container:
                 "  uv run outbound seed\n"
                 f"(database: {self.engine.url.render_as_string(hide_password=True)})"
             )
-        with self.uow.admin() as admin:
-            found = admin.workspaces.by_name(name)
+        with self.platform() as platform:
+            found = platform.workspaces.by_name(name)
         if found is None:
             raise ConfigurationError(f"no workspace named {name!r}: run `uv run outbound seed`")
         return found.id
 
 
+def container_for(settings: Settings, engine: Engine) -> Container:
+    """Wire the unit-of-work factories over an engine that already exists (tests, scripts)."""
+    sessions = make_session_factory(engine)
+    return Container(
+        settings, engine, UnitOfWorkFactory(sessions), PlatformUnitOfWorkFactory(sessions)
+    )
+
+
 def build_container(settings: Settings | None = None) -> Container:
     settings = settings or Settings()
     engine = make_engine(settings.database_url, pool_size=settings.database_pool_size)
-    return Container(settings, engine, UnitOfWorkFactory(make_session_factory(engine)))
+    return container_for(settings, engine)

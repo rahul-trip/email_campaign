@@ -19,7 +19,7 @@ from typer.testing import CliRunner
 from outbound.api.app import create_app
 from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
-from outbound.bootstrap import Container
+from outbound.bootstrap import container_for
 from outbound.cli.main import app as cli_app
 from outbound.config import Settings
 from outbound.db.uow import UnitOfWorkFactory
@@ -52,7 +52,7 @@ def served(
         session_secret=SecretStr("s" * 40),
         intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
-    container = Container(settings, engine, factory)
+    container = container_for(settings, engine)
 
     def build() -> TestClient:
         app = create_app(build_services(container, ws), web_dist=site)

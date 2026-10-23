@@ -8,7 +8,7 @@ from typing import Any
 
 from outbound.db.errors import NotFound
 from outbound.db.repositories.workspaces import MailboxView
-from outbound.db.uow import AdminUnitOfWork, UnitOfWorkFactory
+from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.entities import Campaign, CountryPolicy, Workspace
 from outbound.domain.enums import (
@@ -70,8 +70,8 @@ class SettingsService:
     # ------------------------------------------------------------------ profile and settings
 
     def sender_profile(self) -> dict[str, Any]:
-        with self._uow.admin() as admin:
-            workspace = admin.workspaces.get(self._workspace_id)
+        with self._uow(self._workspace_id) as uow:
+            workspace = uow.workspace()
         return dict(workspace.sender_profile) if workspace else {}
 
     def update_sender_profile(self, changes: dict[str, Any]) -> dict[str, Any]:
@@ -84,21 +84,21 @@ class SettingsService:
         unknown = set(changes) - SENDER_FIELDS
         if unknown:
             raise SettingsError(f"unknown sender profile field(s): {sorted(unknown)}")
-        with self._uow.admin() as admin:
-            workspace = self._workspace(admin)
+        with self._uow(self._workspace_id) as uow:
+            workspace = self._workspace(uow)
             merged = {
                 **workspace.sender_profile,
                 **changes,
                 REVIEWED_KEY: datetime.now(UTC).isoformat(),
             }
-            admin.workspaces.set_sender_profile(self._workspace_id, merged)
-            admin.commit()
-        self._record_change("sender_profile_reviewed", {"fields": sorted(changes)})
+            uow.own_workspace.set_sender_profile(merged)
+            self._record_change(uow, "sender_profile_reviewed", {"fields": sorted(changes)})
+            uow.commit()
         return merged
 
     def workspace_settings(self) -> dict[str, Any]:
-        with self._uow.admin() as admin:
-            workspace = admin.workspaces.get(self._workspace_id)
+        with self._uow(self._workspace_id) as uow:
+            workspace = uow.workspace()
         return dict(workspace.settings) if workspace else {}
 
     def update_workspace_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
@@ -107,32 +107,31 @@ class SettingsService:
         unknown = set(changes) - SETTING_FIELDS
         if unknown:
             raise SettingsError(f"cannot change setting(s): {sorted(unknown)}")
-        with self._uow.admin() as admin:
-            workspace = self._workspace(admin)
+        with self._uow(self._workspace_id) as uow:
+            workspace = self._workspace(uow)
             merged = {**workspace.settings, **changes}
             low, high = merged.get("email_min_words", 120), merged.get("email_max_words", 200)
             if low > high:
                 raise SettingsError(
                     f"the shortest email ({low} words) cannot be longer than the longest ({high})"
                 )
-            admin.workspaces.set_settings(self._workspace_id, merged)
-            admin.commit()
-        self._record_change("settings_changed", changes)
+            uow.own_workspace.set_settings(merged)
+            self._record_change(uow, "settings_changed", changes)
+            uow.commit()
         return merged
 
-    def _workspace(self, admin: AdminUnitOfWork) -> Workspace:
-        workspace = admin.workspaces.get(self._workspace_id)
+    @staticmethod
+    def _workspace(uow: UnitOfWork) -> Workspace:
+        workspace = uow.workspace()
         if workspace is None:
-            raise NotFound(f"workspace {self._workspace_id}")
+            raise NotFound(f"workspace {uow.workspace_id}")
         return workspace
 
-    def _record_change(self, kind: str, detail: dict[str, Any]) -> None:
+    def _record_change(self, uow: UnitOfWork, kind: str, detail: dict[str, Any]) -> None:
         """Settings such as the safe-to-send safeguard and the budget are safety controls, so
         who changed them to what is part of the audit trail (the sender profile: only which
-        fields, since it holds free text)."""
-        with self._uow(self._workspace_id) as uow:
-            uow.events.append(EntityType.WORKSPACE, self._workspace_id, kind, OPERATOR, detail)
-            uow.commit()
+        fields, since it holds free text). Written in the same transaction as the change."""
+        uow.events.append(EntityType.WORKSPACE, self._workspace_id, kind, OPERATOR, detail)
 
     # ------------------------------------------------------------------ campaigns
 

@@ -13,7 +13,7 @@ from sqlalchemy import Engine
 from outbound.api.app import create_app
 from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
-from outbound.bootstrap import Container
+from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db.models import WorkspaceRow
 from outbound.db.uow import UnitOfWorkFactory
@@ -39,7 +39,7 @@ def build(engine: Engine, factory: UnitOfWorkFactory, ws: str) -> tuple[Api, Wor
         operator_password_hash=hash_password(PASSWORD),
         session_secret=SecretStr("s" * 40),
     )
-    container = Container(settings, engine, factory)
+    container = container_for(settings, engine)
     world = World()
     pipeline = assemble(container, ws, world.providers())
     app: FastAPI = create_app(build_services(container, ws), web_dist=None)
