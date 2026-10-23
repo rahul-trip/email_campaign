@@ -48,7 +48,8 @@ class UnitOfWork:
         self.workspace_id = workspace_id
 
     def __enter__(self) -> Self:
-        self.session = self._factory()
+        # Read by the session's ``after_begin`` listener: the row-level-security key.
+        self.session = self._factory(info={"workspace_id": self.workspace_id})
         self.events = EventRepository(self.session, self.workspace_id)
         args = (self.session, self.workspace_id, self.events)
         self.companies = CompanyRepository(*args)

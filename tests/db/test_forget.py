@@ -147,7 +147,11 @@ def populate(uow: UnitOfWork, ws: str) -> dict[str, str]:
 
 
 def occurrences(engine: Engine, needle: str) -> list[str]:
-    """Every ``table.column`` whose text contains the needle, case-insensitively."""
+    """Every ``table.column`` whose text contains the needle, case-insensitively.
+
+    Pass the owner's engine: the app role would only see one workspace, and nothing at all
+    without one, which would make "no trace left" pass for the wrong reason.
+    """
     found = []
     with engine.connect() as connection:
         for table in Base.metadata.sorted_tables:
@@ -165,13 +169,13 @@ def occurrences(engine: Engine, needle: str) -> list[str]:
 
 
 def test_before_forgetting_the_data_really_is_everywhere(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     """Guards the scan below: if this finds little, a clean scan would prove nothing."""
     with factory(ws) as uow:
         populate(uow, ws)
         uow.commit()
-    found = set(occurrences(engine, PERSON))
+    found = set(occurrences(owner_engine, PERSON))
     assert {
         "contact_emails.email",
         "messages.generated_body",
@@ -182,12 +186,12 @@ def test_before_forgetting_the_data_really_is_everywhere(
         "inbound_messages.extracted",
     } <= found
     assert {"contacts.full_name", "consents.evidence", "events.data"} & set(
-        occurrences(engine, NAME)
+        occurrences(owner_engine, NAME)
     )
 
 
 def test_forgetting_removes_every_trace_of_the_person(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     with factory(ws) as uow:
         populate(uow, ws)
@@ -199,8 +203,8 @@ def test_forgetting_removes_every_trace_of_the_person(
 
     assert result.found
     for needle in (PERSON, OTHER_ADDRESS_OF_PERSON, NAME, "jane-doe", "Chief Technology Officer"):
-        assert occurrences(engine, needle) == [], (
-            f"{needle!r} survived in {occurrences(engine, needle)}"
+        assert occurrences(owner_engine, needle) == [], (
+            f"{needle!r} survived in {occurrences(owner_engine, needle)}"
         )
 
 
@@ -266,7 +270,7 @@ def test_rows_and_costs_are_kept_so_the_books_still_add_up(
 
 
 def test_a_colleague_and_the_company_are_left_untouched(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     with factory(ws) as uow:
         ids = populate(uow, ws)
@@ -285,7 +289,7 @@ def test_a_colleague_and_the_company_are_left_untouched(
         assert company.name == "Acme"
         assert company.status is CompanyStatus.NEW  # Sam can still be contacted
         assert "asked about forecast error" in [n.body for n in uow.notes.for_company(company.id)]
-    assert occurrences(engine, "sam@acme.com") != []
+    assert occurrences(owner_engine, "sam@acme.com") != []
 
 
 def test_a_company_with_nobody_left_to_contact_is_suppressed(
@@ -363,7 +367,7 @@ def test_another_workspace_holding_the_same_address_is_not_touched(
 
 
 def test_a_failure_halfway_leaves_the_person_exactly_as_they_were(
-    factory: UnitOfWorkFactory, engine: Engine, ws: str
+    owner_engine: Engine, factory: UnitOfWorkFactory, engine: Engine, ws: str
 ) -> None:
     """Forget is one transaction: an error before commit undoes all of it."""
     with factory(ws) as uow:
@@ -375,6 +379,6 @@ def test_a_failure_halfway_leaves_the_person_exactly_as_they_were(
             raise RuntimeError("something went wrong before commit")
     except RuntimeError:
         pass
-    assert "contact_emails.email" in occurrences(engine, PERSON)
+    assert "contact_emails.email" in occurrences(owner_engine, PERSON)
     with factory(ws) as uow:
         assert not uow.suppressions.is_email_suppressed(PERSON)

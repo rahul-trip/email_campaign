@@ -28,20 +28,56 @@ def database_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     return f"sqlite:///{tmp_path_factory.mktemp('db') / 'test.db'}"
 
 
+# On Postgres the suite runs as the production roles (Phase 6a): tenant work as outbound_app,
+# which row-level security confines to one workspace, and cross-workspace work as
+# outbound_platform. The owner (the server's superuser) only migrates and cleans up.
+ROLE_PASSWORD = "outbound-test-role"
+
+
+def role_url(url: str, role: str) -> str:
+    return make_url(url).set(username=role, password=ROLE_PASSWORD).render_as_string(False)
+
+
 @pytest.fixture(scope="session")
-def engine(database_url: str) -> Iterator[Engine]:
+def owner_engine(database_url: str) -> Iterator[Engine]:
     migrate.upgrade(database_url)
     eng = make_engine(database_url)
+    if IS_POSTGRES:
+        with eng.begin() as connection:
+            for role in ("outbound_app", "outbound_platform"):
+                connection.execute(text(f"ALTER ROLE {role} LOGIN PASSWORD '{ROLE_PASSWORD}'"))
     yield eng
     eng.dispose()
 
 
+def _role_engine(database_url: str, owner: Engine, role: str) -> Iterator[Engine]:
+    if not IS_POSTGRES:
+        yield owner
+        return
+    eng = make_engine(role_url(database_url, role))
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture(scope="session")
+def engine(database_url: str, owner_engine: Engine) -> Iterator[Engine]:
+    """Tenant work: outbound_app on Postgres."""
+    yield from _role_engine(database_url, owner_engine, "outbound_app")
+
+
+@pytest.fixture(scope="session")
+def platform_engine(database_url: str, owner_engine: Engine) -> Iterator[Engine]:
+    """Cross-workspace work: outbound_platform on Postgres."""
+    yield from _role_engine(database_url, owner_engine, "outbound_platform")
+
+
 @pytest.fixture(autouse=True)
 def empty_tables(request: pytest.FixtureRequest) -> None:
-    """Every test that uses the shared engine starts with empty tables."""
-    if "engine" not in request.fixturenames:
+    """Every test that uses the shared engine starts with empty tables (deleted as the owner:
+    the app role would only see one workspace's rows)."""
+    if "owner_engine" not in request.fixturenames:  # every database fixture depends on it
         return
-    eng: Engine = request.getfixturevalue("engine")
+    eng: Engine = request.getfixturevalue("owner_engine")
     with eng.begin() as connection:
         for table in reversed(Base.metadata.sorted_tables):
             connection.execute(table.delete())
@@ -80,8 +116,8 @@ def factory(engine: Engine) -> UnitOfWorkFactory:
 
 
 @pytest.fixture
-def platform(engine: Engine) -> PlatformUnitOfWorkFactory:
-    return PlatformUnitOfWorkFactory(make_session_factory(engine))
+def platform(platform_engine: Engine) -> PlatformUnitOfWorkFactory:
+    return PlatformUnitOfWorkFactory(make_session_factory(platform_engine))
 
 
 def make_workspace(platform: PlatformUnitOfWorkFactory, name: str = "acme") -> str:

@@ -25,7 +25,9 @@ WorkspaceName = Annotated[
 def settings_for(database_url: str | None) -> Settings:
     settings = Settings()
     if database_url:
-        settings = settings.model_copy(update={"database_url": database_url})
+        settings = settings.model_copy(
+            update={"database_url": database_url, "platform_database_url": database_url}
+        )
     configure_logging(settings.log_level, settings.log_format, settings.environment)
     return settings
 

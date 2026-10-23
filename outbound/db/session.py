@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import Connection, Engine, create_engine, event, text
+from sqlalchemy.orm import Session, SessionTransaction, sessionmaker
+
+# The row-level-security key (Phase 6a). Set inside every transaction, never for the session:
+# a pooled connection must not carry one workspace's key into its next use.
+WORKSPACE_SETTING = "app.workspace_id"
 
 
 def normalise_url(url: str) -> str:
@@ -50,4 +54,29 @@ def _configure_sqlite(dbapi_connection: Any, _record: Any) -> None:
 
 
 def make_session_factory(engine: Engine) -> sessionmaker[Session]:
-    return sessionmaker(engine, expire_on_commit=False, future=True)
+    factory = sessionmaker(engine, expire_on_commit=False, future=True)
+    event.listen(factory, "after_begin", _set_workspace)
+    return factory
+
+
+def _set_workspace(
+    session: Session, _transaction: SessionTransaction, connection: Connection
+) -> None:
+    """Tell Postgres which workspace this transaction belongs to, for row-level security.
+
+    A tenant unit of work puts its workspace in ``session.info``; the listener runs at the
+    start of every transaction, including the new one SQLAlchemy begins after a commit in the
+    middle of a unit of work. ``set_config(..., true)`` lasts until the transaction ends.
+    Without a workspace (the platform unit of work) nothing is set, and a tenant table then
+    shows the app role no rows at all.
+    """
+    if connection.dialect.name != "postgresql":
+        return
+    workspace_id = session.info.get("workspace_id")
+    if workspace_id is not None:
+        connection.execute(
+            text("SELECT set_config(:name, :value, true)"),
+            {"name": WORKSPACE_SETTING, "value": workspace_id},
+        )
+    if session.info.get("read_only"):
+        connection.execute(text("SET TRANSACTION READ ONLY"))

@@ -6,13 +6,32 @@ from typing import Annotated
 
 import typer
 
-from outbound.bootstrap import build_container
+from outbound.bootstrap import Container, build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
+from outbound.db.isolation import isolation_problems
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
 from outbound.services import defaults
 
 log = get_logger(__name__)
+
+
+def refuse_unsafe_database(container: Container) -> None:
+    """Stop before serving if this connection could see other workspaces' rows (Phase 6a).
+
+    In production that is fatal; elsewhere (a developer's Postgres) it is only logged.
+    """
+    problems = isolation_problems(container.engine)
+    if not problems:
+        return
+    production = container.settings.environment == "production"
+    for problem in problems:
+        log.error("tenant_isolation_unsafe", problem=problem, refused=production)
+    if production:
+        typer.echo("Refusing to start: " + "; ".join(problems), err=True)
+        raise typer.Exit(1)
+
+
 auth_app = typer.Typer(no_args_is_help=True, help="Operator login.")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
@@ -43,6 +62,7 @@ def register(app: typer.Typer) -> None:
         from outbound.api.app import create_app_from_container
 
         container = build_container(settings_for(database_url))
+        refuse_unsafe_database(container)
         config = container.settings
         bind_host = host or config.api_host
         if bind_host not in LOOPBACK and not config.cookie_secure:
@@ -87,6 +107,7 @@ def register(app: typer.Typer) -> None:
         from outbound.worker import Worker
 
         container = build_container(settings_for(database_url))
+        refuse_unsafe_database(container)
         workspace_id = workspace_id_or_exit(container, workspace)
         try:
             pipeline = assemble(container, workspace_id, real_providers(container.settings))

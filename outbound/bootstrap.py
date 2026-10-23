@@ -44,15 +44,29 @@ class Container:
         return found.id
 
 
-def container_for(settings: Settings, engine: Engine) -> Container:
-    """Wire the unit-of-work factories over an engine that already exists (tests, scripts)."""
-    sessions = make_session_factory(engine)
+def container_for(
+    settings: Settings, engine: Engine, platform_engine: Engine | None = None
+) -> Container:
+    """Wire the unit-of-work factories over engines that already exist (tests, scripts).
+
+    In production the platform engine connects as a different database role, one that may
+    read every workspace; tenant work never uses it.
+    """
+    platform_sessions = make_session_factory(platform_engine or engine)
     return Container(
-        settings, engine, UnitOfWorkFactory(sessions), PlatformUnitOfWorkFactory(sessions)
+        settings,
+        engine,
+        UnitOfWorkFactory(make_session_factory(engine)),
+        PlatformUnitOfWorkFactory(platform_sessions),
     )
 
 
 def build_container(settings: Settings | None = None) -> Container:
     settings = settings or Settings()
     engine = make_engine(settings.database_url, pool_size=settings.database_pool_size)
-    return container_for(settings, engine)
+    platform_engine = (
+        engine
+        if settings.platform_database_url == settings.database_url
+        else make_engine(settings.platform_database_url, pool_size=2)
+    )
+    return container_for(settings, engine, platform_engine)
