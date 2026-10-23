@@ -404,8 +404,9 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 | 4a (from Phase 4) | Opt-out and hard-bounce handling, before the alpha | Opt-outs and bounces suppress and cancel |
 | [6g Verified lead directory](phases/phase-6g-lead-directory.md) | Shared verified facts, first link of the waterfall, reports and reconfirmation | A verified fact saves another customer a paid lookup |
 | [6e Billing](phases/phase-6e-billing.md), [6f Launch readiness](phases/phase-6f-launch-readiness.md) | After the alpha: payments; MFA, support role, CASA, directory legal steps, penetration test | Their checklists |
+| [7 Later](phases/phase-7-later.md) | The backlog: everything deliberately left out, each with the need that would pull it in | None until an item is scheduled |
 
-**Order:** 3b → 6a → 6b → 6c → 6d → 4a → **alpha** → 6g in parallel with the rest of 4 → after the alpha, 6e → 6f → 5.
+**Order:** 3b → 6a → 6b → 6c → 6d → 4a → **alpha** → 6g in parallel with the rest of 4 → after the alpha, 6e → 6f → 5. Phase 7 items are scheduled only on a measured need.
 
 ## 14. Testing and quality bar
 

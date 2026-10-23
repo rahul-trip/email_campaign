@@ -92,6 +92,8 @@ NOW  Close the Supabase Data API (phase-3b-hardening.md, E8)
 
 ## Not in this plan
 
+These wait in [Phase 7](phase-7-later.md), each with the need that would pull it in.
+
 - Agency accounts.
 - SCIM and custom roles.
 - Public API keys and CRM sync. CRM stays a non-goal in [../PLAN.md](../PLAN.md).

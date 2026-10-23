@@ -24,6 +24,7 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 | 6g | [Verified lead directory](phase-6g-lead-directory.md) | Shared verified facts checked first in the email waterfall; reports and reconfirmation; skip option | A fact verified for one customer saves another a paid lookup; nothing reveals who prospected whom | 6d |
 | 6e | [Billing](phase-6e-billing.md) | **After the alpha:** payments, trials, open sign-up | Test-mode lifecycle passes | 6d |
 | 6f | [Launch readiness](phase-6f-launch-readiness.md) | **After the alpha:** MFA, support role replacing superadmin, Google CASA, directory legal steps, penetration test | Launch checklist signed | 6e |
+| 7 | [Later: the backlog](phase-7-later.md) | Everything deliberately left out, each with the need that would pull it in | None until an item is scheduled | — |
 
 ## How to work a phase
 
@@ -48,6 +49,7 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 | 6 | Planned (2026-10-23): SaaS alpha track 6a–6g approved | |
 | 6a–6d, 6g | Not started | |
 | 6e, 6f | After the alpha | |
+| 7 | Backlog, unscheduled | |
 
 **Next:**
 1. **Now:** close the Supabase Data API exposure ([phase-3b-hardening.md](phase-3b-hardening.md), E8). It is an operator task in the Supabase dashboard.
@@ -61,6 +63,8 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 ```
 6a → 6b → 6c → 6d → 4a → ALPHA → (6g ∥ rest of 4) → after the alpha: 6e → 6f → 5
 ```
+
+Everything else that was left out waits in [Phase 7](phase-7-later.md) until a measured need appears.
 
 **Test suite (2026-10-18):** 1,236 Python tests pass on SQLite and on PostgreSQL 16.2; the Playwright browser test passes. CI has not run yet because there is no remote repository.
 
