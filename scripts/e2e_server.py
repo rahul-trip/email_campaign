@@ -3,7 +3,7 @@
     uv run python -m scripts.e2e_server
 
 It starts on a throwaway database with a seeded workspace, serves ``web2/dist`` (or the folder
-in ``E2E_WEB_DIST``, which the legacy ``web/`` tests set), and runs a
+in ``E2E_WEB_DIST``), and runs a
 worker thread that executes queued runs against fake search, model, finder and mailbox
 objects. No network and no keys are used. The password is printed in ``E2E_PASSWORD``.
 """
