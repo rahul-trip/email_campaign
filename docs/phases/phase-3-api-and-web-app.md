@@ -9,8 +9,7 @@
 **How to run it**
 
 ```
-uv run outbound auth hash-password        # put the output in OPERATOR_PASSWORD_HASH
-# also set SESSION_SECRET in .env
+uv run outbound users create --email you@example.com --workspace default   # since Phase 6b
 (cd web && npm ci && npm run build)       # once, and after UI changes
 uv run outbound serve                     # http://127.0.0.1:8000
 uv run outbound worker                    # in a second terminal: executes queued runs

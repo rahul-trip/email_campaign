@@ -1,4 +1,4 @@
-"""The FastAPI application: thin routers over the services, one local login, one process.
+"""The FastAPI application: thin routers over the services, people signed in by email.
 
 The API never runs the pipeline inside a request. Runs are queued and the ``outbound worker``
 process executes them, so the app stays responsive and a long run survives a page refresh.
@@ -15,13 +15,31 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from outbound.api import errors
-from outbound.api.auth import LoginThrottle, Sessions, require_csrf_header, require_operator
-from outbound.api.deps import FixedServices, Services, ServicesFactory, ServicesSource
+from outbound.api.auth import LoginThrottle, require_csrf_header
+from outbound.api.deps import (
+    FixedServices,
+    Services,
+    ServicesFactory,
+    ServicesSource,
+    current_user,
+)
 from outbound.api.errors import ApiError
 from outbound.api.request_log import log_requests
-from outbound.api.routers import auth, leads, privacy, review, runs, settings, targets, webhook
+from outbound.api.routers import (
+    admin,
+    auth,
+    leads,
+    privacy,
+    review,
+    runs,
+    settings,
+    targets,
+    team,
+    webhook,
+)
 from outbound.bootstrap import Container
-from outbound.domain.errors import ConfigurationError
+from outbound.providers.ports import TransactionalEmail
+from outbound.services.identity import IdentityService
 
 # The built web app.
 WEB_DIST = Path(__file__).resolve().parents[2] / "web2" / "dist"
@@ -44,18 +62,25 @@ def create_app(
     *,
     workspace_id: str | None = None,
     web_dist: Path | None = WEB_DIST,
+    email: TransactionalEmail | None = None,
 ) -> FastAPI:
     """The app over prebuilt services (tests, scripts) or a factory that builds them per
-    request (a real run). With a factory, ``workspace_id`` is the deployment's workspace."""
+    request (a real run). ``workspace_id`` is the workspace the intake webhook feeds until
+    Phase 6c gives each workspace its own; with prebuilt services it is theirs. ``email``
+    sends invitations and resets (default: built from the settings)."""
     if isinstance(services, Services):
         source: ServicesSource = FixedServices(services)
         workspace_id = services.workspace_id
-        config = services.container.settings
     else:
         if workspace_id is None:
             raise ValueError("a services factory needs the workspace it serves")
         source = services
-        config = services.container.settings
+    container = services.container
+    config = container.settings
+    if email is None:
+        from outbound.providers.registry import build_transactional_email
+
+        email = build_transactional_email(config)
     # The built-in docs page loads scripts from a CDN, which the content policy forbids, and
     # the API document is served below behind the login instead.
     app = FastAPI(
@@ -63,8 +88,17 @@ def create_app(
     )
     app.state.services_source = source
     app.state.workspace_id = workspace_id
-    app.state.password_hash = config.operator_password_hash
-    app.state.sessions = Sessions(config.session_secret.get_secret_value(), config.session_hours)
+    app.state.container = container
+    app.state.identity = IdentityService(
+        container.identity,
+        container.platform,
+        container.uow,
+        email,
+        base_url=config.app_base_url,
+        terms_version=config.terms_version,
+    )
+    app.state.superadmin_enabled = config.superadmin_enabled
+    app.state.superadmin_views = set()
     app.state.throttle = LoginThrottle()
     app.state.cookie_secure = config.cookie_secure
     app.state.webhook_secret = config.intake_webhook_secret.get_secret_value()
@@ -84,17 +118,17 @@ def create_app(
     # Added last, so it is outermost: the request id exists before anything else runs.
     app.middleware("http")(log_requests)
 
-    guarded = [Depends(require_operator), Depends(require_csrf_header)]
-    app.include_router(auth.router, dependencies=[Depends(require_csrf_header)])
-    app.include_router(webhook.router)  # signed, so no login
-    for router in (targets, review, leads, runs, settings, privacy):
-        app.include_router(router.router, dependencies=guarded)
+    # Each route checks its own permission (``require`` in deps); this adds the write header.
+    csrf = [Depends(require_csrf_header)]
+    app.include_router(webhook.router)  # signed, so no sign-in
+    for router in (auth, team, admin, targets, review, leads, runs, settings, privacy):
+        app.include_router(router.router, dependencies=csrf)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/api/openapi.json", include_in_schema=False, dependencies=[Depends(require_operator)])
+    @app.get("/api/openapi.json", include_in_schema=False, dependencies=[Depends(current_user)])
     def api_document() -> dict[str, Any]:
         return app.openapi()
 
@@ -144,18 +178,11 @@ def _file_inside(root: Path, requested: str) -> Path | None:
 
 
 def create_app_from_container(container: Container) -> FastAPI:
-    """Build the app for a real run: one workspace, search only if a Tavily key is set."""
+    """Build the app for a real run: search only if a Tavily key is set."""
     from outbound.pipeline import search_or_none, writer_or_none
     from outbound.providers.registry import build_mailbox_if_configured
 
     config = container.settings
-    if not config.operator_password_hash or not config.session_secret.get_secret_value():
-        raise ConfigurationError(
-            "The web app needs a login. Add two lines to .env:\n"
-            "  OPERATOR_PASSWORD_HASH=<output of: uv run outbound auth hash-password>\n"
-            "  SESSION_SECRET=<any random string of 32+ characters, for example the output of\n"
-            '    python3 -c "import secrets; print(secrets.token_urlsafe(32))">'
-        )
     workspace_id = container.workspace_id(config.workspace_name)
     factory = ServicesFactory(
         container,

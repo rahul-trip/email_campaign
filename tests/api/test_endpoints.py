@@ -28,7 +28,7 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.services.dns_check import TxtLookup
-from tests.api.conftest import HEADERS, PASSWORD, WEBHOOK_SECRET, Api
+from tests.api.conftest import ADMIN, HEADERS, WEBHOOK_SECRET, Api, sign_in
 
 C = CompanyStatus
 FOOTER = 'Quantra Inc, 1 Main St. Reply "unsubscribe" and we will stop.'
@@ -449,9 +449,7 @@ def test_a_mailbox_dns_check_is_run_from_the_settings_screen(
     records = {"quantra.example": ["v=spf1 -all"], "_dmarc.quantra.example": ["v=DMARC1; p=reject"]}
     lookup: TxtLookup = lambda name: records.get(name, [])  # noqa: E731
     app, _ = make_app(dns_lookup=lookup)
-    client = TestClient(app)
-    client.post("/api/auth/login", json={"password": PASSWORD}, headers=HEADERS)
-    api = Api(client)
+    api = sign_in(app, ADMIN)
     box = api.post(
         "/api/settings/mailboxes",
         json={"address": "sam@quantra.example", "credentials_ref": "env:IMAP_PASSWORD"},

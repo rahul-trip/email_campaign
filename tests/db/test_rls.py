@@ -137,3 +137,14 @@ def test_a_public_data_api_role_with_grants_fails_the_startup_check(
         with owner_engine.begin() as connection:
             connection.execute(text("REVOKE ALL ON companies FROM anon"))
     assert isolation_problems(engine) == []
+
+
+def test_a_read_only_unit_of_work_cannot_write(factory: UnitOfWorkFactory, ws: str) -> None:
+    """The superadmin view (Phase 6b): even a write that slipped past the permission check
+    fails in the database."""
+    add(factory, ws, "seen.com")
+    with factory.reading_only()(ws) as uow:
+        assert [c.domain for c in uow.companies.search()[0]] == ["seen.com"]
+        with pytest.raises(DBAPIError):
+            uow.companies.create(domain="written.com", source=CompanySource.MANUAL)
+            uow.commit()

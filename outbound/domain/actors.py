@@ -4,6 +4,7 @@ from __future__ import annotations
 
 OPERATOR = "operator"
 SYSTEM = "system"
+INTEGRATION_WEBHOOK = "integration:webhook"  # the signed intake webhook, on the operator's behalf
 
 
 def provider(name: str) -> str:
@@ -11,5 +12,6 @@ def provider(name: str) -> str:
 
 
 def is_operator(actor: str) -> bool:
-    """Operators are ``operator`` (single-user mode) or ``user:<id>`` (Phase 6)."""
-    return actor == OPERATOR or actor.startswith("user:")
+    """People and the integrations they set up: ``operator`` (the CLI), ``user:<id>`` (a signed-in
+    person, Phase 6b) or ``integration:<name>`` (the intake webhook)."""
+    return actor == OPERATOR or actor.startswith(("user:", "integration:"))

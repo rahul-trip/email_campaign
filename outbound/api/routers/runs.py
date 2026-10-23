@@ -5,15 +5,18 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
 
-from outbound.api.deps import Services, services
+from outbound.api.deps import Services, require, services
 from outbound.api.schemas import CostOut, QualityOut, RunIn, RunLeadOut, RunOut, StatusOut
 from outbound.db.types import utcnow
+from outbound.domain.permissions import Permission as P
 from outbound.services.runs import RunRequest
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
 
-@router.post("/runs", response_model=RunOut, status_code=202)
+@router.post(
+    "/runs", response_model=RunOut, status_code=202, dependencies=[Depends(require(P.RUNS_WRITE))]
+)
 def start_run(body: RunIn, svc: Annotated[Services, Depends(services)]) -> RunOut:
     """Queue a run; the worker process picks it up. The API never runs the pipeline itself."""
     request = RunRequest(
@@ -26,28 +29,34 @@ def start_run(body: RunIn, svc: Annotated[Services, Depends(services)]) -> RunOu
     return RunOut.model_validate(svc.runs.queue(request))
 
 
-@router.get("/runs", response_model=list[RunOut])
+@router.get("/runs", response_model=list[RunOut], dependencies=[Depends(require(P.RUNS_READ))])
 def recent_runs(svc: Annotated[Services, Depends(services)]) -> list[RunOut]:
     return [RunOut.model_validate(r) for r in svc.runs.recent()]
 
 
-@router.get("/runs/{run_id}", response_model=RunOut)
+@router.get("/runs/{run_id}", response_model=RunOut, dependencies=[Depends(require(P.RUNS_READ))])
 def run(run_id: str, svc: Annotated[Services, Depends(services)]) -> RunOut:
     return RunOut.model_validate(svc.runs.get(run_id))
 
 
-@router.get("/runs/{run_id}/leads", response_model=list[RunLeadOut])
+@router.get(
+    "/runs/{run_id}/leads",
+    response_model=list[RunLeadOut],
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
 def run_leads(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[RunLeadOut]:
     """Every lead the run moved, held, failed or deferred, each with its steps."""
     return [RunLeadOut.model_validate(lead) for lead in svc.runs.leads(run_id)]
 
 
-@router.post("/runs/{run_id}/cancel", response_model=RunOut)
+@router.post(
+    "/runs/{run_id}/cancel", response_model=RunOut, dependencies=[Depends(require(P.RUNS_WRITE))]
+)
 def cancel(run_id: str, svc: Annotated[Services, Depends(services)]) -> RunOut:
     return RunOut.model_validate(svc.runs.cancel(run_id))
 
 
-@router.get("/status", response_model=StatusOut)
+@router.get("/status", response_model=StatusOut, dependencies=[Depends(require(P.LEADS_READ))])
 def status(svc: Annotated[Services, Depends(services)]) -> StatusOut:
     report = svc.reports.status()
     return StatusOut(
@@ -57,7 +66,9 @@ def status(svc: Annotated[Services, Depends(services)]) -> StatusOut:
     )
 
 
-@router.get("/reports/quality", response_model=QualityOut)
+@router.get(
+    "/reports/quality", response_model=QualityOut, dependencies=[Depends(require(P.REPORTS_READ))]
+)
 def quality(svc: Annotated[Services, Depends(services)]) -> QualityOut:
     report = svc.reports.quality()
     return QualityOut(
@@ -73,7 +84,9 @@ def quality(svc: Annotated[Services, Depends(services)]) -> QualityOut:
     )
 
 
-@router.get("/reports/cost", response_model=CostOut)
+@router.get(
+    "/reports/cost", response_model=CostOut, dependencies=[Depends(require(P.REPORTS_READ))]
+)
 def cost(
     svc: Annotated[Services, Depends(services)], days: Annotated[int, Query(ge=1, le=365)] = 30
 ) -> CostOut:

@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from starlette.concurrency import run_in_threadpool
 
-from outbound.api.deps import Services, services
+from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
     CompanyOut,
     CompanyPatch,
@@ -19,6 +19,7 @@ from outbound.api.schemas import (
 )
 from outbound.domain.enums import ImportSource
 from outbound.domain.errors import InvalidInput
+from outbound.domain.permissions import Permission as P
 from outbound.services.intake import IntakeReport, load_rows
 
 router = APIRouter(prefix="/api", tags=["targets"])
@@ -33,7 +34,7 @@ def _out(report: IntakeReport) -> IntakeOut:
     )
 
 
-@router.post("/targets", response_model=IntakeOut)
+@router.post("/targets", response_model=IntakeOut, dependencies=[Depends(require(P.LEADS_WRITE))])
 def add_target(body: TargetIn, svc: Annotated[Services, Depends(services)]) -> IntakeOut:
     row = body.model_dump(exclude={"campaign_id", "validate_only"}, exclude_none=True)
     report = svc.intake.run(
@@ -45,7 +46,9 @@ def add_target(body: TargetIn, svc: Annotated[Services, Depends(services)]) -> I
     return _out(report)
 
 
-@router.post("/targets/upload", response_model=IntakeOut)
+@router.post(
+    "/targets/upload", response_model=IntakeOut, dependencies=[Depends(require(P.LEADS_WRITE))]
+)
 async def upload_targets(
     svc: Annotated[Services, Depends(services)],
     file: Annotated[UploadFile, File()],
@@ -86,17 +89,29 @@ def _import(
     )
 
 
-@router.get("/targets/waiting", response_model=list[WaitingRowOut])
+@router.get(
+    "/targets/waiting",
+    response_model=list[WaitingRowOut],
+    dependencies=[Depends(require(P.LEADS_READ))],
+)
 def waiting(svc: Annotated[Services, Depends(services)]) -> list[WaitingRowOut]:
     return [WaitingRowOut.model_validate(r) for r in svc.intake.needing_confirmation()]
 
 
-@router.post("/targets/{row_id}/confirm", response_model=RowOut)
+@router.post(
+    "/targets/{row_id}/confirm",
+    response_model=RowOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
 def confirm(row_id: str, body: ConfirmIn, svc: Annotated[Services, Depends(services)]) -> RowOut:
     return RowOut.model_validate(svc.intake.confirm(row_id, body.domain))
 
 
-@router.patch("/companies/{company_id}", response_model=CompanyOut)
+@router.patch(
+    "/companies/{company_id}",
+    response_model=CompanyOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
 def edit_company(
     company_id: str, body: CompanyPatch, svc: Annotated[Services, Depends(services)]
 ) -> CompanyOut:

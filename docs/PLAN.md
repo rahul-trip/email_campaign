@@ -314,10 +314,10 @@ Rules:
 - No business rules in the browser.
 - Every write sends the `row_version` it read; a stale one gets HTTP 409.
 - The API client is generated from OpenAPI (`npm run gen:api`); CI fails if it is out of date.
-- One local login until Phase 6b: an Argon2 hash in `OPERATOR_PASSWORD_HASH`, a signed HTTP-only SameSite=Strict cookie, and an `X-Requested-With` header on every write. Failed logins are throttled.
-- From 6b:
-  - users sign in with an email and password (Argon2id) into server-side sessions, using a `__Host-` HttpOnly SameSite=Strict cookie;
-  - app URLs carry the workspace (`/w/{slug}`), and every route declares its permission.
+- Sign-in (Phase 6b): people sign in with an email and password (Argon2id, at least 15 characters) into server-side sessions the server can revoke. The cookie holds only a random token: HttpOnly, SameSite=Strict, and `__Host-` over https. Every write also carries an `X-Requested-With` header. Failed sign-ins are throttled per client and per account, and the answer never reveals whether an account exists.
+- Accounts exist only by invitation: platform staff create a customer and invite its first admin (`POST /api/admin/customers`); workspace admins invite their own people. Invitation links last 7 days and reset links 30 minutes; both are single use and stored as hashes.
+- Every request names its workspace in an `X-Workspace-Id` header (a person in one workspace may leave it out). Every route declares one permission (`require(...)` in `api/deps.py`); a test fails any route that declares none. App URLs carry the workspace (`/w/{slug}`).
+- What a person does is recorded as `user:<id>`; the intake webhook as `integration:webhook`. Both count as operator input (rule 7).
 - Errors are problem-details responses (RFC 9457) with stable codes.
 - The API never runs the pipeline in a request: it queues a run and `outbound worker` executes it.
 - FastAPI serves the built app, so production is two processes: `outbound serve` and `outbound worker`.

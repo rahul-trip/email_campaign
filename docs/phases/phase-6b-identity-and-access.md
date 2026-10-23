@@ -63,80 +63,80 @@ Fixed in code in `outbound/domain/permissions.py`.
 
 ### 6b.1 Migration 0010
 
-- [ ] **`users`:**
+- [x] **`users`:**
   - `email` (unique, lower-cased), `name`, `password_hash` (Argon2id);
   - `platform_role` (`admin`, `superadmin` or null), `status` (`active`, `disabled`);
   - `last_login_at`, `terms_version`, `terms_accepted_at`.
-- [ ] **`memberships`:** `workspace_id`, `user_id`, `role` (`admin`, `member`); `UNIQUE (workspace_id, user_id)`.
-- [ ] **`auth_tokens`:**
+- [x] **`memberships`:** `workspace_id`, `user_id`, `role` (`admin`, `member`); `UNIQUE (workspace_id, user_id)`.
+- [x] **`auth_tokens`:**
   - `purpose` (`invite`, `reset`), `email`;
   - `workspace_id` and `role` (invites only);
   - `token_hash`, `expires_at`, `used_at`, `created_by`.
-- [ ] **`sessions`:** `token_hash`, `user_id`, `created_at`, `last_seen_at`, `expires_at`, `revoked_at`, `ip`, `user_agent`, `data` (JSON: OAuth `state` and PKCE verifier for 6c).
-- [ ] **`audit_log`:** `actor_user_id`, `workspace_id` (nullable), `action`, `target_type`, `target_id`, `note`, `data` (JSON: before and after). The app and platform roles get INSERT and SELECT only.
-- [ ] **RLS:** the `workspaces` policy adds the user's own workspaces through `app.user_id`, so `/api/auth/me` needs no platform role.
-- [ ] New `StrEnum`s with matching `CHECK`s. [../SCHEMA.md](../SCHEMA.md) is updated in the same PR.
+- [x] **`sessions`:** `token_hash`, `user_id`, `created_at`, `last_seen_at`, `expires_at`, `revoked_at`, `ip`, `user_agent`, `data` (JSON: OAuth `state` and PKCE verifier for 6c).
+- [x] **`audit_log`:** `actor_user_id`, `workspace_id` (nullable), `action`, `target_type`, `target_id`, `note`, `data` (JSON: before and after). The app and platform roles get INSERT and SELECT only.
+- [x] ~~**RLS:** the `workspaces` policy adds the user's own workspaces through `app.user_id`~~. Not needed: see "As built".
+- [x] New `StrEnum`s with matching `CHECK`s. [../SCHEMA.md](../SCHEMA.md) is updated in the same PR.
 
 ### 6b.2 Permissions on every route
 
-- [ ] `domain/permissions.py`:
+- [x] `domain/permissions.py`:
   - a `Permission` `StrEnum`;
   - `ROLE_PERMISSIONS`;
   - `can(principal, permission, resource=None)`, where `resource` carries the owner for `mailboxes.own`.
-- [ ] `require(Permission.X)` is a FastAPI dependency, and every tenant route declares one. A test walks the app's routes and fails any route without one.
+- [x] `require(Permission.X)` is a FastAPI dependency, and every tenant route declares one. A test walks the app's routes and fails any route without one.
 
 ### 6b.3 Sign-in, invitations and password reset
 
-- [ ] **The `IdentityProvider` port** has a `local` adapter: Argon2id through today's code (`api/auth.py:29-33`). Supabase Auth or WorkOS can replace it after the alpha, by changing this one adapter.
-- [ ] **Passwords** follow NIST SP 800-63B-4 for a password that is the only factor:
+- [x] **The `IdentityProvider` port** has a `local` adapter: Argon2id through today's code (`api/auth.py:29-33`). Supabase Auth or WorkOS can replace it after the alpha, by changing this one adapter.
+- [x] **Passwords** follow NIST SP 800-63B-4 for a password that is the only factor:
   - at least 15 characters, and long passphrases allowed;
   - no composition rules;
   - checked against a bundled list of common and breached passwords. No network call.
-- [ ] **Throttling:** the existing per-IP throttle (`LoginThrottle`), plus back-off per account.
-- [ ] **No account enumeration:** sign-in and "forgot password" give the same answer whether or not the email exists.
-- [ ] **Endpoints:**
+- [x] **Throttling:** the existing per-IP throttle (`LoginThrottle`), plus back-off per account.
+- [x] **No account enumeration:** sign-in and "forgot password" give the same answer whether or not the email exists.
+- [x] **Endpoints:**
   - `POST /api/auth/login`, `POST /api/auth/logout`, `POST /api/auth/logout-all`;
   - `GET /api/auth/me` returns the user, memberships (id, slug, name, role) and platform role;
   - `POST /api/auth/password/forgot`, `POST /api/auth/password/reset`, `POST /api/auth/password/change`;
   - `GET /api/invitations/{token}` and `POST /api/invitations/{token}/accept`:
     - a new user sets a password;
     - an existing user must be signed in as the invited email.
-- [ ] **Team endpoints** (`team.manage`): list, invite (`email`, `role`), resend, revoke, change role, remove.
+- [x] **Team endpoints** (`team.manage`): list, invite (`email`, `role`), resend, revoke, change role, remove.
   - The last admin cannot leave or be demoted.
   - Removing someone revokes their sessions.
-- [ ] **Tokens:** invites last 7 days; resets last 30 minutes; both single use and stored as hashes.
-- [ ] **The `TransactionalEmail` port:** one adapter (provider chosen by the team: Postmark, Resend or SES) and a fake for tests.
+- [x] **Tokens:** invites last 7 days; resets last 30 minutes; both single use and stored as hashes.
+- [x] **The `TransactionalEmail` port:** one adapter (provider chosen by the team: Postmark, Resend or SES) and a fake for tests.
   - Templates: invite, reset, "your password changed".
   - The platform's sending domain has SPF, DKIM and DMARC.
-- [ ] **The operator login goes:** `OPERATOR_PASSWORD_HASH` and its hard-coded `{"user": "operator"}` cookie (`api/auth.py:36-57`).
+- [x] **The operator login goes:** `OPERATOR_PASSWORD_HASH` and its hard-coded `{"user": "operator"}` cookie (`api/auth.py:36-57`).
 
 ### 6b.4 Sessions and the tenant context
 
-- [ ] **Sessions** are server-side rows. The cookie is `__Host-outbound_session`: HttpOnly, Secure, SameSite=Strict. The `X-Requested-With` check stays.
+- [x] **Sessions** are server-side rows. The cookie is `__Host-outbound_session`: HttpOnly, Secure, SameSite=Strict. The `X-Requested-With` check stays.
   - Users: 24 hours idle, 14 days absolute.
   - Platform roles: 8 hours idle, 3 days absolute.
   - Sessions are revoked on removal, a role change, a password reset or a password change (other sessions), disabling, and workspace suspension.
-- [ ] **`tenant()`** (in `api/deps.py`) runs these steps:
+- [x] **`tenant()`** (in `api/deps.py`) runs these steps:
   1. session → user;
   2. `X-Workspace-Id` → membership and role, or a superadmin view;
   3. workspace status (from 6d: the access level);
   4. binds `user_id` and `workspace_id` to logs;
   5. sets `app.user_id`;
   6. builds the services with `actor = user:<id>`.
-- [ ] **Actors:**
+- [x] **Actors:**
   - the webhook becomes `integration:webhook` (`services/webhook.py:92`);
   - `domain/actors.py:is_operator` accepts `integration:`, so webhook input stays protected;
   - `services/journey.py:401-402` already treats `user:` actors as people.
 
 ### 6b.5 Platform roles and the superadmin view
 
-- [ ] **`/api/admin/*`** is guarded by `platform_role`. The full console is 6d. This phase adds `POST /api/admin/customers` (company name, website, first admin's email): it creates the workspace and sends the invite, so the alpha can onboard customers.
-- [ ] **Superadmin view:** a superadmin opens any `/w/{slug}`.
+- [x] **`/api/admin/*`** is guarded by `platform_role`. The full console is 6d. This phase adds `POST /api/admin/customers` (company name, website, first admin's email): it creates the workspace and sends the invite, so the alpha can onboard customers.
+- [x] **Superadmin view:** a superadmin opens any `/w/{slug}`.
   - `tenant()` grants every read permission and no write.
   - Every transaction of the request runs `SET TRANSACTION READ ONLY` before the workspace setting.
   - Each (session, workspace) view writes one `audit_log` row.
   - The platform setting `superadmin_enabled` turns the role off. Until 6d's `platform_settings` exists, an environment setting stands in.
-- [ ] **The web app** shows a red sticky banner: "Superadmin view of {workspace}, read-only · Exit".
+- [x] **The web app** shows a red sticky banner: "Superadmin view of {workspace}, read-only · Exit".
 
 ### 6b.6 Web app
 
@@ -158,11 +158,26 @@ Fixed in code in `outbound/domain/permissions.py`.
 
 ### 6b.7 Moving the first tenant
 
-- [ ] `scripts/migrate_first_tenant.py`:
+- [x] `scripts/migrate_first_tenant.py`:
   - renames the `default` workspace to the company's name and slug;
   - creates the operator as a user, admin of that workspace and platform `superadmin`.
 
   It prints its plan and changes nothing without `--apply`. The mailbox move is in 6c.
+
+## As built (API, 2026-10-23)
+
+The API, the services and the tests are done; the web app (6b.6) is next. Where the build differs from the tasks above:
+
+- **No `IdentityProvider` port.** `services/identity.py` is the local implementation, and the only one. A port with one adapter is the speculative abstraction CLAUDE.md rules out; it is cut when Supabase Auth or WorkOS is chosen (6f).
+- **Paths:** the invitation endpoints are `GET /api/auth/invitations/{token}` and `POST /api/auth/invitations/{token}/accept`. "Sign out everywhere" is `POST /api/auth/logout-others`: it keeps the browser that asked.
+- **Removing a member or changing a role does not end their sessions.** A session belongs to a person, not a workspace, and memberships are read again on every request, so the change takes effect on the next request (tested), without signing the person out of their other workspaces. A password reset, a password change (other sessions) and disabling the account do end sessions.
+- **No `app.user_id` policy on `workspaces`.** `/api/auth/me` lists workspaces through the platform unit of work, which may read `workspaces` already. Tenant tables still see only `app.workspace_id`.
+- **Superadmin switch:** the environment setting `SUPERADMIN_ENABLED` (default on) until 6d's `platform_settings`.
+- **Throttles:** 5 failed sign-ins a minute per client address, and 10 in 15 minutes per account whatever the address.
+- **Email:** `SmtpEmail` (any provider's SMTP relay: Postmark, Resend and SES all have one) or `LogEmail`, which prints the message in development. In production the API refuses to start without `SMTP_HOST`.
+- **`outbound users create`** replaces `outbound auth hash-password`: it makes an account without an invitation (the first admin, platform staff). `OPERATOR_PASSWORD_HASH`, `SESSION_SECRET` and `SESSION_HOURS` are gone.
+- **The webhook** still feeds the deployment's workspace (`WORKSPACE_NAME`), now as `integration:webhook`; 6c gives each workspace its own URL.
+- **Tests:** `tests/api/test_permissions.py` (the route walk; the matrix for admin, member, superadmin view and platform admin; forged header; removed member), `tests/api/test_identity.py` (invitations, resets, password change, sessions, last admin, expiry, disabled account, creating a customer), `tests/db/test_rls.py` (a read-only unit of work cannot write, on Postgres), `tests/db/test_migrate_first_tenant.py`, `tests/providers/test_transactional_email.py`, `tests/domain/test_actors.py`.
 
 ## Tests that must exist
 

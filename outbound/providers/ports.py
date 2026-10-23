@@ -250,3 +250,17 @@ class Mailbox(Protocol):
     def list_sent(self, since: datetime) -> list[SentMessage]: ...
 
     def list_inbox(self, since: datetime) -> list[InboundMessage]: ...
+
+
+class OutgoingEmail(_Model):
+    """A message the platform itself sends: an invitation, a password reset, a notice."""
+
+    to: str
+    subject: str
+    text: str
+
+
+class TransactionalEmail(Protocol):
+    """The platform's own email (Phase 6b), never a customer's mailbox."""
+
+    def send(self, email: OutgoingEmail) -> None: ...

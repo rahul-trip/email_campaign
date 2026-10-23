@@ -28,7 +28,7 @@ It is built for about 5–50 new companies a week, at no more than $0.50 of vend
 - It writes the **first email only**. There are no automatic follow-ups yet.
 - It does **not read replies** or react to bounces.
 - It does **not send**. Drafts only.
-- There is **one login** for one operator.
+- Accounts are **invitation only**. There is no sign-up page, no two-step sign-in and no sign-in with Google or Microsoft yet.
 
 See also [section 13](#13-known-limits-in-this-version).
 
@@ -43,7 +43,8 @@ You need the following in place once. [README.md](../README.md) has the commands
 | Vendor keys: search (Tavily), email finders and verifier (for example Hunter, ZeroBounce, MyEmailVerifier) | `.env` | The run stops with "not configured" and names what is missing |
 | A model key (any OpenAI-compatible provider) | `.env` | Research and writing cannot run |
 | Your mailbox login (IMAP): `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME` | `.env` | The engine works up to "approved" but cannot make drafts or read your Sent folder |
-| A web login: `OPERATOR_PASSWORD_HASH` and `SESSION_SECRET` | `.env` | The web app will not start |
+| An account: `uv run outbound users create` (below), or an invitation from someone who has one | The command line, once | You cannot sign in |
+| Email for invitations and password resets: `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, `APP_BASE_URL` | `.env` | On your computer the links are printed in the `serve` terminal instead. On the server the app will not start |
 | Your **sender profile**: legal name, postal address, registration details, signature | Settings → Sender profile | The writer refuses to produce an email, because the legal footer would have a hole |
 | A **campaign**: wanted job titles and a description of your ideal customer | Campaigns | Contacts cannot be ranked and fit cannot be scored well |
 
@@ -61,8 +62,15 @@ uv run outbound worker     # does the work you start from the browser
 ```
 
 - **Both must be running.** The web app only *queues* a run; the worker carries it out, for every workspace in the database. Every 15 minutes it also retries failed leads, collects catch-all answers, reads the Sent folder and runs any leads that are due. If you press Start run and nothing happens, the worker is not running.
-- Open <http://127.0.0.1:8000> and sign in with the password you chose when you created `OPERATOR_PASSWORD_HASH`.
-- The web app listens only on your own computer. Five wrong passwords in a minute locks sign-in for a minute. A sign-in lasts 12 hours.
+- Open <http://127.0.0.1:8000> and sign in with your **email and password**.
+- **The first account** is made on the command line; everyone after that is invited from the app:
+  ```bash
+  uv run outbound users create --email you@example.com --workspace default
+  ```
+  It asks for a password: at least 15 characters, and a few ordinary words make a good one. Add `--platform-role superadmin` to make yourself the platform's staff as well.
+- **Moving an install from before Phase 6b** (one shared password): `uv run python -m scripts.migrate_first_tenant --name "Your company" --email you@example.com` shows what it would do; add `--apply` to do it. It renames the `default` workspace and makes you its admin and the platform's superadmin.
+- The web app listens only on your own computer. Five wrong passwords in a minute from one computer, or ten in 15 minutes for one account, pause sign-in. A sign-in lasts until you have been away for 24 hours, and at most 14 days (8 hours and 3 days for platform staff).
+- **Forgot your password?** Ask for a reset link on the sign-in page. It works once, for 30 minutes, and signs you out everywhere else.
 - The database is the local file `outbound.db` unless `.env` says `DATABASE_BACKEND=postgres`, which uses `POSTGRES_URL` (the Supabase database) instead. Change that one line to switch.
 - First time only: `uv run outbound db upgrade` and `uv run outbound seed` create the database, a default workspace, a default campaign and the country rules.
 - **On the server** the app and worker run all the time, at the address your team set up (always https). A deploy sets up the database itself and restarts both processes for a few seconds, so avoid deploying while a run is going. Logs, restarts and CLI commands on the server are in [DEPLOY.md](DEPLOY.md), section 3.
@@ -416,7 +424,7 @@ Everything in the browser can also be done from the terminal. Run from the proje
 | `uv run outbound report cost --days 30` | Spend per vendor and per company |
 | `uv run outbound delete-lead acme.com [--suppress] [--yes]` | Permanently deletes a lead (asks you to type the domain; `--suppress` also blocks the domain) |
 | `uv run outbound forget EMAIL` / `suppress VALUE` | Erases a person on request / stops all contact with an address or domain |
-| `uv run outbound auth hash-password` | Makes the value for `OPERATOR_PASSWORD_HASH` |
+| `uv run outbound users create --email EMAIL [--workspace SLUG] [--role admin\|member] [--platform-role admin\|superadmin]` | Makes an account without an invitation (the first admin, or platform staff). Asks for the password |
 
 Message IDs in `review` can be shortened to their first characters, as long as they are unique.
 
@@ -445,7 +453,7 @@ Honest list of what is not there yet, so nothing surprises you.
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
 | Scrubby (catch-all resolver) has not worked live: its configured address did not answer. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | Confirm Scrubby's API address in your Scrubby account. Run `uv run python -m scripts.live_check` to re-check any vendor |
 | Follow-up and Sent-sync behaviour with a real mailbox is not yet exercised by a real send | Try it with a few of your own addresses first |
-| One workspace, one login | Phase 6 |
+| No two-step sign-in, sign-up page or sign-in with Google or Microsoft | After the alpha (Phase 6f) |
 
 ---
 
@@ -464,7 +472,8 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | Event | Tells you |
 |---|---|
 | `http_request` | method, route, status, `duration_ms`, `request_id`, `client_ip`. The query string is never logged. Warnings are 4xx answers, errors are 5xx |
-| `login_failed`, `login_throttled`, `login_succeeded` | who tried (their address, never the password) |
+| `login_failed`, `login_succeeded` | which account (its id, never the address or the password) and from where |
+| `superadmin_view` | a superadmin opened a workspace they are not a member of (also kept in the audit log) |
 | `run_started`, `run_finished` | the stages, then status, duration, cost and the outcome counts per stage |
 | `stage_done`, `guard_refused`, `stage_failed` | one lead at one stage: `company_id`, `stage`, where it went and why |
 | `provider_call` | vendor, call, outcome, `cost_micro_usd`, `latency_ms`; `provider_call_blocked` when a budget stopped it; `provider_retry` for each retry with the reason |
@@ -481,7 +490,7 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 
 | Symptom | Likely cause and fix |
 |---|---|
-| The web app will not start: "The web app needs a login" | `OPERATOR_PASSWORD_HASH` or `SESSION_SECRET` is missing in `.env` |
+| The server will not start: "SMTP_HOST is not set" | In production the app must be able to send invitations and resets. Set the `SMTP_*` settings and `EMAIL_FROM` |
 | Page loads but shows only "Loading…" or a blank | The web app was not built: `cd web2 && npm ci && npm run build` |
 | Something failed in the browser and the message ends "Reference: …" | Search the logs for that reference (see 13a); the line with `unhandled_error` has the cause |
 | A lead fails with "has no first and last name" | A person was saved with one word. Open the lead, press **Edit** on the person, give both names (or a work email) and **Save and retry the email step** |
@@ -491,7 +500,9 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | Everything is held for *country unknown* | The sites are not revealing a country. Give the country when adding targets |
 | Nothing appears in Drafts | No mailbox login in `.env`, or the approved email has not been through a run yet. Run once more |
 | A run shows *failed* | See the error shown in the run's progress, or in the worker's terminal |
-| You cannot sign in | Check the password; after five wrong tries wait a minute |
+| You cannot sign in | Check the email and password; after five wrong tries wait a minute. Or use **Forgot password** |
+| "You are not a member of that workspace" | Your link points at a workspace you were removed from, or never joined. Ask its admin for an invitation |
+| An invitation link says it is not valid any more | It was used, replaced by a newer invitation, revoked, or is older than 7 days. Ask for a new one |
 | You see old data | The server reads the database in `DATABASE_URL` (default `outbound.db`). Make sure you started it against the one you mean |
 
 ---

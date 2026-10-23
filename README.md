@@ -45,7 +45,7 @@ Copy `.env.example` to `.env` and fill it in. `.env` is git-ignored; never commi
 | Catch-all resolution (optional) | `CATCH_ALL_RESOLVER` and its key; without one, catch-all addresses are held |
 | UK legal-entity check (optional, free) | `COMPANIES_HOUSE_API_KEY` |
 | Drafts and the Sent sync | `IMAP_HOST`, `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME`, `DRAFTS_FOLDER`, `SENT_FOLDER` |
-| The web app | `OPERATOR_PASSWORD_HASH` (from `uv run outbound auth hash-password`) and `SESSION_SECRET` |
+| The web app | An account: `uv run outbound users create --email … --workspace …`. For invitations and password resets: `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, `APP_BASE_URL` |
 | Spend limits (optional) | `MONTHLY_CAPS_MICRO_USD`, `PROVIDER_PRICES`, `LLM_PRICES` |
 
 ### 2. Create the database

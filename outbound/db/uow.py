@@ -43,13 +43,18 @@ from outbound.domain.entities import Workspace
 class UnitOfWork:
     session: Session
 
-    def __init__(self, session_factory: sessionmaker[Session], workspace_id: str) -> None:
+    def __init__(
+        self, session_factory: sessionmaker[Session], workspace_id: str, *, read_only: bool = False
+    ) -> None:
         self._factory = session_factory
         self.workspace_id = workspace_id
+        self.read_only = read_only
 
     def __enter__(self) -> Self:
         # Read by the session's ``after_begin`` listener: the row-level-security key.
-        self.session = self._factory(info={"workspace_id": self.workspace_id})
+        self.session = self._factory(
+            info={"workspace_id": self.workspace_id, "read_only": self.read_only}
+        )
         self.events = EventRepository(self.session, self.workspace_id)
         args = (self.session, self.workspace_id, self.events)
         self.companies = CompanyRepository(*args)
@@ -103,8 +108,15 @@ class UnitOfWork:
 
 
 class UnitOfWorkFactory:
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    """Units of work for one workspace each. ``read_only`` (a superadmin viewing a workspace)
+    makes every transaction READ ONLY on Postgres, whatever the code above tries."""
+
+    def __init__(self, session_factory: sessionmaker[Session], *, read_only: bool = False) -> None:
         self._factory = session_factory
+        self._read_only = read_only
 
     def __call__(self, workspace_id: str) -> UnitOfWork:
-        return UnitOfWork(self._factory, workspace_id)
+        return UnitOfWork(self._factory, workspace_id, read_only=self._read_only)
+
+    def reading_only(self) -> UnitOfWorkFactory:
+        return UnitOfWorkFactory(self._factory, read_only=True)

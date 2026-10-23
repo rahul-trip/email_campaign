@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from outbound.api.deps import Services
 from outbound.logging import clear, configure_logging
-from tests.api.conftest import HEADERS, PASSWORD, Api
+from tests.api.conftest import ADMIN, HEADERS, PASSWORD, Api
 
 
 def lines(capsys: pytest.CaptureFixture[str], event: str) -> list[dict[str, object]]:
@@ -65,8 +65,10 @@ def test_health_checks_are_not_logged_at_info(api: Api, capsys: pytest.CaptureFi
 def test_login_attempts_are_audited_without_the_password(
     anonymous: TestClient, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    anonymous.post("/api/auth/login", json={"password": "wrong-guess-1"}, headers=HEADERS)
-    anonymous.post("/api/auth/login", json={"password": PASSWORD}, headers=HEADERS)
+    anonymous.post(
+        "/api/auth/login", json={"email": ADMIN, "password": "wrong-guess-1"}, headers=HEADERS
+    )
+    anonymous.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}, headers=HEADERS)
     out = capsys.readouterr().err
     events = [json.loads(x) for x in out.splitlines() if x.startswith("{")]
     names = [e["event"] for e in events if e["event"].startswith("login_")]
