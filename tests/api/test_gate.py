@@ -25,7 +25,9 @@ from tests.api.conftest import HEADERS, PASSWORD, Api
 from tests.stages.world import PROFILE, World
 
 
-def build(engine: Engine, factory: UnitOfWorkFactory, ws: str) -> tuple[Api, Worker, World]:
+def build(
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> tuple[Api, Worker, World]:
     with factory(ws) as uow:
         for policy in DEFAULT_COUNTRY_POLICIES:
             uow.policies.add_if_missing(policy)
@@ -39,19 +41,19 @@ def build(engine: Engine, factory: UnitOfWorkFactory, ws: str) -> tuple[Api, Wor
         operator_password_hash=hash_password(PASSWORD),
         session_secret=SecretStr("s" * 40),
     )
-    container = container_for(settings, engine)
+    container = container_for(settings, engine, platform_engine)
     world = World()
     pipeline = assemble(container, ws, world.providers())
     app: FastAPI = create_app(build_services(container, ws), web_dist=None)
     client = TestClient(app)
     client.post("/api/auth/login", json={"password": PASSWORD}, headers=HEADERS)
-    return Api(client), Worker(container, ws, pipeline), world
+    return Api(client), Worker(container, lambda _ws: pipeline, tick_every=None), world
 
 
 def test_the_whole_loop_in_the_browser_api_and_nothing_is_drafted_unapproved(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
-    api, worker, world = build(engine, factory, ws)
+    api, worker, world = build(engine, platform_engine, factory, ws)
 
     # add targets, as the Targets screen does
     for site in ("acme.co.uk", "beta.com"):
@@ -93,9 +95,9 @@ def test_the_whole_loop_in_the_browser_api_and_nothing_is_drafted_unapproved(
 
 
 def test_a_cancelled_queued_run_is_never_executed(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
-    api, worker, _world = build(engine, factory, ws)
+    api, worker, _world = build(engine, platform_engine, factory, ws)
     api.post("/api/targets", json={"website": "acme.co.uk"})
     run = api.post("/api/runs", json={}).json()
     api.post(f"/api/runs/{run['id']}/cancel")
@@ -104,9 +106,9 @@ def test_a_cancelled_queued_run_is_never_executed(
 
 
 def test_a_failing_run_is_recorded_and_the_worker_carries_on(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
-    api, worker, _world = build(engine, factory, ws)
+    api, worker, _world = build(engine, platform_engine, factory, ws)
     request = {"mode": "discovery", "campaign": "no-such-campaign"}
     bad = api.post("/api/runs", json=request).json()
     assert worker.run_once() is True

@@ -107,6 +107,16 @@ class CompanyRepository(ScopedRepository):
         )
         return [snapshot(row, Company) for row in self._session.scalars(stmt)]
 
+    def any_due(self, statuses: list[CompanyStatus], now: datetime | None = None) -> bool:
+        """Whether any company waits in one of ``statuses`` with its time arrived."""
+        moment = now or utcnow()
+        stmt = select(CompanyRow.id).where(
+            CompanyRow.workspace_id == self._workspace_id,
+            CompanyRow.status.in_(statuses),
+            or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
+        )
+        return self._session.scalars(stmt.limit(1)).first() is not None
+
     def search(
         self,
         *,
