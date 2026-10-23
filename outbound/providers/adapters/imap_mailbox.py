@@ -24,16 +24,16 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
-from email import message_from_bytes, policy
-from email.headerregistry import Address
 from email.message import EmailMessage
-from email.utils import format_datetime, make_msgid, parseaddr, parsedate_to_datetime
 from typing import Any
 
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderAuthError, ProviderError
+from outbound.providers.mime import build_message, date_of, inbound_message, parse, sent_message
 from outbound.providers.netguard import Resolve, public_address, system_resolve
 from outbound.providers.ports import InboundMessage, OutgoingDraft, SentMessage
+
+__all__ = ["ImapMailbox", "build_message", "guarded_connect", "imap_date"]
 
 log = get_logger(__name__)
 
@@ -98,26 +98,6 @@ def imap_date(moment: datetime) -> str:
 
 def _quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
-
-
-def build_message(
-    draft: OutgoingDraft, *, from_address: str, from_name: str = "", now: datetime | None = None
-) -> EmailMessage:
-    message = EmailMessage()
-    message["From"] = (
-        str(Address(display_name=from_name, addr_spec=from_address)) if from_name else from_address
-    )
-    message["To"] = draft.to_address
-    message["Subject"] = draft.subject
-    message["Date"] = format_datetime(now or datetime.now(UTC))
-    message["Message-ID"] = draft.message_id or make_msgid(
-        domain=from_address.rpartition("@")[2] or None
-    )
-    if draft.in_reply_to:
-        message["In-Reply-To"] = draft.in_reply_to
-        message["References"] = draft.references or draft.in_reply_to
-    message.set_content(draft.body)
-    return message
 
 
 class ImapMailbox:
@@ -193,42 +173,10 @@ class ImapMailbox:
             return len(uids)
 
     def list_sent(self, since: datetime) -> list[SentMessage]:
-        sent: list[SentMessage] = []
-        for message in self._read("sent", since):
-            ident = message["Message-ID"]
-            when = _date_of(message)
-            if ident is None or when is None:
-                continue
-            sent.append(
-                SentMessage(
-                    rfc_message_id=str(ident).strip(),
-                    to_address=_first_address(message["To"]),
-                    subject=str(message["Subject"] or ""),
-                    sent_at=when,
-                    body=_text_of(message),
-                )
-            )
-        return sent
+        return [m for m in map(sent_message, self._read("sent", since)) if m is not None]
 
     def list_inbox(self, since: datetime) -> list[InboundMessage]:
-        received: list[InboundMessage] = []
-        for message in self._read(self._inbox, since):
-            ident = message["Message-ID"]
-            when = _date_of(message)
-            if ident is None or when is None:
-                continue
-            received.append(
-                InboundMessage(
-                    rfc_message_id=str(ident).strip(),
-                    from_address=_first_address(message["From"]),
-                    subject=str(message["Subject"] or ""),
-                    received_at=when,
-                    body=_text_of(message),
-                    in_reply_to=_header(message, "In-Reply-To"),
-                    references=_header(message, "References"),
-                )
-            )
-        return received
+        return [m for m in map(inbound_message, self._read(self._inbox, since)) if m is not None]
 
     # ------------------------------------------------------------------ plumbing
 
@@ -308,9 +256,9 @@ class ImapMailbox:
                 raw = _raw_bytes(data) if status == "OK" else None
                 if raw is None:
                     continue
-                parsed = message_from_bytes(raw, policy=policy.default)
-                when = _date_of(parsed)  # SINCE has day granularity, so filter exactly here
-                if isinstance(parsed, EmailMessage) and when is not None and when >= cutoff:
+                parsed = parse(raw)
+                when = date_of(parsed) if parsed else None  # SINCE is by day: filter exactly
+                if parsed is not None and when is not None and when >= cutoff:
                     messages.append(parsed)
         return messages
 
@@ -344,34 +292,3 @@ def _raw_bytes(data: Any) -> bytes | None:
         if isinstance(part, tuple) and len(part) > 1 and isinstance(part[1], bytes):
             return part[1]
     return None
-
-
-def _date_of(message: Any) -> datetime | None:
-    value = message["Date"]
-    if value is None:
-        return None
-    try:
-        parsed = parsedate_to_datetime(str(value))
-    except (TypeError, ValueError):
-        return None
-    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
-
-
-def _first_address(header: object) -> str:
-    return parseaddr(str(header or ""))[1].lower()
-
-
-def _header(message: Any, name: str) -> str | None:
-    value = message[name]
-    return str(value).strip() or None if value is not None else None
-
-
-_BLANK_RUNS = re.compile(r"\n{3,}")
-
-
-def _text_of(message: EmailMessage) -> str:
-    part = message.get_body(preferencelist=("plain", "html"))
-    if part is None:
-        return ""
-    text = part.get_content()
-    return _BLANK_RUNS.sub("\n\n", str(text)).strip()

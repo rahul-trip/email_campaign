@@ -252,6 +252,19 @@ class Mailbox(Protocol):
     def list_inbox(self, since: datetime) -> list[InboundMessage]: ...
 
 
+class AccessTokens(Protocol):
+    """A connected mailbox's OAuth access token, kept fresh by whoever stores it (Phase 6c).
+
+    ``current`` gives a token that is valid now, refreshing it first when it is about to run
+    out. ``renew`` refreshes at once, for when the provider refused one that looked valid. Both
+    raise ``ReconnectNeeded`` when the person must connect the mailbox again.
+    """
+
+    def current(self) -> str: ...
+
+    def renew(self) -> str: ...
+
+
 class OutgoingEmail(_Model):
     """A message the platform itself sends: an invitation, a password reset, a notice."""
 

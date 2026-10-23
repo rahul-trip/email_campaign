@@ -29,6 +29,10 @@ class ProviderAuthError(ProviderError):
     """The vendor rejected our credentials (401 or 403). Never retried: fix the key."""
 
 
+class ReconnectNeeded(ProviderAuthError):
+    """A mailbox's access was revoked or expired for good: the person must connect it again."""
+
+
 class RateLimited(ProviderError):
     """The vendor answered 429. Retryable; ``retry_after`` is seconds when the vendor says."""
 
