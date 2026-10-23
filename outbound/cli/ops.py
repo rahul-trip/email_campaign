@@ -11,6 +11,7 @@ import typer
 
 from outbound.bootstrap import Container, build_container
 from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
+from outbound.db.errors import RunInProgress
 from outbound.db.types import utcnow
 from outbound.domain.enums import (
     CompanyStatus,
@@ -97,6 +98,9 @@ def register(app: typer.Typer) -> None:
         )
         try:
             report = execute_run(pipeline, container, workspace_id, request)
+        except RunInProgress as error:
+            typer.echo(f"{error}; try again when it has finished", err=True)
+            raise typer.Exit(1) from error
         except LookupError as error:
             typer.echo(str(error), err=True)
             raise typer.Exit(1) from error
@@ -113,7 +117,11 @@ def register(app: typer.Typer) -> None:
         """One scheduler pass: retries, catch-all answers, the Sent sync, then the pipeline."""
         container = build_container(settings_for(database_url))
         pipeline = _pipeline(container, workspace_id_or_exit(container, workspace))
-        _print_tick(pipeline.tick.run(limit=limit))
+        try:
+            _print_tick(pipeline.tick.run(limit=limit))
+        except RunInProgress as error:
+            typer.echo(f"{error}; the tick will run again later", err=True)
+            raise typer.Exit(1) from error
 
     @app.command()
     def retry(

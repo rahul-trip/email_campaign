@@ -9,3 +9,7 @@ class NotFound(LookupError):
 
 class ConcurrencyConflict(Exception):
     """The row changed since it was read: reload it and try again."""
+
+
+class RunInProgress(Exception):
+    """Another pipeline run is already running in this workspace; this one must wait."""

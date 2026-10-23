@@ -130,25 +130,21 @@ def _workspace(container: Container, workspace_id: str) -> Workspace:
 def build_meter(container: Container, workspace_id: str) -> Meter:
     """The one way to get a meter: with the configured prices, monthly caps and the workspace's
     per-prospect ceiling, so no path to a paid vendor can skip a cap."""
-    workspace = _workspace(container, workspace_id)
+    _workspace(container, workspace_id)  # fail early, with a clear message, if it is missing
     settings = container.settings
     return Meter(
         container.uow,
         workspace_id,
         prices={**DEFAULT_PRICES, **settings.provider_prices},
-        budget=BudgetPolicy.from_workspace_settings(
-            workspace.settings, settings.monthly_caps_micro_usd
-        ),
+        budget=BudgetPolicy.live_from(settings.monthly_caps_micro_usd),
     )
 
 
 def assemble(container: Container, workspace_id: str, providers: Providers) -> Pipeline:
     settings = container.settings
     uow = container.uow
-    workspace = _workspace(container, workspace_id)
-    budget = BudgetPolicy.from_workspace_settings(
-        workspace.settings, settings.monthly_caps_micro_usd
-    )
+    _workspace(container, workspace_id)  # fail early, with a clear message, if it is missing
+    budget = BudgetPolicy.live_from(settings.monthly_caps_micro_usd)
     meter = build_meter(container, workspace_id)
     llm_prices = {**DEFAULT_LLM_PRICES, **settings.llm_prices}
     search = MeteredSearch(providers.search, meter)
