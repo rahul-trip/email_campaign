@@ -14,7 +14,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Float,
-    ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -23,6 +23,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql.elements import conv
 
 from outbound.db.base import AppendOnly, Base, Identified, Mutable
 from outbound.db.types import Json, UtcDateTime, enum_type, utcnow
@@ -65,6 +66,19 @@ def _partial(column: str) -> Any:
     return text(_NOT_NULL.format(col=column))
 
 
+def _tenant_fk(table: str, column: str, parent: str, *, ondelete: str | None = None) -> Any:
+    """A foreign key that also matches the workspace (``(workspace_id, column)`` to the parent's
+    ``(workspace_id, id)``), so the database refuses a link from one workspace into another.
+    Foreign-key checks ignore row-level security, so this is the only thing that stops it.
+    Named as the single-column key it replaced (migration 0007)."""
+    return ForeignKeyConstraint(
+        ["workspace_id", column],
+        [f"{parent}.workspace_id", f"{parent}.id"],
+        name=conv(f"fk_{table}_{column}_{parent}"),
+        ondelete=ondelete,
+    )
+
+
 # ----------------------------------------------------------------------- tenancy and configuration
 
 
@@ -82,6 +96,7 @@ class WorkspaceRow(Identified, Base):
 class CampaignRow(Mutable, Base):
     __tablename__ = "campaigns"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
         UniqueConstraint("workspace_id", "name"),
         CheckConstraint("min_fit_score BETWEEN 0 AND 100", name="min_fit_score_range"),
     )
@@ -99,7 +114,10 @@ class CampaignRow(Mutable, Base):
 
 class MailboxRow(Mutable, Base):
     __tablename__ = "mailboxes"
-    __table_args__ = (UniqueConstraint("workspace_id", "address"),)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "address"),
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+    )
 
     address: Mapped[str] = mapped_column(String(320))
     gateway: Mapped[MailboxGateway] = mapped_column(enum_type(MailboxGateway, "mailbox_gateway"))
@@ -146,8 +164,9 @@ class SuppressionRow(Mutable, Base):
 
 class ImportBatchRow(Mutable, Base):
     __tablename__ = "import_batches"
-
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        _tenant_fk("import_batches", "campaign_id", "campaigns"),
         # A webhook delivery is identified by the sender's event id, kept in ``filename``. The
         # index makes "have we seen this event?" safe even when two deliveries arrive together.
         Index(
@@ -161,7 +180,7 @@ class ImportBatchRow(Mutable, Base):
         ),
     )
 
-    campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id"))
+    campaign_id: Mapped[str | None] = mapped_column(String(36))
     source: Mapped[ImportSource] = mapped_column(enum_type(ImportSource, "import_source"))
     filename: Mapped[str | None] = mapped_column(String(500))
     created_by: Mapped[str] = mapped_column(String(200))
@@ -171,13 +190,15 @@ class ImportBatchRow(Mutable, Base):
 class ImportRowRow(Mutable, Base):
     __tablename__ = "import_rows"
     __table_args__ = (
+        _tenant_fk("import_rows", "batch_id", "import_batches", ondelete="CASCADE"),
+        _tenant_fk("import_rows", "company_id", "companies"),
         CheckConstraint(
             "resolution_confidence BETWEEN 0 AND 1", name="resolution_confidence_range"
         ),
         Index("ix_import_rows_status", "workspace_id", "status"),
     )
 
-    batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.id", ondelete="CASCADE"))
+    batch_id: Mapped[str] = mapped_column(String(36))
     row_number: Mapped[int | None] = mapped_column(Integer)
     raw: Mapped[dict[str, Any]] = mapped_column(Json)
     anchor: Mapped[ImportAnchor] = mapped_column(enum_type(ImportAnchor, "import_anchor"))
@@ -185,7 +206,7 @@ class ImportRowRow(Mutable, Base):
     resolution_confidence: Mapped[float | None] = mapped_column(Float)
     status: Mapped[ImportRowStatus] = mapped_column(enum_type(ImportRowStatus, "import_row_status"))
     reason: Mapped[str | None] = mapped_column(Text)
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id"))
+    company_id: Mapped[str | None] = mapped_column(String(36))
 
 
 # ----------------------------------------------------------------------- accounts and people
@@ -194,13 +215,15 @@ class ImportRowRow(Mutable, Base):
 class CompanyRow(Mutable, Base):
     __tablename__ = "companies"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        _tenant_fk("companies", "campaign_id", "campaigns"),
         UniqueConstraint("workspace_id", "domain"),
         CheckConstraint("country_code IS NULL OR length(country_code) = 2", name="country_length"),
         CheckConstraint("fit_score IS NULL OR fit_score BETWEEN 0 AND 100", name="fit_score_range"),
         Index("ix_companies_queue", "workspace_id", "status", "next_action_at"),
     )
 
-    campaign_id: Mapped[str | None] = mapped_column(ForeignKey("campaigns.id"))
+    campaign_id: Mapped[str | None] = mapped_column(String(36))
     domain: Mapped[str] = mapped_column(String(255))
     name: Mapped[str | None] = mapped_column(String(300))
     country_code: Mapped[str | None] = mapped_column(String(2))
@@ -233,6 +256,8 @@ class CompanyRow(Mutable, Base):
 class ContactRow(Mutable, Base):
     __tablename__ = "contacts"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        _tenant_fk("contacts", "company_id", "companies", ondelete="CASCADE"),
         Index(
             "ux_contacts_linkedin",
             "workspace_id",
@@ -243,7 +268,7 @@ class ContactRow(Mutable, Base):
         ),
     )
 
-    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"))
+    company_id: Mapped[str] = mapped_column(String(36))
     full_name: Mapped[str | None] = mapped_column(String(300))
     first_name: Mapped[str | None] = mapped_column(String(150))
     last_name: Mapped[str | None] = mapped_column(String(150))
@@ -261,6 +286,8 @@ class ContactRow(Mutable, Base):
 class ContactEmailRow(Mutable, Base):
     __tablename__ = "contact_emails"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        _tenant_fk("contact_emails", "contact_id", "contacts", ondelete="CASCADE"),
         UniqueConstraint("workspace_id", "email"),
         Index(
             "ux_contact_emails_primary",
@@ -271,7 +298,7 @@ class ContactEmailRow(Mutable, Base):
         ),
     )
 
-    contact_id: Mapped[str] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
+    contact_id: Mapped[str] = mapped_column(String(36))
     email: Mapped[str | None] = mapped_column(String(320))
     status: Mapped[EmailStatus] = mapped_column(
         enum_type(EmailStatus, "email_status"), default=EmailStatus.UNVERIFIED
@@ -287,9 +314,13 @@ class ContactEmailRow(Mutable, Base):
 
 class NoteRow(AppendOnly, Base):
     __tablename__ = "notes"
+    __table_args__ = (
+        _tenant_fk("notes", "company_id", "companies", ondelete="CASCADE"),
+        _tenant_fk("notes", "contact_id", "contacts"),
+    )
 
-    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"))
-    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id"))
+    company_id: Mapped[str] = mapped_column(String(36))
+    contact_id: Mapped[str | None] = mapped_column(String(36))
     body: Mapped[str] = mapped_column(Text)
     source: Mapped[NoteSource] = mapped_column(enum_type(NoteSource, "note_source"))
     author: Mapped[str | None] = mapped_column(String(200))
@@ -297,8 +328,9 @@ class NoteRow(AppendOnly, Base):
 
 class ConsentRow(Mutable, Base):
     __tablename__ = "consents"
+    __table_args__ = (_tenant_fk("consents", "contact_id", "contacts", ondelete="CASCADE"),)
 
-    contact_id: Mapped[str] = mapped_column(ForeignKey("contacts.id", ondelete="CASCADE"))
+    contact_id: Mapped[str] = mapped_column(String(36))
     basis: Mapped[ConsentBasis] = mapped_column(enum_type(ConsentBasis, "consent_basis"))
     evidence: Mapped[str] = mapped_column(Text)
     recorded_by: Mapped[str] = mapped_column(String(200))
@@ -311,6 +343,11 @@ class ConsentRow(Mutable, Base):
 class MessageRow(Mutable, Base):
     __tablename__ = "messages"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
+        _tenant_fk("messages", "company_id", "companies", ondelete="CASCADE"),
+        _tenant_fk("messages", "contact_id", "contacts"),
+        _tenant_fk("messages", "contact_email_id", "contact_emails"),
+        _tenant_fk("messages", "mailbox_id", "mailboxes"),
         # One live message per touch. A cancelled or rejected one no longer counts, so a lead
         # released after a policy change can be given a fresh first email for the same person.
         Index(
@@ -333,10 +370,10 @@ class MessageRow(Mutable, Base):
         ),
     )
 
-    company_id: Mapped[str] = mapped_column(ForeignKey("companies.id", ondelete="CASCADE"))
-    contact_id: Mapped[str] = mapped_column(ForeignKey("contacts.id"))
-    contact_email_id: Mapped[str] = mapped_column(ForeignKey("contact_emails.id"))
-    mailbox_id: Mapped[str | None] = mapped_column(ForeignKey("mailboxes.id"))
+    company_id: Mapped[str] = mapped_column(String(36))
+    contact_id: Mapped[str] = mapped_column(String(36))
+    contact_email_id: Mapped[str] = mapped_column(String(36))
+    mailbox_id: Mapped[str | None] = mapped_column(String(36))
     step: Mapped[int] = mapped_column(Integer)
     subject: Mapped[str] = mapped_column(Text)
     snippets: Mapped[dict[str, Any] | None] = mapped_column(Json)
@@ -357,12 +394,18 @@ class MessageRow(Mutable, Base):
 
 class InboundMessageRow(Mutable, Base):
     __tablename__ = "inbound_messages"
-    __table_args__ = (UniqueConstraint("workspace_id", "rfc_message_id"),)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "rfc_message_id"),
+        _tenant_fk("inbound_messages", "mailbox_id", "mailboxes"),
+        _tenant_fk("inbound_messages", "message_id", "messages"),
+        _tenant_fk("inbound_messages", "company_id", "companies"),
+        _tenant_fk("inbound_messages", "contact_id", "contacts"),
+    )
 
-    mailbox_id: Mapped[str] = mapped_column(ForeignKey("mailboxes.id"))
-    message_id: Mapped[str | None] = mapped_column(ForeignKey("messages.id"))
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id"))
-    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id"))
+    mailbox_id: Mapped[str] = mapped_column(String(36))
+    message_id: Mapped[str | None] = mapped_column(String(36))
+    company_id: Mapped[str | None] = mapped_column(String(36))
+    contact_id: Mapped[str | None] = mapped_column(String(36))
     rfc_message_id: Mapped[str] = mapped_column(String(500))
     from_address: Mapped[str | None] = mapped_column(String(320))
     received_at: Mapped[datetime] = mapped_column(UtcDateTime)
@@ -384,6 +427,7 @@ _RUNNING_PIPELINE = "status = 'running' AND kind = 'pipeline'"
 class RunRow(Mutable, Base):
     __tablename__ = "runs"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id"),  # target of tenant-bound foreign keys
         # One running pipeline per workspace (migration 0006): two at once would pay twice.
         Index(
             "ux_runs_one_running_pipeline",
@@ -409,6 +453,9 @@ class ProviderCallRow(AppendOnly, Base):
 
     __tablename__ = "provider_calls"
     __table_args__ = (
+        _tenant_fk("provider_calls", "run_id", "runs"),
+        _tenant_fk("provider_calls", "company_id", "companies"),
+        _tenant_fk("provider_calls", "contact_id", "contacts"),
         Index(
             "ix_provider_calls_cache",
             "workspace_id",
@@ -420,9 +467,9 @@ class ProviderCallRow(AppendOnly, Base):
         Index("ix_provider_calls_spend", "workspace_id", "created_at"),
     )
 
-    run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"))
-    company_id: Mapped[str | None] = mapped_column(ForeignKey("companies.id"))
-    contact_id: Mapped[str | None] = mapped_column(ForeignKey("contacts.id"))
+    run_id: Mapped[str | None] = mapped_column(String(36))
+    company_id: Mapped[str | None] = mapped_column(String(36))
+    contact_id: Mapped[str | None] = mapped_column(String(36))
     provider: Mapped[str] = mapped_column(String(100))
     operation: Mapped[str] = mapped_column(String(100))
     request_hash: Mapped[str] = mapped_column(String(64))
