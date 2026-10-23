@@ -85,7 +85,7 @@ uv run outbound report quality
 uv run outbound report cost --days 30
 ```
 
-Run `outbound tick` from cron or a launchd timer (every 15–30 minutes is plenty). There is no daemon.
+`outbound worker` runs a tick for every workspace every 15 minutes by itself (`--tick-minutes`), so no cron job is needed while it runs. Without the worker, run `outbound tick` from cron or a launchd timer.
 
 ## Development
 

@@ -60,7 +60,7 @@ uv run outbound serve      # the web app and API, at http://127.0.0.1:8000
 uv run outbound worker     # does the work you start from the browser
 ```
 
-- **Both must be running.** The web app only *queues* a run; the worker carries it out. If you press Start run and nothing happens, the worker is not running.
+- **Both must be running.** The web app only *queues* a run; the worker carries it out, for every workspace in the database. Every 15 minutes it also retries failed leads, collects catch-all answers, reads the Sent folder and runs any leads that are due. If you press Start run and nothing happens, the worker is not running.
 - Open <http://127.0.0.1:8000> and sign in with the password you chose when you created `OPERATOR_PASSWORD_HASH`.
 - The web app listens only on your own computer. Five wrong passwords in a minute locks sign-in for a minute. A sign-in lasts 12 hours.
 - The database is the local file `outbound.db` unless `.env` says `DATABASE_BACKEND=postgres`, which uses `POSTGRES_URL` (the Supabase database) instead. Change that one line to switch.
@@ -333,7 +333,7 @@ For the three holds that come from the country rule (*country unknown*, *entity 
 
 ### 7.3 Failed
 
-A failed lead shows the step and the reason. The application retries automatically up to 3 times, waiting longer each time, when you run `outbound tick`. You can also press **Retry** on the lead at once.
+A failed lead shows the step and the reason. The application retries automatically up to 3 times, waiting longer each time; the worker's regular pass (every 15 minutes) does this. You can also press **Retry** on the lead at once.
 
 | Message | Meaning | What to do |
 |---|---|---|
@@ -387,9 +387,9 @@ See what you spent: `uv run outbound report cost --days 30`, the Reports screen,
 
 - Drafts go to the folder named by `DRAFTS_FOLDER` (for Hostinger, `INBOX.Drafts`). They are normal drafts: open, adjust and send.
 - Each draft carries a fixed identifier, so even if something fails halfway **a draft is never saved twice**.
-- When you send a draft from your mail program, the next `outbound tick` reads your **Sent** folder and matches it: same recipient, same subject (ignoring "Re:"), sent after the draft was made. It then records exactly what went out and how much you changed it.
+- When you send a draft from your mail program, the worker's next regular pass reads your **Sent** folder and matches it: same recipient, same subject (ignoring "Re:"), sent after the draft was made. It then records exactly what went out and how much you changed it.
   - **Do not change the recipient or subject** when sending, or the match cannot be made. If two sent emails could fit one draft, nothing is guessed; it is flagged in the lead's timeline.
-- Set `outbound tick` to run on a timer (every 15–30 minutes). Example for cron:
+- While `outbound worker` runs, it does this pass by itself every 15 minutes (`--tick-minutes` changes it), along with retries and catch-all answers, and runs any leads that are due. Without the worker, run `outbound tick` on a timer instead, for example from cron:
   ```
   */30 * * * * cd /path/to/email_campaign && uv run outbound tick
   ```
