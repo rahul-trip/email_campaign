@@ -93,6 +93,9 @@ class Settings(BaseSettings):
 
     # --- web app and API ---
     workspace_name: str = "default"
+    # Keys that encrypt workspaces' mailbox tokens and passwords (Phase 6c), as JSON:
+    # {"1": "<base64 of 32 bytes>"}; the highest version encrypts. `outbound secrets new-key`.
+    secrets_keys: SecretStr = SecretStr("")
     # --- people and their email (Phase 6b) ---
     app_base_url: str = "http://127.0.0.1:8000"  # links in invitations and resets start with it
     superadmin_enabled: bool = True  # alpha only: a superadmin may read any workspace

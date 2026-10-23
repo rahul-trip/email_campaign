@@ -179,7 +179,9 @@ class CampaignStatus(StrEnum):
 
 
 class MailboxGateway(StrEnum):
-    IMAP = "imap"
+    IMAP = "imap"  # any IMAP account, with an app password
+    GMAIL = "gmail"  # Google Workspace or Gmail, through the Gmail API (OAuth)
+    GRAPH = "graph"  # Microsoft 365 or Outlook, through Microsoft Graph (OAuth)
     EMAILENGINE = "emailengine"
     SMARTLEAD = "smartlead"
     INSTANTLY = "instantly"
@@ -189,6 +191,13 @@ class MailboxStatus(StrEnum):
     ACTIVE = "active"
     PAUSED = "paused"
     ERROR = "error"
+    NEEDS_RECONNECT = "needs_reconnect"  # access expired or was revoked: sign in again
+
+
+class CredentialPurpose(StrEnum):
+    MAILBOX_OAUTH = "mailbox_oauth"  # access and refresh tokens
+    MAILBOX_PASSWORD = "mailbox_password"  # noqa: S105  (a purpose name, not a password)
+    INTAKE_WEBHOOK = "intake_webhook"  # the workspace's webhook signing secret
 
 
 class RunKind(StrEnum):

@@ -44,6 +44,7 @@ SENSITIVE_KEY_PARTS = (
     "cookie",
     "credential",
     "session",
+    "verifier",  # an OAuth PKCE code verifier
 )
 # Fields that hold an email's text: only the length is logged.
 BODY_KEYS = frozenset({"body", "email_body", "generated_body", "final_body", "edited_body"})
@@ -51,7 +52,8 @@ REDACTED = "[redacted]"
 
 _EMAIL = re.compile(r"\b([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9.-]+\.[A-Za-z]{2,})\b")
 _SECRET_IN_URL = re.compile(
-    r"(?i)\b((?:api[_-]?key|apikey|key|token|access[_-]?token|secret|password|passwd)=)[^&\s\"']+"
+    r"(?i)\b((?:api[_-]?key|apikey|key|token|access[_-]?token|refresh[_-]?token|"
+    r"client[_-]?secret|secret|password|passwd|code|code[_-]?verifier)=)[^&\s\"']+"
 )
 _AUTH_VALUE = re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}")
 _MAX_DEPTH = 8

@@ -9,6 +9,7 @@ import pytest
 from pytest_socket import SocketConnectBlockedError
 
 from outbound.config import Settings
+from tests.conftest import TEST_SECRETS_KEYS
 
 
 def test_a_test_cannot_reach_the_internet() -> None:
@@ -21,6 +22,9 @@ def test_the_machines_own_environment_never_reaches_the_settings(
 ) -> None:
     """The autouse cleanup already ran before this body; anything set here is a new leak."""
     for name in Settings.model_fields:
+        if name.upper() == "SECRETS_KEYS":
+            assert os.environ[name.upper()] == TEST_SECRETS_KEYS  # the tests' own fixed key
+            continue
         assert os.environ.get(name.upper()) is None, f"{name.upper()} leaked into the test"
     monkeypatch.setenv("MONTHLY_CAPS_MICRO_USD", '{"zerobounce": 1}')
     assert Settings(_env_file=None).monthly_caps_micro_usd == {"zerobounce": 1}

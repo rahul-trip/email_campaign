@@ -21,11 +21,16 @@ def no_retry_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 _SETTING_ENV = tuple(name.upper() for name in Settings.model_fields)
 
 
+# A fixed test key for stored secrets (Phase 6c), so credentials can be saved in any test.
+TEST_SECRETS_KEYS = '{"1": "' + "A" * 43 + '="}'
+
+
 @pytest.fixture(autouse=True)
 def clean_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """A developer's exported keys must never change what a test sees."""
     for name in _SETTING_ENV:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SECRETS_KEYS", TEST_SECRETS_KEYS)
 
 
 @pytest.fixture(autouse=True)

@@ -13,7 +13,7 @@ from sqlalchemy.exc import DBAPIError
 from outbound.db.isolation import isolation_problems, tenant_tables
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.enums import CompanySource
+from outbound.domain.enums import CompanySource, CredentialPurpose
 from tests.db.conftest import IS_POSTGRES
 
 pytestmark = pytest.mark.skipif(not IS_POSTGRES, reason="row-level security is Postgres only")
@@ -148,3 +148,14 @@ def test_a_read_only_unit_of_work_cannot_write(factory: UnitOfWorkFactory, ws: s
         with pytest.raises(DBAPIError):
             uow.companies.create(domain="written.com", source=CompanySource.MANUAL)
             uow.commit()
+
+
+def test_the_platform_role_cannot_read_secrets(
+    factory: UnitOfWorkFactory, platform_engine: Engine, ws: str
+) -> None:
+    """Phase 6c: not even the scheduler's cross-workspace role sees stored credentials."""
+    with factory(ws) as uow:
+        uow.credentials.put("imap:sam", CredentialPurpose.MAILBOX_PASSWORD, "pw")
+        uow.commit()
+    with platform_engine.connect() as connection, pytest.raises(DBAPIError):
+        connection.execute(text("SELECT count(*) FROM credentials")).scalar_one()

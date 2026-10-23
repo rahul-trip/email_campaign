@@ -105,14 +105,18 @@ def fresh_url(tmp_path: Path) -> Iterator[str]:
 
 # ----------------------------------------------------------------------- repository fixtures
 
+from outbound.db.crypto import Keyring  # noqa: E402
 from outbound.db.platform import PlatformUnitOfWorkFactory  # noqa: E402
 from outbound.db.session import make_session_factory  # noqa: E402
 from outbound.db.uow import UnitOfWorkFactory  # noqa: E402
+from tests.conftest import TEST_SECRETS_KEYS  # noqa: E402
 
 
 @pytest.fixture
 def factory(engine: Engine) -> UnitOfWorkFactory:
-    return UnitOfWorkFactory(make_session_factory(engine))
+    return UnitOfWorkFactory(
+        make_session_factory(engine), keyring=Keyring.from_setting(TEST_SECRETS_KEYS)
+    )
 
 
 @pytest.fixture

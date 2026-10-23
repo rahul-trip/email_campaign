@@ -37,14 +37,15 @@ The SQL blocks below leave out `id`, `workspace_id`, `created_at` and `updated_a
 ## 2. Relationships
 
 ```
-workspaces 1─N  campaigns, mailboxes, country_policies, suppressions, import_batches,
+workspaces 1─N  campaigns, mailboxes, credentials, country_policies, suppressions, import_batches,
                 companies, runs, provider_calls, events   (every table carries workspace_id)
 campaigns       1─N  companies
 import_batches  1─N  import_rows  N─1 companies (nullable until accepted or merged)
 companies       1─N  contacts, notes, messages, inbound_messages
 contacts        1─N  contact_emails, consents, messages
 contact_emails  1─N  messages          (the exact address each message used)
-mailboxes       1─N  messages, inbound_messages
+mailboxes       1─N  messages, inbound_messages, campaigns (the campaign's sender)
+mailboxes       N─1  credentials (by credentials_ref = credentials.name), users (owner_user_id)
 messages        1─N  inbound_messages  (what each reply answers)
 messages.in_reply_to → previous touch's rfc_message_id (threading)
 runs            1─N  provider_calls
@@ -120,19 +121,44 @@ CREATE TABLE campaigns (
   research_questions JSON NOT NULL DEFAULT '[]',      -- up to 3
   cadence_days       JSON NOT NULL DEFAULT '[0,3,8]', -- business-day offsets from touch 1: days 1, 4, 9
   status             TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','archived')),
-  UNIQUE (workspace_id, name)
+  mailbox_id         TEXT,                            -- its sender; NULL: the workspace's default (0011)
+  UNIQUE (workspace_id, name),
+  FOREIGN KEY (workspace_id, mailbox_id) REFERENCES mailboxes (workspace_id, id)
 );
 
 CREATE TABLE mailboxes (
   address           TEXT NOT NULL,
-  gateway           TEXT NOT NULL CHECK (gateway IN ('imap','emailengine','smartlead','instantly')),
-  credentials_ref   TEXT NOT NULL,     -- name of the secret in the environment, never the secret
+  gateway           TEXT NOT NULL
+                    CHECK (gateway IN ('imap','gmail','graph','emailengine','smartlead','instantly')),
+  credentials_ref   TEXT,              -- credentials.name of its secret; NULL until connected (0011)
   sending_domain    TEXT NOT NULL,
   dns_check         JSON,              -- last SPF/DKIM/DMARC/isolation result with timestamp
   warmup_started_at TIMESTAMP,
   daily_cap         INTEGER NOT NULL DEFAULT 10,
-  status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','paused','error')),
+  status            TEXT NOT NULL DEFAULT 'active'
+                    CHECK (status IN ('active','paused','error','needs_reconnect')),
+  owner_user_id     TEXT REFERENCES users(id) ON DELETE SET NULL,  -- who connected it (0011)
+  is_default        BOOLEAN NOT NULL DEFAULT FALSE,  -- the workspace's default sender (0011)
+  sender            JSON,              -- who signs: name, title, signature, greeting, style examples
+  connection        JSON,              -- how to reach it: IMAP host, port, folders; nothing secret
+  last_checked_at   TIMESTAMP,         -- last health check
   UNIQUE (workspace_id, address)
+);
+CREATE UNIQUE INDEX ux_mailboxes_one_default ON mailboxes (workspace_id) WHERE is_default;
+
+-- Secrets a workspace gives us (migration 0011). Sealed with AES-256-GCM (outbound/db/crypto.py):
+-- the associated data is 'workspace_id|id', so a ciphertext moved to another row does not open.
+-- The keys are in SECRETS_KEYS, never in the database.
+CREATE TABLE credentials (
+  name         TEXT NOT NULL,          -- e.g. 'mailbox:<mailbox id>', referenced by credentials_ref
+  purpose      TEXT NOT NULL CHECK (purpose IN ('mailbox_oauth','mailbox_password','intake_webhook')),
+  key_version  INTEGER NOT NULL,       -- which SECRETS_KEYS entry sealed it
+  nonce        BYTES NOT NULL,         -- 12 random bytes, new for every seal
+  ciphertext   BYTES NOT NULL,
+  version      INTEGER NOT NULL,       -- +1 on every write; a token refresh writes only if unchanged
+  expires_at   TIMESTAMP,              -- when an access token runs out
+  details      JSON,                   -- not secret: scopes, the provider's account id
+  UNIQUE (workspace_id, name)
 );
 
 CREATE TABLE country_policies (
@@ -363,7 +389,6 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 
 - The SaaS tables, each specified in its phase document and added here with its migration:
   - `users`, `memberships`, `auth_tokens`, `sessions`, `audit_log` (6b);
-  - `credentials` (6c);
   - `workspace_plans`, `entitlement_overrides`, `credit_grants`, `usage_events`, `platform_settings`, `platform_credentials` (6d);
   - the `directory_*` tables (6g).
 - A jobs table. The runner's status and `next_action_at` queries cover scheduling at this volume.
@@ -380,6 +405,7 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 - **No `FORCE ROW LEVEL SECURITY`.** The owner must still migrate and seed. Instead, `serve` and `worker` refuse to start in production when connected as the owner, a superuser or a BYPASSRLS role (`outbound/db/isolation.py`).
 - **Supabase's `anon` and `authenticated`** roles have every grant revoked, which closes the Data API.
 - **No `alembic_version` grant** goes to the two roles.
+- **`credentials`** (migration 0011) has the same `tenant_rows` policy for `outbound_app`, and **no grant at all** to `outbound_platform`: not even the scheduler reads secrets.
 
 ## 6. Safe-to-send rule (domain, not SQL)
 
