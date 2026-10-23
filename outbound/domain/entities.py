@@ -28,6 +28,7 @@ from outbound.domain.enums import (
     Provenance,
     SuppressionKind,
     SuppressionReason,
+    WorkspaceStatus,
 )
 
 
@@ -176,8 +177,11 @@ class Consent:
 class Workspace:
     id: str
     name: str
+    slug: str
+    status: WorkspaceStatus
     sender_profile: dict[str, Any]
     settings: dict[str, Any]
+    deletion_due_at: datetime | None = None
 
 
 @dataclass(frozen=True)

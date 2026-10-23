@@ -38,7 +38,7 @@ class Container:
                 f"(database: {self.engine.url.render_as_string(hide_password=True)})"
             )
         with self.platform() as platform:
-            found = platform.workspaces.by_name(name)
+            found = platform.workspaces.find(name)
         if found is None:
             raise ConfigurationError(f"no workspace named {name!r}: run `uv run outbound seed`")
         return found.id
