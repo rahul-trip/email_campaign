@@ -11,7 +11,7 @@ This repository is an outbound B2B email engine. It takes target companies, eith
 3. write a short personalised email;
 4. once a human approves it, place it as a draft in the mailbox.
 
-Later phases add follow-ups, reply handling, automatic sending and multiple workspaces.
+Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns it into a multi-tenant SaaS, starting with an invite-only alpha (`docs/phases/phase-6-saas-ready.md`).
 
 ## Source of truth — read these before changing code
 
@@ -36,6 +36,12 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 - **Phase 1:** code complete and verified on SQLite and on PostgreSQL 16.2. Its CI workflow has not run yet. See `docs/phases/phase-1-schema-and-persistence.md`.
 - **Phase 2 (engine on the CLI):** code complete and verified with fake vendors on SQLite and PostgreSQL 16.2 (1,163 tests). The gate (8 of 10 first emails sent unedited, a zero-cost rerun) waits on live keys and a real run. See `docs/phases/phase-2-engine-on-cli.md`, "Closing the phase".
 - **Phase 3b (hardening) is next:** `docs/phases/phase-3b-hardening.md` lists the gaps found after Phase 3 and the order to fix them.
+  - **Do first, E8:** Supabase's Data API probably exposes the production tables. Turn it off and revoke the `anon` and `authenticated` grants (`docs/DEPLOY.md` §1.2).
+  - Its §8 lists what must be finished before 6a.
+- **Phase 6 (SaaS alpha) is planned and approved (2026-10-23):**
+  - `docs/phases/phase-6-saas-ready.md` gives the overview, decisions and isolation model; the sub-phases are 6a–6g.
+  - Order: 6a tenancy → 6b identity → 6c onboarding and mailboxes → 6d plans, limits and admin console → 4a opt-outs and bounces → **alpha** → 6g lead directory, in parallel with the rest of Phase 4.
+  - After the alpha: 6e billing, 6f launch readiness.
 - **Phase 3 (API and web app):** code complete. FastAPI (`outbound/api/`), a worker (`outbound/worker.py`), and the React app in `web2/` (served by `outbound serve` from `web2/dist`; `web/` is the first app, kept until deleted). Browser test: `cd web2 && npm run build && npx playwright test`. See `docs/phases/phase-3-api-and-web-app.md`, "How to run it".
 - **New code** lives in `outbound/`, with scripts in `scripts/` and tests in `tests/`:
   - `domain/`: enums, state machines, policies, entities, ranking, copy linter, footer, edit distance. No I/O.
@@ -52,6 +58,10 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 - **`agent/`** is the legacy pipeline. Do not touch it. Its reusable parts are ported into `outbound/`, and it is deleted (with the `legacy` dependency group) after the first live run.
 - **Environment:** `uv sync` builds `.venv` on Python 3.12 with the dev tools and the `legacy` dependency group. `.venv` is not tracked in git.
 - **Secrets:** the root `.env` holds real vendor keys and must never be committed. `outbound/config.py` reads it through pydantic-settings (`agent/.env` is still read as a fallback but no longer exists). `test_keys.py` in the root is the operator's own key smoke test; it is untracked and excluded from linting.
+- **LLM model:** DeepSeek served by DeepInfra, which replaced OpenRouter (`LLM_PROVIDER=openai_compatible`, `LLM_BASE_URL` set to DeepInfra's OpenAI-compatible endpoint).
+  - It is managed in Doppler (`outbound/dev` config) and mirrored in the root `.env`.
+  - Its prices must be set in `LLM_PRICES` (3b B5).
+  - From 6d, vendor keys and model settings live in the database and are managed in the admin console.
 - **Provider chain** in `outbound/config.py` is **provisional** until the bake-off picks one.
 - **Two facts from reading the vendors' docs:**
   - OrbiSearch has no finder API, so it can only verify.
@@ -64,11 +74,15 @@ Later phases add follow-ups, reply handling, automatic sending and multiple work
 3. **Every paid call goes through the meter** (`outbound/metering/metered.py`: cache, then budget guard, then call, then a `provider_calls` row committed in its own transaction). Stages receive `Metered*` wrappers from `outbound/pipeline.py`; never call a vendor directly from a stage.
 4. **Status changes only through the state machines** in `outbound/domain/state_machines.py`. Every transition writes an `events` row in the same transaction.
 5. **No database transaction stays open across a network call.** A stage reads what it needs, does the network work, and returns a `StageResult`; the runner makes one short write that checks `row_version`.
-6. **Every query is scoped by `workspace_id`.** No exceptions, including in scripts.
+6. **Every query on a tenant table is scoped by `workspace_id`.** No exceptions, including in scripts.
+   - From 6a, Postgres row-level security enforces it as well: the app connects as `outbound_app`, never as the table owner.
+   - Platform tables are reached only through their own repositories. They are users, sessions, plans and settings, vendor keys, the lead directory and the audit log.
+   - Reads across workspaces go through `PlatformUnitOfWork` (`outbound/db/platform.py`), which stages, the runner, metering and tenant services may not import.
 7. **Operator input wins.** The engine never overwrites a field listed in `manual_fields`; it records its own value as an event instead.
 8. **Safety gates are server-side.** Suppression, country policy and safe-to-send are checked again right before every draft or send.
 9. **LangGraph only inside Stage 2 (Research) and Stage 6 (Copy)**, as stateless subgraphs with no checkpointer. The outer flow is the plain Python runner, which routes on company status.
 10. **The schema only changes through Alembic,** and the same PR updates `docs/SCHEMA.md`. `CHECK` value lists must equal the matching enums in `outbound/domain/enums.py`.
+11. **Every API route declares its permission** with `require(Permission.X)` from Phase 6b on (`outbound/domain/permissions.py`). A test fails any tenant route that does not.
 
 ## Code standards
 

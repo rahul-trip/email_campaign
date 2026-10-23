@@ -4,6 +4,7 @@
 
 **Depends on:**
 - Phase 4.
+- The SaaS track: mailbox adapters from 6c; the `auto_send` plan feature from 6d. The send switch is per workspace.
 - Three prerequisites outside the code:
   - a separate sending domain with SPF, DKIM and DMARC configured;
   - a lawyer's review of `country_policies` and of the legitimate-interests assessment;
@@ -20,7 +21,7 @@ Then send to 10 real prospects at the starting cap and confirm the breaker logic
 ## Scope
 
 **In:**
-- Choosing the sending gateway and writing its adapter.
+- Sending through each connected mailbox's adapter (Graph, Gmail, SMTP for IMAP accounts).
 - The send scheduler.
 - The breaker.
 - The preflight.
@@ -30,17 +31,24 @@ Then send to 10 real prospects at the starting cap and confirm the breaker logic
 
 ## Tasks
 
-### 5.1 Choose and build the sending gateway
+### 5.1 Send through each connected mailbox
 
-- [ ] Decide between:
-  - **EmailEngine** (self-hosted Docker, REST, bounce and sent webhooks);
-  - **Smartlead or Instantly** (about $37–39 a month, includes peer-to-peer warm-up).
+**Decided with the SaaS track (2026-10-23):** each workspace connects its own mailboxes in 6c, so sending goes through the same adapters. There is no separate gateway product.
 
-  If warm-up is not otherwise available, Smartlead or Instantly is the simpler choice. Record the decision in [../PLAN.md](../PLAN.md) decision 10.
-- [ ] Write `adapters/<gateway>.py` implementing `MailboxGateway.send(message) -> rfc_message_id`, plus that gateway's events for sent, bounce and reply.
-- [ ] Webhooks from the gateway feed the same Phase 4 handlers, so no business logic changes. IMAP polling stays available as a fallback.
+| Mailbox | How it sends |
+|---|---|
+| Microsoft 365 | Graph `sendMail`, with the `Mail.Send` scope added to the connection. SMTP basic auth is switched off by default for existing Microsoft tenants at the end of December 2026, so Microsoft 365 always goes through Graph |
+| Google | Gmail `messages.send`, with the `gmail.send` scope. It is a *sensitive* scope, not a restricted one |
+| IMAP accounts | SMTP with the same app password, through a new SMTP part of the IMAP adapter |
 
-**Done when:** the gateway adapter passes the same `MailboxGateway` contract tests as the IMAP adapter.
+- **Smartlead and Instantly do not fit** a multi-tenant product: each customer would need its own account there.
+- **EmailEngine stays an option** if holding many IMAP connections becomes a burden.
+- **Automatic sending is a plan feature** (`auto_send`, 6d), switched on per customer by an admin.
+
+- [ ] Add `send(message) -> rfc_message_id` to the `Mailbox` port (`providers/ports.py:235-252`) and implement it in each adapter.
+- [ ] Bounces and replies keep coming through the Phase 4 inbox reading, so no business logic changes.
+
+**Done when:** each adapter's `send` passes the same `Mailbox` contract tests (fixtures, no network), and one live send per mailbox type is recorded.
 
 ### 5.2 Send scheduler
 
@@ -71,7 +79,7 @@ Then send to 10 real prospects at the starting cap and confirm the breaker logic
   - The DKIM selector resolves.
   - DMARC is set to `quarantine` or `reject`, with an `rua` address.
   - The sending domain is not the workspace's primary domain.
-  - Warm-up has run for at least 14–21 days, or is active in the gateway.
+  - Warm-up has run for at least 14–21 days.
 
   The result is stored in `mailboxes.dns_check`.
 - [ ] `settings.send_enabled` can only become true when the gate conditions above hold. The API refuses with the list of failing checks; every attempt is logged as an event.
@@ -81,7 +89,7 @@ Then send to 10 real prospects at the starting cap and confirm the breaker logic
 ## Gate record
 
 - Date:
-- Gateway chosen:
+- Live send per mailbox type (Graph, Gmail, SMTP):
 - Preflight result:
 - Legal review (who, when, policy version):
 - First 10 live sends (bounces, replies):

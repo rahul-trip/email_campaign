@@ -5,7 +5,14 @@ This is the column-level spec for the outbound engine's database. The SQLAlchemy
 - Every schema change goes through an Alembic migration, and this file is updated in the same PR.
 - A test checks that every `CHECK (... IN (...))` list matches the domain enum of the same name in `outbound/domain/enums.py`.
 
-Schema v1 is meant to last through Phase 6. The SaaS move adds `users` and `workspace_members` and turns `workspace_id` into a row-level-security key; it reshapes no existing table.
+Schema v1 is meant to last through the SaaS move.
+- **The SaaS alpha track** (Phases 6a–6g, [phases/phase-6-saas-ready.md](phases/phase-6-saas-ready.md)) adds tables and columns in migrations 0006–0013:
+  - users, memberships, sessions;
+  - plans, credits and usage;
+  - encrypted credentials;
+  - the verified lead directory.
+- It turns `workspace_id` into a row-level-security key backed by composite foreign keys.
+- Those changes are specified in the phase documents and land here, in this file, with each migration's PR.
 
 ---
 
@@ -342,7 +349,11 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 
 **Not in v1, added only when needed:**
 
-- `users` and `workspace_members`, in Phase 6 with Supabase auth.
+- The SaaS tables, each specified in its phase document and added here with its migration:
+  - `users`, `memberships`, `auth_tokens`, `sessions`, `audit_log` (6b);
+  - `credentials` (6c);
+  - `workspace_plans`, `entitlement_overrides`, `credit_grants`, `usage_events`, `platform_settings`, `platform_credentials` (6d);
+  - the `directory_*` tables (6g).
 - A jobs table. The runner's status and `next_action_at` queries cover scheduling at this volume.
 
 ## 6. Safe-to-send rule (domain, not SQL)

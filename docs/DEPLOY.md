@@ -62,6 +62,22 @@ postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.co
 
 The first deploy creates the tables (`db upgrade`) and the default workspace, campaign and country rules (`seed`). Both are safe to run again, and every deploy runs them. The tables go in the `public` schema, so use a Supabase project of its own, or at least one where nothing else owns tables with the same names.
 
+**Turn off the Data API. This step is required.** Supabase serves the `public` schema through its Data API (PostgREST), and by default grants tables there to the `anon` and `authenticated` roles. Until Phase 6a adds row-level security, anyone holding the project's anon or publishable key could read and write the tables through it. Outbound never uses the Data API.
+1. In the dashboard, open **Security Advisor** and check for "RLS disabled in public".
+2. Turn the **Data API** off, or remove `public` from its exposed schemas.
+3. In the SQL editor, run:
+
+   ```sql
+   REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+   REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+   REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon, authenticated;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
+   ```
+
+From Phase 6a, CI runs a catalog test that fails if those roles hold any grant, and the app connects as a least-privilege role instead of `postgres` (see [phases/phase-6a-tenancy-foundation.md](phases/phase-6a-tenancy-foundation.md)).
+
 To try the app against Supabase from your laptop first, see [section 5.1](#51-the-app-against-either-database).
 
 Migrations are additive. A rollback to an older commit does not undo them, and the older code runs on the newer schema.

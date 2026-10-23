@@ -4,6 +4,18 @@
 
 **Depends on:** Phase 3. An always-on host is needed from here, because `outbound tick` and the worker must run continuously.
 
+**Built after the SaaS foundation (6a–6d)**, so it is tenant-aware from the start:
+- Inbox reading, handlers and webhooks work per workspace and per mailbox.
+- The mailbox adapters come from 6c (IMAP, Microsoft Graph, Gmail), through the `MailboxResolver`. The reply webhook URL and its secret are per workspace.
+
+**Split for the alpha:**
+- **4a** comes *before* the alpha, because every footer already promises that an opt-out is honoured:
+  - reading replies (4.2) for the `unsubscribe` and `hard_bounce` categories;
+  - their handlers (4.3).
+
+  Its gate: an "unsubscribe" reply and a hard bounce each suppress the address and cancel pending emails, on fixtures and on one live mailbox.
+- **The rest of Phase 4** follows the alpha, in parallel with 6g.
+
 **Gate:**
 - A reply cancels every pending touch for that lead.
 - A referral reply creates a new rank-0 contact that goes through verification automatically.
@@ -62,6 +74,8 @@
 | `hard_bounce` | Email → `invalid`; contact → `bounced`; add the email hash to suppressions; lead → `contacts_found` for the next contact |
 | `soft_bounce` | Retry once after 48 hours; if it bounces a second time, treat it as hard |
 | `other` | Shown in Replies for the operator to decide |
+
+Once the verified lead directory exists (6g), a `hard_bounce`, or a reply saying the person has left, also disputes that fact in the directory. A `referral` adds an observation.
 
 **Done when:** there is one end-to-end test per category on fixture mailboxes.
 
