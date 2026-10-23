@@ -68,11 +68,17 @@ def footer_of(body: str) -> str | None:
 
 class ReviewService:
     def __init__(
-        self, uow_factory: UnitOfWorkFactory, workspace_id: str, writer: LlmClient | None = None
+        self,
+        uow_factory: UnitOfWorkFactory,
+        workspace_id: str,
+        writer: LlmClient | None = None,
+        *,
+        actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._writer = writer  # the metered writer model, for revisions the operator asks for
+        self._actor = actor
 
     def queue(self, limit: int = 100) -> list[QueueItem]:
         with self._uow(self._workspace_id) as uow:
@@ -110,11 +116,12 @@ class ReviewService:
         edited_body: str | None = None,
         expected_version: int | None = None,
         acknowledge_skips: bool = False,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> Message:
         """Approve an email. One that relies on a check you skipped (the country rule, the
         email check, or that the person works there) needs ``acknowledge_skips``: approval is
         where you confirm it, and what you confirmed is recorded."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             message = self._pending(uow, message_id)
             if expected_version is not None and message.row_version != expected_version:
@@ -169,7 +176,7 @@ class ReviewService:
         instructions: str,
         *,
         current: str | None = None,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> Revision:
         """Rewrite an email waiting for review the way the operator asks (tone, length, facts).
 
@@ -178,6 +185,7 @@ class ReviewService:
         approving it stores it as the operator's version (so it teaches the writer like an edit).
         The request is kept in the message's history.
         """
+        actor = actor or self._actor
         ask_for = " ".join(instructions.split())
         if not ask_for:
             raise ReviewError("say what to change: the tone, the length, something to add...")
@@ -211,7 +219,8 @@ class ReviewService:
             uow.commit()
         return revision
 
-    def reject(self, message_id: str, reason: str, *, actor: str = OPERATOR) -> Message:
+    def reject(self, message_id: str, reason: str, *, actor: str | None = None) -> Message:
+        actor = actor or self._actor
         if not reason.strip():
             raise ReviewError("say why it is rejected: the reason is kept with the lead")
         with self._uow(self._workspace_id) as uow:

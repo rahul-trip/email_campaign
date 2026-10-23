@@ -51,14 +51,21 @@ class DeleteResult:
 
 class PrivacyService:
     def __init__(
-        self, uow_factory: UnitOfWorkFactory, workspace_id: str, mailbox: Mailbox | None = None
+        self,
+        uow_factory: UnitOfWorkFactory,
+        workspace_id: str,
+        mailbox: Mailbox | None = None,
+        *,
+        actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._mailbox = mailbox
+        self._actor = actor
 
-    def forget(self, email: str, *, actor: str = OPERATOR) -> PrivacyResult:
+    def forget(self, email: str, *, actor: str | None = None) -> PrivacyResult:
         """Erase a person: suppress their address for good and remove what identifies them."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             outcome = forget_email(uow, email, actor=actor)
             uow.commit()
@@ -67,8 +74,9 @@ class PrivacyService:
         self._log("forget", actor, outcome.found, outcome.messages_cancelled, deleted, left)
         return PrivacyResult(outcome.found, outcome.messages_cancelled, deleted, left)
 
-    def suppress_contact(self, contact_id: str, *, actor: str = OPERATOR) -> PrivacyResult:
+    def suppress_contact(self, contact_id: str, *, actor: str | None = None) -> PrivacyResult:
         """Never contact this person again (an opt-out). Their details are kept for the record."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             contact = uow.contacts.get(contact_id)  # NotFound for another workspace's person
             for address in uow.emails.for_contact(contact_id):
@@ -93,8 +101,9 @@ class PrivacyService:
         self._log("suppress_contact", actor, True, cancelled, deleted, left, contact_id=contact_id)
         return PrivacyResult(True, cancelled, deleted, left)
 
-    def suppress_company(self, company_id: str, *, actor: str = OPERATOR) -> PrivacyResult:
+    def suppress_company(self, company_id: str, *, actor: str | None = None) -> PrivacyResult:
         """Never contact anyone at this company's domain again."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             uow.suppressions.add(
@@ -115,8 +124,9 @@ class PrivacyService:
         self._log("suppress_company", actor, True, cancelled, deleted, left, company_id=company_id)
         return PrivacyResult(True, cancelled, deleted, left)
 
-    def suppress_value(self, value: str, *, actor: str = OPERATOR) -> PrivacyResult:
+    def suppress_value(self, value: str, *, actor: str | None = None) -> PrivacyResult:
         """Suppress an address or a domain, acting on the person or company if we hold them."""
+        actor = actor or self._actor
         text = value.strip().lower()
         if not text:
             raise InvalidInput("give an email address or a domain")
@@ -151,7 +161,7 @@ class PrivacyService:
         *,
         confirm_domain: str,
         also_suppress_domain: bool = False,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> DeleteResult:
         """Permanently remove a lead: its people, addresses, emails, notes and history.
 
@@ -160,6 +170,7 @@ class PrivacyService:
         must stay (suppress it instead). Drafts waiting in the mailbox are deleted with it.
         Optionally the domain is also put on the do-not-contact list, so it is never added again.
         """
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)  # NotFound for another workspace's lead
             if confirm_domain.strip().lower() != company.domain:

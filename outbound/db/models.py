@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Float,
+    ForeignKey,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -28,6 +29,7 @@ from sqlalchemy.sql.elements import conv
 from outbound.db.base import AppendOnly, Base, Identified, Mutable
 from outbound.db.types import Json, UtcDateTime, enum_type, utcnow
 from outbound.domain.enums import (
+    AuthTokenPurpose,
     CallOutcome,
     CampaignStatus,
     CompanySource,
@@ -45,8 +47,10 @@ from outbound.domain.enums import (
     LegalEntityType,
     MailboxGateway,
     MailboxStatus,
+    MembershipRole,
     MessageState,
     NoteSource,
+    PlatformRole,
     PolicyRule,
     PolicyStage,
     Provenance,
@@ -54,6 +58,7 @@ from outbound.domain.enums import (
     RunStatus,
     SuppressionKind,
     SuppressionReason,
+    UserStatus,
     WorkspaceStatus,
 )
 
@@ -499,3 +504,92 @@ class EventRow(AppendOnly, Base):
     type: Mapped[str] = mapped_column(String(60))
     actor: Mapped[str] = mapped_column(String(200))
     data: Mapped[dict[str, Any]] = mapped_column(Json)
+
+
+# ----------------------------------------------------------------------- identity (Phase 6b)
+# Platform tables: no row-level security. They are reached only through the identity
+# repositories (outbound.db.identity), every query with an explicit predicate.
+
+
+class UserRow(Identified, Base):
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("email"),)
+
+    email: Mapped[str] = mapped_column(String(320))  # stored lower-cased
+    name: Mapped[str] = mapped_column(String(200), default="")
+    password_hash: Mapped[str] = mapped_column(String(300))
+    platform_role: Mapped[PlatformRole | None] = mapped_column(
+        enum_type(PlatformRole, "platform_role")
+    )
+    status: Mapped[UserStatus] = mapped_column(
+        enum_type(UserStatus, "user_status"), default=UserStatus.ACTIVE
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    terms_version: Mapped[str | None] = mapped_column(String(40))
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)
+
+
+class MembershipRow(Identified, Base):
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("workspace_id", "user_id"),)
+
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    role: Mapped[MembershipRole] = mapped_column(enum_type(MembershipRole, "membership_role"))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)
+
+
+class AuthTokenRow(Identified, Base):
+    """A single-use link: an invitation to a workspace, or a password reset."""
+
+    __tablename__ = "auth_tokens"
+    __table_args__ = (UniqueConstraint("token_hash"),)
+
+    purpose: Mapped[AuthTokenPurpose] = mapped_column(
+        enum_type(AuthTokenPurpose, "auth_token_purpose")
+    )
+    email: Mapped[str] = mapped_column(String(320))
+    workspace_id: Mapped[str | None] = mapped_column(ForeignKey("workspaces.id"))
+    role: Mapped[MembershipRole | None] = mapped_column(enum_type(MembershipRole, "invite_role"))
+    token_hash: Mapped[str] = mapped_column(String(64))  # sha256 of the token; never the token
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    used_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_by: Mapped[str | None] = mapped_column(String(36))  # a user id
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class SessionRow(Identified, Base):
+    """A signed-in browser. The cookie holds a random token; only its hash is stored."""
+
+    __tablename__ = "sessions"
+    __table_args__ = (UniqueConstraint("token_hash"),)
+
+    token_hash: Mapped[str] = mapped_column(String(64))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime)  # the absolute limit
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    ip: Mapped[str | None] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(300))
+    data: Mapped[dict[str, Any] | None] = mapped_column(Json)  # OAuth state for 6c
+
+
+class AuditRow(Identified, Base):
+    """Who did what to whom, for security and the admin console. Append-only."""
+
+    __tablename__ = "audit_log"
+    __table_args__ = (Index("ix_audit_log_workspace", "workspace_id", "created_at"),)
+
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    actor_user_id: Mapped[str | None] = mapped_column(String(36))
+    workspace_id: Mapped[str | None] = mapped_column(String(36))  # no key: survives deletion
+    action: Mapped[str] = mapped_column(String(80))
+    target_type: Mapped[str | None] = mapped_column(String(40))
+    target_id: Mapped[str | None] = mapped_column(String(64))
+    note: Mapped[str | None] = mapped_column(Text)
+    data: Mapped[dict[str, Any]] = mapped_column(Json, default=dict)

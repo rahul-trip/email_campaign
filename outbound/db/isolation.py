@@ -15,10 +15,18 @@ from outbound.db.base import Base
 
 PUBLIC_API_ROLES = ("anon", "authenticated")
 
+# Platform tables that name a workspace but are not one workspace's data: they are reached only
+# through outbound.db.identity, with explicit predicates, and have no row-level security.
+PLATFORM_TABLES = frozenset({"memberships", "auth_tokens", "audit_log"})
+
 
 def tenant_tables() -> tuple[str, ...]:
     """Every table whose rows belong to one workspace, plus ``workspaces`` itself."""
-    scoped = (t.name for t in Base.metadata.sorted_tables if "workspace_id" in t.columns)
+    scoped = (
+        t.name
+        for t in Base.metadata.sorted_tables
+        if "workspace_id" in t.columns and t.name not in PLATFORM_TABLES
+    )
     return (*sorted(scoped), "workspaces")
 
 

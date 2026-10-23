@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 
 from outbound.domain.enums import (
+    AuthTokenPurpose,
     CallOutcome,
     CompanySource,
     CompanyStatus,
@@ -21,13 +22,16 @@ from outbound.domain.enums import (
     EntityType,
     HoldReason,
     LegalEntityType,
+    MembershipRole,
     MessageState,
     NoteSource,
+    PlatformRole,
     PolicyRule,
     PolicyStage,
     Provenance,
     SuppressionKind,
     SuppressionReason,
+    UserStatus,
     WorkspaceStatus,
 )
 
@@ -238,3 +242,52 @@ class Suppression:
     reason: SuppressionReason
     value_hash: str
     created_at: datetime
+
+
+# ----------------------------------------------------------------------- identity (Phase 6b)
+
+
+@dataclass(frozen=True)
+class User:
+    id: str
+    email: str
+    name: str
+    platform_role: PlatformRole | None
+    status: UserStatus
+    last_login_at: datetime | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class Membership:
+    id: str
+    workspace_id: str
+    user_id: str
+    role: MembershipRole
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class AuthToken:
+    id: str
+    purpose: AuthTokenPurpose
+    email: str
+    workspace_id: str | None
+    role: MembershipRole | None
+    expires_at: datetime
+    used_at: datetime | None
+    revoked_at: datetime | None
+    created_by: str | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class LoginSession:
+    id: str
+    user_id: str
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    revoked_at: datetime | None
+    ip: str | None
+    user_agent: str | None

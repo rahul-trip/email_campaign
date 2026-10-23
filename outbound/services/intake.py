@@ -313,11 +313,13 @@ class IntakeService:
         search: SearchProvider | None,
         *,
         allow_personal_domain: bool = False,
+        actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._resolver = DomainResolver(search) if search else None
         self._allow_personal = allow_personal_domain
+        self._actor = actor
 
     def run(
         self,
@@ -328,9 +330,10 @@ class IntakeService:
         campaign_id: str | None = None,
         filename: str | None = None,
         validate_only: bool = False,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> IntakeReport:
         """Import ``rows``. With ``validate_only`` nothing is written and no search is made."""
+        actor = actor or self._actor
         targets = [parse_target(raw) for raw in rows]
         resolutions = [self._resolve(t, search=not validate_only) for t in targets]
 
@@ -379,8 +382,9 @@ class IntakeService:
         with self._uow(self._workspace_id) as uow:
             return uow.imports.rows_with_status(ImportRowStatus.NEEDS_CONFIRMATION)
 
-    def confirm(self, row_id: str, domain: str, *, actor: str = OPERATOR) -> RowOutcome:
+    def confirm(self, row_id: str, domain: str, *, actor: str | None = None) -> RowOutcome:
         """The operator says which website a waiting row means; the row is then processed."""
+        actor = actor or self._actor
         resolved = registrable_domain(domain)
         if resolved is None:
             raise InvalidInput(f"{domain!r} is not a usable domain")

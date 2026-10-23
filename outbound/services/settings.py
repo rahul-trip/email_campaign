@@ -62,10 +62,12 @@ class SettingsService:
         workspace_id: str,
         *,
         dns_lookup: TxtLookup = system_lookup,
+        actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._dns = dns_lookup
+        self._actor = actor
 
     # ------------------------------------------------------------------ profile and settings
 
@@ -131,7 +133,7 @@ class SettingsService:
         """Settings such as the safe-to-send safeguard and the budget are safety controls, so
         who changed them to what is part of the audit trail (the sender profile: only which
         fields, since it holds free text). Written in the same transaction as the change."""
-        uow.events.append(EntityType.WORKSPACE, self._workspace_id, kind, OPERATOR, detail)
+        uow.events.append(EntityType.WORKSPACE, self._workspace_id, kind, self._actor, detail)
 
     # ------------------------------------------------------------------ campaigns
 
@@ -192,7 +194,7 @@ class SettingsService:
                 EntityType.WORKSPACE,
                 self._workspace_id,
                 "policy_changed",
-                OPERATOR,
+                self._actor,
                 {
                     "country_code": saved.country_code,
                     "rule": saved.rule.value,
@@ -215,7 +217,7 @@ class SettingsService:
                 EntityType.WORKSPACE,
                 self._workspace_id,
                 "policy_deleted",
-                OPERATOR,
+                self._actor,
                 {"country_code": code},
             )
             uow.commit()
@@ -230,9 +232,15 @@ class SettingsService:
             ]
 
     def suppress(
-        self, kind: SuppressionKind, value: str, reason: SuppressionReason, *, actor: str = OPERATOR
+        self,
+        kind: SuppressionKind,
+        value: str,
+        reason: SuppressionReason,
+        *,
+        actor: str | None = None,
     ) -> bool:
         """Add a value to the do-not-contact list. It is hashed here and never stored."""
+        actor = actor or self._actor
         if not value.strip():
             raise SettingsError("give the address or domain to suppress")
         with self._uow(self._workspace_id) as uow:

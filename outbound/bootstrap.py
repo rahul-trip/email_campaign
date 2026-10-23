@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from sqlalchemy import Engine, inspect
 
 from outbound.config import Settings
+from outbound.db.identity import IdentityUnitOfWorkFactory
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
@@ -23,6 +24,7 @@ class Container:
     engine: Engine
     uow: UnitOfWorkFactory
     platform: PlatformUnitOfWorkFactory
+    identity: IdentityUnitOfWorkFactory
 
     def workspace_id(self, name: str) -> str:
         """The id of the named workspace, or a ConfigurationError that says what to run.
@@ -53,11 +55,13 @@ def container_for(
     read every workspace; tenant work never uses it.
     """
     platform_sessions = make_session_factory(platform_engine or engine)
+    sessions = make_session_factory(engine)
     return Container(
         settings,
         engine,
-        UnitOfWorkFactory(make_session_factory(engine)),
+        UnitOfWorkFactory(sessions),
         PlatformUnitOfWorkFactory(platform_sessions),
+        IdentityUnitOfWorkFactory(sessions),
     )
 
 

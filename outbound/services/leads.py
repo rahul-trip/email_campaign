@@ -137,9 +137,12 @@ class WaterfallStep:
 
 
 class LeadService:
-    def __init__(self, uow_factory: UnitOfWorkFactory, workspace_id: str) -> None:
+    def __init__(
+        self, uow_factory: UnitOfWorkFactory, workspace_id: str, *, actor: str = OPERATOR
+    ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
+        self._actor = actor
 
     def search(
         self,
@@ -226,9 +229,10 @@ class LeadService:
         changes: Mapping[str, Any],
         *,
         expected_version: int,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> Company:
         """Edit a saved target. A stale ``expected_version`` raises ``ConcurrencyConflict``."""
+        actor = actor or self._actor
         unknown = set(changes) - EDITABLE
         if unknown:
             raise LeadError(f"cannot change {sorted(unknown)}")
@@ -241,8 +245,9 @@ class LeadService:
             uow.commit()
             return updated
 
-    def retry(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+    def retry(self, company_id: str, *, actor: str | None = None) -> Company:
         """Send a failed lead back to the stage that failed, without waiting out the back-off."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             if company.status is not CompanyStatus.FAILED or company.failed_stage is None:
@@ -263,9 +268,10 @@ class LeadService:
         company_id: str,
         *,
         resume_to: CompanyStatus | None = None,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> Company:
         """Let a held lead go on, at the stage that held it unless the operator chooses."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             if company.status is not CompanyStatus.HELD or company.hold_reason is None:
@@ -299,7 +305,7 @@ class LeadService:
         email: str | None = None,
         consent_basis: ConsentBasis | None = None,
         consent_evidence: str | None = None,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> ContactWithEmails:
         """Add a person you know to a company already in the system, with their consent if given.
 
@@ -307,6 +313,7 @@ class LeadService:
         by you. Consent is recorded in the same step, which is how a lead held for *consent
         required* gets the consent it is waiting for.
         """
+        actor = actor or self._actor
         name = " ".join(full_name.split())
         if not name:
             raise InvalidInput("give the person's name")
@@ -366,7 +373,7 @@ class LeadService:
         full_name: str | None = None,
         title: str | None = None,
         email: str | None = None,
-        actor: str = OPERATOR,
+        actor: str | None = None,
     ) -> ContactWithEmails:
         """Correct a person: their name, title or address.
 
@@ -374,6 +381,7 @@ class LeadService:
         one written to, the earlier one stays as history, and the person is put first. A lead
         whose email step failed (a wrong guess, an incomplete name) can then be retried.
         """
+        actor = actor or self._actor
         address = _clean_address(email)
         with self._uow(self._workspace_id) as uow:
             contact = uow.contacts.get(contact_id)  # NotFound for another workspace's person
@@ -398,12 +406,13 @@ class LeadService:
                 uow.contacts.get(updated.id), uow.emails.for_contact(contact_id)
             )
 
-    def confirm_person(self, contact_id: str, *, actor: str = OPERATOR) -> ContactWithEmails:
+    def confirm_person(self, contact_id: str, *, actor: str | None = None) -> ContactWithEmails:
         """Say that a person a search could not place here does work here.
 
         Until then they are never looked up or written to. The confirmation is recorded with
         your name, and approving an email to them asks you to acknowledge it.
         """
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             contact = uow.contacts.get(
                 contact_id
@@ -418,12 +427,13 @@ class LeadService:
             uow.commit()
             return ContactWithEmails(confirmed, uow.emails.for_contact(contact_id))
 
-    def remove_person(self, contact_id: str, *, actor: str = OPERATOR) -> None:
+    def remove_person(self, contact_id: str, *, actor: str | None = None) -> None:
         """Take a person off a lead, such as someone a search matched by mistake.
 
         Refused once anything has been written to them: then the history matters, and the
         person can be suppressed or forgotten instead.
         """
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             uow.contacts.get(contact_id)  # NotFound unless the person is in this workspace
             if uow.messages.for_contact(contact_id):
@@ -435,7 +445,7 @@ class LeadService:
             uow.commit()
 
     def change_recipient(
-        self, company_id: str, contact_id: str, *, actor: str = OPERATOR
+        self, company_id: str, contact_id: str, *, actor: str | None = None
     ) -> Company:
         """Write to a different person at this lead.
 
@@ -443,6 +453,7 @@ class LeadService:
         person is put first, and the lead goes back to the email step, which reuses an address
         it already has at no cost.
         """
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             contact = uow.contacts.get(contact_id)
@@ -472,7 +483,7 @@ class LeadService:
             )
 
     def skip_policy(
-        self, company_id: str, from_stage: PolicyStage, reason: str, *, actor: str = OPERATOR
+        self, company_id: str, from_stage: PolicyStage, reason: str, *, actor: str | None = None
     ) -> Company:
         """Skip the country rule for this lead from ``from_stage`` onward.
 
@@ -480,6 +491,7 @@ class LeadService:
         (or disqualified) by the rule at that stage or a later one goes straight on from where
         it was stopped; otherwise the skip simply waits until the lead gets there.
         """
+        actor = actor or self._actor
         why = " ".join(reason.split())
         if not why:
             raise InvalidInput("say why the country rule is skipped: it is kept with the record")
@@ -517,8 +529,9 @@ class LeadService:
                 target = RESUME_AFTER_SKIP[stopped_at]
             return self._move(uow, company, target, actor, "country rule skipped by the operator")
 
-    def revoke_policy_skip(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+    def revoke_policy_skip(self, company_id: str, *, actor: str | None = None) -> Company:
         """Apply the country rule to this lead again. Refused once its email is approved."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             if company.policy_skip_from is None:
@@ -538,9 +551,10 @@ class LeadService:
             uow.commit()
             return updated
 
-    def release_policy_holds(self, *, actor: str = OPERATOR) -> int:
+    def release_policy_holds(self, *, actor: str | None = None) -> int:
         """Release every lead held by a country rule that no longer holds it (say, after the
         rules were switched off for the workspace). Returns how many went on."""
+        actor = actor or self._actor
         released = 0
         with self._uow(self._workspace_id) as uow:
             held, _ = uow.companies.search(status=CompanyStatus.HELD, limit=10_000)
@@ -564,12 +578,13 @@ class LeadService:
         return released
 
     def skip_email_verification(
-        self, email_id: str, reason: str, *, actor: str = OPERATOR
+        self, email_id: str, reason: str, *, actor: str | None = None
     ) -> ContactWithEmails:
         """Write to this address whatever the verifier said (even *invalid*), or before it is
         checked. The address becomes the one written to and its person is put first; a lead
         stopped at the email step goes on to writing. Approving the email asks you to confirm.
         """
+        actor = actor or self._actor
         why = " ".join(reason.split())
         if not why:
             raise InvalidInput("say why the check is skipped: it is kept with the record")
@@ -605,9 +620,10 @@ class LeadService:
             )
 
     def restore_email_verification(
-        self, email_id: str, *, actor: str = OPERATOR
+        self, email_id: str, *, actor: str | None = None
     ) -> ContactWithEmails:
         """Check this address again like any other. Refused once its email is approved."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             address = uow.emails.get(email_id)
             approved = [
@@ -628,7 +644,7 @@ class LeadService:
                 uow.contacts.get(address.contact_id), uow.emails.for_contact(address.contact_id)
             )
 
-    def research_again(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+    def research_again(self, company_id: str, *, actor: str | None = None) -> Company:
         """Send a lead back to research, to pick up fresh news or a changed site.
 
         Everything after research runs again too: the gate, people, the email (addresses already
@@ -636,6 +652,7 @@ class LeadService:
         not yet in the mailbox is cancelled, so the new one replaces it. What you set by hand
         (name, country, people, addresses, consent) is kept.
         """
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             if company.status is CompanyStatus.NEW:
@@ -655,8 +672,9 @@ class LeadService:
                     )
             return self._move(uow, company, CompanyStatus.NEW, actor, "research again")
 
-    def requalify(self, company_id: str, *, actor: str = OPERATOR) -> Company:
+    def requalify(self, company_id: str, *, actor: str | None = None) -> Company:
         """Override a disqualification, such as a low fit score the operator disagrees with."""
+        actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             if company.status is not CompanyStatus.DISQUALIFIED:
@@ -664,8 +682,9 @@ class LeadService:
             return self._move(uow, company, CompanyStatus.QUALIFIED, actor, "operator override")
 
     def record_consent(
-        self, contact_id: str, basis: ConsentBasis, evidence: str, *, actor: str = OPERATOR
+        self, contact_id: str, basis: ConsentBasis, evidence: str, *, actor: str | None = None
     ) -> Consent:
+        actor = actor or self._actor
         if not evidence.strip():
             raise LeadError("say where the consent came from: the evidence is kept with it")
         with self._uow(self._workspace_id) as uow:

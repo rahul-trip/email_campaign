@@ -23,6 +23,7 @@ EXPECTED_TABLES = {
     "companies", "contacts", "contact_emails", "notes", "consents",
     "messages", "inbound_messages",
     "runs", "provider_calls", "events",
+    "users", "memberships", "auth_tokens", "sessions", "audit_log",
 }  # fmt: skip
 
 
@@ -34,9 +35,9 @@ def table_names(url: str) -> set[str]:
         engine.dispose()
 
 
-def test_the_models_describe_exactly_the_seventeen_tables_of_the_spec() -> None:
+def test_the_models_describe_exactly_the_tables_of_the_spec() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 17
+    assert len(EXPECTED_TABLES) == 22  # schema v1's 17, and Phase 6b's five identity tables
 
 
 def test_upgrade_builds_every_table_and_records_the_head_revision(fresh_url: str) -> None:
@@ -84,7 +85,7 @@ def _enum_columns() -> list[tuple[str, sa.Enum, str]]:
 
 
 def test_there_is_a_check_constraint_for_every_enum_column() -> None:
-    assert len(_enum_columns()) == 27
+    assert len(_enum_columns()) == 32
 
 
 @pytest.fixture(scope="module")

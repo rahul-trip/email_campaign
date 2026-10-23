@@ -247,3 +247,27 @@ class WorkspaceStatus(StrEnum):
     SUSPENDED = "suspended"  # a platform admin closed it; nobody can use it
     PENDING_DELETION = "pending_deletion"  # deletion asked for; can be restored until it is due
     DELETED = "deleted"  # purged; the row stays as a tombstone so cost history keeps its key
+
+
+class MembershipRole(StrEnum):
+    """A person's role in one workspace (Phase 6b)."""
+
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
+class PlatformRole(StrEnum):
+    """Staff of the platform itself, separate from any workspace role."""
+
+    ADMIN = "admin"  # runs the admin console; never sees lead content
+    SUPERADMIN = "superadmin"  # alpha only: may also read every workspace
+
+
+class UserStatus(StrEnum):
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
+class AuthTokenPurpose(StrEnum):
+    INVITE = "invite"
+    RESET = "reset"
