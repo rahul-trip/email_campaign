@@ -218,22 +218,39 @@ def discover_companies(
     return report.count(ImportRowStatus.ACCEPTED)
 
 
+def writer_or_none(settings: Settings) -> LlmClient | None:
+    """The writer model's raw client, built once per process; None if no model is set up."""
+    from outbound.providers.errors import ProviderError
+
+    try:
+        return build_llm(settings, model=settings.llm_copy_model)
+    except ProviderError:
+        return None
+
+
+def search_or_none(settings: Settings) -> SearchProvider | None:
+    """Tavily's raw client, built once per process; None when no key is set."""
+    return build_search(settings) if settings.tavily_api_key.get_secret_value() else None
+
+
+def meter_writer(container: Container, workspace_id: str, writer: LlmClient) -> LlmClient:
+    """The writer behind this workspace's meter (revisions asked for on Review)."""
+    prices = {**DEFAULT_LLM_PRICES, **container.settings.llm_prices}
+    return MeteredLlm(writer, build_meter(container, workspace_id), prices=prices)
+
+
+def meter_search(container: Container, workspace_id: str, search: SearchProvider) -> SearchProvider:
+    return MeteredSearch(search, build_meter(container, workspace_id))
+
+
 def metered_writer_or_none(container: Container, workspace_id: str) -> LlmClient | None:
     """The writer model behind the meter, for revisions asked for on Review; None if no model
     is configured (Review then says so instead of failing at start-up)."""
-    from outbound.providers.errors import ProviderError
-
-    settings = container.settings
-    try:
-        llm = build_llm(settings, model=settings.llm_copy_model)
-    except ProviderError:
-        return None
-    prices = {**DEFAULT_LLM_PRICES, **settings.llm_prices}
-    return MeteredLlm(llm, build_meter(container, workspace_id), prices=prices)
+    writer = writer_or_none(container.settings)
+    return meter_writer(container, workspace_id, writer) if writer else None
 
 
 def metered_search_or_none(container: Container, workspace_id: str) -> SearchProvider | None:
     """Tavily behind the meter, or None when no key is set (name targets then wait for you)."""
-    if not container.settings.tavily_api_key.get_secret_value():
-        return None
-    return MeteredSearch(build_search(container.settings), build_meter(container, workspace_id))
+    search = search_or_none(container.settings)
+    return meter_search(container, workspace_id, search) if search else None

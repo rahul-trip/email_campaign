@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Request
 from starlette.concurrency import run_in_threadpool
 
-from outbound.api.deps import services
+from outbound.api.deps import services, tenant
 from outbound.api.errors import ApiError
 from outbound.services.webhook import WebhookError, verify
 
@@ -47,7 +47,9 @@ async def webhook(request: Request) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise WebhookError(422, "bad_json", "The body must be a JSON object.")
         # Intake searches and writes, so it must not run on the event loop.
-        result = await run_in_threadpool(services(request).webhook.receive, payload)
+        result = await run_in_threadpool(
+            services(request, tenant(request)).webhook.receive, payload
+        )
     except WebhookError as error:
         raise ApiError(error.status, error.code, error.detail) from None
     if result.duplicate or result.report is None:

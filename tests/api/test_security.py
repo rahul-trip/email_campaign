@@ -169,7 +169,7 @@ def test_a_bug_is_a_plain_500_with_no_internal_detail(
     def broken(*args: object, **kwargs: object) -> None:
         raise RuntimeError("secret internal detail: /Users/someone/path")
 
-    monkeypatch.setattr(app.state.services.leads, "search", broken)
+    monkeypatch.setattr(app.state.services_source.services.leads, "search", broken)
     quiet = TestClient(app, raise_server_exceptions=False)
     quiet.cookies = client.cookies
     response = quiet.get("/api/companies")

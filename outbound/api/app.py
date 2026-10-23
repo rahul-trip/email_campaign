@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from outbound.api import errors
 from outbound.api.auth import LoginThrottle, Sessions, require_csrf_header, require_operator
-from outbound.api.deps import Services
+from outbound.api.deps import FixedServices, Services, ServicesFactory, ServicesSource
 from outbound.api.errors import ApiError
 from outbound.api.request_log import log_requests
 from outbound.api.routers import auth, leads, privacy, review, runs, settings, targets, webhook
@@ -39,14 +39,30 @@ SECURITY_HEADERS = {
 }
 
 
-def create_app(services: Services, *, web_dist: Path | None = WEB_DIST) -> FastAPI:
-    config = services.container.settings
+def create_app(
+    services: Services | ServicesFactory,
+    *,
+    workspace_id: str | None = None,
+    web_dist: Path | None = WEB_DIST,
+) -> FastAPI:
+    """The app over prebuilt services (tests, scripts) or a factory that builds them per
+    request (a real run). With a factory, ``workspace_id`` is the deployment's workspace."""
+    if isinstance(services, Services):
+        source: ServicesSource = FixedServices(services)
+        workspace_id = services.workspace_id
+        config = services.container.settings
+    else:
+        if workspace_id is None:
+            raise ValueError("a services factory needs the workspace it serves")
+        source = services
+        config = services.container.settings
     # The built-in docs page loads scripts from a CDN, which the content policy forbids, and
     # the API document is served below behind the login instead.
     app = FastAPI(
         title="Outbound", version="0.3.0", docs_url=None, redoc_url=None, openapi_url=None
     )
-    app.state.services = services
+    app.state.services_source = source
+    app.state.workspace_id = workspace_id
     app.state.password_hash = config.operator_password_hash
     app.state.sessions = Sessions(config.session_secret.get_secret_value(), config.session_hours)
     app.state.throttle = LoginThrottle()
@@ -129,8 +145,7 @@ def _file_inside(root: Path, requested: str) -> Path | None:
 
 def create_app_from_container(container: Container) -> FastAPI:
     """Build the app for a real run: one workspace, search only if a Tavily key is set."""
-    from outbound.api.deps import build_services
-    from outbound.pipeline import metered_search_or_none, metered_writer_or_none
+    from outbound.pipeline import search_or_none, writer_or_none
     from outbound.providers.registry import build_mailbox_if_configured
 
     config = container.settings
@@ -142,12 +157,10 @@ def create_app_from_container(container: Container) -> FastAPI:
             '    python3 -c "import secrets; print(secrets.token_urlsafe(32))">'
         )
     workspace_id = container.workspace_id(config.workspace_name)
-    return create_app(
-        build_services(
-            container,
-            workspace_id,
-            search=metered_search_or_none(container, workspace_id),
-            mailbox=build_mailbox_if_configured(config),
-            writer=metered_writer_or_none(container, workspace_id),
-        )
+    factory = ServicesFactory(
+        container,
+        search=search_or_none(config),
+        writer=writer_or_none(config),
+        mailbox=build_mailbox_if_configured(config),
     )
+    return create_app(factory, workspace_id=workspace_id)
