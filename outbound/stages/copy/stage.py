@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from outbound.db.repositories.workspaces import MailboxView
 from outbound.db.uow import UnitOfWork
 from outbound.domain.copy_lint import LintRules
 from outbound.domain.entities import Contact, ContactEmail
@@ -15,6 +16,7 @@ from outbound.domain.enums import (
 )
 from outbound.domain.footer import DEFAULT_FOOTER, MissingProfileField, render_footer
 from outbound.domain.policies import PolicyOutcome, is_sendable
+from outbound.domain.sender import sender_for
 from outbound.providers.ports import LlmClient
 from outbound.stages.base import StageContext, StageFailure, StageResult
 from outbound.stages.copy.graph import CopyInput, CopyOutput, run_copy
@@ -36,22 +38,18 @@ class CopyStage:
 
     def handle(self, ctx: StageContext) -> StageResult:
         company = ctx.company
-        sender = dict(ctx.workspace.sender_profile)
+        profile = dict(ctx.workspace.sender_profile)
         safe_only = bool(ctx.workspace.settings.get("safe_to_send_only", True))
         wanted = (
             self._examples
             if self._examples is not None
             else int(ctx.workspace.settings.get("few_shot_examples", 5))
         )
-        if not sender.get("reviewed_at"):
+        if not profile.get("reviewed_at"):
             raise StageFailure(
                 "review and save your sender profile first (Settings → Sender profile, or "
                 "`outbound sender-profile review`): its statements are quoted in every email"
             )
-        for field_name in ("signature_name", "signature_title"):
-            value = str(sender.get(field_name) or "").strip()
-            if not value or value.startswith("["):
-                raise StageFailure(f"the sender profile needs {field_name}")
 
         def load(uow: UnitOfWork):  # type: ignore[no-untyped-def]
             chosen = _chosen_address(uow, company.id, safe_only)
@@ -72,9 +70,16 @@ class CopyStage:
                 if company.campaign_id and wanted
                 else []
             )
-            return chosen, decision, notes, shots
+            return chosen, decision, notes, shots, _sending_mailbox(uow, company.campaign_id)
 
-        chosen, decision, notes, shots = ctx.read(load)
+        chosen, decision, notes, shots, mailbox = ctx.read(load)
+        # The person signing is the sending mailbox's, where it says; the company is the profile's.
+        sender = sender_for(profile, mailbox.sender if mailbox else None)
+        for field_name in ("signature_name", "signature_title"):
+            value = str(sender.get(field_name) or "").strip()
+            if not value or value.startswith("["):
+                raise StageFailure(f"the sender profile needs {field_name}")
+        mailbox_id = mailbox.id if mailbox else None
         if chosen is None or decision is None:
             raise StageFailure("no contact has an address that is safe to send to")
         contact, address = chosen
@@ -117,7 +122,7 @@ class CopyStage:
         return StageResult(
             CompanyStatus.COPY_READY,
             reason=_summary(output),
-            write=lambda uow: _save(uow, company.id, contact, address, output),
+            write=lambda uow: _save(uow, company.id, contact, address, output, mailbox_id),
         )
 
 
@@ -153,8 +158,22 @@ def _summary(output: CopyOutput) -> str:
     return f"written in {output.attempts} attempt(s){flag}"
 
 
+def _sending_mailbox(uow: UnitOfWork, campaign_id: str | None) -> MailboxView | None:
+    """The campaign's mailbox if it has one, else the workspace's default (Phase 6c)."""
+    if campaign_id:
+        campaign = uow.campaigns.get(campaign_id)
+        if campaign.mailbox_id:
+            return uow.mailboxes.get(campaign.mailbox_id)
+    return uow.mailboxes.default()
+
+
 def _save(
-    uow: UnitOfWork, company_id: str, contact: Contact, address: ContactEmail, output: CopyOutput
+    uow: UnitOfWork,
+    company_id: str,
+    contact: Contact,
+    address: ContactEmail,
+    output: CopyOutput,
+    mailbox_id: str | None,
 ) -> None:
     uow.messages.create(
         company_id=company_id,
@@ -166,4 +185,5 @@ def _save(
         state=MessageState.GENERATED,
         snippets=output.snippets,
         lint_report=output.report.to_json(),
+        mailbox_id=mailbox_id,
     )

@@ -14,11 +14,12 @@ import httpx
 from pydantic import SecretStr
 
 from outbound.config import Settings
+from outbound.domain.enums import MailboxGateway
 from outbound.domain.errors import ConfigurationError
+from outbound.providers import oauth
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
 from outbound.providers.adapters.hunter import HunterFinder, HunterVerifier
-from outbound.providers.adapters.imap_mailbox import ImapMailbox
 from outbound.providers.adapters.llm import OpenAiCompatibleLlm
 from outbound.providers.adapters.myemailverifier import MyEmailVerifierVerifier
 from outbound.providers.adapters.orbisearch import OrbiSearchVerifier
@@ -26,13 +27,13 @@ from outbound.providers.adapters.scrubby import ScrubbyResolver
 from outbound.providers.adapters.tavily import TavilySearch
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder, ZeroBounceVerifier
 from outbound.providers.errors import ProviderAuthError
+from outbound.providers.oauth import OAuthApp
 from outbound.providers.ports import (
     CatchAllResolver,
     CompanyRegistry,
     EmailFinder,
     EmailVerifier,
     LlmClient,
-    Mailbox,
     SearchProvider,
     TransactionalEmail,
 )
@@ -178,25 +179,18 @@ def build_company_registry(
     return CompaniesHouse(key, client=client) if key else None
 
 
-def build_mailbox_if_configured(settings: Settings) -> Mailbox | None:
-    """The IMAP mailbox, or None when no login is set (drafts then cannot be saved or deleted)."""
-    if settings.imap_host and settings.email_address:
-        return build_mailbox(settings)
-    return None
-
-
-def build_mailbox(settings: Settings) -> Mailbox:
-    return ImapMailbox(
-        host=settings.imap_host,
-        address=settings.email_address,
-        password=_key(settings.email_password),
-        port=settings.imap_port,
-        timeout=settings.imap_timeout_seconds,
-        from_name=settings.from_name,
-        drafts_folder=settings.drafts_folder,
-        sent_folder=settings.sent_folder,
-        inbox_folder=settings.inbox_folder,
-    )
+def build_oauth_apps(settings: Settings) -> dict[MailboxGateway, OAuthApp]:
+    """The sign-in apps customers connect Microsoft 365 and Google mailboxes through. Only the
+    ones set up on this server are offered."""
+    apps = {
+        MailboxGateway.GRAPH: oauth.microsoft(
+            settings.microsoft_client_id, _key(settings.microsoft_client_secret)
+        ),
+        MailboxGateway.GMAIL: oauth.google(
+            settings.google_client_id, _key(settings.google_client_secret)
+        ),
+    }
+    return {gateway: app for gateway, app in apps.items() if app.configured}
 
 
 def build_search(settings: Settings, client: httpx.Client | None = None) -> SearchProvider:

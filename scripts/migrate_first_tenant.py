@@ -3,11 +3,13 @@
 Before Phase 6b one person signed in with a shared password to a workspace called ``default``.
 This gives that workspace the company's name and address (slug) and creates the operator as a
 person who signs in with an email: an admin of the workspace and the platform's superadmin.
+The mailbox that was configured in ``.env`` (``IMAP_HOST``, ``EMAIL_ADDRESS``,
+``EMAIL_PASSWORD``, ...) becomes the workspace's default mailbox, its password encrypted with
+``SECRETS_KEYS``; afterwards those lines can be removed from ``.env`` and Doppler.
 
 Nothing is written without ``--apply``: by default it prints what it would do. The password is
 asked for, never taken from the command line. Running it twice is harmless: a workspace that
-already has the name and slug is left alone, and an existing account is reused. The mailbox
-moves out of the environment in Phase 6c.
+already has the name and slug is left alone, and an existing account is reused. 
 
     uv run python -m scripts.migrate_first_tenant --name "Quantra" --email sam@quantra.example
     uv run python -m scripts.migrate_first_tenant --name "Quantra" --email sam@quantra.example \
@@ -20,12 +22,62 @@ import argparse
 import getpass
 from collections.abc import Callable
 
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from outbound.bootstrap import Container, build_container
 from outbound.config import Settings
-from outbound.domain.enums import MembershipRole, PlatformRole
+from outbound.domain.enums import CredentialPurpose, MailboxGateway, MembershipRole, PlatformRole
 from outbound.domain.slugs import slugify
 from outbound.providers.adapters.transactional_email import LogEmail
 from outbound.services.identity import IdentityService
+
+
+class LegacyMailbox(BaseSettings):
+    """The mailbox settings ``.env`` held before Phase 6c (the names of the legacy agent)."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    imap_host: str = ""
+    imap_port: int = 993
+    email_address: str = ""
+    email_password: SecretStr = SecretStr("")
+    from_name: str = ""
+    drafts_folder: str = ""
+    sent_folder: str = ""
+
+    @property
+    def present(self) -> bool:
+        return bool(
+            self.imap_host and self.email_address and self.email_password.get_secret_value()
+        )
+
+
+def move_mailbox(
+    container: Container, workspace_id: str, legacy: LegacyMailbox, owner_id: str | None
+) -> str | None:
+    """Make the ``.env`` mailbox the workspace's default; nothing if it is already there."""
+    address = legacy.email_address.strip().lower()
+    with container.uow(workspace_id) as uow:
+        if uow.mailboxes.by_address(address) is not None:
+            return None
+        created = uow.mailboxes.create(
+            address, address.rpartition("@")[2], gateway=MailboxGateway.IMAP,
+            owner_user_id=owner_id, is_default=True,
+            connection={
+                "host": legacy.imap_host, "port": legacy.imap_port,
+                "drafts_folder": legacy.drafts_folder or None,
+                "sent_folder": legacy.sent_folder or None,
+            },
+            sender={"signature_name": legacy.from_name} if legacy.from_name else None,
+        )  # fmt: skip
+        name = f"mailbox:{created.id}"
+        uow.credentials.put(
+            name, CredentialPurpose.MAILBOX_PASSWORD, legacy.email_password.get_secret_value()
+        )
+        uow.mailboxes.update(created.id, credentials_ref=name)
+        uow.commit()
+    return created.id
 
 
 def migrate(
@@ -39,6 +91,7 @@ def migrate(
     apply: bool = False,
     password: Callable[[], str] = lambda: "",
     say: Callable[[str], None] = print,
+    legacy: LegacyMailbox | None = None,
 ) -> bool:
     """Print the plan and, with ``apply``, carry it out. False when there is nothing to move."""
     with container.platform() as platform:
@@ -54,6 +107,8 @@ def migrate(
     )  # fmt: skip
     say(f"workspace {found.name!r} ({found.slug}) -> {name!r} ({new_slug})")
     say(f"{email}: admin of {new_slug}, platform superadmin")
+    if legacy is not None and legacy.present:
+        say(f"mailbox {legacy.email_address} ({legacy.imap_host}): the default, password encrypted")
     if not apply:
         say("dry run: nothing changed (add --apply)")
         return True
@@ -61,10 +116,17 @@ def migrate(
         with container.platform() as platform:
             platform.workspaces.rename(found.id, name, new_slug)
             platform.commit()
-    ids.add_user(
+    user = ids.add_user(
         email, password(), name=user_name, platform_role=PlatformRole.SUPERADMIN,
         workspace_id=found.id, role=MembershipRole.ADMIN,
     )  # fmt: skip
+    if legacy is not None and legacy.present:
+        moved = move_mailbox(container, found.id, legacy, user.id)
+        say(
+            "mailbox moved; remove IMAP_* and EMAIL_* from .env"
+            if moved
+            else "mailbox was already there"
+        )
     say("done; sign in with the email and the password you chose")
     return True
 
@@ -89,6 +151,7 @@ def main() -> None:
         build_container(Settings()),
         workspace=args.workspace, name=args.name, slug=args.slug, email=args.email,
         user_name=args.user_name, apply=args.apply, password=ask_password,
+        legacy=LegacyMailbox(),
     )  # fmt: skip
 
 

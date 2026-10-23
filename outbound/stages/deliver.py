@@ -1,4 +1,4 @@
-"""Stage 8: save an approved email as a draft in the operator's mailbox.
+"""Stage 8: save an approved email as a draft in the mailbox it is sent from.
 
 Everything is checked again first, because time has passed since the operator approved it: the
 address may have been suppressed, the policy edited, the contact opted out. A draft that fails
@@ -7,6 +7,10 @@ the safe-to-send rule is never saved; the lead stays approved and is looked at a
 Saving is idempotent. The draft gets a Message-ID derived from the message, and the mailbox is
 asked whether it already has that draft, so a crash between "saved" and "recorded" cannot leave
 a duplicate.
+
+The mailbox is the one the copy stage chose (``messages.mailbox_id``), or the workspace's
+default. One that is paused or must be connected again is not used: the lead stays approved and
+is tried again later (Phase 6c).
 """
 
 from __future__ import annotations
@@ -15,8 +19,9 @@ from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Message
 from outbound.domain.enums import CompanyStatus, HoldReason, MessageState
 from outbound.domain.policies import check_send
-from outbound.providers.ports import Mailbox, OutgoingDraft
+from outbound.providers.ports import OutgoingDraft
 from outbound.stages.base import StageContext, StageFailure, StageResult
+from outbound.stages.mailboxes import Mailboxes
 from outbound.stages.policy import policy_decision_for
 
 
@@ -30,8 +35,8 @@ class DeliverStage:
     guard_policy = True
     spends = False
 
-    def __init__(self, mailbox: Mailbox) -> None:
-        self._mailbox = mailbox
+    def __init__(self, mailboxes: Mailboxes) -> None:
+        self._mailboxes = mailboxes
 
     def handle(self, ctx: StageContext) -> StageResult:
         company = ctx.company
@@ -82,9 +87,10 @@ class DeliverStage:
                 write=lambda uow: _withdraw(uow, message),
             )
 
-        remote_id = draft_message_id(message, self._mailbox.address)
-        if not self._mailbox.draft_exists(remote_id):
-            self._mailbox.append_draft(
+        mailbox_id, mailbox = self._mailboxes.open(message.mailbox_id)  # waits if unavailable
+        remote_id = draft_message_id(message, mailbox.address)
+        if not mailbox.draft_exists(remote_id):
+            mailbox.append_draft(
                 OutgoingDraft(
                     to_address=address.email,
                     subject=message.subject,
@@ -98,14 +104,14 @@ class DeliverStage:
                 message.id,
                 MessageState.DRAFTED,
                 expected_version=message.row_version,
-                set_fields={"remote_draft_id": remote_id},
+                set_fields={"remote_draft_id": remote_id, "mailbox_id": mailbox_id},
             )
 
         return StageResult(
             CompanyStatus.IN_SEQUENCE,
             reason="draft saved",
             write=write,
-            undo=lambda: _ignore(self._mailbox.delete_draft(remote_id)),
+            undo=lambda: _ignore(mailbox.delete_draft(remote_id)),
         )
 
 

@@ -38,7 +38,7 @@ from outbound.providers.registry import (
     build_company_registry,
     build_finder_chain,
     build_llm,
-    build_mailbox_if_configured,
+    build_oauth_apps,
     build_resolver,
     build_search,
     build_verifier,
@@ -57,6 +57,7 @@ from outbound.stages.deliver import DeliverStage
 from outbound.stages.email.poller import CatchAllPoller
 from outbound.stages.email.stage import EmailDeps, EmailStage
 from outbound.stages.gate import GateStage
+from outbound.stages.mailboxes import Mailboxes, StoredMailboxes, one
 from outbound.stages.research.graph import ResearchDeps
 from outbound.stages.research.stage import ResearchStage
 from outbound.stages.sync import SentSync
@@ -72,6 +73,8 @@ class Providers:
     verifier: EmailVerifier
     resolver: CatchAllResolver | None = None
     registry: CompanyRegistry | None = None
+    # One mailbox for every workspace (tests, scripts). Real runs leave it out: each workspace
+    # uses the mailboxes it connected (``StoredMailboxes``).
     mailbox: Mailbox | None = None
     copy_llm: LlmClient | None = None  # the writer's model; None means ``llm``
 
@@ -102,7 +105,6 @@ def real_providers(settings: Settings) -> Providers:
             resolver = build_resolver(settings)
         except ProviderError:
             resolver = None  # no resolver configured: catch-alls stay unverified
-        mailbox = build_mailbox_if_configured(settings)
         return Providers(
             search=build_search(settings),
             llm=build_llm(settings),
@@ -110,7 +112,6 @@ def real_providers(settings: Settings) -> Providers:
             verifier=build_verifier(settings),
             resolver=resolver,
             registry=build_company_registry(settings),
-            mailbox=mailbox,
             copy_llm=build_llm(settings, model=settings.llm_copy_model)
             if settings.llm_copy_model
             else None,
@@ -165,9 +166,11 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     jobs: list[Job] = []
     if resolver is not None:
         jobs.append(CatchAllPoller(uow, workspace_id, resolver))
-    if providers.mailbox is not None:
-        stages.append(DeliverStage(providers.mailbox))
-        jobs.append(SentSync(uow, workspace_id, providers.mailbox))
+    mailboxes = mailboxes_for(container, workspace_id, providers)
+    has_mailbox = providers.mailbox is not None or _any_mailbox(container, workspace_id)
+    if has_mailbox:
+        stages.append(DeliverStage(mailboxes))
+        jobs.append(SentSync(uow, workspace_id, mailboxes))
 
     runner = Runner(uow, workspace_id, stages, Guards(budget))
     return Pipeline(
@@ -179,8 +182,26 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         meter=meter,
         search=search,
         stage_names=[stage.name for stage in stages],
-        has_mailbox=providers.mailbox is not None,
+        has_mailbox=has_mailbox,
     )
+
+
+def mailboxes_for(
+    container: Container, workspace_id: str, providers: Providers | None = None
+) -> Mailboxes:
+    """The workspace's connected mailboxes, or the one mailbox a test or script injected."""
+    if providers is not None and providers.mailbox is not None:
+        return one(providers.mailbox)
+    settings = container.settings
+    return StoredMailboxes(
+        container.uow, workspace_id, apps=build_oauth_apps(settings),
+        timeout=settings.mailbox_timeout_seconds,
+    )  # fmt: skip
+
+
+def _any_mailbox(container: Container, workspace_id: str) -> bool:
+    with container.uow(workspace_id) as uow:
+        return bool(uow.mailboxes.all())
 
 
 def execute_run(

@@ -54,17 +54,13 @@ class Settings(BaseSettings):
     tavily_api_key: SecretStr = SecretStr("")
     companies_house_api_key: SecretStr = SecretStr("")  # free key from Companies House
 
-    # --- mailbox (IMAP). The names match the legacy agent/.env so existing values keep working ---
-    imap_host: str = ""
-    imap_port: int = 993
-    imap_use_ssl: bool = True
-    email_address: str = ""
-    email_password: SecretStr = SecretStr("")
-    from_name: str = ""
-    drafts_folder: str = "INBOX.Drafts"
-    sent_folder: str = "INBOX.Sent"
-    inbox_folder: str = "INBOX"
-    imap_timeout_seconds: float = 30.0  # a hung mail server must not freeze a run
+    # --- mailboxes (Phase 6c): each workspace connects its own in Settings. These are the
+    # platform's OAuth apps that let customers sign in to Microsoft 365 and Google. ---
+    microsoft_client_id: str = ""  # our multi-tenant Entra app
+    microsoft_client_secret: SecretStr = SecretStr("")
+    google_client_id: str = ""  # our Google Cloud OAuth client
+    google_client_secret: SecretStr = SecretStr("")
+    mailbox_timeout_seconds: float = 30.0  # a hung mail server must not freeze a run
 
     # --- language model: any OpenAI-compatible endpoint (see providers/adapters/llm.py) ---
     # anthropic, openai, gemini, ollama, github_copilot or openai_compatible

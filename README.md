@@ -44,7 +44,7 @@ Copy `.env.example` to `.env` and fill it in. `.env` is git-ignored; never commi
 | Email finding and verification | The keys for every name in `FINDER_CHAIN` and `VERIFIER` |
 | Catch-all resolution (optional) | `CATCH_ALL_RESOLVER` and its key; without one, catch-all addresses are held |
 | UK legal-entity check (optional, free) | `COMPANIES_HOUSE_API_KEY` |
-| Drafts and the Sent sync | `IMAP_HOST`, `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME`, `DRAFTS_FOLDER`, `SENT_FOLDER` |
+| Drafts and the Sent sync | Each workspace connects its own mailbox in Settings (IMAP, Microsoft 365 or Google). The server needs `SECRETS_KEYS`, and for Microsoft 365 and Google sign-in `MICROSOFT_CLIENT_ID`/`_SECRET` and `GOOGLE_CLIENT_ID`/`_SECRET` |
 | The web app | An account: `uv run outbound users create --email … --workspace …`. For invitations and password resets: `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, `APP_BASE_URL` |
 | Spend limits (optional) | `MONTHLY_CAPS_MICRO_USD`, `PROVIDER_PRICES`, `LLM_PRICES` |
 

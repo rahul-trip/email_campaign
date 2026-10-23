@@ -1,7 +1,8 @@
 """Check each configured vendor against the real service, using your own address.
 
-    uv run python -m scripts.live_check                 # every configured vendor, asks first
-    uv run python -m scripts.live_check --only imap,tavily --yes
+    uv run python -m scripts.live_check --address you@yours.com           # every vendor; asks
+    uv run python -m scripts.live_check --address you@yours.com --only tavily --yes
+    uv run python -m scripts.live_check --address you@yours.com --workspace acme   # + its mailboxes
 
 It costs a few cents (one verification per verifier, one search, one model reply) and the mailbox
 check saves one draft and deletes it again. Only your own address is ever sent to a vendor. Keys
@@ -18,7 +19,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from outbound.config import Settings
-from outbound.domain.errors import ConfigurationError
 from outbound.providers import registry
 from outbound.providers.ports import OutgoingDraft, PersonQuery
 
@@ -34,6 +34,41 @@ class Result:
 
 
 Check = Callable[[], str]
+
+
+def _mailbox_checks(settings: Settings, workspace: str, address: str) -> dict[str, Check]:
+    """One check per mailbox the workspace connected: save a draft to ``address``, find it,
+    delete it."""
+    from outbound.bootstrap import build_container
+    from outbound.pipeline import mailboxes_for
+    from outbound.stages.mailboxes import StoredMailboxes
+
+    container = build_container(settings)
+    workspace_id = container.workspace_id(workspace)
+    mailboxes = mailboxes_for(container, workspace_id)
+    assert isinstance(mailboxes, StoredMailboxes)
+    with container.uow(workspace_id) as uow:
+        views = uow.mailboxes.all()
+    checks: dict[str, Check] = {}
+    for view in views:
+
+        def check(view=view) -> str:  # type: ignore[no-untyped-def]  # bound per loop turn
+            mailbox = mailboxes.build(view)
+            draft = OutgoingDraft(
+                to_address=address,
+                subject="Outbound live check (safe to delete)",
+                body="Saved by scripts/live_check.py and deleted straight away.",
+                message_id=f"<live-check-{int(time.time())}@{view.sending_domain}>",
+            )
+            ref = mailbox.append_draft(draft)
+            try:
+                found = mailbox.draft_exists(ref)
+            finally:
+                removed = mailbox.delete_draft(ref)
+            return f"{view.gateway.value}: draft saved, found={found}, deleted={removed}"
+
+        checks[f"mailbox:{view.address}"] = check
+    return checks
 
 
 def _checks(settings: Settings, address: str, *, finders: bool) -> dict[str, Check]:
@@ -74,24 +109,6 @@ def _checks(settings: Settings, address: str, *, finders: bool) -> dict[str, Che
             return f"{len(entries)} match(es); first: {entries[0].name if entries else 'none'}"
 
         checks["companies_house"] = house
-
-    if settings.imap_host and settings.email_address:
-
-        def imap() -> str:
-            mailbox = registry.build_mailbox(settings)
-            draft = OutgoingDraft(
-                to_address=address,
-                subject="Outbound live check (safe to delete)",
-                body="Saved by scripts/live_check.py and deleted straight away.",
-            )
-            ref = mailbox.append_draft(draft)
-            try:
-                found = mailbox.draft_exists(ref)
-            finally:
-                removed = mailbox.delete_draft(ref)
-            return f"draft saved, found={found}, deleted={removed}"
-
-        checks["imap"] = imap
 
     for name, verifier in registry.configured_verifiers(settings).items():
 
@@ -155,8 +172,9 @@ def main() -> int:
         "--only", help="comma-separated checks, for example imap,llm,verify:zerobounce"
     )
     parser.add_argument(
-        "--address", help="the address to verify and save a draft to (default: EMAIL_ADDRESS)"
+        "--address", required=True, help="your own address: verified, and drafts are saved to it"
     )
+    parser.add_argument("--workspace", help="also check the mailboxes this workspace connected")
     parser.add_argument(
         "--finders", action="store_true", help="also try the email finders (uses credits)"
     )
@@ -164,10 +182,10 @@ def main() -> int:
     args = parser.parse_args()
 
     settings = Settings()
-    address = args.address or settings.email_address
-    if not address:
-        raise ConfigurationError("set EMAIL_ADDRESS in .env, or pass --address")
+    address = args.address
     checks = _checks(settings, address, finders=args.finders)
+    if args.workspace:
+        checks.update(_mailbox_checks(settings, args.workspace, address))
     if args.only:
         wanted = {n.strip() for n in args.only.split(",")}
         unknown = wanted - set(checks)

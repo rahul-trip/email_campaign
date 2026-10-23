@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import SecretStr
 from sqlalchemy import Engine
 
 from outbound.bootstrap import container_for
@@ -9,7 +10,7 @@ from outbound.config import Settings
 from outbound.db.identity import normalise_email
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.domain.enums import MembershipRole, PlatformRole
-from scripts.migrate_first_tenant import migrate
+from scripts.migrate_first_tenant import LegacyMailbox, migrate
 
 PASSWORD = "plum kettle orbit lantern meadow"
 EMAIL = "Sam@Quantra.example"
@@ -58,3 +59,29 @@ def test_an_unknown_workspace_is_reported(engine: Engine, platform_engine: Engin
     assert run(engine, platform_engine, "nope", apply=True) == [
         "no workspace 'nope'; nothing to do"
     ]
+
+
+def test_the_env_mailbox_becomes_the_default_with_its_password_encrypted(
+    engine: Engine, platform_engine: Engine, ws: str
+) -> None:
+    legacy = LegacyMailbox(
+        _env_file=None, imap_host="imap.hostinger.com", email_address="Sam@Quantra.example",
+        email_password=SecretStr("app-pass-123"), from_name="Sam", drafts_folder="INBOX.Drafts",
+    )  # fmt: skip
+    container = container_for(Settings(_env_file=None), engine, platform_engine)
+    for _ in range(2):  # twice is harmless
+        migrate(
+            container, workspace="acme", name="Quantra Energy", email=EMAIL, apply=True,
+            password=lambda: PASSWORD, say=lambda _: None, legacy=legacy,
+        )  # fmt: skip
+    with container.uow(ws) as uow:
+        [box] = uow.mailboxes.all()
+        _, secret = uow.credentials.reveal(box.credentials_ref or "")
+    assert (box.address, box.is_default, box.gateway.value) == ("sam@quantra.example", True, "imap")
+    assert box.connection == {
+        "host": "imap.hostinger.com",
+        "port": 993,
+        "drafts_folder": "INBOX.Drafts",
+        "sent_folder": None,
+    }
+    assert box.sender == {"signature_name": "Sam"} and secret == "app-pass-123"

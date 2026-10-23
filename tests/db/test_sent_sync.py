@@ -16,6 +16,7 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.providers.ports import SentMessage
+from outbound.stages.mailboxes import one
 from outbound.stages.sync import SentSync, normal_subject
 
 BODY = "Hi Jane,\n\nI saw the Leeds office. Would a call help?\n\nSam Lee\n\n--\nQuantra, Austin."
@@ -116,7 +117,7 @@ def sent_mail(
 
 
 def run(factory: UnitOfWorkFactory, ws: str, folder: SentFolder) -> dict[str, int]:
-    return SentSync(factory, ws, folder).run()
+    return SentSync(factory, ws, one(folder)).run()
 
 
 def state(factory: UnitOfWorkFactory, ws: str, message_id: str):  # type: ignore[no-untyped-def]

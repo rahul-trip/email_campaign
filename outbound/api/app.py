@@ -180,7 +180,6 @@ def _file_inside(root: Path, requested: str) -> Path | None:
 def create_app_from_container(container: Container) -> FastAPI:
     """Build the app for a real run: search only if a Tavily key is set."""
     from outbound.pipeline import search_or_none, writer_or_none
-    from outbound.providers.registry import build_mailbox_if_configured
 
     config = container.settings
     workspace_id = container.workspace_id(config.workspace_name)
@@ -188,6 +187,5 @@ def create_app_from_container(container: Container) -> FastAPI:
         container,
         search=search_or_none(config),
         writer=writer_or_none(config),
-        mailbox=build_mailbox_if_configured(config),
     )
     return create_app(factory, workspace_id=workspace_id)

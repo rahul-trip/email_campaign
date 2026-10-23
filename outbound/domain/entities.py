@@ -198,6 +198,7 @@ class Campaign:
     research_questions: tuple[str, ...]
     cadence_days: tuple[int, ...]
     icp_description: str | None = None
+    mailbox_id: str | None = None  # the sender; None means the workspace's default mailbox
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "target_titles", tuple(self.target_titles))

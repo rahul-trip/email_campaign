@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from outbound.db.crypto import Keyring, Sealed, associated_data
 from outbound.db.errors import NotFound
-from outbound.db.models import CampaignRow, CredentialRow, MailboxRow, WorkspaceRow
+from outbound.db.models import CampaignRow, CredentialRow, MailboxRow, MessageRow, WorkspaceRow
 from outbound.db.repositories.base import EventRepository, ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.entities import Campaign, Workspace
@@ -208,7 +208,7 @@ class CampaignRepository(ScopedRepository):
     def update(self, campaign_id: str, changes: dict[str, Any]) -> Campaign:
         allowed = {
             "name", "target_titles", "icp_description", "min_fit_score",
-            "research_questions", "cadence_days",
+            "research_questions", "cadence_days", "mailbox_id",
         }  # fmt: skip
         unknown = set(changes) - allowed
         if unknown:
@@ -243,11 +243,20 @@ class MailboxRepository(ScopedRepository):
         self,
         address: str,
         sending_domain: str,
-        credentials_ref: str,
+        credentials_ref: str | None = None,
         *,
         gateway: MailboxGateway = MailboxGateway.IMAP,
         daily_cap: int = 10,
+        owner_user_id: str | None = None,
+        connection: dict[str, Any] | None = None,
+        sender: dict[str, Any] | None = None,
+        is_default: bool | None = None,
     ) -> MailboxView:
+        """A mailbox. The first one in a workspace becomes its default sender."""
+        if is_default is None:
+            is_default = self.default() is None
+        if is_default:
+            self._clear_default()
         row = MailboxRow(
             workspace_id=self._workspace_id,
             address=address.strip().lower(),
@@ -255,10 +264,96 @@ class MailboxRepository(ScopedRepository):
             credentials_ref=credentials_ref,
             sending_domain=sending_domain.strip().lower(),
             daily_cap=daily_cap,
+            owner_user_id=owner_user_id,
+            connection=connection,
+            sender=sender,
+            is_default=is_default,
         )
         self._session.add(row)
         self._session.flush()
         return self._view(row)
+
+    def by_address(self, address: str) -> MailboxView | None:
+        stmt = select(MailboxRow).where(
+            MailboxRow.workspace_id == self._workspace_id,
+            MailboxRow.address == address.strip().lower(),
+        )
+        row = self._session.scalars(stmt).one_or_none()
+        return self._view(row) if row else None
+
+    def default(self) -> MailboxView | None:
+        """The workspace's default sender."""
+        stmt = select(MailboxRow).where(
+            MailboxRow.workspace_id == self._workspace_id, MailboxRow.is_default.is_(True)
+        )
+        row = self._session.scalars(stmt).one_or_none()
+        return self._view(row) if row else None
+
+    def update(self, mailbox_id: str, **fields: Any) -> MailboxView:
+        """Change ``credentials_ref``, ``connection``, ``sender``, ``status``, ``daily_cap``,
+        ``gateway`` or ``last_checked_at``."""
+        allowed = {
+            "credentials_ref",
+            "connection",
+            "sender",
+            "status",
+            "daily_cap",
+            "gateway",
+            "last_checked_at",
+        }
+        unknown = set(fields) - allowed
+        if unknown:
+            raise ValueError(f"cannot change {sorted(unknown)}")
+        row = self._row(MailboxRow, mailbox_id)
+        for name, value in fields.items():
+            setattr(row, name, value)
+        self._session.flush()
+        return self._view(row)
+
+    def make_default(self, mailbox_id: str) -> MailboxView:
+        row = self._row(MailboxRow, mailbox_id)
+        self._clear_default()
+        row.is_default = True
+        self._session.flush()
+        return self._view(row)
+
+    def delete(self, mailbox_id: str) -> None:
+        """Remove a mailbox. Campaigns that sent from it fall back to the default; the messages
+        it drafted keep their history but no longer point at it."""
+        row = self._row(MailboxRow, mailbox_id)
+        self._session.execute(
+            update(CampaignRow)
+            .where(CampaignRow.workspace_id == self._workspace_id, CampaignRow.mailbox_id == row.id)
+            .values(mailbox_id=None)
+            .execution_options(synchronize_session=False)
+        )
+        self._session.execute(
+            update(MessageRow)
+            .where(MessageRow.workspace_id == self._workspace_id, MessageRow.mailbox_id == row.id)
+            .values(mailbox_id=None)
+            .execution_options(synchronize_session=False)
+        )
+        was_default = row.is_default
+        self._session.delete(row)
+        self._session.flush()
+        if was_default:
+            remaining = self._session.scalars(
+                select(MailboxRow)
+                .where(MailboxRow.workspace_id == self._workspace_id)
+                .order_by(MailboxRow.created_at)
+            ).first()
+            if remaining is not None:
+                remaining.is_default = True
+                self._session.flush()
+
+    def _clear_default(self) -> None:
+        self._session.execute(
+            update(MailboxRow)
+            .where(MailboxRow.workspace_id == self._workspace_id, MailboxRow.is_default.is_(True))
+            .values(is_default=False)
+            .execution_options(synchronize_session=False)
+        )
+        self._session.flush()
 
     def all(self) -> list[MailboxView]:
         stmt = (

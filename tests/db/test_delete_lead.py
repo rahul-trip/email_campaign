@@ -20,6 +20,7 @@ from outbound.domain.errors import InvalidInput
 from outbound.services.leads import LeadError
 from outbound.services.privacy import PrivacyService
 from outbound.stages.base import StageContext, StageResult
+from outbound.stages.mailboxes import one
 from tests.db.test_forget import NAME, PERSON, occurrences, populate
 from tests.db.test_runner import FakeStage, add_company, make_runner
 from tests.stages.fakes import FakeMailbox
@@ -39,7 +40,7 @@ def lead(
         uow.emails.add(keeper.id, "kim@beta.io", Provenance.API_DATABASE, is_primary=True)
         uow.commit()
     ids["other"] = other.id
-    return PrivacyService(factory, ws, mailbox), ids
+    return PrivacyService(factory, ws, one(mailbox) if mailbox else None), ids
 
 
 def test_before_deleting_the_data_really_is_in_many_places(
