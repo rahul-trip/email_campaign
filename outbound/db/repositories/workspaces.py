@@ -84,6 +84,18 @@ class WorkspaceRepository:
         self._session.flush()
         return snapshot(row, Workspace)
 
+    def rename(self, workspace_id: str, name: str, slug: str) -> Workspace:
+        """A new name and address; the slug must be free (or already this workspace's)."""
+        row = self._session.get(WorkspaceRow, workspace_id)
+        if row is None:
+            raise LookupError(workspace_id)
+        holder = self.by_slug(slug)
+        if holder is not None and holder.id != workspace_id:
+            raise ValueError(f"the address {slug!r} is taken")
+        row.name, row.slug = name, slug
+        self._session.flush()
+        return snapshot(row, Workspace)
+
     def get(self, workspace_id: str) -> Workspace | None:
         row = self._session.get(WorkspaceRow, workspace_id)
         return snapshot(row, Workspace) if row else None

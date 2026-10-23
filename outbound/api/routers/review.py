@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from outbound.api.deps import Services, services
+from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
     ApproveIn,
     CompanyOut,
@@ -18,6 +18,7 @@ from outbound.api.schemas import (
     RevisionOut,
     SkipOut,
 )
+from outbound.domain.permissions import Permission as P
 from outbound.services.review import QueueItem
 
 router = APIRouter(prefix="/api/review", tags=["review"])
@@ -36,18 +37,24 @@ def _item(item: QueueItem) -> ReviewItemOut:
     )
 
 
-@router.get("", response_model=list[ReviewItemOut])
+@router.get("", response_model=list[ReviewItemOut], dependencies=[Depends(require(P.REVIEW_READ))])
 def queue(svc: Annotated[Services, Depends(services)]) -> list[ReviewItemOut]:
     return [_item(i) for i in svc.review.queue()]
 
 
-@router.get("/{message_id}", response_model=ReviewDetailOut)
+@router.get(
+    "/{message_id}", response_model=ReviewDetailOut, dependencies=[Depends(require(P.REVIEW_READ))]
+)
 def show(message_id: str, svc: Annotated[Services, Depends(services)]) -> ReviewDetailOut:
     detail = svc.review.show(message_id)
     return ReviewDetailOut(item=_item(detail.item), notes=detail.notes)
 
 
-@router.post("/{message_id}/approve", response_model=MessageOut)
+@router.post(
+    "/{message_id}/approve",
+    response_model=MessageOut,
+    dependencies=[Depends(require(P.REVIEW_WRITE))],
+)
 def approve(
     message_id: str, body: ApproveIn, svc: Annotated[Services, Depends(services)]
 ) -> MessageOut:
@@ -60,7 +67,11 @@ def approve(
     return MessageOut.model_validate(message)
 
 
-@router.post("/{message_id}/rewrite", response_model=CompanyOut)
+@router.post(
+    "/{message_id}/rewrite",
+    response_model=CompanyOut,
+    dependencies=[Depends(require(P.REVIEW_WRITE))],
+)
 def rewrite(message_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     """Throw this email away and have the next run write a new one to the same person.
 
@@ -71,7 +82,11 @@ def rewrite(message_id: str, svc: Annotated[Services, Depends(services)]) -> Com
     return CompanyOut.model_validate(svc.leads.change_recipient(item.company.id, item.contact.id))
 
 
-@router.post("/{message_id}/revise", response_model=RevisionOut)
+@router.post(
+    "/{message_id}/revise",
+    response_model=RevisionOut,
+    dependencies=[Depends(require(P.REVIEW_WRITE))],
+)
 def revise(
     message_id: str, body: ReviseIn, svc: Annotated[Services, Depends(services)]
 ) -> RevisionOut:
@@ -80,7 +95,11 @@ def revise(
     return RevisionOut(body=revision.body, lint_report=revision.report.to_json())
 
 
-@router.post("/{message_id}/reject", response_model=MessageOut)
+@router.post(
+    "/{message_id}/reject",
+    response_model=MessageOut,
+    dependencies=[Depends(require(P.REVIEW_WRITE))],
+)
 def reject(
     message_id: str, body: RejectIn, svc: Annotated[Services, Depends(services)]
 ) -> MessageOut:

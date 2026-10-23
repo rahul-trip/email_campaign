@@ -211,8 +211,6 @@ def test_the_sender_profile_must_be_confirmed_and_can_be(isolated: str) -> None:
 def test_serve_on_a_database_that_was_never_set_up_says_what_to_run(
     url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("OPERATOR_PASSWORD_HASH", "x")
-    monkeypatch.setenv("SESSION_SECRET", "s" * 40)
     code, out = run("serve", url=url)
     assert code == 1
     assert "has not been set up" in out and "outbound db upgrade" in out and "outbound seed" in out
@@ -227,8 +225,6 @@ def test_serve_in_the_container_listens_on_all_addresses_and_trusts_the_proxy(
     started: dict[str, object] = {}
     monkeypatch.setattr(uvicorn, "run", lambda _app, **kwargs: started.update(kwargs))
     for name, value in {
-        "OPERATOR_PASSWORD_HASH": "x",
-        "SESSION_SECRET": "s" * 40,
         "API_HOST": "0.0.0.0",
         "COOKIE_SECURE": "true",
         "FORWARDED_ALLOW_IPS": "*",

@@ -4,6 +4,14 @@ common password. Nothing here calls the network."""
 
 from __future__ import annotations
 
+import hashlib
+import secrets
+
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
+
+_hasher = PasswordHasher()
+
 MIN_LENGTH = 15
 MAX_LENGTH = 256
 
@@ -31,3 +39,25 @@ def password_problem(password: str, *, email: str = "") -> str | None:
     if local and len(local) >= 4 and local in folded:
         return "Do not use your email address in the password."
     return None
+
+
+def hash_password(password: str) -> str:
+    """Argon2id, with the library's current recommended cost."""
+    return _hasher.hash(password)
+
+
+def verify_password(stored_hash: str, password: str) -> bool:
+    try:
+        return _hasher.verify(stored_hash, password)
+    except (VerificationError, InvalidHashError):
+        return False
+
+
+def new_token() -> tuple[str, str]:
+    """A random single-use secret and the hash that is stored in its place."""
+    token = secrets.token_urlsafe(32)
+    return token, hash_token(token)
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()

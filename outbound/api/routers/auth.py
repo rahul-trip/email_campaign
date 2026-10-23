@@ -1,46 +1,155 @@
+"""Signing in and out, passwords, and accepting an invitation (Phase 6b)."""
+
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from typing import Annotated
 
-from outbound.api.auth import COOKIE, LoginThrottle, Sessions, require_operator, verify_password
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.concurrency import run_in_threadpool
+
+from outbound.api.auth import LoginThrottle, clear_session, session_token, set_session
+from outbound.api.deps import current_user, identity
 from outbound.api.errors import ApiError
-from outbound.api.schemas import LoginIn, Me
-from outbound.logging import get_logger
+from outbound.api.schemas import (
+    AcceptIn,
+    ChangePasswordIn,
+    ForgotIn,
+    InvitationOut,
+    LoginIn,
+    Me,
+    MyWorkspace,
+    ResetIn,
+    UserOut,
+)
+from outbound.logging import bind
+from outbound.services.identity import CurrentUser, IdentityError, IdentityService, SignedIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-log = get_logger(__name__)
+Ids = Annotated[IdentityService, Depends(identity)]
+User = Annotated[CurrentUser, Depends(current_user)]
+
+
+def _client(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _me(ids: IdentityService, user: CurrentUser) -> Me:
+    return Me(
+        user=UserOut(
+            id=user.user.id,
+            email=user.user.email,
+            name=user.user.name,
+            platform_role=user.user.platform_role.value if user.user.platform_role else None,
+        ),
+        workspaces=[
+            MyWorkspace(
+                id=w.id,
+                slug=w.slug,
+                name=w.name,
+                status=w.status.value,
+                role=role.value if role else None,
+            )
+            for w, role in ids.workspaces_of(user)
+        ],
+    )
+
+
+def _signed_in(request: Request, response: Response, ids: IdentityService, signed: SignedIn) -> Me:
+    set_session(request, response, signed.token, signed.max_age)
+    return _me(ids, signed.current)
+
+
+def _refuse(error: IdentityError) -> ApiError:
+    return ApiError(error.status, error.code, error.detail)
 
 
 @router.post("/login", response_model=Me)
-def login(body: LoginIn, request: Request, response: Response) -> Me:
+def login(body: LoginIn, request: Request, response: Response, ids: Ids) -> Me:
     throttle: LoginThrottle = request.app.state.throttle
-    sessions: Sessions = request.app.state.sessions
-    client = request.client.host if request.client else "unknown"
+    client = _client(request)
+    bind(client_ip=client)
     if throttle.blocked(client):
-        log.warning("login_throttled", client_ip=client)
         raise ApiError(429, "too_many_attempts", "Too many failed sign-ins. Wait a minute.")
-    if not verify_password(request.app.state.password_hash, body.password):
-        throttle.failed(client)
-        log.warning("login_failed", client_ip=client)
-        raise ApiError(401, "bad_credentials", "That password is not right.")
+    try:
+        signed = ids.login(
+            body.email, body.password, ip=client, user_agent=request.headers.get("user-agent")
+        )
+    except IdentityError as error:
+        if error.code == "bad_credentials":
+            throttle.failed(client)
+        raise _refuse(error) from None
     throttle.succeeded(client)
-    log.info("login_succeeded", client_ip=client, session_hours=sessions.max_age // 3600)
-    response.set_cookie(
-        COOKIE,
-        sessions.issue(),
-        max_age=sessions.max_age,
-        httponly=True,
-        samesite="strict",
-        secure=request.app.state.cookie_secure,
-    )
-    return Me()
+    return _signed_in(request, response, ids, signed)
 
 
 @router.post("/logout", status_code=204)
-def logout(response: Response) -> None:
-    response.delete_cookie(COOKIE)
+def logout(request: Request, response: Response, ids: Ids) -> None:
+    ids.logout(session_token(request))
+    clear_session(request, response)
 
 
-@router.get("/me", response_model=Me, dependencies=[Depends(require_operator)])
-def me() -> Me:
-    return Me()
+@router.post("/logout-others")
+def logout_others(user: User, ids: Ids) -> dict[str, int]:
+    return {"signed_out": ids.logout_everywhere(user)}
+
+
+@router.get("/me", response_model=Me)
+def me(user: User, ids: Ids) -> Me:
+    return _me(ids, user)
+
+
+@router.post("/password/forgot", status_code=202)
+async def forgot(body: ForgotIn, ids: Ids) -> dict[str, str]:
+    # Sending can take a moment; the answer is the same whether or not the account exists.
+    await run_in_threadpool(ids.forgot, body.email)
+    return {"detail": "If that address has an account, a reset link is on its way."}
+
+
+@router.post("/password/reset", response_model=Me)
+def reset(body: ResetIn, request: Request, response: Response, ids: Ids) -> Me:
+    try:
+        return _signed_in(request, response, ids, ids.reset(body.token, body.password))
+    except IdentityError as error:
+        raise _refuse(error) from None
+
+
+@router.post("/password/change", status_code=204)
+def change_password(body: ChangePasswordIn, user: User, ids: Ids) -> None:
+    try:
+        ids.change_password(user, body.current_password, body.new_password)
+    except IdentityError as error:
+        raise _refuse(error) from None
+
+
+@router.get("/invitations/{token}", response_model=InvitationOut)
+def invitation(token: str, ids: Ids) -> InvitationOut:
+    try:
+        found = ids.invitation(token)
+    except IdentityError as error:
+        raise _refuse(error) from None
+    return InvitationOut(
+        email=found.email,
+        workspace_name=found.workspace_name,
+        role=found.role.value,
+        has_account=found.has_account,
+    )
+
+
+@router.post("/invitations/{token}/accept", response_model=Me)
+def accept(token: str, body: AcceptIn, request: Request, response: Response, ids: Ids) -> Me:
+    current = ids.authenticate(session_token(request))
+    try:
+        result = ids.accept(
+            token,
+            password=body.password,
+            name=body.name,
+            accept_terms=body.accept_terms,
+            current=current,
+            ip=_client(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+    except IdentityError as error:
+        raise _refuse(error) from None
+    if isinstance(result, SignedIn):
+        return _signed_in(request, response, ids, result)
+    return _me(ids, result)

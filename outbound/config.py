@@ -93,9 +93,15 @@ class Settings(BaseSettings):
 
     # --- web app and API ---
     workspace_name: str = "default"
-    operator_password_hash: str = ""  # an Argon2 hash: `uv run outbound auth hash-password`
-    session_secret: SecretStr = SecretStr("")  # signs the session cookie; any long random string
-    session_hours: int = 12
+    # --- people and their email (Phase 6b) ---
+    app_base_url: str = "http://127.0.0.1:8000"  # links in invitations and resets start with it
+    superadmin_enabled: bool = True  # alpha only: a superadmin may read any workspace
+    terms_version: str = "2026-10"  # the Terms a person accepts when they set a password
+    email_from: str = "Outbound <no-reply@localhost>"
+    smtp_host: str = ""  # blank: messages go to the log (development)
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: SecretStr = SecretStr("")
     intake_webhook_secret: SecretStr = SecretStr("")  # blank disables the webhook
     cookie_secure: bool = False  # set true when served over https
     api_host: str = "127.0.0.1"

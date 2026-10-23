@@ -6,9 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Request
 from starlette.concurrency import run_in_threadpool
 
-from outbound.api.deps import services, tenant
+from outbound.api.deps import ServicesSource, deployment_workspace
 from outbound.api.errors import ApiError
-from outbound.services.webhook import WebhookError, verify
+from outbound.domain.actors import INTEGRATION_WEBHOOK
+from outbound.services.webhook import WebhookError, WebhookService, verify
 
 router = APIRouter(prefix="/api/intake", tags=["intake"])
 MAX_BODY_BYTES = 1_000_000
@@ -29,9 +30,15 @@ async def _read_body(request: Request) -> bytes:
     return b"".join(chunks)
 
 
+def _webhook_service(request: Request) -> WebhookService:
+    source: ServicesSource = request.app.state.services_source
+    workspace_id = deployment_workspace(request)
+    return source.for_tenant(workspace_id, actor=INTEGRATION_WEBHOOK).webhook
+
+
 @router.post("/webhook")
 async def webhook(request: Request) -> dict[str, Any]:
-    """Signed intake for other systems. Not behind the operator login: the signature is the key."""
+    """Signed intake for other systems. Not behind a sign-in: the signature is the key."""
     body = await _read_body(request)
     try:
         verify(
@@ -47,9 +54,7 @@ async def webhook(request: Request) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise WebhookError(422, "bad_json", "The body must be a JSON object.")
         # Intake searches and writes, so it must not run on the event loop.
-        result = await run_in_threadpool(
-            services(request, tenant(request)).webhook.receive, payload
-        )
+        result = await run_in_threadpool(_webhook_service(request).receive, payload)
     except WebhookError as error:
         raise ApiError(error.status, error.code, error.detail) from None
     if result.duplicate or result.report is None:

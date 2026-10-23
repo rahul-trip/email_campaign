@@ -1,4 +1,4 @@
-"""``outbound serve`` (the web app and API), ``outbound worker`` and ``outbound auth``."""
+"""``outbound serve`` (the web app and API), ``outbound worker`` and ``outbound users``."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import typer
 from outbound.bootstrap import Container, build_container
 from outbound.cli.common import DatabaseUrl, settings_for
 from outbound.db.isolation import isolation_problems
+from outbound.domain.enums import MembershipRole, PlatformRole
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
 
@@ -31,23 +32,58 @@ def refuse_unsafe_database(container: Container) -> None:
         raise typer.Exit(1)
 
 
-auth_app = typer.Typer(no_args_is_help=True, help="Operator login.")
+users_app = typer.Typer(no_args_is_help=True, help="People who sign in to the web app.")
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
 
 
 def register(app: typer.Typer) -> None:
-    app.add_typer(auth_app, name="auth")
+    app.add_typer(users_app, name="users")
 
-    @auth_app.command("hash-password")
-    def hash_password_command(
+    @users_app.command("create")
+    def create_user(
+        email: Annotated[str, typer.Option(help="The address they sign in with.")],
         password: Annotated[
             str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)
         ],
+        name: Annotated[str, typer.Option()] = "",
+        workspace: Annotated[
+            str | None, typer.Option(help="Slug of a workspace to add them to.")
+        ] = None,
+        role: Annotated[MembershipRole, typer.Option(help="Their role there.")] = (
+            MembershipRole.ADMIN
+        ),
+        platform_role: Annotated[
+            PlatformRole | None, typer.Option(help="Make them platform staff.")
+        ] = None,
+        database_url: DatabaseUrl = None,
     ) -> None:
-        """Print the value to put in OPERATOR_PASSWORD_HASH."""
-        from outbound.api.auth import hash_password
+        """Create an account directly, without an invitation (the first admin, staff)."""
+        from outbound.providers.adapters.transactional_email import LogEmail
+        from outbound.services.identity import IdentityError, IdentityService
 
-        typer.echo(hash_password(password))
+        container = build_container(settings_for(database_url))
+        workspace_id = None
+        if workspace:
+            with container.platform() as platform:
+                found = platform.workspaces.by_slug(workspace)
+            if found is None:
+                typer.echo(f"no workspace with slug {workspace!r}", err=True)
+                raise typer.Exit(1)
+            workspace_id = found.id
+        config = container.settings
+        ids = IdentityService(
+            container.identity, container.platform, container.uow, LogEmail(),
+            base_url=config.app_base_url, terms_version=config.terms_version,
+        )  # fmt: skip
+        try:
+            user = ids.add_user(
+                email, password, name=name, platform_role=platform_role,
+                workspace_id=workspace_id, role=role,
+            )  # fmt: skip
+        except IdentityError as error:
+            typer.echo(error.detail, err=True)
+            raise typer.Exit(1) from None
+        typer.echo(f"user {user.id} ({user.email}) ready")
 
     @app.command()
     def serve(
@@ -66,7 +102,7 @@ def register(app: typer.Typer) -> None:
         bind_host = host or config.api_host
         if bind_host not in LOOPBACK and not config.cookie_secure:
             typer.echo(
-                f"Refusing to listen on {bind_host}: the login cookie would travel unencrypted. "
+                f"Refusing to listen on {bind_host}: the session cookie would travel unencrypted. "
                 "Serve it behind https and set COOKIE_SECURE=true, or use 127.0.0.1.",
                 err=True,
             )

@@ -133,8 +133,8 @@ Migrations are additive. A rollback to an older commit does not undo them, and t
 1. Create a project `outbound` with a `prd` config.
 2. Add every key from [`.env.example`](../.env.example) that you use, plus:
    - `POSTGRES_URL`, the Supabase URL from 1.2;
-   - `OPERATOR_PASSWORD_HASH`, from `uv run outbound auth hash-password`;
-   - `SESSION_SECRET`, a long random string (`openssl rand -hex 32`).
+   - `APP_BASE_URL`, the app's public address (invitation and reset links start with it);
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD` and `EMAIL_FROM` for invitations and password resets. In production the API refuses to start without `SMTP_HOST`. The sending domain needs SPF, DKIM and DMARC.
    From a filled-in local `.env`: `doppler secrets upload --project outbound --config prd .env`. Then remove keys that are only for your laptop.
 3. Do **not** put `DATABASE_BACKEND`, `ENVIRONMENT`, `LOG_FORMAT`, `API_HOST`, `API_PORT`, `COOKIE_SECURE` or `FORWARDED_ALLOW_IPS` there. `deploy/compose.yml` sets them, and the compose values win.
 4. Create a **service token** for `outbound/prd` with read access. That is the `DOPPLER_TOKEN` secret below. Never use a personal token (`dp.pt.…`) for the VM: it can read and change every project you can.
@@ -251,7 +251,7 @@ An explicit `DATABASE_URL`, or `--database-url`, overrides the switch. While swi
 **Once:**
 
 1. Docker Desktop is running.
-2. In Doppler, `outbound/dev` holds the same keys as `prd`, with `POSTGRES_URL` as in the table and its own `SESSION_SECRET`.
+2. In Doppler, `outbound/dev` holds the same keys as `prd`, with `POSTGRES_URL` as in the table. Without `SMTP_HOST`, invitation and reset links are printed in the `api` container's log.
 3. Create a read-only service token for `outbound/dev` and save it:
    ```bash
    mkdir -p .deploy-local && (umask 077 && echo 'DOPPLER_TOKEN=dp.st.dev...' > .deploy-local/doppler.env)

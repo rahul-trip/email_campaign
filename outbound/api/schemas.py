@@ -34,11 +34,96 @@ class In(BaseModel):
 
 
 class LoginIn(In):
-    password: str
+    email: str = Field(max_length=320)
+    password: str = Field(max_length=256)
+
+
+class UserOut(Out):
+    id: str
+    email: str
+    name: str
+    platform_role: Literal["admin", "superadmin"] | None = None
+
+
+class MyWorkspace(Out):
+    id: str
+    slug: str
+    name: str
+    status: str
+    role: Literal["admin", "member"] | None  # None: a superadmin viewing, read-only
 
 
 class Me(Out):
-    user: str = "operator"
+    user: UserOut
+    workspaces: list[MyWorkspace]
+
+
+class ForgotIn(In):
+    email: str = Field(max_length=320)
+
+
+class ResetIn(In):
+    token: str = Field(max_length=200)
+    password: str = Field(max_length=256)
+
+
+class ChangePasswordIn(In):
+    current_password: str = Field(max_length=256)
+    new_password: str = Field(max_length=256)
+
+
+class InvitationOut(Out):
+    email: str
+    workspace_name: str
+    role: Literal["admin", "member"]
+    has_account: bool
+
+
+class AcceptIn(In):
+    name: str = Field(default="", max_length=200)
+    password: str | None = Field(default=None, max_length=256)
+    accept_terms: bool = False
+
+
+class MemberOut(Out):
+    user_id: str
+    email: str
+    name: str
+    role: Literal["admin", "member"]
+    last_login_at: datetime | None
+
+
+class PendingInviteOut(Out):
+    id: str
+    email: str
+    role: Literal["admin", "member"]
+    expires_at: datetime
+
+
+class TeamOut(Out):
+    members: list[MemberOut]
+    invitations: list[PendingInviteOut]
+
+
+class InviteIn(In):
+    email: str = Field(max_length=320)
+    role: Literal["admin", "member"] = "member"
+
+
+class RoleIn(In):
+    role: Literal["admin", "member"]
+
+
+class CustomerIn(In):
+    name: str = Field(min_length=1, max_length=200)
+    website: str = Field(default="", max_length=255)
+    admin_email: str = Field(max_length=320)
+
+
+class CustomerOut(Out):
+    workspace_id: str
+    slug: str
+    invited: str
 
 
 # ------------------------------------------------------------------ leads

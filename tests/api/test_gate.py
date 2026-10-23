@@ -6,12 +6,9 @@ The API queues work and the worker executes it, exactly as in production, with f
 from __future__ import annotations
 
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from pydantic import SecretStr
 from sqlalchemy import Engine
 
 from outbound.api.app import create_app
-from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
 from outbound.bootstrap import container_for
 from outbound.config import Settings
@@ -20,8 +17,9 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import RunStatus
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
 from outbound.pipeline import assemble
+from outbound.providers.adapters.transactional_email import LogEmail
 from outbound.worker import Worker
-from tests.api.conftest import HEADERS, PASSWORD, Api
+from tests.api.conftest import ADMIN, Api, add_user, sign_in
 from tests.stages.world import PROFILE, World
 
 
@@ -36,18 +34,13 @@ def build(
         row.sender_profile = PROFILE
         uow.campaigns.create("default", ["CTO"], icp_description="Utilities that need forecasts")
         uow.commit()
-    settings = Settings(
-        _env_file=None,
-        operator_password_hash=hash_password(PASSWORD),
-        session_secret=SecretStr("s" * 40),
-    )
+    settings = Settings(_env_file=None)
     container = container_for(settings, engine, platform_engine)
     world = World()
     pipeline = assemble(container, ws, world.providers())
-    app: FastAPI = create_app(build_services(container, ws), web_dist=None)
-    client = TestClient(app)
-    client.post("/api/auth/login", json={"password": PASSWORD}, headers=HEADERS)
-    return Api(client), Worker(container, lambda _ws: pipeline, tick_every=None), world
+    app: FastAPI = create_app(build_services(container, ws), web_dist=None, email=LogEmail())
+    add_user(app, ADMIN, ws)
+    return sign_in(app, ADMIN), Worker(container, lambda _ws: pipeline, tick_every=None), world
 
 
 def test_the_whole_loop_in_the_browser_api_and_nothing_is_drafted_unapproved(

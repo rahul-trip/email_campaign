@@ -5,7 +5,8 @@
 It starts on a throwaway database with a seeded workspace, serves ``web2/dist`` (or the folder
 in ``E2E_WEB_DIST``), and runs a
 worker thread that executes queued runs against fake search, model, finder and mailbox
-objects. No network and no keys are used. The password is printed in ``E2E_PASSWORD``.
+objects. No network and no keys are used. Sign in as ``E2E_EMAIL`` with ``E2E_PASSWORD`` (a
+workspace admin), or as ``E2E_STAFF`` (a superadmin with no workspace of their own).
 """
 
 from __future__ import annotations
@@ -17,10 +18,8 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
-from pydantic import SecretStr
 
 from outbound.api.app import WEB_DIST, create_app
-from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
 from outbound.bootstrap import container_for
 from outbound.config import Settings
@@ -28,13 +27,17 @@ from outbound.db import migrate
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.enums import PlatformRole
 from outbound.metering.metered import MeteredLlm
 from outbound.pipeline import assemble, build_meter
+from outbound.providers.adapters.transactional_email import LogEmail
 from outbound.services.seed import seed_defaults
 from outbound.worker import Worker
 from tests.stages.world import PROFILE, World
 
-E2E_PASSWORD = "e2e-password-123"
+E2E_EMAIL = "operator@e2e.example"
+E2E_STAFF = "staff@e2e.example"
+E2E_PASSWORD = "e2e-password-1234567"
 PORT = 8765
 
 
@@ -55,8 +58,6 @@ def build() -> tuple[FastAPI, Worker]:
     settings = Settings(
         _env_file=None,
         database_url=url,
-        operator_password_hash=hash_password(E2E_PASSWORD),
-        session_secret=SecretStr("e2e-session-secret-0123456789"),
     )
     container = container_for(settings, engine)
     world = World()
@@ -64,7 +65,13 @@ def build() -> tuple[FastAPI, Worker]:
     web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST
     # Revisions on Review use the fake world's model too, metered like the real one.
     writer = MeteredLlm(world.llm, build_meter(container, workspace.id))
-    app = create_app(build_services(container, workspace.id, writer=writer), web_dist=web_dist)
+    app = create_app(
+        build_services(container, workspace.id, writer=writer),
+        web_dist=web_dist,
+        email=LogEmail(),
+    )
+    app.state.identity.add_user(E2E_EMAIL, E2E_PASSWORD, name="Sam", workspace_id=workspace.id)
+    app.state.identity.add_user(E2E_STAFF, E2E_PASSWORD, platform_role=PlatformRole.SUPERADMIN)
     return app, Worker(container, lambda _ws: pipeline, tick_every=None)
 
 

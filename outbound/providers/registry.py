@@ -14,6 +14,7 @@ import httpx
 from pydantic import SecretStr
 
 from outbound.config import Settings
+from outbound.domain.errors import ConfigurationError
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
 from outbound.providers.adapters.hunter import HunterFinder, HunterVerifier
@@ -33,6 +34,7 @@ from outbound.providers.ports import (
     LlmClient,
     Mailbox,
     SearchProvider,
+    TransactionalEmail,
 )
 
 
@@ -200,3 +202,23 @@ def build_mailbox(settings: Settings) -> Mailbox:
 
 def build_search(settings: Settings, client: httpx.Client | None = None) -> SearchProvider:
     return TavilySearch(_key(settings.tavily_api_key), client=client)
+
+
+def build_transactional_email(settings: Settings) -> TransactionalEmail:
+    """SMTP when it is set up; otherwise the log (refused in production)."""
+    from outbound.providers.adapters.transactional_email import LogEmail, SmtpEmail
+
+    if settings.smtp_host:
+        return SmtpEmail(
+            settings.smtp_host,
+            settings.smtp_port,
+            settings.smtp_username,
+            settings.smtp_password.get_secret_value(),
+            settings.email_from,
+        )
+    if settings.environment == "production":
+        raise ConfigurationError(
+            "SMTP_HOST is not set, so invitations and password resets could not be sent. "
+            "Set SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD and EMAIL_FROM."
+        )
+    return LogEmail()

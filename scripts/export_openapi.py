@@ -12,8 +12,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-from pydantic import SecretStr
-
 from outbound.api.app import create_app
 from outbound.api.deps import build_services
 from outbound.bootstrap import container_for
@@ -21,6 +19,7 @@ from outbound.config import Settings
 from outbound.db import migrate
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
+from outbound.providers.adapters.transactional_email import LogEmail
 
 
 def build_document() -> dict[str, object]:
@@ -31,14 +30,11 @@ def build_document() -> dict[str, object]:
         with PlatformUnitOfWorkFactory(make_session_factory(engine))() as directory:
             workspace = directory.workspaces.create("docs", {}, {})
             directory.commit()
-        settings = Settings(
-            _env_file=None,
-            database_url=url,
-            operator_password_hash="x",
-            session_secret=SecretStr("x" * 32),
-        )
+        settings = Settings(_env_file=None, database_url=url)
         app = create_app(
-            build_services(container_for(settings, engine), workspace.id), web_dist=None
+            build_services(container_for(settings, engine), workspace.id),
+            web_dist=None,
+            email=LogEmail(),
         )
         document = app.openapi()
         engine.dispose()

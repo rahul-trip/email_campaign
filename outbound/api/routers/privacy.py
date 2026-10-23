@@ -4,8 +4,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from outbound.api.deps import Services, services
+from outbound.api.deps import Services, require, services
 from outbound.api.schemas import DeleteLeadIn, DeleteLeadOut, ForgetIn, PrivacyOut
+from outbound.domain.permissions import Permission as P
 from outbound.services.privacy import PrivacyResult
 
 router = APIRouter(prefix="/api", tags=["privacy"])
@@ -20,13 +21,19 @@ def _out(result: PrivacyResult) -> PrivacyOut:
     )
 
 
-@router.post("/privacy/forget", response_model=PrivacyOut)
+@router.post(
+    "/privacy/forget", response_model=PrivacyOut, dependencies=[Depends(require(P.PRIVACY_FORGET))]
+)
 def forget(body: ForgetIn, svc: Annotated[Services, Depends(services)]) -> PrivacyOut:
     """Erase a person: suppress the address for good and remove what identifies them."""
     return _out(svc.privacy.forget(body.email))
 
 
-@router.post("/companies/{company_id}/delete", response_model=DeleteLeadOut)
+@router.post(
+    "/companies/{company_id}/delete",
+    response_model=DeleteLeadOut,
+    dependencies=[Depends(require(P.LEADS_DELETE))],
+)
 def delete_lead(
     company_id: str, body: DeleteLeadIn, svc: Annotated[Services, Depends(services)]
 ) -> DeleteLeadOut:
@@ -46,13 +53,21 @@ def delete_lead(
     )
 
 
-@router.post("/contacts/{contact_id}/suppress", response_model=PrivacyOut)
+@router.post(
+    "/contacts/{contact_id}/suppress",
+    response_model=PrivacyOut,
+    dependencies=[Depends(require(P.SUPPRESSIONS_WRITE))],
+)
 def suppress_contact(contact_id: str, svc: Annotated[Services, Depends(services)]) -> PrivacyOut:
     """Never contact this person again; their unsent emails are cancelled."""
     return _out(svc.privacy.suppress_contact(contact_id))
 
 
-@router.post("/companies/{company_id}/suppress", response_model=PrivacyOut)
+@router.post(
+    "/companies/{company_id}/suppress",
+    response_model=PrivacyOut,
+    dependencies=[Depends(require(P.SUPPRESSIONS_WRITE))],
+)
 def suppress_company(company_id: str, svc: Annotated[Services, Depends(services)]) -> PrivacyOut:
     """Never contact anyone at this company's domain again."""
     return _out(svc.privacy.suppress_company(company_id))

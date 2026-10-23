@@ -17,13 +17,13 @@ from sqlalchemy import Engine
 from typer.testing import CliRunner
 
 from outbound.api.app import create_app
-from outbound.api.auth import hash_password
 from outbound.api.deps import build_services
 from outbound.bootstrap import container_for
 from outbound.cli.main import app as cli_app
 from outbound.config import Settings
 from outbound.db.uow import UnitOfWorkFactory
-from tests.api.conftest import PASSWORD, WEBHOOK_SECRET
+from outbound.providers.adapters.transactional_email import LogEmail
+from tests.api.conftest import ADMIN, PASSWORD, WEBHOOK_SECRET, add_user
 
 DECOY = "SECRET-DECOY-OUTSIDE-THE-WEB-FOLDER"
 
@@ -44,18 +44,17 @@ def site(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def served(
-    engine: Engine, factory: UnitOfWorkFactory, ws: str, site: Path
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str, site: Path
 ) -> Callable[..., TestClient]:
     settings = Settings(
         _env_file=None,
-        operator_password_hash=hash_password(PASSWORD),
-        session_secret=SecretStr("s" * 40),
         intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
-    container = container_for(settings, engine)
+    container = container_for(settings, engine, platform_engine)
 
     def build() -> TestClient:
-        app = create_app(build_services(container, ws), web_dist=site)
+        app = create_app(build_services(container, ws), web_dist=site, email=LogEmail())
+        add_user(app, ADMIN, ws)
         return TestClient(app)
 
     return build
@@ -162,7 +161,9 @@ def test_a_bug_is_a_plain_500_with_no_internal_detail(
 ) -> None:
     client = served()
     client.post(
-        "/api/auth/login", json={"password": PASSWORD}, headers={"X-Requested-With": "outbound"}
+        "/api/auth/login",
+        json={"email": ADMIN, "password": PASSWORD},
+        headers={"X-Requested-With": "outbound"},
     )
     app: FastAPI = client.app  # type: ignore[assignment]
 
@@ -201,7 +202,9 @@ def test_an_unknown_api_path_is_a_clear_json_404_for_any_method(
     """
     client = served()
     client.post(
-        "/api/auth/login", json={"password": PASSWORD}, headers={"X-Requested-With": "outbound"}
+        "/api/auth/login",
+        json={"email": ADMIN, "password": PASSWORD},
+        headers={"X-Requested-With": "outbound"},
     )
     for method in ("get", "post", "put", "patch", "delete"):
         response = getattr(client, method)(
