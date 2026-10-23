@@ -1,19 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Lock } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Tabs, Textarea } from "../components/ui";
 import { lines, when } from "../lib/format";
+import { Account, Team } from "./SettingsTeam";
+import type { SettingsTab } from "./settingsTabs";
 
-type Tab = "setup" | "profile" | "limits";
+type Tab = SettingsTab;
 type Profile = Record<string, unknown>;
 
 export function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("setup");
+  const { tab = "setup" } = useSearch({ from: "/settings" });
+  const navigate = useNavigate();
+  const setTab = (next: Tab) => void navigate({ to: "/settings", search: { tab: next === "setup" ? undefined : next }, replace: true });
   return (
     <>
-      <PageHeader title="Settings" subtitle="Who you are in every email, and the limits the engine works within." />
+      <PageHeader title="Settings" subtitle="Who you are in every email, the limits the engine works within, and who works here." />
       <Tabs
         label="Settings"
         tour="settings-tabs"
@@ -23,11 +27,15 @@ export function SettingsPage() {
           ["setup", "Setup check"],
           ["profile", "Sender profile"],
           ["limits", "Limits and budget"],
+          ["team", "Team"],
+          ["account", "Your account"],
         ]}
       >
         {tab === "setup" && <Setup onOpen={setTab} />}
         {tab === "profile" && <SenderProfile />}
         {tab === "limits" && <Limits />}
+        {tab === "team" && <Team />}
+        {tab === "account" && <Account />}
       </Tabs>
     </>
   );

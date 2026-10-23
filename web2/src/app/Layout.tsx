@@ -1,37 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { AlertTriangle, Compass, LogOut, Menu, Monitor, Moon, Plus, Search, Sun, X, Zap } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Sun, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { SIGNED_OUT, client, ok } from "../api/client";
-import { buttonClass } from "../components/ui";
+import { client, ok } from "../api/client";
+import { Avatar, Menu, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
 import { useTheme, type Theme } from "../lib/theme";
 import { TourProvider, useTour } from "../tour/Tour";
-import { Login } from "./Login";
 import { NAV } from "./nav";
+import { go, inWorkspace, isViewing, rememberWorkspace, useCurrent } from "./session";
 
 /** A run still queued after this long means no worker is picking runs up. */
 const WORKER_SILENT_MS = 45_000;
 
+/** The signed-in shell of one workspace. Who is signed in is settled before it renders (main.tsx). */
 export function Layout({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
-  const me = useQuery({ queryKey: ["me"], queryFn: () => ok(client.GET("/api/auth/me")) });
-
-  // Any request answered 401 means the session ended: show the sign-in form again.
-  useEffect(() => {
-    const signedOut = () => void queryClient.invalidateQueries({ queryKey: ["me"] });
-    window.addEventListener(SIGNED_OUT, signedOut);
-    return () => window.removeEventListener(SIGNED_OUT, signedOut);
-  }, [queryClient]);
-
-  if (me.isPending)
-    return (
-      <div role="status" className="flex min-h-screen items-center justify-center text-muted">
-        Loading…
-      </div>
-    );
-  if (me.isError) return <Login onDone={() => queryClient.invalidateQueries({ queryKey: ["me"] })} />;
   return (
     <TourProvider autoStart>
       <Shell>{children}</Shell>
@@ -40,7 +24,8 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const queryClient = useQueryClient();
+  const current = useCurrent();
+  const viewing = isViewing(current.workspace);
   const [menuOpen, setMenuOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   useEffect(() => setMenuOpen(false), [pathname]);
@@ -55,7 +40,6 @@ function Shell({ children }: { children: ReactNode }) {
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
   const workspace = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const rulesOff = workspace.data?.country_policy_enabled === false;
-  const logout = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => queryClient.clear() });
 
   const held = Object.values(status.data?.held ?? {}).reduce((sum, n) => sum + n, 0);
   const counts = {
@@ -73,7 +57,7 @@ function Shell({ children }: { children: ReactNode }) {
       </a>
       <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-line bg-surface px-3 sm:px-4">
         <button type="button" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)} className="rounded-lg p-1.5 text-muted hover:bg-surface-low lg:hidden">
-          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          {menuOpen ? <X size={20} /> : <MenuIcon size={20} />}
         </button>
         <Link to="/" className="flex shrink-0 items-center gap-2">
           <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-on-primary">
@@ -82,20 +66,18 @@ function Shell({ children }: { children: ReactNode }) {
           <span className="text-lg font-bold tracking-tight">Outbound</span>
         </Link>
         <span className="hidden text-outline md:inline">/</span>
-        <span className="hidden text-[13px] font-semibold text-muted md:inline" title="One workspace for now; several arrive with sign-in for teams.">
-          Workspace
-        </span>
+        <WorkspaceSwitcher />
         <SearchBox />
         <div className="ml-auto flex items-center gap-2">
           <EngineChip run={active} stuck={stuck} />
-          <Link to="/targets" className={buttonClass("primary", "md", "hidden sm:inline-flex")}>
-            <Plus size={16} aria-hidden /> Add target
-          </Link>
+          {!viewing && (
+            <Link to="/targets" className={buttonClass("primary", "md", "hidden sm:inline-flex")}>
+              <Plus size={16} aria-hidden /> Add target
+            </Link>
+          )}
           <TourButton />
           <ThemeSwitch />
-          <button type="button" onClick={() => logout.mutate()} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-muted hover:bg-surface-low hover:text-ink">
-            <LogOut size={16} aria-hidden /> <span className="hidden md:inline">Sign out</span>
-          </button>
+          <UserMenu />
         </div>
       </header>
 
@@ -148,6 +130,7 @@ function Shell({ children }: { children: ReactNode }) {
 
       <main id="main" className="px-4 pb-12 pt-[72px] sm:px-6 lg:ml-60">
         <div className="mx-auto max-w-[1440px]">
+          {viewing && <ViewingBanner name={current.workspace.name} />}
           {stuck && (
             <Banner tone="error">
               A run has been waiting {ago(active?.created_at)} and nothing has picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.
@@ -262,5 +245,87 @@ function ThemeSwitch() {
     <button type="button" title={label} aria-label={`${label}. Change theme`} onClick={() => setTheme(next[theme])} className="rounded-lg p-1.5 text-muted hover:bg-surface-low hover:text-ink">
       <Icon size={18} />
     </button>
+  );
+}
+
+/** A superadmin reading a workspace they are not in. Stays in view; every write is refused. */
+function ViewingBanner({ name }: { name: string }) {
+  return (
+    <div role="status" data-tour="viewing" className="sticky top-[60px] z-20 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error px-3 py-2 text-[13px] font-semibold text-white shadow">
+      <span className="flex items-center gap-2">
+        <Eye size={16} aria-hidden /> Superadmin view of {name}, read-only
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          rememberWorkspace(null);
+          go("/");
+        }}
+        className="rounded-md bg-white/15 px-2 py-0.5 hover:bg-white/25"
+      >
+        Exit
+      </button>
+    </div>
+  );
+}
+
+/** The workspace this page acts in; the others this person can open are one click away. */
+function WorkspaceSwitcher() {
+  const { me, workspace } = useCurrent();
+  return (
+    <Menu
+      label="Switch workspace"
+      tour="workspace-switcher"
+      align="left"
+      buttonClassName="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-muted hover:bg-surface-low hover:text-ink"
+      button={
+        <>
+          <span className="max-w-[180px] truncate">{workspace.name}</span>
+          <ChevronDown size={14} aria-hidden />
+        </>
+      }
+      header={<span className="text-muted">Workspaces</span>}
+      items={me.workspaces.map((w) => ({
+        label: (
+          <>
+            {w.id === workspace.id ? <Check size={14} aria-hidden /> : <span className="w-3.5" />}
+            {w.name}
+          </>
+        ),
+        hint: w.role ?? "view only",
+        current: w.id === workspace.id,
+        onSelect: () => w.id !== workspace.id && go(inWorkspace(w.slug)),
+      }))}
+    />
+  );
+}
+
+/** Who is signed in: their account, and signing out. */
+function UserMenu() {
+  const { me } = useCurrent();
+  const signOut = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => go("/sign-in") });
+  const others = useMutation({ mutationFn: () => ok(client.POST("/api/auth/logout-others")) });
+  const navigate = useNavigate();
+  const name = me.user.name || me.user.email;
+  return (
+    <Menu
+      label="Your account"
+      tour="user-menu"
+      buttonClassName="flex items-center rounded-full p-0.5 hover:bg-surface-low"
+      button={<Avatar name={name} />}
+      header={
+        <>
+          <div className="font-semibold">{name}</div>
+          <div className="text-muted">{me.user.email}</div>
+          {me.user.platform_role && <div className="mt-1 text-[11px] font-semibold uppercase text-primary">Platform {me.user.platform_role}</div>}
+          {others.isSuccess && <div className="mt-1 text-[11px] text-muted">Signed out of {others.data.signed_out} other session(s).</div>}
+        </>
+      }
+      items={[
+        { label: <><KeyRound size={14} aria-hidden /> Account and password</>, onSelect: () => void navigate({ to: "/settings", search: { tab: "account" } }) },
+        { label: <><LogOut size={14} aria-hidden /> Sign out everywhere else</>, onSelect: () => others.mutate() },
+        { label: <><LogOut size={14} aria-hidden /> Sign out</>, onSelect: () => signOut.mutate(), tone: "danger" },
+      ]}
+    />
   );
 }

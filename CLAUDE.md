@@ -46,6 +46,14 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - one worker for every workspace, with a 15-minute tick.
 
   On Postgres the tests run as the production roles. Before deploying, set up the roles (`docs/DEPLOY.md` §1.2a).
+- **Phase 6b (identity and access) is code complete** on branch `phase-6/identity-and-access`:
+  - people sign in with an email and password into revocable sessions (`outbound/services/identity.py`); accounts come only by invitation, or from `outbound users create`;
+  - every route declares one permission (`require(...)` in `outbound/api/deps.py`), and every request names its workspace in `X-Workspace-Id`;
+  - roles are workspace admin and member, plus platform admin and the alpha-only superadmin, who reads any workspace read-only;
+  - invitation and reset emails go through the `TransactionalEmail` port (SMTP relay, or the log in development);
+  - in `web2/`, a workspace's pages live under `/w/{slug}`: `src/main.tsx` builds the router with that base path, and the pages outside a workspace are in `src/app/Public.tsx`.
+
+  The old operator password (`OPERATOR_PASSWORD_HASH`) is gone. To move an existing install, run `scripts/migrate_first_tenant.py`.
 - **Phase 6 (SaaS alpha) is planned and approved (2026-10-23):**
   - `docs/phases/phase-6-saas-ready.md` gives the overview, decisions and isolation model; the sub-phases are 6a–6g.
   - Order: 6a tenancy → 6b identity → 6c onboarding and mailboxes → 6d plans, limits and admin console → 4a opt-outs and bounces → **alpha** → 6g lead directory, in parallel with the rest of Phase 4.
@@ -60,7 +68,7 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - `runner/`: the status runner, guards and the tick. `pipeline.py` assembles everything with metered providers.
   - `services/`: intake, review, reports, forget, seed, legacy import. `prompts/`: every model instruction.
   - `api/`: FastAPI app, auth, routers, schemas. `cli/`: `db`, `seed`, `targets`, `run`, `tick`, `retry`, `status`, `review`, `report`, `serve`, `worker`, `auth`, `import-legacy-xlsx`.
-  - `web2/`: modernized React app implementing Google Stitch design system tokens (`docs/design.md`) and complete screen suite (Dashboard Variant 2, Review, Attention, Leads, LeadDetail, LeadJourney, Targets, Runs, Reports, Campaigns, Mailboxes, Compliance, Settings). Verify with `npm --prefix web2 run build`. Develop with `cd web2 && npm run dev` (port 5174, proxies `/api` to `:8000`; set `API_TARGET=http://127.0.0.1:8765` to use the fake-vendor server from `uv run python -m scripts.e2e_server`). Shared components live in `web2/src/components/ui.tsx`; status words and colours in `web2/src/lib/status.ts`.
+  - `web2/`: modernized React app implementing Google Stitch design system tokens (`docs/design.md`) and complete screen suite (Dashboard Variant 2, Review, Attention, Leads, LeadDetail, LeadJourney, Targets, Runs, Reports, Campaigns, Mailboxes, Compliance, Settings). Verify with `npm --prefix web2 run build`. Develop with `cd web2 && npm run dev` (port 5174, proxies `/api` to `:8000`; set `API_TARGET=http://127.0.0.1:8765` to use the fake-vendor server from `uv run python -m scripts.e2e_server`, and sign in as `operator@e2e.example` / `e2e-password-1234567`). Shared components live in `web2/src/components/ui.tsx`; status words and colours in `web2/src/lib/status.ts`.
 - **Deployment:** `Dockerfile` (one image), `deploy/compose.yml` (`migrate`, `api`, `worker`; project `outbound`), `deploy/remote-deploy.sh` (build on the VM, health check, rollback), `deploy/local-test.sh` (the same deploy rehearsed locally, with a local Postgres and https proxy) and `.github/workflows/deploy.yml` (manual: host, username, ref). Secrets come from Doppler via `doppler run`; the database is Supabase Postgres (session pooler). See `docs/DEPLOY.md`.
 - **`agent/`** is the legacy pipeline. Do not touch it. Its reusable parts are ported into `outbound/`, and it is deleted (with the `legacy` dependency group) after the first live run.
 - **Environment:** `uv sync` builds `.venv` on Python 3.12 with the dev tools and the `legacy` dependency group. `.venv` is not tracked in git.

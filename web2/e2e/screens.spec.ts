@@ -103,7 +103,8 @@ test("campaigns and mailboxes save", async ({ page }) => {
 test("every screen opens without errors, on a laptop and a phone", async ({ page }) => {
   await signIn(page);
   await addTarget(page, { website: unique("smoke"), country: "US" });
-  const routes = ["/", "/review", "/attention", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/mailboxes", "/compliance", "/settings"];
+  const screens = ["/", "/review", "/attention", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/mailboxes", "/compliance", "/settings", "/settings?tab=team", "/settings?tab=account"];
+  const routes = ["/sign-in", "/forgot-password", ...screens.map((route) => `/w/default${route}`)];
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const route of routes) {

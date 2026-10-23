@@ -3,6 +3,7 @@ import { Layout } from "./app/Layout";
 import { Empty, buttonClass } from "./components/ui";
 import { DashboardPage } from "./pages/Dashboard";
 import type { LeadsSearch } from "./pages/Leads";
+import { SETTINGS_TABS, type SettingsTab } from "./pages/settingsTabs";
 
 function NotFound() {
   return (
@@ -57,6 +58,14 @@ const review = createRoute({
   validateSearch: (search: Record<string, unknown>): { message?: string } => ({ message: text(search.message) }),
 });
 
+// Settings can open on one tab, e.g. the account tab from the user menu.
+const settings = createRoute({
+  getParentRoute: () => root,
+  path: "/settings",
+  component: lazy(() => import("./pages/Settings"), "SettingsPage"),
+  validateSearch: (search: Record<string, unknown>): { tab?: SettingsTab } => ({ tab: SETTINGS_TABS.find((t) => t === search.tab) }),
+});
+
 const routeTree = root.addChildren([
   page("/", DashboardPage),
   review,
@@ -71,13 +80,17 @@ const routeTree = root.addChildren([
   page("/mailboxes", lazy(() => import("./pages/Mailboxes"), "MailboxesPage")),
   page("/reports", lazy(() => import("./pages/Reports"), "ReportsPage")),
   page("/compliance", lazy(() => import("./pages/Compliance"), "CompliancePage")),
-  page("/settings", lazy(() => import("./pages/Settings"), "SettingsPage")),
+  settings,
 ]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent" });
+/**
+ * The app inside one workspace. Its pages live under /w/{slug}, given as the base path, so a
+ * link to "/leads" inside the app opens that workspace's leads.
+ */
+export const makeRouter = (slug: string) => createRouter({ routeTree, basepath: `/w/${encodeURIComponent(slug)}`, defaultPreload: "intent" });
 
 declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router;
+    router: ReturnType<typeof makeRouter>;
   }
 }

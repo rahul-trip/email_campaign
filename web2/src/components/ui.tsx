@@ -484,3 +484,85 @@ export function Confirm({
     </Dialog>
   );
 }
+
+// ------------------------------------------------------------------ menus
+
+/** A person's initials in a circle. */
+export function Avatar({ name, className }: { name: string; className?: string }) {
+  const initials =
+    name
+      .split(/[\s@._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]!.toUpperCase())
+      .join("") || "?";
+  return (
+    <span aria-hidden className={cx("flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-[11px] font-semibold text-primary", className)}>
+      {initials}
+    </span>
+  );
+}
+
+export type MenuItem = { label: ReactNode; onSelect: () => void; hint?: ReactNode; current?: boolean; tone?: "danger" };
+
+/**
+ * A button that opens a short list of actions. Arrow keys move, Enter picks, Escape or a click
+ * outside closes it, and focus returns to the button.
+ */
+export function Menu({ label, button, items, header, align = "right", tour, buttonClassName }: { label: string; button: ReactNode; items: MenuItem[]; header?: ReactNode; align?: "left" | "right"; tour?: string; buttonClassName?: string }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
+  useEffect(() => {
+    if (!open) return;
+    root.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
+    const away = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    return () => document.removeEventListener("mousedown", away);
+  }, [open]);
+  const close = () => {
+    setOpen(false);
+    trigger.current?.focus();
+  };
+  const onKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    const entries = Array.from(root.current?.querySelectorAll<HTMLElement>("[role=menuitem]") ?? []);
+    const at = entries.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "Escape") close();
+    else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      entries[(at + step + entries.length) % entries.length]?.focus();
+    }
+  };
+  return (
+    <div ref={root} className="relative" onKeyDown={onKey} data-tour={tour}>
+      <button ref={trigger} type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(!open)} className={buttonClassName}>
+        {button}
+      </button>
+      {open && (
+        <div id={id} role="menu" aria-label={label} className={cx("absolute top-full z-50 mt-1 min-w-56 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg", align === "right" ? "right-0" : "left-0")}>
+          {header && <div className="border-b border-line px-3 py-2 text-[12px]">{header}</div>}
+          {items.map((item, index) => (
+            <button
+              key={index}
+              type="button"
+              role="menuitem"
+              aria-current={item.current || undefined}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              className={cx("flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[13px] outline-none hover:bg-surface-low focus:bg-surface-low", item.tone === "danger" ? "text-error" : "text-ink", item.current && "font-semibold")}
+            >
+              <span className="flex items-center gap-2">{item.label}</span>
+              {item.hint && <span className="text-[11px] text-muted">{item.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
