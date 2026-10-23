@@ -7,11 +7,10 @@ from typing import Annotated
 import typer
 
 from outbound.bootstrap import Container, build_container
-from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
+from outbound.cli.common import DatabaseUrl, settings_for
 from outbound.db.isolation import isolation_problems
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
-from outbound.services import defaults
 
 log = get_logger(__name__)
 
@@ -99,30 +98,42 @@ def register(app: typer.Typer) -> None:
     @app.command()
     def worker(
         poll_seconds: Annotated[float, typer.Option(help="Wait between checks when idle.")] = 2.0,
-        workspace: WorkspaceName = defaults.DEFAULT_WORKSPACE_NAME,
+        threads: Annotated[int, typer.Option(help="Workspaces worked on at the same time.")] = 4,
+        tick_minutes: Annotated[
+            float, typer.Option(help="Retries, mailbox sync and due leads, this often (0: never).")
+        ] = 15,
         database_url: DatabaseUrl = None,
     ) -> None:
-        """Execute runs queued from the web app, one after another, until stopped."""
+        """Execute queued runs and the periodic tick for every workspace, until stopped."""
+        from datetime import timedelta
+
         from outbound.pipeline import NotConfigured, assemble, real_providers
         from outbound.worker import Worker
 
         container = build_container(settings_for(database_url))
         refuse_unsafe_database(container)
-        workspace_id = workspace_id_or_exit(container, workspace)
         try:
-            pipeline = assemble(container, workspace_id, real_providers(container.settings))
+            providers = real_providers(container.settings)  # built once, shared by workspaces
         except NotConfigured as error:
             typer.echo(f"not configured: {error}", err=True)
             raise typer.Exit(1) from error
         log.info(
             "service_started",
             role="worker",
-            workspace_id=workspace_id,
+            threads=threads,
+            tick_minutes=tick_minutes,
             poll_seconds=poll_seconds,
             database=container.engine.url.render_as_string(hide_password=True),
         )
         typer.echo("worker ready; waiting for queued runs (Ctrl-C to stop)")
+        tick_every = timedelta(minutes=tick_minutes) if tick_minutes > 0 else None
+        engine = Worker(
+            container,
+            lambda workspace_id: assemble(container, workspace_id, providers),
+            threads=threads,
+            tick_every=tick_every,
+        )
         try:
-            Worker(container, workspace_id, pipeline).run_forever(poll_seconds=poll_seconds)
+            engine.run_forever(poll_seconds=poll_seconds)
         except KeyboardInterrupt:
             typer.echo("stopped")

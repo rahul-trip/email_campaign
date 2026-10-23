@@ -51,11 +51,17 @@ class Tick:
         self._runner = runner
         self._jobs = tuple(jobs)
 
-    def run(self, *, limit: int = 50) -> TickReport:
+    def run(self, *, limit: int = 50, skip_idle: bool = False) -> TickReport:
+        """Retries, then the jobs, then the pipeline.
+
+        With ``skip_idle`` (the worker's timer) no pipeline run is started when no lead is
+        waiting, so a quiet workspace does not fill its Runs screen with empty runs.
+        """
         report = TickReport(retried=self._runner.retry_failed(limit=limit))
         if self._jobs:
             report.jobs = self._run_jobs()
-        report.pipeline = self._runner.run_pipeline(limit=limit)
+        if not skip_idle or self._runner.has_due_work():
+            report.pipeline = self._runner.run_pipeline(limit=limit)
         return report
 
     def _run_jobs(self) -> dict[str, dict[str, int]]:

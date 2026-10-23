@@ -65,7 +65,7 @@ def build() -> tuple[FastAPI, Worker]:
     # Revisions on Review use the fake world's model too, metered like the real one.
     writer = MeteredLlm(world.llm, build_meter(container, workspace.id))
     app = create_app(build_services(container, workspace.id, writer=writer), web_dist=web_dist)
-    return app, Worker(container, workspace.id, pipeline)
+    return app, Worker(container, lambda _ws: pipeline, tick_every=None)
 
 
 def main() -> None:

@@ -378,6 +378,12 @@ class Runner:
                 detail["run_id"] = self._run_id
             uow.events.append(EntityType.COMPANY, company.id, "deferred", SYSTEM, detail)
 
+    def has_due_work(self) -> bool:
+        """Whether any stage has a lead waiting; a tick skips the pipeline run otherwise."""
+        statuses = [stage.input_status for stage in self._stages]
+        with self._uow(self._workspace_id) as uow:
+            return uow.companies.any_due(statuses, self._now())
+
     # ------------------------------------------------------------------ retries
 
     def retry_failed(self, *, limit: int = 50) -> int:

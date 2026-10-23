@@ -7,6 +7,7 @@ never the URL, because several vendors take the API key as a query parameter.
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 import httpx
@@ -55,6 +56,22 @@ def _honouring_retry_after(base: wait_base) -> wait_base:
 
 def _is_retryable(exc: BaseException) -> bool:
     return isinstance(exc, ProviderError) and exc.retryable
+
+
+# Calls in flight to one vendor at once, across every worker thread. The keys are shared by
+# every workspace, and research fans out four ways, so without a cap K worker threads could
+# send 4K requests together and trip the vendor's rate limit for everyone.
+MAX_CONCURRENT_PER_PROVIDER = 4
+_in_flight: dict[str, threading.BoundedSemaphore] = {}
+_in_flight_lock = threading.Lock()
+
+
+def _gate(provider: str) -> threading.BoundedSemaphore:
+    with _in_flight_lock:
+        gate = _in_flight.get(provider)
+        if gate is None:
+            gate = _in_flight[provider] = threading.BoundedSemaphore(MAX_CONCURRENT_PER_PROVIDER)
+        return gate
 
 
 class HttpClient:
@@ -123,7 +140,8 @@ class HttpClient:
     def _once(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self._base_url}/{path.lstrip('/')}"
         try:
-            response = self._client.request(method, url, headers=self._headers, **kwargs)
+            with _gate(self._provider):  # held for the request only, never across a retry wait
+                response = self._client.request(method, url, headers=self._headers, **kwargs)
         except httpx.TransportError as exc:
             raise ProviderError(
                 self._provider, f"{method} {path}: {type(exc).__name__}", retryable=True

@@ -122,16 +122,16 @@ def test_a_rate_limit_waits_as_long_as_the_vendor_asked_up_to_a_minute() -> None
 def test_the_worker_outlives_a_database_error(
     engine: Engine, factory: UnitOfWorkFactory, ws: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    worker = Worker(container(engine, factory), ws, pipeline=None)  # type: ignore[arg-type]
+    worker = Worker(container(engine, factory), lambda _ws: None, tick_every=None)  # type: ignore[arg-type,return-value]
     calls = {"n": 0}
 
-    def flaky() -> bool:
+    def flaky() -> list[object]:
         calls["n"] += 1
         if calls["n"] == 1:
             raise RuntimeError("database is locked")
-        return False
+        return []
 
-    monkeypatch.setattr(worker, "run_once", flaky)
+    monkeypatch.setattr(worker, "plan", flaky)
     worker.run_forever(poll_seconds=0, stop=lambda: calls["n"] >= 3)
     assert calls["n"] == 3  # it kept going after the first call blew up
 

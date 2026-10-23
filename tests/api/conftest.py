@@ -61,14 +61,16 @@ class Api:
 
 
 @pytest.fixture
-def container(engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path) -> Container:
+def container(
+    engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path
+) -> Container:
     settings = Settings(
         _env_file=None,
         operator_password_hash=hash_password(PASSWORD),
         session_secret=SecretStr("s" * 40),
         intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
-    return container_for(settings, engine)
+    return container_for(settings, engine, platform_engine)
 
 
 @pytest.fixture
