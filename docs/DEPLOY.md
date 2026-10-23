@@ -78,6 +78,52 @@ The first deploy creates the tables (`db upgrade`) and the default workspace, ca
 
 From Phase 6a, CI runs a catalog test that fails if those roles hold any grant, and the app connects as a least-privilege role instead of `postgres` (see [phases/phase-6a-tenancy-foundation.md](phases/phase-6a-tenancy-foundation.md)).
 
+### 1.2a Database roles (Phase 6a)
+
+Row-level security keeps each workspace's rows apart, but only for a connection that is subject to it. The owner of the tables (`postgres` on Supabase), a superuser and a BYPASSRLS role all see every workspace. So the app uses three connections:
+
+| Setting | Role | Used by | May |
+|---|---|---|---|
+| `POSTGRES_MIGRATE_URL` | the owner (`postgres`) | `outbound db upgrade` and `outbound seed` (the `migrate` container) | create and change tables |
+| `POSTGRES_URL` | `outbound_app` | `api`, `worker` | read and write one workspace's rows at a time |
+| `POSTGRES_PLATFORM_URL` | `outbound_platform` | the worker's scheduler | read every workspace; write only `workspaces` |
+
+Migration 0009 creates the two roles (without a login) and gives them their grants and policies. You give them a login and password, once, by hand.
+
+**Set it up, in this order.** `serve` and `worker` refuse to start in production if they find they are connected as the owner, a superuser or a BYPASSRLS role, so the roles must be ready before the release that brings Phase 6a.
+
+1. **Create the logins** in the Supabase SQL editor, with long random passwords of your own:
+
+   ```sql
+   CREATE ROLE outbound_app LOGIN NOBYPASSRLS PASSWORD '...';
+   CREATE ROLE outbound_platform LOGIN NOBYPASSRLS PASSWORD '...';
+   ```
+
+   Give them no `VALID UNTIL`. An expired role fails at the pooler with `EAUTHQUERY`.
+2. **Build their session-pooler URLs** from the one you already have. The user name is `<role>.<project-ref>`:
+
+   ```
+   postgresql://outbound_app.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+   ```
+
+3. **In Doppler `outbound/prd`:**
+   - `POSTGRES_URL` becomes the `outbound_app` URL;
+   - add `POSTGRES_PLATFORM_URL` (the `outbound_platform` URL);
+   - add `POSTGRES_MIGRATE_URL` (the owner's URL, the old `POSTGRES_URL`).
+4. **Better: keep the owner's password out of the app's environment.**
+   - Create a second Doppler config (for example `prd_migrate`) whose only secret is `POSTGRES_URL` set to the owner's URL. Leave `POSTGRES_MIGRATE_URL` out of `prd`.
+   - Make a read-only service token for that config and save it as the GitHub secret `DOPPLER_MIGRATE_TOKEN`.
+   - The deploy workflow then writes `doppler-migrate.env` on the VM, and only the `migrate` container uses it.
+5. **Deploy.** `migrate` runs 0009 as the owner, then `api` and `worker` start as `outbound_app` and pass the self-check.
+
+**Before the first production run:** rehearse the migrations on a copy of the production database. Restore a Supabase backup into a scratch project, run `outbound db upgrade`, then check the self-check:
+
+```
+uv run python -c "from outbound.bootstrap import build_container; from outbound.db.isolation import isolation_problems; print(isolation_problems(build_container().engine) or 'ok')"
+```
+
+**The worker serves every workspace.** `outbound worker` no longer takes `--workspace`. It runs queued runs for all active workspaces, up to `--threads` (4) at a time, and every `--tick-minutes` (15) it retries failed leads, collects catch-all answers, reads the Sent folder and runs any leads that are due. No cron job is needed.
+
 To try the app against Supabase from your laptop first, see [section 5.1](#51-the-app-against-either-database).
 
 Migrations are additive. A rollback to an older commit does not undo them, and the older code runs on the newer schema.
@@ -162,6 +208,10 @@ Moving the data from a laptop's SQLite file is not automatic. Start on the empty
 | The login page loads but signing in fails with a cookie error | The site is not on https, or the proxy does not forward to the app. |
 | Every login is throttled together | The proxy does not send `X-Forwarded-For`. |
 | `port is already allocated` | Another app uses `OUTBOUND_PORT`. Choose another (1.1) and update the proxy. |
+| `Refusing to start: connected as postgres, …` (`tenant_isolation_unsafe` in the logs) | `POSTGRES_URL` still points at the owner. Set it to the `outbound_app` URL (section 1.2a). |
+| `Refusing to start: row-level security is off on …` | The migrations have not run, or ran as the wrong role. Run `migrate` (it runs on every deploy) and check `POSTGRES_MIGRATE_URL`. |
+| `Refusing to start: the anon role can read or write tables` | Supabase's Data API roles still hold grants. Run the `REVOKE` statements in section 1.2. |
+| `migrate` fails with `permission denied for schema public` | `migrate` connected as `outbound_app`. Its `POSTGRES_URL` (or `POSTGRES_MIGRATE_URL`) must be the owner. |
 
 The compose file's `env_file` treats `$` as a variable. That does not matter for `doppler.env`, which holds only the token, but an Argon2 hash pasted into an env file for a local test must be in single quotes.
 
@@ -195,7 +245,7 @@ An explicit `DATABASE_URL`, or `--database-url`, overrides the switch. While swi
 |---|---|
 | Supabase | a local Postgres 16 container (`db`), kept between runs |
 | the VM's nginx or Caddy | Caddy with its own certificate on <https://localhost:8443> (`proxy`) |
-| Doppler config `prd` | Doppler config `dev`: the same keys, with `POSTGRES_URL=postgresql://outbound:outbound@db:5432/outbound` |
+| Doppler config `prd` | Doppler config `dev`: the same keys, with `POSTGRES_URL=postgresql://outbound_app:outbound@db:5432/outbound`, `POSTGRES_PLATFORM_URL=postgresql://outbound_platform:outbound@db:5432/outbound` and `POSTGRES_MIGRATE_URL=postgresql://outbound:outbound@db:5432/outbound` (the local database creates both logins on first start; after upgrading an older rehearsal, run `deploy/local-test.sh reset` once) |
 | `/opt/outbound` | `.deploy-local/` in the repo (git-ignored) |
 
 **Once:**

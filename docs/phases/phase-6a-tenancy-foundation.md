@@ -7,6 +7,19 @@
 
 **Depends on:** Phase 3b, including B2, B3, B4, B5 and B7 (migration 0006; see [phase-3b-hardening.md](phase-3b-hardening.md), §8).
 
+**Status (2026-10-23): code complete** on branch `phase-6/tenancy-foundation`.
+- **Tests:** 1,601 pass on Postgres connected as `outbound_app`/`outbound_platform`, and 1,593 on SQLite.
+- **What the gate still waits on:** creating the roles in Supabase, then rehearsing on a production copy and deploying (see "Closing the phase").
+- **Prerequisites done here:** B2, B3, B4 and B7 were built in this phase; B5 (model prices) is still open.
+
+**Built differently from the text below** (each for a reason found while building):
+- **No `FORCE ROW LEVEL SECURITY`.** The owner still runs migrations and `seed`, which FORCE would block. The startup self-check refuses to run as the owner instead.
+- **Ticks are not queued runs.** The worker runs each workspace's tick directly on a timer. A tick skips the pipeline when no lead is due, so a quiet workspace does not fill its Runs screen with empty runs.
+- **The owner's connection:** a `POSTGRES_MIGRATE_URL` setting serves single-config setups such as the local rehearsal. Production can use a separate Doppler config through the optional `DOPPLER_MIGRATE_TOKEN` secret.
+- **The import-linter contract** forbids `outbound.db.platform` to stages, the runner, metering and all services except `services.seed`, which creates workspaces.
+- **`actor` as a service constructor argument** moves to 6b, where real users first exist.
+- **The repository-walk test** for workspace predicates is replaced by stronger proof: the whole Postgres suite runs as `outbound_app`, so any unscoped query returns nothing and fails its test. `tests/db/test_rls.py` checks the same with raw, unfiltered SQL.
+
 **Gate:**
 - **The Phase 6 isolation test:** with application-level scoping patched out, no query made for workspace A returns a row of workspace B.
 - **The whole Postgres suite** passes while connected as `outbound_app`.
@@ -195,10 +208,17 @@ Until 6b, the API still resolves the one configured workspace and keeps today's 
 - The startup self-check, against faked catalog answers.
 - Migrations 0007–0009 up and down on SQLite and Postgres, on a populated database.
 
+## Closing the phase (what only you can do)
+
+1. Create the two logins in Supabase and set the Doppler URLs ([../DEPLOY.md](../DEPLOY.md), section 1.2a).
+2. Restore a production backup into a scratch Supabase project, run `outbound db upgrade` against it, and check that the self-check prints `ok`.
+3. Deploy. Confirm the worker logs `service_started` and no `tenant_isolation_unsafe`.
+4. Seed a second workspace (`outbound seed --workspace "Test Co"`), queue a run in each, and confirm both run.
+
 ## Gate record
 
 - Date:
-- Isolation test with scoping patched out:
-- Postgres suite as `outbound_app`:
+- Isolation test with scoping bypassed: `tests/db/test_rls.py`, 8 tests, pass on Postgres 16 as `outbound_app` (2026-10-23)
+- Postgres suite as `outbound_app`: 1,601 passed, 1 skipped (2026-10-23)
 - Rehearsal on a production copy:
 - Checked by:

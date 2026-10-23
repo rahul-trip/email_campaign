@@ -321,11 +321,11 @@ The SaaS track ([phase-6-saas-ready.md](phase-6-saas-ready.md)) builds on these.
 | Item | What 6a needs from it |
 |---|---|
 | **E8** Data API closed | No exposure while the tenancy work goes on. Do it first |
-| **B2** One run per workspace | A partial unique index, one `running` run per workspace (migration 0006). It also blocks a second CLI run. The multi-tenant scheduler relies on it |
-| **B3** Stale runs | `runs.heartbeat_at` (migration 0006) and recovery after 30 minutes without one |
-| **B4** Budget read live | The pipeline is assembled per run in 6a, and limits change at runtime in 6d |
+| **B2** One run per workspace (**done in 6a**) | A partial unique index, one `running` run per workspace (migration 0006). It also blocks a second CLI run. The multi-tenant scheduler relies on it |
+| **B3** Stale runs (**done in 6a**) | `runs.heartbeat_at` (migration 0006) and recovery after 30 minutes without one |
+| **B4** Budget read live (**done in 6a**) | The pipeline is assembled per run in 6a, and limits change at runtime in 6d |
 | **B5** Model prices | The LLM is now DeepSeek served by DeepInfra (OpenAI-compatible). Set its prices in `LLM_PRICES`: credits and margins (6d) are wrong while model calls cost $0 in the ledger |
-| **B7** Worker tick | A tick run queued per workspace every 15 minutes. 6a's scheduler claims it like any run, and 6d's automatic resume runs in it |
+| **B7** Worker tick (**done in 6a**, as a timer in the worker rather than queued runs) | A tick run queued per workspace every 15 minutes. 6a's scheduler claims it like any run, and 6d's automatic resume runs in it |
 | **E4** Delete `agent/` | Less to carry through the tenancy refactor |
 | `web/` deleted | Its CI job signs in with the old password form; 6b replaces sign-in |
 

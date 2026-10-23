@@ -47,7 +47,8 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 | 4 | Not started (4a planned before the SaaS alpha) | |
 | 5 | Not started | |
 | 6 | Planned (2026-10-23): SaaS alpha track 6a–6g approved | |
-| 6a–6d, 6g | Not started | |
+| 6a | **Code complete** (2026-10-23, branch `phase-6/tenancy-foundation`); the Postgres suite passes as `outbound_app`; the gate waits on the database roles in Supabase, a rehearsal on a production copy and a deploy | |
+| 6b–6d, 6g | Not started | |
 | 6e, 6f | After the alpha | |
 | 7 | Backlog, unscheduled | |
 

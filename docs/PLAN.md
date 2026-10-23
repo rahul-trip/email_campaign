@@ -113,7 +113,7 @@ Three research findings shaped the design:
 The engine is a modular monolith: one Python package, `outbound/`. It replaced the legacy `agent/` package, which is deleted after the first live run (the last step of Phase 2).
 
 ```
- CLI (Typer)     API (FastAPI) + Worker      Scheduler tick (cron)
+ CLI (Typer)     API (FastAPI) + Worker (ticks every 15 min)   `outbound tick` (cron, optional)
         \                   |                        /
          +----------- Services (use cases) ---------+
                             |
@@ -172,14 +172,14 @@ web/           the first React app, kept until it is deleted
 1. No database transaction stays open across a network call.
 2. Every paid call commits its own `provider_calls` row, so its cost is recorded even if the stage then fails.
 
-**Tenant context (Phase 6).**
+**Tenant context (Phase 6; the parts marked built exist since 6a).**
 - **Workspace identity on every request:**
   - the SPA sends `X-Workspace-Id`, taken from the `/w/{slug}` URL;
   - the `tenant()` dependency checks the session, the membership and role, and the access level;
   - it then builds that request's services with `ServicesFactory.for_tenant(workspace_id, actor)`.
-- **Unit of work:** every unit of work is bound to one workspace, and a Session `after_begin` listener sets `app.workspace_id` in every transaction for Postgres row-level security.
-- **Reads across workspaces** (the admin console, the scheduler's "what is due", aggregates) go through `PlatformUnitOfWork` (`db/platform.py`), which tenant code may not import.
-- **The worker** claims runs for every workspace fairly, with a thread pool and one running run per workspace, and assembles a pipeline per run.
+- **Unit of work (built):** every unit of work is bound to one workspace, and a Session `after_begin` listener sets `app.workspace_id` in every transaction for Postgres row-level security. The API builds a request's services from a `ServicesFactory`; until 6b the workspace is the deployment's configured one.
+- **Reads across workspaces (built)** (the admin console, the scheduler's "what is due", aggregates) go through `PlatformUnitOfWork` (`db/platform.py`), on its own `outbound_platform` connection; import-linter keeps tenant code from importing it.
+- **The worker (built)** claims runs for every workspace fairly, with a thread pool and one running pipeline per workspace, assembles a pipeline per run, ticks each active workspace every 15 minutes, and fails runs whose heartbeat stopped.
 - **Planned modules:**
   - `domain`: `permissions.py`, `entitlements.py`, `directory.py`;
   - `db`: `platform.py`, `crypto.py`;
@@ -230,7 +230,7 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 
 - **Releasing a hold** resumes at the stage that held it, fixed by `hold_reason`: `catch_all_resolving` and `catch_all_unverified` go back to `contacts_found`; `consent_required`, `country_unknown` and `entity_unknown` go back to `researched`; `needs_operator` has no default, so the operator chooses.
 - **A retry after `failed`** restores the input status of the stage that failed. Only research, gate, contacts, email and copy can fail a lead. Deliver and sync leave the lead where it is and try again an hour later.
-- **Back-off.** A failed lead waits 15 minutes times the number of attempts so far before `outbound tick` retries it, and is retried automatically at most 3 times. The operator can retry at once from the CLI or the lead page.
+- **Back-off.** A failed lead waits 15 minutes times the number of attempts so far before a tick (the worker's, every 15 minutes, or `outbound tick`) retries it, and is retried automatically at most 3 times. The operator can retry at once from the CLI or the lead page.
 - **A hold can start at `qualified`, `email_ready` and `approved` too.** If the country rules change after approval, or delivery finds the email is no longer safe (an opt-out, a bounce, a suppressed address), the lead is held with the reason and its approved email is withdrawn; once released it is checked again and gets a fresh first email. Nothing is retried silently.
 - **Guards before every stage.** A suppressed domain moves the lead to `suppressed`. A country rule that now blocks or needs a person holds the lead (`needs_operator` for a block) where the lifecycle allows a hold, and otherwise defers it: a rule can come back into force (a skip revoked, the workspace switch turned back on), so it never ends a lead for good. A lead that has used its per-prospect budget fails with that reason.
 

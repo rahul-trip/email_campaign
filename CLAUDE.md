@@ -38,6 +38,14 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
 - **Phase 3b (hardening) is next:** `docs/phases/phase-3b-hardening.md` lists the gaps found after Phase 3 and the order to fix them.
   - **Do first, E8:** Supabase's Data API probably exposes the production tables. Turn it off and revoke the `anon` and `authenticated` grants (`docs/DEPLOY.md` §1.2).
   - Its §8 lists what must be finished before 6a.
+- **Phase 6a (tenancy foundation) is code complete** on branch `phase-6/tenancy-foundation`. It covers:
+  - row-level security, with `outbound_app` and `outbound_platform` roles;
+  - tenant-bound foreign keys;
+  - workspace slug and status;
+  - services per request;
+  - one worker for every workspace, with a 15-minute tick.
+
+  On Postgres the tests run as the production roles. Before deploying, set up the roles (`docs/DEPLOY.md` §1.2a).
 - **Phase 6 (SaaS alpha) is planned and approved (2026-10-23):**
   - `docs/phases/phase-6-saas-ready.md` gives the overview, decisions and isolation model; the sub-phases are 6a–6g.
   - Order: 6a tenancy → 6b identity → 6c onboarding and mailboxes → 6d plans, limits and admin console → 4a opt-outs and bounces → **alpha** → 6g lead directory, in parallel with the rest of Phase 4.
