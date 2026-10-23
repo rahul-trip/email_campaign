@@ -1,6 +1,36 @@
 {
   "components": {
     "schemas": {
+      "AcceptIn": {
+        "additionalProperties": false,
+        "properties": {
+          "accept_terms": {
+            "default": false,
+            "title": "Accept Terms",
+            "type": "boolean"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "AcceptIn",
+        "type": "object"
+      },
       "ApproveIn": {
         "additionalProperties": false,
         "properties": {
@@ -305,6 +335,27 @@
           }
         },
         "title": "CampaignPatch",
+        "type": "object"
+      },
+      "ChangePasswordIn": {
+        "additionalProperties": false,
+        "properties": {
+          "current_password": {
+            "maxLength": 256,
+            "title": "Current Password",
+            "type": "string"
+          },
+          "new_password": {
+            "maxLength": 256,
+            "title": "New Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordIn",
         "type": "object"
       },
       "CompanyOut": {
@@ -856,6 +907,57 @@
         "title": "CostOut",
         "type": "object"
       },
+      "CustomerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "admin_email": {
+            "maxLength": 320,
+            "title": "Admin Email",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "website": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "admin_email"
+        ],
+        "title": "CustomerIn",
+        "type": "object"
+      },
+      "CustomerOut": {
+        "properties": {
+          "invited": {
+            "title": "Invited",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "slug",
+          "invited"
+        ],
+        "title": "CustomerOut",
+        "type": "object"
+      },
       "DeleteLeadIn": {
         "additionalProperties": false,
         "properties": {
@@ -1020,6 +1122,21 @@
         "title": "ForgetIn",
         "type": "object"
       },
+      "ForgotIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "ForgotIn",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1095,6 +1212,62 @@
           "rows"
         ],
         "title": "IntakeOut",
+        "type": "object"
+      },
+      "InvitationOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "has_account": {
+            "title": "Has Account",
+            "type": "boolean"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "workspace_name": {
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "workspace_name",
+          "role",
+          "has_account"
+        ],
+        "title": "InvitationOut",
+        "type": "object"
+      },
+      "InviteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "role": {
+            "default": "member",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "InviteIn",
         "type": "object"
       },
       "JourneyOut": {
@@ -1187,13 +1360,19 @@
       "LoginIn": {
         "additionalProperties": false,
         "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
           "password": {
-            "maxLength": 10000,
+            "maxLength": 256,
             "title": "Password",
             "type": "string"
           }
         },
         "required": [
+          "email",
           "password"
         ],
         "title": "LoginIn",
@@ -1281,12 +1460,66 @@
       "Me": {
         "properties": {
           "user": {
-            "default": "operator",
-            "title": "User",
+            "$ref": "#/components/schemas/UserOut"
+          },
+          "workspaces": {
+            "items": {
+              "$ref": "#/components/schemas/MyWorkspace"
+            },
+            "title": "Workspaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "user",
+          "workspaces"
+        ],
+        "title": "Me",
+        "type": "object"
+      },
+      "MemberOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
             "type": "string"
           }
         },
-        "title": "Me",
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "role",
+          "last_login_at"
+        ],
+        "title": "MemberOut",
         "type": "object"
       },
       "MessageOut": {
@@ -1395,6 +1628,50 @@
         "title": "MessageOut",
         "type": "object"
       },
+      "MyWorkspace": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "admin",
+                  "member"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "status",
+          "role"
+        ],
+        "title": "MyWorkspace",
+        "type": "object"
+      },
       "NoteOut": {
         "properties": {
           "author": {
@@ -1487,6 +1764,39 @@
           "facts"
         ],
         "title": "OriginOut",
+        "type": "object"
+      },
+      "PendingInviteOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "expires_at"
+        ],
+        "title": "PendingInviteOut",
         "type": "object"
       },
       "PersonIn": {
@@ -1924,6 +2234,27 @@
         "title": "ReleaseIn",
         "type": "object"
       },
+      "ResetIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 200,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "ResetIn",
+        "type": "object"
+      },
       "ReviewDetailOut": {
         "properties": {
           "item": {
@@ -2022,6 +2353,24 @@
           "lint_report"
         ],
         "title": "RevisionOut",
+        "type": "object"
+      },
+      "RoleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "RoleIn",
         "type": "object"
       },
       "RowOut": {
@@ -2941,6 +3290,30 @@
         "title": "TargetIn",
         "type": "object"
       },
+      "TeamOut": {
+        "properties": {
+          "invitations": {
+            "items": {
+              "$ref": "#/components/schemas/PendingInviteOut"
+            },
+            "title": "Invitations",
+            "type": "array"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/MemberOut"
+            },
+            "title": "Members",
+            "type": "array"
+          }
+        },
+        "required": [
+          "members",
+          "invitations"
+        ],
+        "title": "TeamOut",
+        "type": "object"
+      },
       "TimelineOut": {
         "properties": {
           "actor": {
@@ -2979,6 +3352,44 @@
           "data"
         ],
         "title": "TimelineOut",
+        "type": "object"
+      },
+      "UserOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "platform_role": {
+            "anyOf": [
+              {
+                "enum": [
+                  "admin",
+                  "superadmin"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Platform Role"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name"
+        ],
+        "title": "UserOut",
         "type": "object"
       },
       "ValidationError": {
@@ -3259,6 +3670,142 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/admin/customers": {
+      "post": {
+        "description": "Create a customer's workspace and invite its first admin.",
+        "operationId": "create_customer_api_admin_customers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Customer",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/auth/invitations/{token}": {
+      "get": {
+        "operationId": "invitation_api_auth_invitations__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invitation",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/invitations/{token}/accept": {
+      "post": {
+        "operationId": "accept_api_auth_invitations__token__accept_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login_api_auth_login_post",
@@ -3314,6 +3861,31 @@
         ]
       }
     },
+    "/api/auth/logout-others": {
+      "post": {
+        "operationId": "logout_others_api_auth_logout_others_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Logout Others Api Auth Logout Others Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout Others",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/me": {
       "get": {
         "operationId": "me_api_auth_me_get",
@@ -3330,6 +3902,126 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/change": {
+      "post": {
+        "operationId": "change_password_api_auth_password_change_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/forgot": {
+      "post": {
+        "operationId": "forgot_api_auth_password_forgot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Forgot Api Auth Password Forgot Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forgot",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password/reset": {
+      "post": {
+        "operationId": "reset_api_auth_password_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset",
         "tags": [
           "auth"
         ]
@@ -4514,7 +5206,7 @@
     },
     "/api/intake/webhook": {
       "post": {
-        "description": "Signed intake for other systems. Not behind the operator login: the signature is the key.",
+        "description": "Signed intake for other systems. Not behind a sign-in: the signature is the key.",
         "operationId": "webhook_api_intake_webhook_post",
         "responses": {
           "200": {
@@ -5815,6 +6507,244 @@
         "summary": "Confirm",
         "tags": [
           "targets"
+        ]
+      }
+    },
+    "/api/team": {
+      "get": {
+        "operationId": "team_api_team_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Team",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/invitations": {
+      "post": {
+        "operationId": "invite_api_team_invitations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/invitations/{invitation_id}": {
+      "delete": {
+        "operationId": "revoke_api_team_invitations__invitation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/invitations/{invitation_id}/resend": {
+      "post": {
+        "operationId": "resend_api_team_invitations__invitation_id__resend_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resend",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/members/{user_id}": {
+      "delete": {
+        "operationId": "remove_api_team_members__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove",
+        "tags": [
+          "team"
+        ]
+      },
+      "patch": {
+        "operationId": "set_role_api_team_members__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Role",
+        "tags": [
+          "team"
         ]
       }
     }

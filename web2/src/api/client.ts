@@ -5,23 +5,32 @@ export type Schemas = components["schemas"];
 
 export const client = createClient<paths>({ baseUrl: "" });
 
+let workspaceId: string | null = null;
+
+/** Every request from now on acts in this workspace (the page's /w/{slug}). */
+export function actIn(id: string | null) {
+  workspaceId = id;
+}
+
 // The server refuses writes that lack this header, which a cross-site request cannot add.
+// Each request also names its workspace, so a second tab on another workspace never mixes them.
 client.use({
   onRequest({ request }) {
     request.headers.set("X-Requested-With", "outbound");
+    if (workspaceId) request.headers.set("X-Workspace-Id", workspaceId);
     return request;
   },
 });
 
 /**
- * Raised on any 401 from an ordinary request, so the app can show the sign-in form. The sign-in
- * attempt and the "who am I" check are left out: they are how the app finds out, and reacting to
- * them would loop.
+ * Raised on any 401 from an ordinary request, so the app can show the sign-in page. The sign-in
+ * pages' own requests are left out: they are how the app finds out, and reacting to them would
+ * loop.
  */
 export const SIGNED_OUT = "outbound:signed-out";
 client.use({
   onResponse({ response, request }) {
-    const asking = request.url.endsWith("/api/auth/login") || request.url.endsWith("/api/auth/me");
+    const asking = new URL(request.url).pathname.startsWith("/api/auth/");
     if (response.status === 401 && !asking) window.dispatchEvent(new Event(SIGNED_OUT));
     return undefined;
   },

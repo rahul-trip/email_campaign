@@ -3,10 +3,12 @@
     uv run python -m scripts.e2e_server
 
 It starts on a throwaway database with a seeded workspace, serves ``web2/dist`` (or the folder
-in ``E2E_WEB_DIST``), and runs a
-worker thread that executes queued runs against fake search, model, finder and mailbox
-objects. No network and no keys are used. Sign in as ``E2E_EMAIL`` with ``E2E_PASSWORD`` (a
-workspace admin), or as ``E2E_STAFF`` (a superadmin with no workspace of their own).
+in ``E2E_WEB_DIST``), and runs a worker thread that executes queued runs against fake search,
+model, finder and mailbox objects. No network and no keys are used.
+
+Sign in as ``E2E_EMAIL`` with ``E2E_PASSWORD`` (a workspace admin), or as ``E2E_STAFF`` (a
+superadmin with no workspace of their own). ``GET /e2e/outbox`` lists the emails the app would
+have sent, so a test can follow an invitation or reset link.
 """
 
 from __future__ import annotations
@@ -14,10 +16,12 @@ from __future__ import annotations
 import os
 import tempfile
 import threading
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 
 from outbound.api.app import WEB_DIST, create_app
 from outbound.api.deps import build_services
@@ -65,14 +69,31 @@ def build() -> tuple[FastAPI, Worker]:
     web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST
     # Revisions on Review use the fake world's model too, metered like the real one.
     writer = MeteredLlm(world.llm, build_meter(container, workspace.id))
+    outbox = LogEmail()
     app = create_app(
         build_services(container, workspace.id, writer=writer),
         web_dist=web_dist,
-        email=LogEmail(),
+        email=outbox,
     )
+    _serve_outbox(app, outbox)
     app.state.identity.add_user(E2E_EMAIL, E2E_PASSWORD, name="Sam", workspace_id=workspace.id)
     app.state.identity.add_user(E2E_STAFF, E2E_PASSWORD, platform_role=PlatformRole.SUPERADMIN)
     return app, Worker(container, lambda _ws: pipeline, tick_every=None)
+
+
+def _serve_outbox(app: FastAPI, outbox: LogEmail) -> None:
+    """``GET /e2e/outbox``: every email the app would have sent, so a browser test can follow an
+    invitation or reset link. Test server only; the real app has no such route."""
+
+    @app.middleware("http")
+    async def outbox_route(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if request.url.path != "/e2e/outbox":
+            return await call_next(request)
+        return JSONResponse(
+            [{"to": m.to, "subject": m.subject, "text": m.text} for m in outbox.sent]
+        )
 
 
 def main() -> None:

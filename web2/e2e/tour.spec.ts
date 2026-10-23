@@ -1,5 +1,5 @@
 import { test as base, type Page } from "@playwright/test";
-import { PASSWORD, addTarget, expect, runEngine, unique } from "./helpers";
+import { EMAIL, PASSWORD, addTarget, expect, runEngine, unique } from "./helpers";
 
 // These tests need the tour to open by itself, so they use the plain test, not the helper that
 // marks the tour as seen.
@@ -7,7 +7,8 @@ const test = base;
 const tour = (page: Page) => page.getByRole("dialog", { name: "Product tour" });
 
 async function signIn(page: Page) {
-  await page.goto("/");
+  await page.goto("/sign-in");
+  await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
 }

@@ -75,9 +75,17 @@ uv run outbound worker     # does the work you start from the browser
 - First time only: `uv run outbound db upgrade` and `uv run outbound seed` create the database, a default workspace, a default campaign and the country rules.
 - **On the server** the app and worker run all the time, at the address your team set up (always https). A deploy sets up the database itself and restarts both processes for a few seconds, so avoid deploying while a run is going. Logs, restarts and CLI commands on the server are in [DEPLOY.md](DEPLOY.md), section 3.
 
-### 3.1 The guided tour
+### 3.1 Accounts, invitations and workspaces
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
+- **Workspaces.** A workspace is one company's leads, campaigns, settings and people. Its address in the browser starts with `/w/` and its short name, for example `/w/acme-energy/leads`, so a link you send a colleague opens the same workspace. If you belong to several, the workspace name at the top left switches between them. Opening the bare address (`/`) takes you to the one you used last.
+- **Invitations.** Admins invite people from **Settings → Team**. The invitation email has a link that works once, for 7 days: a new person gives their name, chooses a password and accepts the Terms; someone who already has an account signs in with the invited address and presses **Join**. A newer invitation to the same address replaces the old link.
+- **Roles.** An **admin** can do everything in the workspace. A **member** does the daily work: adding leads, runs, review, campaigns, suppressing an address. Only admins manage the team, the sender profile and limits, country rules, forgetting a person and deleting a lead; members see a message saying so. A workspace always keeps at least one admin.
+- **Your account** (the round button at the top right): change your password, sign out every other device, or sign out.
+- **Superadmin view (alpha only).** The platform's superadmin can open any workspace to help. A red banner, *Superadmin view of …, read-only*, stays at the top the whole time, nothing can be changed, and every such visit is recorded. **Exit** leaves it.
+
+### 3.2 The guided tour
+
+The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher and your account button, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 
 Every step has these buttons:
 
@@ -119,7 +127,8 @@ Across the top:
 
 - **Search** finds a lead by company or domain. Press Enter to open the filtered list; Ctrl+K (Cmd+K on a Mac) jumps to the box from anywhere.
 - A chip shows a run that is queued or in progress. If a run stays queued, a red banner says the worker is not running.
-- **Add target**, **Tour**, the **theme** button (light, dark, or follow the computer) and **Sign out**.
+- The **workspace name**, next to the logo: switch to another workspace you belong to.
+- **Add target**, **Tour**, the **theme** button (light, dark, or follow the computer) and **your account** (your initials): password, sign out everywhere else, sign out.
 - A yellow banner reminds you while the sender profile is not confirmed, because no email is written until it is.
 
 On a narrow screen the menu folds away; open it with the button at the top left.
@@ -275,6 +284,8 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
 | **Sender profile** | Who you are, in four parts: the legal identity printed in footers, your signature, what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**, and *How you write*: the greeting (Hi, Hello or Dear), what you want from these emails (the closing ask follows it), and up to four emails you have sent before. Those are read for what you offer and how direct you are, never copied: their wording, greeting and bullet lists are not reused. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
+| **Team** | Who works in this workspace, their role and when they last signed in, and invitations not used yet. Admins invite people (email and role), change roles, remove people, and send an invitation again or withdraw it. Members see the list only |
+| **Your account** | Change your password (the current one first; other devices are signed out), and sign out every other browser and device |
 | **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), the shortest and longest first email in words (120 and 200 by default; greeting, sign-off and footer are not counted), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
 
 Automatic sending cannot be switched on in this version.

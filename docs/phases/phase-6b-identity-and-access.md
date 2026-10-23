@@ -140,21 +140,21 @@ Fixed in code in `outbound/domain/permissions.py`.
 
 ### 6b.6 Web app
 
-- [ ] **Public routes,** outside the signed-in shell: `/sign-in`, `/forgot-password`, `/reset-password`, `/invite/{token}`.
+- [x] **Public routes,** outside the signed-in shell: `/sign-in`, `/forgot-password`, `/reset-password`, `/invite/{token}`.
   - The root route (`web2/src/router.tsx:22-29`) splits into a public layout and an app layout.
   - The in-place `Login.tsx` goes.
-- [ ] **Every app route** moves under `/w/$slug/…`.
+- [x] **Every app route** moves under `/w/$slug/…`.
   - `/` opens the last workspace used, stored per browser, or else the first membership.
   - One openapi-fetch middleware sends `X-Workspace-Id`.
   - One QueryClient per workspace is remounted on switching.
   - Cost: about 59 links, 31 `page.goto` calls in `web2/e2e/`, and the tour's `place` values.
-- [ ] **Header:**
+- [x] **Header:**
   - a workspace switcher (replacing the fixed "Workspace" label, `Layout.tsx:84-87`);
   - a user menu: profile, password, sessions, sign out, and **Admin console** for platform roles.
-- [ ] **Settings → Team:** members, roles, pending invites, invite, resend, remove.
-- [ ] **New UI parts** in `web2/src/components/ui.tsx`: dropdown menu and avatar.
-- [ ] **Kept up to date:** the tour (`web2/src/tour/steps.ts`), the "Guided tour" and sign-in sections of [../USER_MANUAL.md](../USER_MANUAL.md), and the `screens.spec.ts` route list.
-- [ ] **E2E:** `scripts/e2e_server.py` seeds users and memberships. `helpers.ts` signs in with an email and password.
+- [x] **Settings → Team:** members, roles, pending invites, invite, resend, remove.
+- [x] **New UI parts** in `web2/src/components/ui.tsx`: dropdown menu and avatar.
+- [x] **Kept up to date:** the tour (`web2/src/tour/steps.ts`), the "Guided tour" and sign-in sections of [../USER_MANUAL.md](../USER_MANUAL.md), and the `screens.spec.ts` route list.
+- [x] **E2E:** `scripts/e2e_server.py` seeds users and memberships. `helpers.ts` signs in with an email and password.
 
 ### 6b.7 Moving the first tenant
 
@@ -164,9 +164,9 @@ Fixed in code in `outbound/domain/permissions.py`.
 
   It prints its plan and changes nothing without `--apply`. The mailbox move is in 6c.
 
-## As built (API, 2026-10-23)
+## As built (2026-10-23)
 
-The API, the services and the tests are done; the web app (6b.6) is next. Where the build differs from the tasks above:
+Where the build differs from the tasks above:
 
 - **No `IdentityProvider` port.** `services/identity.py` is the local implementation, and the only one. A port with one adapter is the speculative abstraction CLAUDE.md rules out; it is cut when Supabase Auth or WorkOS is chosen (6f).
 - **Paths:** the invitation endpoints are `GET /api/auth/invitations/{token}` and `POST /api/auth/invitations/{token}/accept`. "Sign out everywhere" is `POST /api/auth/logout-others`: it keeps the browser that asked.
@@ -177,6 +177,10 @@ The API, the services and the tests are done; the web app (6b.6) is next. Where 
 - **Email:** `SmtpEmail` (any provider's SMTP relay: Postmark, Resend and SES all have one) or `LogEmail`, which prints the message in development. In production the API refuses to start without `SMTP_HOST`.
 - **`outbound users create`** replaces `outbound auth hash-password`: it makes an account without an invitation (the first admin, platform staff). `OPERATOR_PASSWORD_HASH`, `SESSION_SECRET` and `SESSION_HOURS` are gone.
 - **The webhook** still feeds the deployment's workspace (`WORKSPACE_NAME`), now as `integration:webhook`; 6c gives each workspace its own URL.
+- **Web app, `/w/{slug}`:** the workspace's router is built with the base path `/w/{slug}` (`web2/src/main.tsx`, `makeRouter` in `router.tsx`), so the app's links (`to="/leads"`) did not change. Switching workspace loads the page again, which gives each workspace a fresh query cache. An old link such as `/leads` opens in the workspace used last. The public pages (`/sign-in`, `/forgot-password`, `/reset-password`, `/invite/{token}`, and `/`, which picks the workspace) are in `web2/src/app/Public.tsx`, outside the router.
+- **The user menu** has the account tab, "sign out everywhere else" and sign out. The **Admin console** entry arrives with 6d's console.
+- **Settings** gains **Team** and **Your account** tabs (`web2/src/pages/SettingsTeam.tsx`); the tab is in the URL (`/settings?tab=team`).
+- **E2E:** `scripts/e2e_server.py` creates an admin (`operator@e2e.example`) and a superadmin (`staff@e2e.example`), and serves the emails it would have sent at `/e2e/outbox`. `web2/e2e/auth.spec.ts` covers invite → set password → dashboard, the reset flow, the superadmin banner and refused writes, and signing out.
 - **Tests:** `tests/api/test_permissions.py` (the route walk; the matrix for admin, member, superadmin view and platform admin; forged header; removed member), `tests/api/test_identity.py` (invitations, resets, password change, sessions, last admin, expiry, disabled account, creating a customer), `tests/db/test_rls.py` (a read-only unit of work cannot write, on Postgres), `tests/db/test_migrate_first_tenant.py`, `tests/providers/test_transactional_email.py`, `tests/domain/test_actors.py`.
 
 ## Tests that must exist
@@ -193,7 +197,7 @@ The API, the services and the tests are done; the web app (6b.6) is next. Where 
 
 ## Gate record
 
-- Date:
-- Permission matrix:
-- Playwright flows:
+- Date: 2026-10-23 (code); the gate closes after a deploy with a real email provider.
+- Permission matrix: `tests/api/test_permissions.py` passes on SQLite and on Postgres as `outbound_app` (1,697 tests in all on SQLite with the legacy suite, 1,643 on Postgres).
+- Playwright flows: 27 of 27, including `auth.spec.ts` (invite, reset, superadmin view, sign out).
 - Checked by:

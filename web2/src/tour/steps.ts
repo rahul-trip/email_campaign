@@ -40,6 +40,16 @@ export const SECTIONS: Section[] = [
         body: "Work is what waits for you: emails to review and leads that need a decision. Pipeline is where companies go in and the engine runs. Items marked Soon arrive in later phases.",
       },
       {
+        target: "workspace-switcher",
+        title: "Your workspace",
+        body: "Everything you see belongs to this workspace. If you work in several, switch here; the address bar always shows which one you are in, so a link you share opens the right one.",
+      },
+      {
+        target: "user-menu",
+        title: "Your account",
+        body: "Change your password, sign out other devices, or sign out.",
+      },
+      {
         target: "search",
         title: "Find any lead",
         body: "Type a company or domain and press Enter. Ctrl+K (Cmd+K on a Mac) jumps here from anywhere.",
@@ -234,8 +244,8 @@ export const SECTIONS: Section[] = [
     steps: [
       {
         target: "settings-tabs",
-        title: "Setup, profile, limits",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from.",
+        title: "Setup, profile, limits, team",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Your account changes your password.",
       },
       {
         target: "setup-check",
