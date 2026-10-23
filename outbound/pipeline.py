@@ -120,8 +120,8 @@ def real_providers(settings: Settings) -> Providers:
 
 
 def _workspace(container: Container, workspace_id: str) -> Workspace:
-    with container.uow.admin() as admin:
-        workspace = admin.workspaces.get(workspace_id)
+    with container.uow(workspace_id) as uow:
+        workspace = uow.workspace()
     if workspace is None:
         raise ConfigurationError(f"workspace {workspace_id} does not exist")
     return workspace

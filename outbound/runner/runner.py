@@ -189,10 +189,9 @@ class Runner:
                     return Outcome.SKIPPED  # someone moved it since the list was made
                 refusal = self._guards.check(uow, company, stage)
                 campaign = uow.campaigns.get(company.campaign_id) if company.campaign_id else None
+                workspace = uow.workspace()
             if refusal is not None:
                 return self._apply_refusal(stage, company, refusal)
-            with self._uow.admin() as admin:
-                workspace = admin.workspaces.get(self._workspace_id)
             if workspace is None:
                 raise ConfigurationError(f"workspace {self._workspace_id} does not exist")
 

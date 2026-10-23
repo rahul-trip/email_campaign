@@ -88,8 +88,8 @@ def test_the_live_budget_follows_the_workspace_setting(factory: UnitOfWorkFactor
     policy = BudgetPolicy.live_from({})
     with factory(ws) as uow:
         assert policy.ceiling(uow) is None
-    with factory.admin() as admin:
-        admin.workspaces.set_settings(ws, {"budget_per_prospect_micro_usd": 250_000})
-        admin.commit()
+    with factory(ws) as uow:
+        uow.own_workspace.set_settings({"budget_per_prospect_micro_usd": 250_000})
+        uow.commit()
     with factory(ws) as uow:
         assert policy.ceiling(uow) == 250_000

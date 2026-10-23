@@ -14,7 +14,7 @@ from sqlalchemy import Engine
 from outbound.api.app import create_app
 from outbound.api.auth import hash_password
 from outbound.api.deps import Services, build_services
-from outbound.bootstrap import Container
+from outbound.bootstrap import Container, container_for
 from outbound.config import Settings
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.services.dns_check import TxtLookup
@@ -26,6 +26,7 @@ from tests.db.conftest import (  # noqa: F401  (fixtures used by name)
     factory,
     fresh_url,
     other_ws,
+    platform,
     ws,
 )
 from tests.stages.fakes import FakeLlm
@@ -65,7 +66,7 @@ def container(engine: Engine, factory: UnitOfWorkFactory, tmp_path: Path) -> Con
         session_secret=SecretStr("s" * 40),
         intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
-    return Container(settings, engine, factory)
+    return container_for(settings, engine)
 
 
 @pytest.fixture

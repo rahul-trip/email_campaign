@@ -1,4 +1,8 @@
-"""Workspaces (the one unscoped table) and the campaigns inside them."""
+"""Workspaces and the campaigns and mailboxes inside them.
+
+``WorkspaceRepository`` sees every workspace and is reached only through the platform unit of
+work. A tenant unit of work holds ``OwnWorkspaceRepository``, which sees its own row only.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +13,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from outbound.db.errors import NotFound
 from outbound.db.models import CampaignRow, MailboxRow, WorkspaceRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.domain.entities import Campaign, Workspace
@@ -56,6 +61,40 @@ class WorkspaceRepository:
     def all(self) -> list[Workspace]:
         rows = self._session.scalars(select(WorkspaceRow).order_by(WorkspaceRow.created_at))
         return [snapshot(row, Workspace) for row in rows]
+
+
+class OwnWorkspaceRepository:
+    """The one workspace a tenant unit of work belongs to: its own row, nothing else."""
+
+    def __init__(self, session: Session, workspace_id: str) -> None:
+        self._session = session
+        self._workspace_id = workspace_id
+
+    def get(self) -> Workspace | None:
+        row = self._own()
+        return snapshot(row, Workspace) if row else None
+
+    def set_sender_profile(self, profile: dict[str, Any]) -> Workspace:
+        row = self._required()
+        row.sender_profile = profile
+        self._session.flush()
+        return snapshot(row, Workspace)
+
+    def set_settings(self, settings: dict[str, Any]) -> Workspace:
+        row = self._required()
+        row.settings = settings
+        self._session.flush()
+        return snapshot(row, Workspace)
+
+    def _own(self) -> WorkspaceRow | None:
+        stmt = select(WorkspaceRow).where(WorkspaceRow.id == self._workspace_id)
+        return self._session.scalars(stmt).one_or_none()
+
+    def _required(self) -> WorkspaceRow:
+        row = self._own()
+        if row is None:
+            raise NotFound(f"workspace {self._workspace_id}")
+        return row
 
 
 class CampaignRepository(ScopedRepository):

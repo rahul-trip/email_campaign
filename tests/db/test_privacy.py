@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import Engine
 
-from outbound.bootstrap import Container
+from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db.errors import NotFound
 from outbound.db.models import WorkspaceRow
@@ -48,7 +48,7 @@ def drafted_lead(
         if uow.campaigns.by_name("default") is None:
             uow.campaigns.create("default", ["CTO"], icp_description="Utilities")
         uow.commit()
-    pipeline = assemble(Container(Settings(_env_file=None), engine, factory), ws, world.providers())
+    pipeline = assemble(container_for(Settings(_env_file=None), engine), ws, world.providers())
     pipeline.intake.run([{"Website": domain, "Company": "Acme Energy", "Country": "UK"}])
     pipeline.runner.run_pipeline()
     [queued] = pipeline.review.queue()
@@ -159,9 +159,7 @@ def test_a_suppressed_address_is_never_chosen_again_by_a_new_lead(
 ) -> None:
     drafted_lead(engine, factory, ws, World())
     PrivacyService(factory, ws).suppress_value("acme.co.uk")
-    pipeline = assemble(
-        Container(Settings(_env_file=None), engine, factory), ws, World().providers()
-    )
+    pipeline = assemble(container_for(Settings(_env_file=None), engine), ws, World().providers())
     report = pipeline.intake.run([{"Website": "www.acme.co.uk"}])
     assert report.rows[0].status.value in {"merged", "rejected"}
 

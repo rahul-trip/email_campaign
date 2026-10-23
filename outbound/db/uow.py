@@ -35,7 +35,7 @@ from outbound.db.repositories.suppressions import SuppressionRepository
 from outbound.db.repositories.workspaces import (
     CampaignRepository,
     MailboxRepository,
-    WorkspaceRepository,
+    OwnWorkspaceRepository,
 )
 from outbound.domain.entities import Workspace
 
@@ -66,6 +66,7 @@ class UnitOfWork:
         self.calls = ProviderCallRepository(*args)
         self.erasure = ErasureRepository(*args)
         self.reports = ReportRepository(*args)
+        self.own_workspace = OwnWorkspaceRepository(self.session, self.workspace_id)
         return self
 
     def __exit__(
@@ -92,41 +93,12 @@ class UnitOfWork:
 
     def workspace(self) -> Workspace | None:
         """This workspace's own row (sender profile and settings), read in this session."""
-        return WorkspaceRepository(self.session).get(self.workspace_id)
+        return self.own_workspace.get()
 
     def workspace_settings(self) -> dict[str, Any]:
         """This workspace's settings (its own row only), for checks deep inside a stage."""
         workspace = self.workspace()
         return dict(workspace.settings) if workspace else {}
-
-
-class AdminUnitOfWork:
-    """For the one table that is not scoped: workspaces."""
-
-    session: Session
-
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
-        self._factory = session_factory
-
-    def __enter__(self) -> Self:
-        self.session = self._factory()
-        self.workspaces = WorkspaceRepository(self.session)
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
-    ) -> None:
-        try:
-            if exc_type is not None:
-                self.session.rollback()
-        finally:
-            self.session.close()
-
-    def commit(self) -> None:
-        self.session.commit()
 
 
 class UnitOfWorkFactory:
@@ -135,6 +107,3 @@ class UnitOfWorkFactory:
 
     def __call__(self, workspace_id: str) -> UnitOfWork:
         return UnitOfWork(self._factory, workspace_id)
-
-    def admin(self) -> AdminUnitOfWork:
-        return AdminUnitOfWork(self._factory)

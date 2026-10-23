@@ -173,11 +173,23 @@ class ErasureRepository(ScopedRepository):
             .where(ImportRowRow.workspace_id == ws, ImportRowRow.company_id == company_id)
             .values(company_id=None, raw={"erased": True})
         )
-        messages = run(delete(MessageRow).where(MessageRow.id.in_(message_ids)))
-        run(delete(ConsentRow).where(ConsentRow.contact_id.in_(contact_ids)))
-        emails = run(delete(ContactEmailRow).where(ContactEmailRow.id.in_(email_ids)))
+        messages = run(
+            delete(MessageRow).where(MessageRow.workspace_id == ws, MessageRow.id.in_(message_ids))
+        )
+        run(
+            delete(ConsentRow).where(
+                ConsentRow.workspace_id == ws, ConsentRow.contact_id.in_(contact_ids)
+            )
+        )
+        emails = run(
+            delete(ContactEmailRow).where(
+                ContactEmailRow.workspace_id == ws, ContactEmailRow.id.in_(email_ids)
+            )
+        )
         run(delete(NoteRow).where(NoteRow.workspace_id == ws, NoteRow.company_id == company_id))
-        contacts = run(delete(ContactRow).where(ContactRow.id.in_(contact_ids)))
+        contacts = run(
+            delete(ContactRow).where(ContactRow.workspace_id == ws, ContactRow.id.in_(contact_ids))
+        )
         events = 0
         for entity_type, ids in (
             (EntityType.COMPANY, [company_id]),
@@ -231,8 +243,16 @@ class ErasureRepository(ScopedRepository):
             .where(NoteRow.workspace_id == ws, NoteRow.contact_id == contact_id)
             .values(contact_id=None)
         )
-        self._session.execute(delete(ConsentRow).where(ConsentRow.contact_id == contact_id))
-        self._session.execute(delete(ContactEmailRow).where(ContactEmailRow.id.in_(email_ids)))
+        self._session.execute(
+            delete(ConsentRow).where(
+                ConsentRow.workspace_id == ws, ConsentRow.contact_id == contact_id
+            )
+        )
+        self._session.execute(
+            delete(ContactEmailRow).where(
+                ContactEmailRow.workspace_id == ws, ContactEmailRow.id.in_(email_ids)
+            )
+        )
         for entity_type, ids in (
             (EntityType.CONTACT, [contact_id]),
             (EntityType.CONTACT_EMAIL, email_ids),
