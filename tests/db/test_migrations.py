@@ -102,3 +102,42 @@ def test_each_check_constraint_allows_exactly_the_values_of_its_enum(
     (check,) = [c for c in checks if c["name"] == wanted_name]
     allowed = set(re.findall(r"'([^']+)'", check["sqltext"]))
     assert allowed == set(enum.enums), f"{table}.{column}"
+
+
+def test_tenant_bound_keys_refuse_to_migrate_over_a_cross_workspace_link(fresh_url: str) -> None:
+    """Migration 0007 checks first: a row already pointing into another workspace stops it."""
+    migrate.upgrade(fresh_url, "0006")
+    engine = create_engine(fresh_url)
+    try:
+        with engine.begin() as connection:
+            now = "2026-10-23 00:00:00+00:00"
+            for ws in ("w1", "w2"):
+                connection.execute(
+                    sa.text(
+                        "INSERT INTO workspaces (id, name, sender_profile, settings, created_at, "
+                        "updated_at) VALUES (:id, :id, '{}', '{}', :now, :now)"
+                    ),
+                    {"id": ws, "now": now},
+                )
+            connection.execute(
+                sa.text(
+                    "INSERT INTO campaigns (id, workspace_id, name, target_titles, "
+                    "research_questions, cadence_days, min_fit_score, status, created_at, "
+                    "updated_at) VALUES ('c2', 'w2', 'theirs', '[]', '[]', '[]', 60, 'active', "
+                    ":now, :now)"
+                ),
+                {"now": now},
+            )
+            connection.execute(
+                sa.text(
+                    "INSERT INTO companies (id, workspace_id, campaign_id, domain, source, "
+                    "priority, status, legal_entity_type, attempts, manual_fields, row_version, "
+                    "created_at, updated_at) VALUES ('x1', 'w1', 'c2', 'acme.com', 'manual', 5, "
+                    "'new', 'unknown', 0, '[]', 1, :now, :now)"
+                ),
+                {"now": now},
+            )
+    finally:
+        engine.dispose()
+    with pytest.raises(RuntimeError, match=r"companies\.campaign_id"):
+        migrate.upgrade(fresh_url)

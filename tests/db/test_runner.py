@@ -7,11 +7,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
+from outbound.db.errors import NotFound
 from outbound.db.models import EventRow, ProviderCallRow, RunRow
+from outbound.db.repositories.workspaces import CampaignRepository
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
-from outbound.domain.entities import Company, CountryPolicy
+from outbound.domain.entities import Campaign, Company, CountryPolicy
 from outbound.domain.enums import (
     CallOutcome,
     CompanySource,
@@ -564,15 +567,16 @@ def test_the_same_deferral_is_recorded_once_not_every_hour(
     assert events_of(factory, ws, cid).count("deferred") == 1
 
 
-def test_a_lead_that_cannot_even_be_loaded_does_not_stop_the_run(
+def test_the_database_refuses_a_lead_that_points_into_another_workspace(
     factory: UnitOfWorkFactory, ws: str, other_ws: str
 ) -> None:
-    broken = add_company(factory, ws, "broken.com", priority=1)
-    fine = add_company(factory, ws, "fine.com", priority=2)
-    with factory(other_ws) as uow:  # a campaign that belongs to someone else's workspace
+    """Tenant-bound foreign keys (migration 0007): a campaign from someone else's workspace
+    cannot be attached, whatever the application code does."""
+    broken = add_company(factory, ws, "broken.com")
+    with factory(other_ws) as uow:
         foreign = uow.campaigns.create("theirs", ["CTO"])
         uow.commit()
-    with factory(ws) as uow:
+    with factory(ws) as uow, pytest.raises(IntegrityError):
         uow.companies.update_fields(
             broken,
             {"campaign_id": foreign.id},
@@ -580,6 +584,32 @@ def test_a_lead_that_cannot_even_be_loaded_does_not_stop_the_run(
             expected_version=uow.companies.get(broken).row_version,
         )
         uow.commit()
+
+
+def test_a_lead_that_cannot_even_be_loaded_does_not_stop_the_run(
+    factory: UnitOfWorkFactory, ws: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with factory(ws) as uow:
+        campaign = uow.campaigns.create("gone", ["CTO"])
+        uow.commit()
+    broken = add_company(factory, ws, "broken.com", priority=1)
+    fine = add_company(factory, ws, "fine.com", priority=2)
+    with factory(ws) as uow:
+        uow.companies.update_fields(
+            broken,
+            {"campaign_id": campaign.id},
+            actor="system",
+            expected_version=uow.companies.get(broken).row_version,
+        )
+        uow.commit()
+    real_get = CampaignRepository.get
+
+    def unreadable(self: CampaignRepository, campaign_id: str) -> Campaign:
+        if campaign_id == campaign.id:
+            raise NotFound(f"CampaignRow {campaign_id}")
+        return real_get(self, campaign_id)
+
+    monkeypatch.setattr(CampaignRepository, "get", unreadable)
     stage = FakeStage("research", C.NEW, C.RESEARCHED)
     report = make_runner(factory, ws, [stage]).run_pipeline()
     assert status_of(factory, ws, fine) is C.RESEARCHED
