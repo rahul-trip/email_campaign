@@ -52,7 +52,7 @@ class Guards:
                     decision.hold_reason or HoldReason.NEEDS_OPERATOR,
                 )
 
-        ceiling = self._budget.per_prospect
+        ceiling = self._budget.ceiling(uow)
         if ceiling is not None and stage.spends:
             spent = uow.calls.spend_on_company(company.id)
             if spent >= ceiling:

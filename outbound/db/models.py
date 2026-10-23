@@ -378,8 +378,21 @@ class InboundMessageRow(Mutable, Base):
 # ----------------------------------------------------------------------- runs, cost and audit
 
 
+_RUNNING_PIPELINE = "status = 'running' AND kind = 'pipeline'"
+
+
 class RunRow(Mutable, Base):
     __tablename__ = "runs"
+    __table_args__ = (
+        # One running pipeline per workspace (migration 0006): two at once would pay twice.
+        Index(
+            "ux_runs_one_running_pipeline",
+            "workspace_id",
+            unique=True,
+            sqlite_where=text(_RUNNING_PIPELINE),
+            postgresql_where=text(_RUNNING_PIPELINE),
+        ),
+    )
 
     kind: Mapped[RunKind] = mapped_column(enum_type(RunKind, "run_kind"))
     params: Mapped[dict[str, Any] | None] = mapped_column(Json)
@@ -388,6 +401,7 @@ class RunRow(Mutable, Base):
     cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    heartbeat_at: Mapped[datetime | None] = mapped_column(UtcDateTime)  # touched between leads
 
 
 class ProviderCallRow(AppendOnly, Base):

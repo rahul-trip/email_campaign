@@ -165,8 +165,13 @@ class Runner:
             uow.commit()
 
     def _cancelled(self, run_id: str) -> bool:
+        """Whether the operator cancelled the run; otherwise record that it is still alive."""
         with self._uow(self._workspace_id) as uow:
-            return uow.runs.status(run_id) is RunStatus.CANCELLED
+            if uow.runs.status(run_id) is RunStatus.CANCELLED:
+                return True
+            uow.runs.heartbeat(run_id)
+            uow.commit()
+            return False
 
     # ------------------------------------------------------------------ one lead
 

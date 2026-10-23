@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 
+from outbound.db.errors import RunInProgress
 from outbound.db.models import ProviderCallRow, RunRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
@@ -42,7 +44,11 @@ class RunRepository(ScopedRepository):
         return row.id
 
     def claim_next(self) -> RunView | None:
-        """Take the oldest queued run and mark it running. Safe with several workers."""
+        """Take the oldest queued run and mark it running. Safe with several workers.
+
+        While a pipeline run is running in this workspace, queued pipeline runs wait: two at
+        once would pay twice for the same vendor calls (``ux_runs_one_running_pipeline``).
+        """
         stmt = (
             select(RunRow)
             .where(RunRow.workspace_id == self._workspace_id, RunRow.status == RunStatus.QUEUED)
@@ -50,20 +56,64 @@ class RunRepository(ScopedRepository):
             .limit(1)
             .with_for_update(skip_locked=True)
         )
+        if self.pipeline_running():
+            stmt = stmt.where(RunRow.kind != RunKind.PIPELINE)
         row = self._session.scalars(stmt).first()
         if row is None:
             return None
         row.status = RunStatus.RUNNING
-        row.started_at = utcnow()
-        self._session.flush()
+        row.started_at = row.heartbeat_at = utcnow()
+        self._flush_run()
         return self._view(row)
+
+    def pipeline_running(self) -> bool:
+        stmt = select(RunRow.id).where(
+            RunRow.workspace_id == self._workspace_id,
+            RunRow.status == RunStatus.RUNNING,
+            RunRow.kind == RunKind.PIPELINE,
+        )
+        return self._session.scalars(stmt).first() is not None
 
     def mark_running(self, run_id: str) -> None:
         row = self._row(RunRow, run_id)
         if RUN.allows(row.status, RunStatus.RUNNING):
             row.status = RunStatus.RUNNING
-            row.started_at = utcnow()
+            row.started_at = row.heartbeat_at = utcnow()
+            self._flush_run()
+
+    def heartbeat(self, run_id: str) -> None:
+        """The runner is alive and working on this run."""
+        self._row(RunRow, run_id).heartbeat_at = utcnow()
+        self._session.flush()
+
+    def fail_stale(self, cutoff: datetime) -> list[str]:
+        """Fail running runs with no heartbeat since ``cutoff``: their worker stopped.
+
+        Without this, a run whose worker died stays ``running`` for ever and blocks the queue.
+        """
+        stmt = select(RunRow).where(
+            RunRow.workspace_id == self._workspace_id,
+            RunRow.status == RunStatus.RUNNING,
+            or_(
+                RunRow.heartbeat_at < cutoff,
+                RunRow.heartbeat_at.is_(None) & (RunRow.started_at < cutoff),
+                RunRow.heartbeat_at.is_(None) & RunRow.started_at.is_(None),
+            ),
+        )
+        failed = []
+        for row in self._session.scalars(stmt):
+            row.status = RunStatus.FAILED
+            row.finished_at = utcnow()
+            row.counts = {**(row.counts or {}), "error": "worker stopped (no heartbeat)"}
+            failed.append(row.id)
+        self._session.flush()
+        return failed
+
+    def _flush_run(self) -> None:
+        try:
             self._session.flush()
+        except IntegrityError as error:
+            raise RunInProgress("another pipeline run is already running here") from error
 
     def cancel(self, run_id: str) -> RunStatus:
         """Stop a queued run now, or ask a running one to stop between leads."""
@@ -108,9 +158,12 @@ class RunRepository(ScopedRepository):
             params=params,
             status=RunStatus.RUNNING,
             started_at=utcnow(),
+            heartbeat_at=utcnow(),
         )
+        if kind is RunKind.PIPELINE and self.pipeline_running():
+            raise RunInProgress("another pipeline run is already running here")
         self._session.add(row)
-        self._session.flush()
+        self._flush_run()
         return row.id
 
     def finish(self, run_id: str, status: RunStatus, counts: dict[str, Any] | None = None) -> None:
