@@ -1,10 +1,16 @@
-"""The services one API process shares, built once at start-up."""
+"""The services a request works with, built for the request's workspace.
+
+Vendor clients are built once per process (they hold no workspace); each request wraps them in
+its own workspace's meters and services, which are cheap. Until Phase 6b the workspace is the
+one configured for the deployment (``tenant``).
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Annotated, Protocol
 
-from fastapi import Request
+from fastapi import Depends, Request
 
 from outbound.bootstrap import Container
 from outbound.providers.ports import LlmClient, Mailbox, SearchProvider
@@ -57,6 +63,51 @@ def build_services(
     )
 
 
-def services(request: Request) -> Services:
-    result: Services = request.app.state.services
-    return result
+class ServicesSource(Protocol):
+    def for_tenant(self, workspace_id: str) -> Services: ...
+
+
+@dataclass(frozen=True)
+class ServicesFactory:
+    """Builds a request's services: shared vendor clients, this workspace's meters."""
+
+    container: Container
+    search: SearchProvider | None = None  # raw; metered per workspace
+    writer: LlmClient | None = None  # raw; metered per workspace
+    mailbox: Mailbox | None = None
+
+    def for_tenant(self, workspace_id: str) -> Services:
+        from outbound.pipeline import meter_search, meter_writer
+
+        container = self.container
+        return build_services(
+            container,
+            workspace_id,
+            search=meter_search(container, workspace_id, self.search) if self.search else None,
+            mailbox=self.mailbox,
+            writer=meter_writer(container, workspace_id, self.writer) if self.writer else None,
+        )
+
+
+@dataclass(frozen=True)
+class FixedServices:
+    """Services built in advance for one workspace (tests and scripts)."""
+
+    services: Services
+
+    def for_tenant(self, workspace_id: str) -> Services:
+        if workspace_id != self.services.workspace_id:
+            raise LookupError(f"no services for workspace {workspace_id}")
+        return self.services
+
+
+def tenant(request: Request) -> str:
+    """The workspace this request acts in. Phase 6b replaces this with the signed-in user's
+    membership; until then it is the deployment's configured workspace."""
+    workspace_id: str = request.app.state.workspace_id
+    return workspace_id
+
+
+def services(request: Request, workspace_id: Annotated[str, Depends(tenant)]) -> Services:
+    source: ServicesSource = request.app.state.services_source
+    return source.for_tenant(workspace_id)
