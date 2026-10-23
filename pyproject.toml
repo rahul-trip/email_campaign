@@ -133,6 +133,14 @@ forbidden_modules = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Only directory and scheduling code reads across workspaces (Phase 6a)"
+type = "forbidden"
+source_modules = ["outbound.stages", "outbound.runner", "outbound.metering", "outbound.services"]
+forbidden_modules = ["outbound.db.platform"]
+# Seeding creates and finds workspaces by name, which is a directory operation.
+ignore_imports = ["outbound.services.seed -> outbound.db.platform"]
+
+[[tool.importlinter.contracts]]
 name = "Providers and the database do not depend on each other"
 type = "independence"
 modules = ["outbound.providers", "outbound.db"]

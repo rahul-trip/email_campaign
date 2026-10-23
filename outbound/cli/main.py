@@ -10,7 +10,13 @@ import typer
 from outbound.bootstrap import build_container
 from outbound.cli import ops, profile, serve
 from outbound.cli import privacy as privacy_cli
-from outbound.cli.common import DatabaseUrl, WorkspaceName, settings_for, workspace_id_or_exit
+from outbound.cli.common import (
+    DatabaseUrl,
+    WorkspaceName,
+    as_owner,
+    settings_for,
+    workspace_id_or_exit,
+)
 from outbound.cli.targets import targets_app
 from outbound.db import migrate
 from outbound.services import defaults
@@ -33,7 +39,7 @@ def db_upgrade(
     database_url: DatabaseUrl = None,
 ) -> None:
     """Bring the database up to the latest schema."""
-    url = settings_for(database_url).database_url
+    url = settings_for(database_url).migrate_database_url
     migrate.upgrade(url, revision)
     typer.echo(f"database is at revision {migrate.current_revision(url)}")
 
@@ -44,14 +50,14 @@ def db_downgrade(
     database_url: DatabaseUrl = None,
 ) -> None:
     """Step the schema back (this can drop data)."""
-    migrate.downgrade(settings_for(database_url).database_url, revision)
+    migrate.downgrade(settings_for(database_url).migrate_database_url, revision)
     typer.echo(f"moved back to {revision}")
 
 
 @db_app.command("current")
 def db_current(database_url: DatabaseUrl = None) -> None:
     """Show which schema revision the database is at, and the latest available."""
-    url = settings_for(database_url).database_url
+    url = settings_for(database_url).migrate_database_url
     typer.echo(f"database: {migrate.current_revision(url) or 'not created yet'}")
     typer.echo(f"latest:   {migrate.head_revision()}")
 
@@ -61,7 +67,7 @@ def seed(
     workspace: WorkspaceName = defaults.DEFAULT_WORKSPACE_NAME, database_url: DatabaseUrl = None
 ) -> None:
     """Create the default workspace, campaign and country policies. Safe to run again."""
-    container = build_container(settings_for(database_url))
+    container = build_container(as_owner(settings_for(database_url)))
     result = seed_defaults(container.uow, container.platform, workspace)
     typer.echo(
         f"workspace {workspace!r} ({'created' if result.workspace_created else 'already there'}), "

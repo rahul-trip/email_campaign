@@ -34,3 +34,23 @@ def test_an_explicit_database_url_wins_over_the_switch(monkeypatch: pytest.Monke
     monkeypatch.setenv("POSTGRES_URL", SUPABASE)
     monkeypatch.setenv("DATABASE_URL", "sqlite:///other.db")
     assert Settings().database_url == "sqlite:///other.db"
+
+
+def test_the_platform_and_migrate_connections_default_to_the_app_connection() -> None:
+    settings = Settings(
+        _env_file=None, database_backend="postgres", postgres_url="postgresql://app"
+    )
+    assert settings.platform_database_url == settings.migrate_database_url == "postgresql://app"
+
+
+def test_production_names_three_connections() -> None:
+    settings = Settings(
+        _env_file=None,
+        database_backend="postgres",
+        postgres_url="postgresql://outbound_app",
+        postgres_platform_url="postgresql://outbound_platform",
+        postgres_migrate_url="postgresql://owner",
+    )
+    assert settings.database_url == "postgresql://outbound_app"
+    assert settings.platform_database_url == "postgresql://outbound_platform"
+    assert settings.migrate_database_url == "postgresql://owner"

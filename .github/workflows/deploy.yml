@@ -123,6 +123,19 @@ jobs:
           printf 'DOPPLER_TOKEN=%s\n' "$DOPPLER_TOKEN" \
             | ssh target "umask 077 && cat > '$APP_DIR/doppler.env'"
 
+      - name: Give the migrate container its own Doppler token, if there is one
+        env:
+          DOPPLER_MIGRATE_TOKEN: ${{ secrets.DOPPLER_MIGRATE_TOKEN }}
+        run: |
+          # Optional (Phase 6a): a token for a config whose POSTGRES_URL is the tables' owner,
+          # so the owner's password never reaches the api or worker containers.
+          if [[ -n "$DOPPLER_MIGRATE_TOKEN" ]]; then
+            printf 'DOPPLER_TOKEN=%s\n' "$DOPPLER_MIGRATE_TOKEN" \
+              | ssh target "umask 077 && cat > '$APP_DIR/doppler-migrate.env'"
+          else
+            ssh target "rm -f '$APP_DIR/doppler-migrate.env'"
+          fi
+
       - name: Build, migrate and start on the VM
         env:
           SHA: ${{ steps.release.outputs.sha }}

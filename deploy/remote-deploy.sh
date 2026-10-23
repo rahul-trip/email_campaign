@@ -60,6 +60,11 @@ command -v curl >/dev/null || die "curl is not installed"
 [[ -d "$RELEASES/$RELEASE" ]] || die "release $RELEASE is not unpacked in $RELEASES"
 [[ -s "$OUTBOUND_HOME/doppler.env" ]] || die "$OUTBOUND_HOME/doppler.env is missing (DOPPLER_TOKEN)"
 
+# The migrate container uses its own Doppler token (the tables' owner) when one is provided.
+if [[ -s "$OUTBOUND_HOME/doppler-migrate.env" ]]; then
+  export MIGRATE_ENV_FILE=doppler-migrate.env
+fi
+
 previous=""
 if [[ -L "$OUTBOUND_HOME/current" ]]; then
   previous="$(basename "$(readlink "$OUTBOUND_HOME/current")")"
