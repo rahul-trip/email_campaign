@@ -17,6 +17,7 @@ from outbound.domain.enums import (
     MessageState,
     PolicyStage,
     RunStatus,
+    WorkspaceStatus,
 )
 
 
@@ -222,4 +223,18 @@ CONTACT = StateMachine(
         K.FORGOTTEN: _row(),
     },
     ContactStatus,
+)
+
+
+W = WorkspaceStatus
+WORKSPACE = StateMachine(
+    "workspace",
+    {
+        W.ACTIVE: _row(W.PAUSED, W.SUSPENDED, W.PENDING_DELETION),
+        W.PAUSED: _row(W.ACTIVE, W.SUSPENDED, W.PENDING_DELETION),
+        W.SUSPENDED: _row(W.ACTIVE, W.PENDING_DELETION),
+        W.PENDING_DELETION: _row(W.ACTIVE, W.DELETED),  # restored, or purged when due
+        W.DELETED: _row(),
+    },
+    WorkspaceStatus,
 )

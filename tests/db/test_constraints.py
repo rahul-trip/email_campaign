@@ -19,6 +19,7 @@ from outbound.db.models import (
     SuppressionRow,
 )
 from outbound.db.platform import PlatformUnitOfWorkFactory
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.enums import (
     CompanySource,
@@ -30,6 +31,8 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.domain.enums import WorkspaceStatus as W
+from outbound.domain.state_machines import IllegalTransition
 
 
 def seeded(uow: UnitOfWork) -> tuple[str, str]:
@@ -313,6 +316,51 @@ def test_file_imports_with_the_same_name_are_still_allowed(
         uow.session.flush()
 
 
-def test_workspace_names_are_unique(platform: PlatformUnitOfWorkFactory, ws: str) -> None:
+def test_two_workspaces_may_share_a_name_but_not_a_slug(
+    platform: PlatformUnitOfWorkFactory, ws: str
+) -> None:
+    with platform() as directory:  # the fixture already made one called "acme"
+        second = directory.workspaces.create("acme", {}, {})
+        directory.commit()
+    assert second.slug == "acme-2"
+    with platform() as directory:
+        first = directory.workspaces.find("acme")
+        assert first is not None and first.id == ws  # by slug
+        assert directory.workspaces.find("acme-2") == second
+        with pytest.raises(ValueError, match="taken"):
+            directory.workspaces.create("other", {}, {}, slug="acme")
+    with platform() as directory:  # a fresh slug inserts fine, so the next failure is the slug
+        directory.session.execute(
+            text(
+                "INSERT INTO workspaces (id, name, slug, status, sender_profile, settings, "
+                "created_at, updated_at) VALUES ('ok', 'x', :slug, 'active', '{}', '{}', "
+                ":now, :now)"
+            ),
+            {"slug": "fresh", "now": "2026-10-23 00:00:00+00:00"},
+        )
     with platform() as directory, pytest.raises(IntegrityError):
-        directory.workspaces.create("acme", {}, {})  # the fixture already made one called "acme"
+        directory.session.execute(
+            text(
+                "INSERT INTO workspaces (id, name, slug, status, sender_profile, settings, "
+                "created_at, updated_at) VALUES ('dup', 'x', :slug, 'active', '{}', '{}', "
+                ":now, :now)"
+            ),
+            {"slug": "acme", "now": "2026-10-23 00:00:00+00:00"},
+        )
+
+
+def test_a_workspace_moves_only_along_its_lifecycle(
+    platform: PlatformUnitOfWorkFactory, ws: str
+) -> None:
+    with platform() as directory:
+        current = directory.workspaces.get(ws)
+        assert current is not None and current.status is W.ACTIVE
+        paused = directory.workspaces.set_status(ws, W.PAUSED)
+        assert paused.status is W.PAUSED
+        with pytest.raises(IllegalTransition):
+            directory.workspaces.set_status(ws, W.DELETED)  # only from pending_deletion
+        due = utcnow()
+        pending = directory.workspaces.set_status(ws, W.PENDING_DELETION, deletion_due_at=due)
+        assert pending.deletion_due_at == due
+        restored = directory.workspaces.set_status(ws, W.ACTIVE)
+        assert restored.deletion_due_at is None

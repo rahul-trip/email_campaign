@@ -17,7 +17,9 @@ from outbound.db.errors import NotFound
 from outbound.db.models import CampaignRow, MailboxRow, WorkspaceRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.domain.entities import Campaign, Workspace
-from outbound.domain.enums import MailboxGateway, MailboxStatus
+from outbound.domain.enums import MailboxGateway, MailboxStatus, WorkspaceStatus
+from outbound.domain.slugs import unique_slug
+from outbound.domain.state_machines import WORKSPACE
 
 
 class WorkspaceRepository:
@@ -27,16 +29,60 @@ class WorkspaceRepository:
         self._session = session
 
     def create(
-        self, name: str, sender_profile: dict[str, Any], settings: dict[str, Any]
+        self,
+        name: str,
+        sender_profile: dict[str, Any],
+        settings: dict[str, Any],
+        *,
+        slug: str | None = None,
     ) -> Workspace:
-        row = WorkspaceRow(name=name, sender_profile=sender_profile, settings=settings)
+        """A new workspace. Its slug comes from the name unless given, made unique."""
+        taken = set(self._session.scalars(select(WorkspaceRow.slug)))
+        if slug is not None and slug in taken:
+            raise ValueError(f"the address {slug!r} is taken")
+        row = WorkspaceRow(
+            name=name,
+            slug=slug or unique_slug(name, taken),
+            sender_profile=sender_profile,
+            settings=settings,
+        )
         self._session.add(row)
         self._session.flush()
         return snapshot(row, Workspace)
 
-    def by_name(self, name: str) -> Workspace | None:
-        row = self._session.scalars(select(WorkspaceRow).where(WorkspaceRow.name == name)).first()
+    def by_slug(self, slug: str) -> Workspace | None:
+        stmt = select(WorkspaceRow).where(WorkspaceRow.slug == slug)
+        row = self._session.scalars(stmt).one_or_none()
         return snapshot(row, Workspace) if row else None
+
+    def by_name(self, name: str) -> Workspace | None:
+        """The oldest workspace with this name. Names may repeat: prefer ``by_slug``."""
+        stmt = (
+            select(WorkspaceRow)
+            .where(WorkspaceRow.name == name)
+            .order_by(WorkspaceRow.id)  # UUIDv7: the oldest first
+        )
+        row = self._session.scalars(stmt).first()
+        return snapshot(row, Workspace) if row else None
+
+    def find(self, ref: str) -> Workspace | None:
+        """A workspace by slug, or else by name (how the CLI and settings name one)."""
+        return self.by_slug(ref) or self.by_name(ref)
+
+    def set_status(
+        self, workspace_id: str, status: WorkspaceStatus, *, deletion_due_at: datetime | None = None
+    ) -> Workspace:
+        """Move a workspace through its lifecycle; illegal moves are refused."""
+        row = self._session.get(WorkspaceRow, workspace_id)
+        if row is None:
+            raise LookupError(workspace_id)
+        WORKSPACE.check(row.status, status)
+        row.status = status
+        row.deletion_due_at = (
+            deletion_due_at if status is WorkspaceStatus.PENDING_DELETION else None
+        )
+        self._session.flush()
+        return snapshot(row, Workspace)
 
     def get(self, workspace_id: str) -> Workspace | None:
         row = self._session.get(WorkspaceRow, workspace_id)

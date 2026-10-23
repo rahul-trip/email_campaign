@@ -237,3 +237,13 @@ class PolicyStage(StrEnum):
     EMAIL = "email"
     COPY = "copy"
     DELIVER = "deliver"
+
+
+class WorkspaceStatus(StrEnum):
+    """Whether a workspace may be used. Billing access (Phase 6d) is separate."""
+
+    ACTIVE = "active"
+    PAUSED = "paused"  # a platform admin stopped its engine; people can still sign in and read
+    SUSPENDED = "suspended"  # a platform admin closed it; nobody can use it
+    PENDING_DELETION = "pending_deletion"  # deletion asked for; can be restored until it is due
+    DELETED = "deleted"  # purged; the row stays as a tombstone so cost history keeps its key

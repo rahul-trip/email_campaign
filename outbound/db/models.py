@@ -54,6 +54,7 @@ from outbound.domain.enums import (
     RunStatus,
     SuppressionKind,
     SuppressionReason,
+    WorkspaceStatus,
 )
 
 _NOT_NULL = "{col} IS NOT NULL"
@@ -84,9 +85,15 @@ def _tenant_fk(table: str, column: str, parent: str, *, ondelete: str | None = N
 
 class WorkspaceRow(Identified, Base):
     __tablename__ = "workspaces"
-    __table_args__ = (UniqueConstraint("name"),)  # workspaces are looked up by name
+    # Reached by slug (``/w/<slug>``); two customers may share a name (migration 0008).
+    __table_args__ = (UniqueConstraint("slug"),)
 
     name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(48))
+    status: Mapped[WorkspaceStatus] = mapped_column(
+        enum_type(WorkspaceStatus, "workspace_status"), default=WorkspaceStatus.ACTIVE
+    )
+    deletion_due_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     sender_profile: Mapped[dict[str, Any]] = mapped_column(Json)
     settings: Mapped[dict[str, Any]] = mapped_column(Json)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
