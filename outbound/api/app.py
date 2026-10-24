@@ -28,6 +28,7 @@ from outbound.api.request_log import log_requests
 from outbound.api.routers import (
     admin,
     auth,
+    integrations,
     leads,
     mailboxes,
     privacy,
@@ -61,21 +62,13 @@ SECURITY_HEADERS = {
 def create_app(
     services: Services | ServicesFactory,
     *,
-    workspace_id: str | None = None,
     web_dist: Path | None = WEB_DIST,
     email: TransactionalEmail | None = None,
 ) -> FastAPI:
     """The app over prebuilt services (tests, scripts) or a factory that builds them per
-    request (a real run). ``workspace_id`` is the workspace the intake webhook feeds until
-    Phase 6c gives each workspace its own; with prebuilt services it is theirs. ``email``
-    sends invitations and resets (default: built from the settings)."""
-    if isinstance(services, Services):
-        source: ServicesSource = FixedServices(services)
-        workspace_id = services.workspace_id
-    else:
-        if workspace_id is None:
-            raise ValueError("a services factory needs the workspace it serves")
-        source = services
+    request (a real run). ``email`` sends invitations and resets (default: built from the
+    settings)."""
+    source: ServicesSource = FixedServices(services) if isinstance(services, Services) else services
     container = services.container
     config = container.settings
     if email is None:
@@ -88,7 +81,6 @@ def create_app(
         title="Outbound", version="0.3.0", docs_url=None, redoc_url=None, openapi_url=None
     )
     app.state.services_source = source
-    app.state.workspace_id = workspace_id
     app.state.container = container
     app.state.identity = IdentityService(
         container.identity,
@@ -102,7 +94,6 @@ def create_app(
     app.state.superadmin_views = set()
     app.state.throttle = LoginThrottle()
     app.state.cookie_secure = config.cookie_secure
-    app.state.webhook_secret = config.intake_webhook_secret.get_secret_value()
     errors.install(app)
 
     @app.middleware("http")
@@ -122,7 +113,19 @@ def create_app(
     # Each route checks its own permission (``require`` in deps); this adds the write header.
     csrf = [Depends(require_csrf_header)]
     app.include_router(webhook.router)  # signed, so no sign-in
-    for router in (auth, team, admin, mailboxes, targets, review, leads, runs, settings, privacy):
+    for router in (
+        auth,
+        team,
+        admin,
+        mailboxes,
+        integrations,
+        targets,
+        review,
+        leads,
+        runs,
+        settings,
+        privacy,
+    ):
         app.include_router(router.router, dependencies=csrf)
 
     @app.get("/api/health")
@@ -183,10 +186,10 @@ def create_app_from_container(container: Container) -> FastAPI:
     from outbound.pipeline import search_or_none, writer_or_none
 
     config = container.settings
-    workspace_id = container.workspace_id(config.workspace_name)
+    container.require_database()
     factory = ServicesFactory(
         container,
         search=search_or_none(config),
         writer=writer_or_none(config),
     )
-    return create_app(factory, workspace_id=workspace_id)
+    return create_app(factory)

@@ -42,7 +42,7 @@ def test_what_a_person_does_is_recorded_as_them_not_as_the_operator(
     engine: Engine, platform_engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:
     container = container_for(Settings(_env_file=None), engine, platform_engine)
-    app = create_app(ServicesFactory(container), workspace_id=ws, web_dist=None, email=LogEmail())
+    app = create_app(ServicesFactory(container), web_dist=None, email=LogEmail())
     user_id = add_user(app, ADMIN, ws)
     sign_in(app, ADMIN).post("/api/targets", json={"website": "acme.com", "country": "UK"})
     with factory(ws) as uow:

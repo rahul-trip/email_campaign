@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import secrets
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -18,10 +19,12 @@ from typing import Any
 from sqlalchemy.exc import IntegrityError
 
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.enums import CompanySource, ImportSource
+from outbound.domain.actors import INTEGRATION_WEBHOOK
+from outbound.domain.enums import CompanySource, CredentialPurpose, ImportSource
 from outbound.services.intake import IntakeReport, IntakeService
 
 TOLERANCE_SECONDS = 300
+CREDENTIAL = "intake_webhook"  # the name of the workspace's signing secret
 MAX_TARGETS = 200
 
 
@@ -74,6 +77,18 @@ class WebhookService:
         self._workspace_id = workspace_id
         self._intake = intake
 
+    def configured(self) -> bool:
+        with self._uow(self._workspace_id) as uow:
+            return uow.credentials.get(CREDENTIAL) is not None
+
+    def rotate_secret(self) -> str:
+        """A new signing secret, shown once; the old one stops working at once."""
+        secret = "whsec_" + secrets.token_urlsafe(32)
+        with self._uow(self._workspace_id) as uow:
+            uow.credentials.put(CREDENTIAL, CredentialPurpose.INTAKE_WEBHOOK, secret)
+            uow.commit()
+        return secret
+
     def receive(self, payload: Mapping[str, Any]) -> WebhookResult:
         event_id = str(payload.get("event_id") or "").strip()
         if not event_id:
@@ -89,7 +104,7 @@ class WebhookService:
                 source=ImportSource.WEBHOOK,
                 company_source=CompanySource.MANUAL,
                 filename=label,
-                actor="user:webhook",
+                actor=INTEGRATION_WEBHOOK,
             )
         except IntegrityError:
             # Another delivery of the same event won the race and committed first.
@@ -106,3 +121,12 @@ def _targets(payload: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
     if not rows or len(rows) > MAX_TARGETS:
         raise WebhookError(422, "bad_targets", f"Send between 1 and {MAX_TARGETS} targets.")
     return rows
+
+
+def secret_of(uow_factory: UnitOfWorkFactory, workspace_id: str) -> str:
+    """The workspace's signing secret, or "" when it has none (or there is no such workspace:
+    the two cannot be told apart from outside)."""
+    with uow_factory(workspace_id) as uow:
+        if uow.credentials.get(CREDENTIAL) is None:
+            return ""
+        return uow.credentials.reveal(CREDENTIAL)[1]

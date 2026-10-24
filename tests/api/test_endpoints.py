@@ -11,6 +11,7 @@ from collections.abc import Callable
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from outbound.api.deps import Services
 from outbound.db.uow import UnitOfWorkFactory
@@ -20,15 +21,17 @@ from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
     ContactSource,
+    CredentialPurpose,
     EmailStatus,
     EntityType,
     HoldReason,
+    MembershipRole,
     MessageState,
     PolicyRule,
     Provenance,
 )
 from outbound.services.dns_check import TxtLookup
-from tests.api.conftest import ADMIN, HEADERS, WEBHOOK_SECRET, Api, sign_in
+from tests.api.conftest import ADMIN, HEADERS, WEBHOOK_SECRET, Api, add_user, sign_in
 
 C = CompanyStatus
 FOOTER = 'Quantra Inc, 1 Main St. Reply "unsubscribe" and we will stop.'
@@ -478,15 +481,24 @@ def signed(
 
 
 @pytest.fixture
-def secret() -> None:
-    """The test app is built with the webhook secret already set (see conftest)."""
+def secret(services: Services) -> None:
+    """The workspace has a webhook signing secret (stored encrypted, as Settings makes it)."""
+    with services.container.uow(services.workspace_id) as uow:
+        uow.credentials.put("intake_webhook", CredentialPurpose.INTAKE_WEBHOOK, SECRET)
+        uow.commit()
+
+
+@pytest.fixture
+def hook(services: Services) -> str:
+    """This workspace's webhook address."""
+    return f"/api/intake/webhook/{services.workspace_id}"
 
 
 def test_a_signed_webhook_creates_targets_without_a_login(
-    anonymous: TestClient, secret: None, services: Services
+    anonymous: TestClient, secret: None, hook: str, services: Services
 ) -> None:
     payload = {"event_id": "evt-1", "targets": [{"website": "acme.com"}, {"website": "beta.io"}]}
-    response = anonymous.post("/api/intake/webhook", **signed(payload))  # type: ignore[arg-type]
+    response = anonymous.post(hook, **signed(payload))  # type: ignore[arg-type]
     assert response.status_code == 200
     body = response.json()
     assert body["duplicate"] is False and [r["status"] for r in body["rows"]] == ["accepted"] * 2
@@ -494,50 +506,93 @@ def test_a_signed_webhook_creates_targets_without_a_login(
         assert uow.companies.known_domains() == {"acme.com", "beta.io"}
 
 
-def test_the_same_event_twice_changes_nothing(anonymous: TestClient, secret: None) -> None:
+def test_the_same_event_twice_changes_nothing(
+    anonymous: TestClient, secret: None, hook: str
+) -> None:
     payload = {"event_id": "evt-2", "website": "acme.com", "notes": "from the CRM"}
-    first = anonymous.post("/api/intake/webhook", **signed(payload))  # type: ignore[arg-type]
-    second = anonymous.post("/api/intake/webhook", **signed(payload))  # type: ignore[arg-type]
+    first = anonymous.post(hook, **signed(payload))  # type: ignore[arg-type]
+    second = anonymous.post(hook, **signed(payload))  # type: ignore[arg-type]
     assert first.json()["duplicate"] is False
     assert second.status_code == 200 and second.json() == {"duplicate": True}
 
 
-def test_a_bad_signature_is_rejected(anonymous: TestClient, secret: None) -> None:
+def test_a_bad_signature_is_rejected(anonymous: TestClient, secret: None, hook: str) -> None:
     request = signed({"event_id": "e", "website": "acme.com"}, secret="wrong")
-    response = anonymous.post("/api/intake/webhook", **request)  # type: ignore[arg-type]
+    response = anonymous.post(hook, **request)  # type: ignore[arg-type]
     assert response.status_code == 401 and response.json()["code"] == "bad_signature"
 
 
-def test_a_tampered_body_is_rejected(anonymous: TestClient, secret: None) -> None:
+def test_a_tampered_body_is_rejected(anonymous: TestClient, secret: None, hook: str) -> None:
     request = signed({"event_id": "e", "website": "acme.com"})
     request["content"] = b'{"event_id": "e", "website": "evil.com"}'
-    response = anonymous.post("/api/intake/webhook", **request)  # type: ignore[arg-type]
+    response = anonymous.post(hook, **request)  # type: ignore[arg-type]
     assert response.json()["code"] == "bad_signature"
 
 
-def test_an_old_signed_request_is_not_replayable(anonymous: TestClient, secret: None) -> None:
+def test_an_old_signed_request_is_not_replayable(
+    anonymous: TestClient, secret: None, hook: str
+) -> None:
     request = signed({"event_id": "e", "website": "acme.com"}, age=3_600)
-    response = anonymous.post("/api/intake/webhook", **request)  # type: ignore[arg-type]
+    response = anonymous.post(hook, **request)  # type: ignore[arg-type]
     assert response.status_code == 401 and response.json()["code"] == "stale_timestamp"
 
 
-def test_missing_headers_and_a_missing_secret_are_refused(anonymous: TestClient) -> None:
-    anonymous.app.state.webhook_secret = ""  # type: ignore[attr-defined]
-    off = anonymous.post("/api/intake/webhook", **signed({"event_id": "e", "website": "a.com"}))  # type: ignore[arg-type]
+def test_missing_headers_and_a_missing_secret_are_refused(
+    anonymous: TestClient, hook: str, services: Services
+) -> None:
+    off = anonymous.post(hook, **signed({"event_id": "e", "website": "a.com"}))  # type: ignore[arg-type]
     assert off.status_code == 503 and off.json()["code"] == "webhook_disabled"
-    anonymous.app.state.webhook_secret = SECRET  # type: ignore[attr-defined]
-    bare = anonymous.post("/api/intake/webhook", content=b"{}")
+    unknown = anonymous.post(
+        "/api/intake/webhook/no-such-workspace",
+        **signed({"event_id": "e", "website": "a.com"}),  # type: ignore[arg-type]
+    )
+    assert (unknown.status_code, unknown.json()["code"]) == (503, "webhook_disabled")  # same answer
+    with services.container.uow(services.workspace_id) as uow:
+        uow.credentials.put("intake_webhook", CredentialPurpose.INTAKE_WEBHOOK, SECRET)
+        uow.commit()
+    bare = anonymous.post(hook, content=b"{}")
     assert bare.status_code == 401
 
 
 def test_a_webhook_payload_needs_an_event_id_and_targets(
-    anonymous: TestClient, secret: None
+    anonymous: TestClient, secret: None, hook: str
 ) -> None:
-    no_id = anonymous.post("/api/intake/webhook", **signed({"website": "a.com"}))  # type: ignore[arg-type]
+    no_id = anonymous.post(hook, **signed({"website": "a.com"}))  # type: ignore[arg-type]
     assert no_id.status_code == 422 and no_id.json()["code"] == "missing_event_id"
     too_many = {"event_id": "e", "targets": [{"website": f"a{i}.com"} for i in range(201)]}
-    big = anonymous.post("/api/intake/webhook", **signed(too_many))  # type: ignore[arg-type]
+    big = anonymous.post(hook, **signed(too_many))  # type: ignore[arg-type]
     assert big.json()["code"] == "bad_targets"
+
+
+def test_the_workspace_makes_and_rotates_its_own_webhook_secret(
+    api: Api, anonymous: TestClient, hook: str, services: Services
+) -> None:
+    def deliver(event: str, secret: str) -> int:
+        request = signed({"event_id": event, "website": f"{event}.com"}, secret=secret)
+        return anonymous.post(hook, **request).status_code  # type: ignore[arg-type]
+
+    assert api.get("/api/integrations/webhook").json() == {"path": hook, "configured": False}
+    first = api.post("/api/integrations/webhook/rotate").json()
+    assert first["path"] == hook and first["secret"].startswith("whsec_")
+    info = api.get("/api/integrations/webhook").json()
+    assert info["configured"] is True and "secret" not in info  # shown once, never again
+    assert deliver("r1", first["secret"]) == 200
+    second = api.post("/api/integrations/webhook/rotate").json()["secret"]
+    assert deliver("r2", first["secret"]) == 401  # the old secret stopped working at once
+    assert deliver("r3", second) == 200
+    with services.container.uow(services.workspace_id) as uow:
+        made_by = uow.session.execute(text("SELECT DISTINCT created_by FROM import_batches"))
+        assert set(made_by.scalars()) == {"integration:webhook"}  # an integration, not a person
+
+
+def test_a_member_cannot_see_or_change_the_webhook(
+    app_and_services: tuple[FastAPI, Services], ws: str
+) -> None:
+    app, _ = app_and_services
+    add_user(app, "pat@customer.example", ws, MembershipRole.MEMBER)
+    member = sign_in(app, "pat@customer.example")
+    assert member.get("/api/integrations/webhook").status_code == 403
+    assert member.post("/api/integrations/webhook/rotate").status_code == 403
 
 
 # ------------------------------------------------------------------ privacy

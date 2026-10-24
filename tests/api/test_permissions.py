@@ -25,7 +25,7 @@ from tests.api.conftest import ADMIN, PASSWORD, Api, add_user, sign_in
 # Routes anyone may call, or that check something else (a signature, the session alone).
 OPEN = {
     "/api/health",
-    "/api/intake/webhook",
+    "/api/intake/webhook/{workspace_id}",
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/logout-others",

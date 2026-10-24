@@ -257,9 +257,3 @@ def services(request: Request, context: Annotated[Tenant, Depends(tenant)]) -> S
         actor=context.actor,
         read_only=context.principal.superadmin_view,
     )
-
-
-def deployment_workspace(request: Request) -> str:
-    """The intake webhook's workspace until Phase 6c gives every workspace its own URL."""
-    workspace_id: str = request.app.state.workspace_id
-    return workspace_id

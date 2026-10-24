@@ -101,7 +101,6 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_username: str = ""
     smtp_password: SecretStr = SecretStr("")
-    intake_webhook_secret: SecretStr = SecretStr("")  # blank disables the webhook
     cookie_secure: bool = False  # set true when served over https
     api_host: str = "127.0.0.1"
     api_port: int = 8000

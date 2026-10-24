@@ -245,7 +245,7 @@ export const SECTIONS: Section[] = [
       {
         target: "settings-tabs",
         title: "Setup, profile, mailboxes, limits, team",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Your account changes your password.",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Integrations holds the signed address other systems use to add targets. Your account changes your password.",
       },
       {
         target: "setup-check",

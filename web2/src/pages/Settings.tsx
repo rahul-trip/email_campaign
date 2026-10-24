@@ -6,6 +6,7 @@ import { client, ok } from "../api/client";
 import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Tabs, Textarea } from "../components/ui";
 import { lines, when } from "../lib/format";
 import { Mailboxes } from "./Mailboxes";
+import { Integrations } from "./SettingsIntegrations";
 import { Account, Team } from "./SettingsTeam";
 import type { SettingsTab } from "./settingsTabs";
 
@@ -30,6 +31,7 @@ export function SettingsPage() {
           ["mailboxes", "Mailboxes"],
           ["limits", "Limits and budget"],
           ["team", "Team"],
+          ["integrations", "Integrations"],
           ["account", "Your account"],
         ]}
       >
@@ -38,6 +40,7 @@ export function SettingsPage() {
         {tab === "mailboxes" && <Mailboxes />}
         {tab === "limits" && <Limits />}
         {tab === "team" && <Team />}
+        {tab === "integrations" && <Integrations />}
         {tab === "account" && <Account />}
       </Tabs>
     </>

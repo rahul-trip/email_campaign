@@ -673,3 +673,13 @@ class MailboxCheckOut(Out):
     ok: bool
     status: str
     detail: str
+
+
+class WebhookInfoOut(Out):
+    path: str  # where other systems POST, on this server
+    configured: bool  # whether a signing secret exists
+
+
+class WebhookSecretOut(Out):
+    path: str
+    secret: str  # shown once
