@@ -14,6 +14,7 @@ from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import IllegalTransition
 from outbound.logging import get_logger
 from outbound.services.leads import LeadError
+from outbound.services.resume import NoCredits
 from outbound.services.review import ReviewError
 from outbound.services.settings import SettingsError
 
@@ -57,6 +58,16 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(IllegalTransition)
     async def _state(request: Request, error: Exception) -> JSONResponse:
         return problem(409, "action_not_allowed", str(error))
+
+    @app.exception_handler(NoCredits)
+    async def _no_credits(request: Request, error: NoCredits) -> JSONResponse:
+        return problem(
+            409,
+            "no_credits",
+            f"{error.reason.capitalize()}. Credits renew on {error.renews:%d %b %Y}.",
+            step=error.step.value if error.step else None,
+            renews=error.renews.isoformat(),
+        )
 
     @app.exception_handler(SettingsError)
     @app.exception_handler(InvalidInput)

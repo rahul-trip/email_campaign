@@ -137,8 +137,8 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 
 - [x] The guard's refusal with "wait for credits"; `credit_wait_step`; one event; `due()` skips waiting leads.
 - [x] Waiting import rows, and discovery capped at the credits left.
-- [ ] The automatic resume job, oldest first and capped by the credits available.
-- [ ] Customer endpoints:
+- [x] The automatic resume job, oldest first and capped by the credits available.
+- [x] Customer endpoints:
   - `POST /api/companies/{id}/resume`;
   - `POST /api/companies/resume`;
   - `POST /api/targets/resume`;

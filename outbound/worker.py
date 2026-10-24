@@ -76,9 +76,12 @@ class Worker:
     def plan(self) -> list[Job]:
         """The work to start now: at most one job per workspace, not for a busy workspace,
         queued runs before ticks, the least recently served workspace first."""
+        now = self._now()
         with self._container.platform() as platform:
-            queued = platform.scheduler.with_queued_runs()
-            active = platform.scheduler.active_workspaces() if self._tick_every else []
+            if platform.settings.get()[0].kill_runs:
+                return []  # the platform's kill switch: nothing runs for anyone
+            queued = platform.scheduler.with_queued_runs(now)
+            active = platform.scheduler.active_workspaces(now) if self._tick_every else []
         jobs = [Job(ws, Task.RUN) for ws in queued if ws not in self._busy]
         planned = {job.workspace_id for job in jobs}
         if self._tick_every is not None:

@@ -22,8 +22,9 @@ from outbound.api.auth import session_token
 from outbound.api.errors import ApiError
 from outbound.bootstrap import Container
 from outbound.domain.actors import OPERATOR
+from outbound.domain.entitlements import AccessLevel
 from outbound.domain.enums import PlatformRole, WorkspaceStatus
-from outbound.domain.permissions import Permission, Principal, can
+from outbound.domain.permissions import READ, Permission, Principal, can
 from outbound.logging import bind, get_logger
 from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.providers.registry import build_oauth_apps
@@ -32,11 +33,14 @@ from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
 from outbound.services.mailboxes import MailboxService
 from outbound.services.privacy import PrivacyService
+from outbound.services.quota import QuotaService
 from outbound.services.reports import ReportService
+from outbound.services.resume import ResumeService
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunService
 from outbound.services.settings import SettingsService
 from outbound.services.setup import SetupService
+from outbound.services.usage import UsageService
 from outbound.services.webhook import WebhookService
 from outbound.stages.mailboxes import Mailboxes
 
@@ -58,6 +62,9 @@ class Services:
     privacy: PrivacyService
     mailboxes: MailboxService
     setup: SetupService
+    quota: QuotaService
+    resume: ResumeService
+    usage: UsageService
 
 
 def build_services(
@@ -73,6 +80,8 @@ def build_services(
 ) -> Services:
     uow = container.uow.reading_only() if read_only else container.uow
     intake = IntakeService(uow, workspace_id, search, actor=actor)
+    quota = QuotaService(uow, workspace_id)
+    resume = ResumeService(uow, workspace_id, intake)
     return Services(
         container=container,
         workspace_id=workspace_id,
@@ -85,6 +94,9 @@ def build_services(
         webhook=WebhookService(uow, workspace_id, intake),
         privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),
         setup=SetupService(uow, workspace_id),
+        quota=quota,
+        resume=resume,
+        usage=UsageService(uow, container.identity, workspace_id, quota, resume),
         mailboxes=MailboxService(
             uow, container.identity, workspace_id,
             apps=build_oauth_apps(container.settings), base_url=container.settings.app_base_url,
@@ -227,7 +239,7 @@ Check = Callable[..., object]
 def require(permission: Permission) -> Check:
     """A route's permission. As a dependency it returns the request's tenant, checked."""
 
-    def check(context: Annotated[Tenant, Depends(tenant)]) -> Tenant:
+    def check(request: Request, context: Annotated[Tenant, Depends(tenant)]) -> Tenant:
         if not can(context.principal, permission):
             refusal = (
                 "A superadmin view is read-only."
@@ -235,10 +247,27 @@ def require(permission: Permission) -> Check:
                 else "Your role does not allow this. Ask a workspace admin."
             )
             raise ApiError(403, "forbidden", refusal)
+        if permission not in READ:
+            _refuse_if_access_ended(request, context.workspace_id)
         return context
 
     check.permission = permission  # type: ignore[attr-defined]  # read by the route-walk test
     return check
+
+
+def _refuse_if_access_ended(request: Request, workspace_id: str) -> None:
+    """Past its access date a workspace is read-only: nothing is lost, and nothing changes until
+    a platform admin extends it. Reads, and asking for more, stay open."""
+    container: Container = request.app.state.container
+    quota = QuotaService(container.uow, workspace_id).quota()
+    if quota.access is AccessLevel.READ_ONLY:
+        ended = f"{quota.access_until:%d %b %Y}" if quota.access_until else "recently"
+        raise ApiError(
+            403,
+            "access_ended",
+            f"Access to this workspace ended on {ended}, so it is read-only. Everything is kept; "
+            "ask your admin for an extension.",
+        )
 
 
 def require_platform(permission: Permission) -> Check:

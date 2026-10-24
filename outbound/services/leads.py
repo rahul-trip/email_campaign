@@ -154,6 +154,7 @@ class LeadService:
         hold_reason: HoldReason | None = None,
         campaign_id: str | None = None,
         text: str | None = None,
+        waiting_for_credits: bool | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Company], int]:
@@ -163,6 +164,7 @@ class LeadService:
                 hold_reason=hold_reason,
                 campaign_id=campaign_id,
                 text=text,
+                waiting_for_credits=waiting_for_credits,
                 limit=limit,
                 offset=offset,
             )

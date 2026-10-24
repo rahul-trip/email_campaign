@@ -13,12 +13,14 @@ from datetime import datetime
 from types import TracebackType
 from typing import Self
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.sql.elements import ColumnElement
 
-from outbound.db.models import RunRow, WorkspaceRow
+from outbound.db.models import RunRow, WorkspacePlanRow, WorkspaceRow
 from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettingsRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
+from outbound.db.types import utcnow
 from outbound.domain.enums import RunStatus, WorkspaceStatus
 
 
@@ -28,24 +30,32 @@ class SchedulerQueries:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def active_workspaces(self) -> list[str]:
-        """Workspaces whose engine may run (paused, suspended and deleted ones may not)."""
+    @staticmethod
+    def _may_run(now: datetime) -> ColumnElement[bool]:
+        """Active, and not past the access date its plan gives it (no plan row: no end)."""
+        return and_(
+            WorkspaceRow.status == WorkspaceStatus.ACTIVE,
+            or_(WorkspacePlanRow.access_until.is_(None), WorkspacePlanRow.access_until > now),
+        )
+
+    def active_workspaces(self, now: datetime | None = None) -> list[str]:
+        """Workspaces whose engine may run: active, with access (paused, suspended, deleted and
+        expired ones may not)."""
         stmt = (
             select(WorkspaceRow.id)
-            .where(WorkspaceRow.status == WorkspaceStatus.ACTIVE)
+            .outerjoin(WorkspacePlanRow, WorkspacePlanRow.workspace_id == WorkspaceRow.id)
+            .where(self._may_run(now or utcnow()))
             .order_by(WorkspaceRow.id)
         )
         return list(self._session.scalars(stmt))
 
-    def with_queued_runs(self) -> list[str]:
-        """Active workspaces with a queued run, the one waiting longest first."""
+    def with_queued_runs(self, now: datetime | None = None) -> list[str]:
+        """Workspaces that may run and have a queued run, the one waiting longest first."""
         stmt = (
             select(RunRow.workspace_id)
             .join(WorkspaceRow, WorkspaceRow.id == RunRow.workspace_id)
-            .where(
-                RunRow.status == RunStatus.QUEUED,
-                WorkspaceRow.status == WorkspaceStatus.ACTIVE,
-            )
+            .outerjoin(WorkspacePlanRow, WorkspacePlanRow.workspace_id == WorkspaceRow.id)
+            .where(RunRow.status == RunStatus.QUEUED, self._may_run(now or utcnow()))
             .group_by(RunRow.workspace_id)
             .order_by(func.min(RunRow.created_at))
         )

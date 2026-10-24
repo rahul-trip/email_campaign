@@ -20,6 +20,8 @@ from outbound.domain.enums import (
 from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
 
+StepName = Literal["discovery", "manual", "research", "email", "copy", "deliver", "rewrite"]
+
 
 class Out(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -138,6 +140,7 @@ class CompanyOut(Out):
     hold_reason: HoldReason | None
     failed_stage: str | None
     last_error: str | None
+    credit_wait_step: StepName | None = None  # waiting, in place, for a credit on this step
     country_code: str | None
     legal_entity_type: str
     priority: int
@@ -697,3 +700,52 @@ class SetupOut(Out):
     items: list[SetupItemOut]
     done: bool  # nothing is missing: the engine can draft
     next: SetupItemOut | None
+
+
+class StepUsageOut(Out):
+    step: str
+    limit: int | None  # None: unlimited
+    granted: int
+    used: int
+    remaining: int | None  # None: unlimited
+
+
+class GrantOut(Out):
+    id: str
+    step: str
+    amount: int
+    created_at: datetime
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    note: str
+
+
+class UsageOut(Out):
+    plan_code: str
+    plan_name: str
+    period_start: datetime
+    period_end: datetime  # when the allowances renew
+    access: Literal["full", "read_only", "locked"]
+    access_until: datetime | None
+    engine: bool  # the worker may work for this workspace
+    steps: list[StepUsageOut]
+    grants: list[GrantOut]
+    waiting_leads: dict[str, int]  # leads parked for a credit, per step
+    waiting_rows: int  # manual rows waiting to become leads
+    seats: int | None
+    mailboxes: int | None
+    active_campaigns: int | None
+    features: list[str]
+    announcement: str
+
+
+class RequestCreditsIn(In):
+    step: (
+        Literal["discovery", "manual", "research", "email", "copy", "deliver", "rewrite"] | None
+    ) = None
+    note: str = Field(default="", max_length=500)
+
+
+class ResumedOut(Out):
+    leads: int
+    rows: int

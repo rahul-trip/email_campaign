@@ -50,6 +50,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
 from outbound.services.intake import IntakeService, discover_rows, discovery_query
+from outbound.services.resume import ResumeService
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunMode, RunRequest, RunService
 from outbound.stages.base import Stage
@@ -178,13 +179,17 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         if isinstance(mailboxes, StoredMailboxes):
             jobs.append(MailboxHealth(mailboxes))
 
+    intake = IntakeService(uow, workspace_id, search)
+    # First in the tick: credits that appeared (a new period, a grant) release waiting work
+    # before this tick's pipeline looks for it.
+    jobs.insert(0, ResumeService(uow, workspace_id, intake))
     runner = Runner(uow, workspace_id, stages, Guards(budget))
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),
         review=ReviewService(uow, workspace_id, writer),
         runs=RunService(uow, workspace_id),
-        intake=IntakeService(uow, workspace_id, search),
+        intake=intake,
         meter=meter,
         search=search,
         stage_names=[stage.name for stage in stages],
