@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from outbound.db.errors import ConcurrencyConflict, NotFound
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.copy_lint import LintRules
@@ -22,8 +23,10 @@ from outbound.domain.enums import (
     EmailStatus,
     EntityType,
     MessageState,
+    UsageStep,
 )
 from outbound.metering.metered import call_scope
+from outbound.metering.quota import credit_left
 from outbound.providers.ports import LlmClient
 from outbound.stages.copy.graph import Revision, revise_email
 
@@ -197,6 +200,12 @@ class ReviewService:
             workspace = uow.workspace()
             sender = dict(workspace.sender_profile) if workspace else {}
             settings = dict(workspace.settings) if workspace else {}
+            left, renews = credit_left(uow, UsageStep.REWRITE, utcnow())
+        if not left:  # checked before the model is asked, so nothing is spent on a refusal
+            raise ReviewError(
+                f"no rewrite credits are left; they renew on {renews:%d %b}. "
+                "Ask your admin for more in Settings → Plan and usage."
+            )
         low = int(settings.get("email_min_words") or 120)
         high = int(settings.get("email_max_words") or 200)
         with call_scope(company_id=message.company_id, contact_id=message.contact_id):
@@ -216,6 +225,7 @@ class ReviewService:
             uow.events.append(
                 EntityType.MESSAGE, message.id, "revision_asked", actor, {"instructions": ask_for}
             )
+            uow.usage.charge(UsageStep.REWRITE, message.company_id)
             uow.commit()
         return revision
 

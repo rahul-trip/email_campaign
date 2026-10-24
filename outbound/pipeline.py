@@ -11,9 +11,11 @@ from dataclasses import dataclass, field
 
 from outbound.bootstrap import Container
 from outbound.config import Settings
+from outbound.db.types import utcnow
 from outbound.domain.entities import Workspace
-from outbound.domain.enums import CompanySource, ImportRowStatus, ImportSource
+from outbound.domain.enums import CompanySource, ImportRowStatus, ImportSource, UsageStep
 from outbound.domain.errors import ConfigurationError
+from outbound.logging import get_logger
 from outbound.metering.budget import BudgetPolicy
 from outbound.metering.metered import (
     Meter,
@@ -24,6 +26,7 @@ from outbound.metering.metered import (
     MeteredSearch,
     MeteredVerifier,
 )
+from outbound.metering.quota import quota_in
 from outbound.providers.ports import (
     CatchAllResolver,
     CompanyRegistry,
@@ -60,6 +63,8 @@ from outbound.stages.mailboxes import Mailboxes, MailboxHealth, StoredMailboxes,
 from outbound.stages.research.graph import ResearchDeps
 from outbound.stages.research.stage import ResearchStage
 from outbound.stages.sync import SentSync
+
+log = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -234,6 +239,16 @@ def discover_companies(
             f"describe the ideal customer on the {campaign_name!r} campaign first: "
             "discovery searches for companies that fit it"
         )
+    with container.uow(workspace_id) as uow:
+        quota, _ = quota_in(uow, utcnow())
+    if not quota.engine:
+        return 0
+    left = quota.remaining(UsageStep.DISCOVERY)
+    if left is not None:
+        count = min(count, left)  # never search for companies there is no credit to add
+    if count <= 0:
+        log.info("discovery_skipped", reason="no discovery credit left")
+        return 0
     query = discovery_query(campaign.icp_description or "")
     rows = discover_rows(pipeline.search, [query], per_query=count)
     report = pipeline.intake.run(

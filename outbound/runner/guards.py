@@ -7,14 +7,19 @@ its budget gets no more paid work.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork
 from outbound.domain.entities import Company
-from outbound.domain.enums import HoldReason
+from outbound.domain.entitlements import AccessLevel, Quota
+from outbound.domain.enums import HoldReason, UsageStep
 from outbound.domain.policies import PolicyOutcome
 from outbound.metering.budget import BudgetPolicy
+from outbound.metering.quota import STAGE_CHARGES, quota_in
 from outbound.stages.base import Stage
 from outbound.stages.policy import policy_decision_for
 
@@ -23,6 +28,8 @@ class RefusalKind(StrEnum):
     SUPPRESSED = "suppressed"  # never contact: the domain is on the suppression list
     HOLD = "hold"  # wait for a person
     BUDGET = "budget"
+    CREDITS = "credits"  # the plan has no credit left for this step: wait in place
+    ACCESS = "access"  # the workspace may not run now (paused, past its access date, stopped)
 
 
 @dataclass(frozen=True)
@@ -30,15 +37,33 @@ class Refusal:
     kind: RefusalKind
     reason: str
     hold_reason: HoldReason | None = None
+    step: UsageStep | None = None  # for CREDITS: the step that has none left
 
 
 class Guards:
-    def __init__(self, budget: BudgetPolicy | None = None) -> None:
+    def __init__(
+        self, budget: BudgetPolicy | None = None, *, now: Callable[[], datetime] = utcnow
+    ) -> None:
         self._budget = budget or BudgetPolicy()
+        self._now = now
 
     def check(self, uow: UnitOfWork, company: Company, stage: Stage) -> Refusal | None:
         if uow.suppressions.is_domain_suppressed(company.domain):
             return Refusal(RefusalKind.SUPPRESSED, f"{company.domain} is on the suppression list")
+
+        quota, _ = quota_in(uow, self._now())
+        if not quota.engine:
+            return Refusal(RefusalKind.ACCESS, _why_not_running(quota))
+        charge = STAGE_CHARGES.get(stage.name)
+        if charge is not None:
+            step = charge[0]
+            # A step already charged on this lead (research again, a retry) never needs a credit.
+            if not quota.has_credit(step) and not uow.usage.charged(step, company.id):
+                return Refusal(
+                    RefusalKind.CREDITS,
+                    f"no {step.value} credit left until {quota.period_end:%d %b}",
+                    step=step,
+                )
 
         if stage.guard_policy:
             decision = policy_decision_for(uow, company, stage=stage.name)
@@ -61,3 +86,11 @@ class Guards:
                     f"per-prospect budget used up ({spent} of {ceiling} micro-USD)",
                 )
         return None
+
+
+def _why_not_running(quota: Quota) -> str:
+    if quota.access is AccessLevel.READ_ONLY:
+        return "access has ended"
+    if quota.access is AccessLevel.LOCKED:
+        return "the workspace is closed"
+    return "the engine is paused"

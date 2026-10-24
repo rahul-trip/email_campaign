@@ -8,22 +8,14 @@ plans did) is unlimited and never expires.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
 from datetime import datetime
 
-from outbound.db.errors import NotFound
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.entitlements import (
-    UNLIMITED,
-    Plan,
-    PlanAssignment,
-    Quota,
-    compute_quota,
-    period_bounds,
-)
+from outbound.domain.entitlements import Plan, Quota
 from outbound.domain.enums import UsageStep
 from outbound.domain.platform_settings import PlatformSettings
+from outbound.metering.quota import quota_in
 
 
 class QuotaService:
@@ -44,29 +36,14 @@ class QuotaService:
     def snapshot(self) -> tuple[Quota, PlatformSettings]:
         """The quota and the platform settings it was computed with (the kill switches, the
         announcement), in one short read."""
-        now = self._now()
         with self._uow(self._workspace_id) as uow:
-            workspace = uow.workspace()
-            if workspace is None:
-                raise NotFound(f"workspace {self._workspace_id}")
-            settings, _ = uow.platform_settings.get()
-            stored = uow.usage.assignment()
-            overrides, grants = uow.usage.overrides(), uow.usage.grants()
-            assignment = stored or PlanAssignment(UNLIMITED.code, workspace.created_at or now, None)
-            plan = settings.plan(assignment.plan_code)
-            start, end = period_bounds(assignment.started_at, now)
-            used = uow.usage.used(start, end)
-        quota = compute_quota(assignment, plan, overrides, grants, used, workspace.status, now)
-        if settings.kill_runs:
-            quota = replace(quota, engine=False)  # the platform's kill switch
-        return quota, settings
+            return quota_in(uow, self._now())
 
     def plan(self) -> Plan:
         return self.quota().plan
 
     def charge(self, step: UsageStep, company_id: str) -> bool:
-        """Charge ``step`` on a lead (once; True if this call did). Not used by stages, which
-        charge in their own transaction; for services that already hold no transaction."""
+        """Charge ``step`` on a lead, once (True if this call did), in its own transaction."""
         with self._uow(self._workspace_id) as uow:
             charged = uow.usage.charge(step, company_id)
             uow.commit()

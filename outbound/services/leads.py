@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.entities import (
@@ -30,6 +31,7 @@ from outbound.domain.enums import (
     MessageState,
     PolicyStage,
     Provenance,
+    UsageStep,
 )
 from outbound.domain.errors import InvalidInput
 from outbound.domain.names import same_person, split_name
@@ -42,6 +44,7 @@ from outbound.domain.state_machines import (
     resume_status_for,
     retry_status_for,
 )
+from outbound.metering.quota import credit_left
 from outbound.services.journey import Journey, JourneyData, build_journey
 from outbound.stages.policy import policy_decision_for
 
@@ -466,14 +469,26 @@ class LeadService:
                     f"the lead is {company.status.value}: the person can only be changed before"
                     " the email is in the mailbox"
                 )
-            for message in uow.messages.for_company(company_id):
-                if message.state in (MessageState.GENERATED, MessageState.APPROVED):
-                    uow.messages.transition(
-                        message.id,
-                        MessageState.CANCELLED,
-                        expected_version=message.row_version,
-                        actor=actor,
+            open_emails = [
+                m
+                for m in uow.messages.for_company(company_id)
+                if m.state in (MessageState.GENERATED, MessageState.APPROVED)
+            ]
+            if open_emails:  # throwing an email away to have it written again costs a rewrite
+                left, renews = credit_left(uow, UsageStep.REWRITE, utcnow())
+                if not left:
+                    raise LeadError(
+                        f"no rewrite credits are left; they renew on {renews:%d %b}. "
+                        "Ask your admin for more in Settings → Plan and usage."
                     )
+                uow.usage.charge(UsageStep.REWRITE, company_id)
+            for message in open_emails:
+                uow.messages.transition(
+                    message.id,
+                    MessageState.CANCELLED,
+                    expected_version=message.row_version,
+                    actor=actor,
+                )
             uow.contacts.make_first(contact_id)
             if company.status is CompanyStatus.CONTACTS_FOUND:
                 uow.commit()

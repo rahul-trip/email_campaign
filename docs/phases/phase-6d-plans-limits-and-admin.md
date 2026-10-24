@@ -122,8 +122,8 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 
 - [x] **`domain/entitlements.py`:** the plan model, the Free plan's defaults, and the pure functions above.
   - Free plan: 5 discovery and 5 manual a month, other steps unlimited, 3 seats, 1 mailbox, 2 active campaigns, 30 days of access.
-- [ ] **Charging** in `Runner._apply`, `IntakeService` and `ReviewService`. A unique-key conflict means "already charged" and is not an error.
-- [ ] **The guard** checks credits before a step that charges, and the access level before any work.
+- [x] **Charging** in `Runner._apply`, `IntakeService` and `ReviewService`. A unique-key conflict means "already charged" and is not an error.
+- [x] **The guard** checks credits before a step that charges, and the access level before any work.
 - [ ] **Limits on create:**
   - seats at invite (pending invites count);
   - mailboxes at connect;
@@ -135,8 +135,8 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 
 ### 6d.3 Waiting and resuming
 
-- [ ] The guard's refusal with "wait for credits"; `credit_wait_step`; one event; `due()` skips waiting leads.
-- [ ] Waiting import rows, and discovery capped at the credits left.
+- [x] The guard's refusal with "wait for credits"; `credit_wait_step`; one event; `due()` skips waiting leads.
+- [x] Waiting import rows, and discovery capped at the credits left.
 - [ ] The automatic resume job, oldest first and capped by the credits available.
 - [ ] Customer endpoints:
   - `POST /api/companies/{id}/resume`;
