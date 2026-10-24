@@ -683,3 +683,17 @@ class WebhookInfoOut(Out):
 class WebhookSecretOut(Out):
     path: str
     secret: str  # shown once
+
+
+class SetupItemOut(Out):
+    key: str
+    title: str
+    status: Literal["ok", "warning", "missing"]
+    detail: str
+    where: str  # settings:profile | settings:mailboxes | campaigns | compliance | targets
+
+
+class SetupOut(Out):
+    items: list[SetupItemOut]
+    done: bool  # nothing is missing: the engine can draft
+    next: SetupItemOut | None

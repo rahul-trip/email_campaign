@@ -71,3 +71,14 @@ def test_a_mailbox_of_another_workspace_is_not_found(
         )
         uow.commit()
     assert api.post(f"/api/mailboxes/{theirs.id}/pause").status_code == 404
+
+
+def test_the_setup_report_is_served_to_every_member(
+    api: Api, app_and_services: tuple[FastAPI, Services], ws: str
+) -> None:
+    app, _ = app_and_services
+    add_user(app, "pat@customer.example", ws, MembershipRole.MEMBER)
+    for who in (api, sign_in(app, "pat@customer.example")):
+        body = who.get("/api/setup").json()
+        assert {"items", "done", "next"} <= set(body) and body["done"] is False
+        assert body["items"][0].keys() >= {"key", "title", "status", "detail", "where"}
