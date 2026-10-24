@@ -749,3 +749,208 @@ class RequestCreditsIn(In):
 class ResumedOut(Out):
     leads: int
     rows: int
+
+
+# ----------------------------------------------------------------------- admin console (6d)
+
+
+class AdminStepOut(Out):
+    step: str
+    plan_limit: int | None  # the plan's own limit; None: unlimited
+    limit: int | None  # after this customer's overrides
+    granted: int
+    used: int
+    remaining: int | None
+
+
+class OverrideOut(Out):
+    id: str
+    key: str
+    value: int | bool | None
+    created_at: datetime
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    note: str
+
+
+class CustomerRowOut(Out):
+    id: str
+    name: str
+    slug: str
+    status: str
+    plan_code: str
+    plan_name: str
+    access: Literal["full", "read_only", "locked"]
+    access_until: datetime | None
+    period_start: datetime
+    period_end: datetime
+    steps: list[AdminStepOut]
+    spend_micro_usd: int  # this calendar month
+    leads: int
+    members: int
+    mailboxes: int
+    mailbox_problems: int
+    waiting: int
+    last_active: datetime | None
+    open_request: bool
+    near_limit: bool
+    features: list[str]
+
+
+class AdminMailboxOut(Out):
+    id: str
+    address: str
+    gateway: str
+    status: str
+    last_checked_at: datetime | None
+    dns_ok: bool | None
+
+
+class AuditOut(Out):
+    id: str
+    at: datetime
+    actor: str
+    workspace: str
+    workspace_id: str | None
+    action: str
+    target_type: str | None
+    target_id: str | None
+    note: str | None
+    data: dict[str, Any]
+
+
+class CustomerDetailOut(Out):
+    row: CustomerRowOut
+    overrides: list[OverrideOut]
+    grants: list[GrantOut]
+    members: list[MemberOut]
+    mailboxes: list[AdminMailboxOut]
+    requests: list[AuditOut]
+    activity: list[AuditOut]
+    plan_started_at: datetime | None
+    plan_note: str
+
+
+class AttentionOut(Out):
+    kind: Literal["credit_request", "access_ending", "mailbox"]
+    workspace_id: str
+    workspace_name: str
+    detail: str
+
+
+class OverviewOut(Out):
+    customers: int
+    expiring: int
+    leads_added: int
+    drafts_made: int
+    spend_micro_usd: int
+    spend_by_provider: dict[str, int]
+    waiting: int
+    waiting_customers: int
+    attention: list[AttentionOut]
+    activity: list[AuditOut]
+
+
+class AdminUserOut(Out):
+    id: str
+    email: str
+    name: str
+    platform_role: Literal["admin", "superadmin"] | None
+    status: Literal["active", "disabled"]
+    last_login_at: datetime | None
+    workspaces: list[str]  # "Acme (admin)"
+
+
+class PlanChangeIn(In):
+    plan: str = Field(max_length=60)
+    note: str = Field(default="", max_length=500)
+
+
+class ExtendAccessIn(In):
+    days: int | None = Field(default=None, ge=1, le=3650)
+    until: datetime | None = None
+    note: str = Field(default="", max_length=500)
+
+
+class StatusChangeIn(In):
+    status: Literal["active", "paused", "suspended"]
+    note: str = Field(default="", max_length=500)
+
+
+class OverrideIn(In):
+    key: str = Field(max_length=80)
+    value: int | bool | None  # null: unlimited
+    expires_at: datetime | None = None
+    note: str = Field(default="", max_length=500)
+
+
+class GrantIn(In):
+    step: StepName
+    amount: int = Field(ge=1, le=1_000_000)
+    expires_at: datetime | None = None
+    note: str = Field(default="", max_length=500)
+    resume_now: bool = True
+
+
+class GrantedOut(Out):
+    grant: GrantOut
+    resumed_leads: int
+    resumed_rows: int
+
+
+class PlanDefinition(Out):
+    code: str
+    name: str
+    limits: dict[str, int | None]
+    seats: int | None
+    mailboxes: int | None
+    active_campaigns: int | None
+    max_leads_per_run: int | None
+    max_prospect_budget_micro_usd: int | None
+    features: list[str]
+    access_days: int | None
+    customers: int  # how many are on it now
+
+
+class PlansOut(Out):
+    plans: list[PlanDefinition]
+    default_plan: str
+    version: int
+
+
+class PlanSaveIn(In):
+    name: str = Field(min_length=1, max_length=100)
+    limits: dict[StepName, int | None] = Field(default_factory=dict)
+    seats: int | None = Field(default=3, ge=0)
+    mailboxes: int | None = Field(default=1, ge=0)
+    active_campaigns: int | None = Field(default=2, ge=0)
+    max_leads_per_run: int | None = Field(default=None, ge=0)
+    max_prospect_budget_micro_usd: int | None = Field(default=500_000, ge=0)
+    features: list[str] = Field(default_factory=lambda: ["discovery"])
+    access_days: int | None = Field(default=30, ge=1)
+    version: int
+
+
+class DefaultPlanIn(In):
+    plan: str
+    version: int
+
+
+class PlatformSettingsOut(Out):
+    kill_runs: bool
+    kill_drafts: bool
+    superadmin_enabled: bool
+    announcement: str
+    version: int
+
+
+class PlatformSettingsIn(In):
+    version: int
+    kill_runs: bool | None = None
+    kill_drafts: bool | None = None
+    superadmin_enabled: bool | None = None
+    announcement: str | None = Field(default=None, max_length=1000)
+
+
+class PlatformRoleIn(In):
+    role: Literal["admin", "superadmin"] | None
