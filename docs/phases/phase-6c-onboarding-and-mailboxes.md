@@ -128,11 +128,11 @@
 
 - [ ] **The workspace profile** (today's `sender_profile`) keeps the company and legal fields.
 - [ ] **The mailbox's `sender`** holds the person: name, title, signature, greeting, style examples. The copy stage prefers it.
-- [ ] **`services/workspaces.py`** replaces `services/seed.py` for creating a workspace. It seeds:
+- [x] **`services/workspaces.py`** replaces `services/seed.py` for creating a workspace. It seeds:
   - the slug;
   - the country rules (`domain/policy_seeds.py`);
   - an empty default campaign.
-- [ ] **`services/defaults.py` loses Quantra Energy's profile and ideal customer.** New workspaces start empty, and the copy stage's `reviewed_at` gate stays.
+- [x] **`services/defaults.py` loses Quantra Energy's profile and ideal customer.** New workspaces start empty, and the copy stage's `reviewed_at` gate stays.
 - [ ] **Optional "Fill from our website":** one metered research call proposes profile fields, and the user reviews them before saving.
 
 ### 6c.8 Onboarding, setup check and Settings

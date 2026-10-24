@@ -1,4 +1,5 @@
-"""Create the default workspace, campaign and country policies. Safe to run again."""
+"""Create the default workspace (empty, for a developer or the first install) and its starting
+rows. Safe to run again."""
 
 from __future__ import annotations
 
@@ -8,6 +9,7 @@ from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
 from outbound.services import defaults
+from outbound.services.workspaces import add_starting_rows, create_workspace
 
 
 @dataclass(frozen=True)
@@ -24,26 +26,9 @@ def seed_defaults(
     workspace_name: str = defaults.DEFAULT_WORKSPACE_NAME,
 ) -> SeedResult:
     with platform() as directory:
-        workspace = directory.workspaces.by_name(workspace_name)
-        created = workspace is None
-        if workspace is None:
-            workspace = directory.workspaces.create(
-                workspace_name,
-                defaults.default_sender_profile(),
-                defaults.default_workspace_settings(),
-            )
-        directory.commit()
-
-    with factory(workspace.id) as uow:
-        policies_created = sum(
-            uow.policies.add_if_missing(policy) for policy in DEFAULT_COUNTRY_POLICIES
-        )
-        campaign_created = uow.campaigns.by_name(defaults.DEFAULT_CAMPAIGN_NAME) is None
-        if campaign_created:
-            uow.campaigns.create(
-                defaults.DEFAULT_CAMPAIGN_NAME,
-                list(defaults.DEFAULT_TARGET_TITLES),
-                icp_description=defaults.DEFAULT_ICP,
-            )
-        uow.commit()
-    return SeedResult(workspace.id, created, campaign_created, policies_created)
+        existing = directory.workspaces.by_name(workspace_name)
+    if existing is None:
+        created = create_workspace(factory, platform, workspace_name)
+        return SeedResult(created.id, True, True, len(DEFAULT_COUNTRY_POLICIES))
+    policies_created, campaign_created = add_starting_rows(factory, existing.id)
+    return SeedResult(existing.id, False, campaign_created, policies_created)

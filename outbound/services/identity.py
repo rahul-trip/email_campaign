@@ -30,7 +30,7 @@ from outbound.domain.passwords import (
 )
 from outbound.logging import get_logger
 from outbound.providers.ports import OutgoingEmail, TransactionalEmail
-from outbound.services.seed import seed_defaults
+from outbound.services.workspaces import create_workspace
 
 log = get_logger(__name__)
 
@@ -474,14 +474,7 @@ class IdentityService:
         """A platform admin creates a customer's workspace and invites its first admin."""
         if not name.strip():
             raise IdentityError(422, "name_required", "Give the company's name.")
-        with self._platform() as directory:
-            created = directory.workspaces.create(name.strip(), {}, {})
-            directory.commit()
-        seed_defaults(self._uow, self._platform, created.slug)
-        if website:
-            with self._uow(created.id) as uow:
-                uow.own_workspace.set_sender_profile({"company_name": name, "domain": website})
-                uow.commit()
+        created = create_workspace(self._uow, self._platform, name, website=website)
         with self._identity() as ids:
             ids.audit.record(
                 "customer_created", actor_user_id=by, workspace_id=created.id,
