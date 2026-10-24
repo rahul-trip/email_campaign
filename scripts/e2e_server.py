@@ -48,6 +48,13 @@ E2E_PASSWORD = "e2e-password-1234567"
 PORT = 8765
 
 
+def platform_default_id(platform: PlatformUnitOfWorkFactory) -> str:
+    with platform() as directory:
+        found = directory.workspaces.by_name("default")
+    assert found is not None
+    return found.id
+
+
 def build() -> tuple[FastAPI, Worker]:
     folder = Path(tempfile.mkdtemp(prefix="outbound-e2e-"))
     url = f"sqlite:///{folder / 'e2e.db'}"
@@ -56,6 +63,12 @@ def build() -> tuple[FastAPI, Worker]:
     factory = UnitOfWorkFactory(make_session_factory(engine))
     platform = PlatformUnitOfWorkFactory(make_session_factory(engine))
     seed_defaults(factory, platform, "default")
+    with factory(platform_default_id(platform)) as uow:  # a campaign the fake world can rank for
+        [campaign] = uow.campaigns.all()
+        uow.campaigns.update(
+            campaign.id, {"target_titles": ["CTO"], "icp_description": "Utilities"}
+        )
+        uow.commit()
     with platform() as directory:
         workspace = directory.workspaces.by_name("default")
         assert workspace is not None

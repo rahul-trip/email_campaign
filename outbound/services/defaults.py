@@ -1,9 +1,10 @@
-"""Starting values for a new workspace. Edit them in the database afterwards; seeding never
-overwrites what is already there.
+"""Starting values for a new workspace. Edit them in the app afterwards; creating a workspace
+never overwrites what is already there.
 
-The sender profile is ported from the legacy ``agent/`` examples. The legal name, postal address
-and registration details are blank on purpose: they must be filled in before any email is
-drafted, because the country footers need them.
+A new workspace starts **empty**: the company's name and website, and nothing else. What the
+writer may say about the company, who signs, the legal footer and the ideal customer are all
+written by the customer and confirmed before any email is drafted (the copy stage refuses until
+the profile is confirmed). Never ship claims, numbers or another company's wording as defaults.
 """
 
 from __future__ import annotations
@@ -13,58 +14,32 @@ from typing import Any
 DEFAULT_WORKSPACE_NAME = "default"
 DEFAULT_CAMPAIGN_NAME = "default"
 
-DEFAULT_TARGET_TITLES = ["VP of Sales", "CTO", "Chief Architect", "Director of Product"]
 
-DEFAULT_ICP = (
-    "Utilities, energy retailers, grid operators and trading desks that manage volatile "
-    "renewable assets and need forecasts that plug into live operational decisions."
-)
-
-_NARRATIVE = """\
-Quantra Energy is an AI-driven forecasting company serving utilities, retailers, and grid
-operators. We build machine-learning models for short-term renewable generation and demand
-forecasting, then plug them into a customer's existing dispatch, trading, or grid-operations
-workflows.
-
-Overlap keywords: machine learning, renewable forecasting, solar nowcasting, grid
-optimization, dispatch algorithms, carbon-aware dispatch, demand forecasting, real-time
-operational data, high-resolution meteorological data.
-"""
-
-# Deliberately empty. Anything listed here is offered to the writer as a true, usable fact, so
-# the operator must write these down and confirm them (see ``SettingsService``) before an email
-# can be written. Never ship numbers or customer claims as defaults.
-
-
-def default_sender_profile() -> dict[str, Any]:
+def blank_sender_profile(company_name: str = "", website: str = "") -> dict[str, Any]:
+    """The profile of a workspace that has not set itself up yet."""
     return {
-        "company_name": "Quantra Energy",
-        "domain": "quantraenergy.com",
-        "industry": "Energy & Renewables Analytics",
-        "mission": "AI-driven intelligence for energy-sector decision-making",
+        "company_name": company_name.strip(),
+        "domain": website.strip(),
+        "industry": "",
+        "mission": "",
         "value_propositions": [],
-        "technologies": [
-            "machine learning",
-            "renewable forecasting",
-            "grid optimization",
-            "dispatch algorithms",
-        ],
-        "target_verticals": ["Grid operators", "Energy trading desks"],
+        "technologies": [],
+        "target_verticals": [],
         "case_studies": [],
         # How the emails are written: how they open, what you want from them, and emails you
         # have sent that show your voice (reference only; see the copy prompt).
         "greeting": "Hi",
         "outreach_goal": "",
         "style_examples": [],
-        "geographic_focus": "UK, Europe, India",
-        "signature_name": "[Your Name]",
-        "signature_title": "CPO & Founder",
+        "geographic_focus": "",
+        "signature_name": "",
+        "signature_title": "",
         # Needed by the country footers. Fill these in before drafting.
         "legal_name": "",
         "postal_address": "",
         "registration_details": "",
         "contact_info": "",
-        "narrative": _NARRATIVE,
+        "narrative": "",
     }
 
 

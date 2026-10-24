@@ -731,14 +731,14 @@ def test_every_save_of_the_profile_records_a_review_the_client_cannot_forge(
     assert saved["reviewed_at"].startswith("20")
 
 
-def test_a_new_workspace_ships_no_claims_for_the_writer_to_quote() -> None:
-    from outbound.services.defaults import default_sender_profile
+def test_a_new_workspace_starts_blank_with_nothing_for_the_writer_to_quote() -> None:
+    from outbound.services.defaults import blank_sender_profile
 
-    profile = default_sender_profile()
-    assert profile["value_propositions"] == [] and profile["case_studies"] == []
-    text = str(profile["narrative"])
-    assert "%" not in text and "GBP" not in text and "proven" not in text.lower()
-    assert "reviewed_at" not in profile and profile["signature_name"].startswith("[")
+    profile = blank_sender_profile("Globex Ltd", "globex.example")
+    assert (profile["company_name"], profile["domain"]) == ("Globex Ltd", "globex.example")
+    empty = {k: v for k, v in profile.items() if k not in ("company_name", "domain", "greeting")}
+    assert all(not value for value in empty.values()), empty  # no claims, no one else's wording
+    assert "reviewed_at" not in profile and "Quantra" not in str(profile)
 
 
 def test_the_first_email_length_is_a_setting_and_cannot_be_back_to_front(
