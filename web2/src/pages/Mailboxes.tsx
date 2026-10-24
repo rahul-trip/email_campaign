@@ -155,8 +155,8 @@ function MailboxCard({ box, mine, admin, viewing, onChange }: { box: Box; mine: 
       </div>
       <Problem error={dns.error} className="mb-2" />
       {report ? (
-        <div className="grid gap-3 md:grid-cols-3">
-          {(["spf", "dkim", "dmarc"] as const).map((key) => {
+        <div className={cx("grid gap-3", report.mx ? "md:grid-cols-4" : "md:grid-cols-3")}>
+          {(["mx", "spf", "dkim", "dmarc"] as const).filter((key) => report[key]).map((key) => {
             const record = report[key];
             return (
               <div key={key} className={cx("rounded-lg border p-3 text-xs", record?.ok ? "border-line bg-surface-low" : "border-error/30 bg-error-container/50")}>
