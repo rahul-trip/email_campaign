@@ -134,11 +134,15 @@ class CompanyRepository(ScopedRepository):
         hold_reason: HoldReason | None = None,
         campaign_id: str | None = None,
         text: str | None = None,
+        waiting_for_credits: bool | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Company], int]:
         """A page of companies, newest first, and how many match in all."""
         filters = [CompanyRow.workspace_id == self._workspace_id]
+        if waiting_for_credits is not None:
+            parked = CompanyRow.credit_wait_step.is_not(None)
+            filters.append(parked if waiting_for_credits else ~parked)
         if status is not None:
             filters.append(CompanyRow.status == status)
         if hold_reason is not None:
@@ -256,6 +260,19 @@ class CompanyRepository(ScopedRepository):
             EntityType.COMPANY, row.id, "waiting_for_credits", SYSTEM, {"step": step.value}
         )
         return True
+
+    def waiting_for_credits(self, limit: int = 1000) -> list[Company]:
+        """Leads parked for a credit, the one waiting longest first."""
+        stmt = (
+            select(CompanyRow)
+            .where(
+                CompanyRow.workspace_id == self._workspace_id,
+                CompanyRow.credit_wait_step.is_not(None),
+            )
+            .order_by(CompanyRow.updated_at, CompanyRow.id)
+            .limit(limit)
+        )
+        return [snapshot(row, Company) for row in self._session.scalars(stmt)]
 
     def release_credit_wait(self, company_id: str, actor: str = SYSTEM) -> UsageStep | None:
         """Let a waiting lead continue. Returns the step it waited on, or None if it was not

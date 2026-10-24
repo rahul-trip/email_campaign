@@ -54,6 +54,7 @@ def companies(
     hold_reason: HoldReason | None = None,
     campaign_id: str | None = None,
     q: str | None = None,
+    waiting_for_credits: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> CompanyPage:
@@ -62,6 +63,7 @@ def companies(
         hold_reason=hold_reason,
         campaign_id=campaign_id,
         text=q,
+        waiting_for_credits=waiting_for_credits,
         limit=limit,
         offset=offset,
     )

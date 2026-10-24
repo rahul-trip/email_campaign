@@ -38,6 +38,7 @@ from outbound.api.routers import (
     setup,
     targets,
     team,
+    usage,
     webhook,
 )
 from outbound.bootstrap import Container
@@ -121,6 +122,7 @@ def create_app(
         mailboxes,
         integrations,
         setup,
+        usage,
         targets,
         review,
         leads,
