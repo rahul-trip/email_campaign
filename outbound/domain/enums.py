@@ -194,6 +194,18 @@ class MailboxStatus(StrEnum):
     NEEDS_RECONNECT = "needs_reconnect"  # access expired or was revoked: sign in again
 
 
+class UsageStep(StrEnum):
+    """What a plan limits and a customer is charged for, once per lead (Phase 6d)."""
+
+    DISCOVERY = "discovery"  # a discovered company accepted as a new lead
+    MANUAL = "manual"  # a company a person added, accepted as a new lead
+    RESEARCH = "research"  # new -> researched
+    EMAIL = "email"  # contacts found -> email ready
+    COPY = "copy"  # email ready -> copy ready
+    DELIVER = "deliver"  # approved -> in sequence (the draft is in the mailbox)
+    REWRITE = "rewrite"  # each "write it again" or "ask for changes": the only step that repeats
+
+
 class CredentialPurpose(StrEnum):
     MAILBOX_OAUTH = "mailbox_oauth"  # access and refresh tokens
     MAILBOX_PASSWORD = "mailbox_password"  # noqa: S105  (a purpose name, not a password)

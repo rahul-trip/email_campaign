@@ -186,6 +186,7 @@ class Workspace:
     sender_profile: dict[str, Any]
     settings: dict[str, Any]
     deletion_due_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True)

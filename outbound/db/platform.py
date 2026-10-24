@@ -17,6 +17,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from outbound.db.models import RunRow, WorkspaceRow
+from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettingsRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
 from outbound.domain.enums import RunStatus, WorkspaceStatus
 
@@ -77,6 +78,8 @@ class PlatformUnitOfWork:
         self.session = self._factory()
         self.workspaces = WorkspaceRepository(self.session)
         self.scheduler = SchedulerQueries(self.session)
+        self.plans = PlanAdminRepository(self.session)
+        self.settings = PlatformSettingsRepository(self.session)
         return self
 
     def __exit__(

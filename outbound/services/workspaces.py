@@ -7,7 +7,10 @@ those during onboarding, and nothing is drafted until the profile is confirmed.
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from outbound.db.platform import PlatformUnitOfWorkFactory
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import Workspace
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
@@ -19,11 +22,20 @@ def create_workspace(
 ) -> Workspace:
     """A new workspace, ready for its first admin to set up. Its address (slug) comes from the
     name and is made unique."""
+    now = utcnow()
     with platform() as directory:
+        catalog, _ = directory.settings.get()
+        plan = catalog.plan(catalog.default_plan)
         created = directory.workspaces.create(
             name.strip(),
             defaults.blank_sender_profile(name, website),
             defaults.default_workspace_settings(),
+        )
+        directory.plans.set_plan(
+            created.id,
+            plan.code,
+            started_at=now,
+            access_until=now + timedelta(days=plan.access_days) if plan.access_days else None,
         )
         directory.commit()
     add_starting_rows(uow, created.id)
