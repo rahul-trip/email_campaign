@@ -76,6 +76,9 @@ def build() -> tuple[FastAPI, Worker]:
         email=outbox,
     )
     _serve_outbox(app, outbox)
+    with factory(workspace.id) as uow:  # a mailbox to look after in the browser (no real server)
+        uow.mailboxes.create("sam@quantra-e2e.example", "quantra-e2e.example")
+        uow.commit()
     app.state.identity.add_user(E2E_EMAIL, E2E_PASSWORD, name="Sam", workspace_id=workspace.id)
     app.state.identity.add_user(E2E_STAFF, E2E_PASSWORD, platform_role=PlatformRole.SUPERADMIN)
     return app, Worker(container, lambda _ws: pipeline, tick_every=None)

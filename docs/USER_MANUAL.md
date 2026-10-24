@@ -42,7 +42,8 @@ You need the following in place once. [README.md](../README.md) has the commands
 |---|---|---|
 | Vendor keys: search (Tavily), email finders and verifier (for example Hunter, ZeroBounce, MyEmailVerifier) | `.env` | The run stops with "not configured" and names what is missing |
 | A model key (any OpenAI-compatible provider) | `.env` | Research and writing cannot run |
-| Your mailbox login (IMAP): `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME` | `.env` | The engine works up to "approved" but cannot make drafts or read your Sent folder |
+| A connected mailbox | Settings → Mailboxes | The engine works up to "approved" but cannot make drafts or read your Sent folder |
+| `SECRETS_KEYS` (encrypts the mailbox passwords and sign-ins; `uv run outbound secrets new-key`) | `.env` | A mailbox cannot be connected |
 | An account: `uv run outbound users create` (below), or an invitation from someone who has one | The command line, once | You cannot sign in |
 | Email for invitations and password resets: `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `EMAIL_FROM`, `APP_BASE_URL` | `.env` | On your computer the links are printed in the `serve` terminal instead. On the server the app will not start |
 | Your **sender profile**: legal name, postal address, registration details, signature | Settings → Sender profile | The writer refuses to produce an email, because the legal footer would have a hole |
@@ -266,7 +267,12 @@ Each campaign has its wanted job titles (one per line, best first), the ideal cu
 
 ### 5.9 Mailboxes
 
-Record a mailbox and press **Check DNS** to see whether its domain has SPF, DKIM and DMARC set up. Drafting and the Sent sync use the mailbox login in `.env`, not this list, so record the same mailbox.
+Mailboxes are connected in **Settings → Mailboxes** (the old Mailboxes address opens it). Approved emails are saved as drafts in a mailbox you connect; you read them there and press Send yourself.
+
+- **Connect** with *Microsoft 365 / Outlook* or *Google Workspace / Gmail* (you sign in on the provider's page and allow access to drafts and the Sent folder), or with *Any other (IMAP)*: the server, your address and an **app password**. The IMAP login is tested, and the Drafts and Sent folders found, before anything is saved. A server on a private network address is refused. The Microsoft and Google buttons appear only when the server has those sign-in apps set up.
+- Each mailbox shows whether it works, who **signs** from it (name, title, greeting and voice examples; empty fields use the company profile), and its **DNS check** for SPF, DKIM and DMARC.
+- The **default** mailbox is used by campaigns that do not name one. Members look after the mailboxes they connected; admins look after all of them and choose the default.
+- **Test** uses the mailbox once and records the result. **Pause** stops drafting in it (approved emails wait). If access is withdrawn or runs out the mailbox says *Connect again* and emails wait until you connect the same account again. **Disconnect** deletes the stored password or sign-in; drafts already saved stay in the mailbox.
 
 ### 5.10 Policies and privacy
 
@@ -284,6 +290,7 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 |---|---|
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
 | **Sender profile** | Who you are, in four parts: the legal identity printed in footers, your signature, what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**, and *How you write*: the greeting (Hi, Hello or Dear), what you want from these emails (the closing ask follows it), and up to four emails you have sent before. Those are read for what you offer and how direct you are, never copied: their wording, greeting and bullet lists are not reused. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
+| **Mailboxes** | Connect Microsoft 365, Google or an IMAP mailbox, check it, pause it, choose the default and who signs from it (see 5.9) |
 | **Team** | Who works in this workspace, their role and when they last signed in, and invitations not used yet. Admins invite people (email and role), change roles, remove people, and send an invitation again or withdraw it. Members see the list only |
 | **Your account** | Change your password (the current one first; other devices are signed out), and sign out every other browser and device |
 | **Limits and budget** | Budget per prospect (blank means no limit; 0 means no paid calls), the shortest and longest first email in words (120 and 200 by default; greeting, sign-off and footer are not counted), how many of your earlier corrections the writer sees, *Only send to proven addresses* (leave this on), and *Add a footer to every email* (leave this on: your company, postal address and a plain way to say no; the country's footer, or a short default where it has none, also when a country rule is skipped) |
@@ -459,7 +466,6 @@ Honest list of what is not there yet, so nothing surprises you.
 | Limit | Workaround |
 |---|---|
 | **Changing the address of a person who already has one** is not possible | Add the person again with the right address, and suppress the old one if needed |
-| The **Mailboxes** screen records a mailbox and checks its DNS. Drafting and the Sent sync use the mailbox login in `.env`, not this list | Keep the two the same |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
 | Scrubby (catch-all resolver) has not worked live: its configured address did not answer. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | Confirm Scrubby's API address in your Scrubby account. Run `uv run python -m scripts.live_check` to re-check any vendor |
@@ -509,7 +515,7 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 | **Start run** does nothing | The worker is not running: `uv run outbound worker` |
 | "not configured" when running | A needed vendor key is missing; the message names it |
 | Everything is held for *country unknown* | The sites are not revealing a country. Give the country when adding targets |
-| Nothing appears in Drafts | No mailbox login in `.env`, or the approved email has not been through a run yet. Run once more |
+| Nothing appears in Drafts | No mailbox is connected, it is paused or says *Connect again* (Settings → Mailboxes), or the approved email has not been through a run yet. Run once more |
 | A run shows *failed* | See the error shown in the run's progress, or in the worker's terminal |
 | You cannot sign in | Check the email and password; after five wrong tries wait a minute. Or use **Forgot password** |
 | "You are not a member of that workspace" | Your link points at a workspace you were removed from, or never joined. Ask its admin for an invitation |

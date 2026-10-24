@@ -567,6 +567,197 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mailboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All Mailboxes */
+        get: operations["all_mailboxes_api_mailboxes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/imap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect Imap */
+        post: operations["connect_imap_api_mailboxes_imap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/oauth/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Oauth Finish
+         * @description Back from Microsoft or Google. The page there does not know the workspace, so it comes
+         *     from the sign-in this session started; the person must still be allowed to act there.
+         */
+        post: operations["oauth_finish_api_mailboxes_oauth_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Oauth Start */
+        post: operations["oauth_start_api_mailboxes_oauth_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Options */
+        get: operations["options_api_mailboxes_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Disconnect */
+        delete: operations["disconnect_api_mailboxes__mailbox_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make Default */
+        post: operations["make_default_api_mailboxes__mailbox_id__default_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause */
+        post: operations["pause_api_mailboxes__mailbox_id__pause_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_mailboxes__mailbox_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}/sender": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Sender */
+        put: operations["set_sender_api_mailboxes__mailbox_id__sender_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mailboxes/{mailbox_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Mailbox */
+        post: operations["test_mailbox_api_mailboxes__mailbox_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/privacy/forget": {
         parameters: {
             query?: never;
@@ -840,24 +1031,6 @@ export interface paths {
         head?: never;
         /** Update Campaign */
         patch: operations["update_campaign_api_settings_campaigns__campaign_id__patch"];
-        trace?: never;
-    };
-    "/api/settings/mailboxes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Mailboxes */
-        get: operations["mailboxes_api_settings_mailboxes_get"];
-        put?: never;
-        /** Add Mailbox */
-        post: operations["add_mailbox_api_settings_mailboxes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/api/settings/mailboxes/{mailbox_id}/dns-check": {
@@ -1496,6 +1669,27 @@ export interface components {
          * @enum {string}
          */
         HoldReason: "catch_all_unverified" | "catch_all_resolving" | "consent_required" | "country_unknown" | "entity_unknown" | "needs_operator";
+        /** ImapIn */
+        ImapIn: {
+            /** Address */
+            address: string;
+            /** Drafts Folder */
+            drafts_folder?: string | null;
+            /** Host */
+            host: string;
+            /** Password */
+            password: string;
+            /**
+             * Port
+             * @default 993
+             * @enum {integer}
+             */
+            port?: 993 | 143;
+            /** Sent Folder */
+            sent_folder?: string | null;
+            /** Username */
+            username?: string | null;
+        };
         /** IncidentOut */
         IncidentOut: {
             /**
@@ -1573,36 +1767,61 @@ export interface components {
             /** Password */
             password: string;
         };
-        /** MailboxIn */
-        MailboxIn: {
-            /** Address */
-            address: string;
-            /** Credentials Ref */
-            credentials_ref: string;
-            /**
-             * Daily Cap
-             * @default 10
-             */
-            daily_cap?: number;
+        /** MailboxCheckOut */
+        MailboxCheckOut: {
+            /** Detail */
+            detail: string;
+            /** Ok */
+            ok: boolean;
+            /** Status */
+            status: string;
+        };
+        /** MailboxOptionsOut */
+        MailboxOptionsOut: {
+            /** Gateways */
+            gateways: ("imap" | "gmail" | "graph")[];
         };
         /** MailboxOut */
         MailboxOut: {
             /** Address */
             address: string;
+            /** Connection */
+            connection?: {
+                [key: string]: unknown;
+            } | null;
             /** Daily Cap */
             daily_cap: number;
             /** Dns Check */
             dns_check: {
                 [key: string]: unknown;
             } | null;
-            /** Gateway */
-            gateway: string;
+            /**
+             * Gateway
+             * @enum {string}
+             */
+            gateway: "imap" | "gmail" | "graph" | "emailengine" | "smartlead" | "instantly";
             /** Id */
             id: string;
+            /**
+             * Is Default
+             * @default false
+             */
+            is_default?: boolean;
+            /** Last Checked At */
+            last_checked_at?: string | null;
+            /** Owner User Id */
+            owner_user_id?: string | null;
+            /** Sender */
+            sender?: {
+                [key: string]: unknown;
+            } | null;
             /** Sending Domain */
             sending_domain: string;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "paused" | "error" | "needs_reconnect";
         };
         /** Me */
         Me: {
@@ -1682,6 +1901,34 @@ export interface components {
             id: string;
             /** Source */
             source: string;
+        };
+        /** OAuthFinishIn */
+        OAuthFinishIn: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OAuthFinishOut */
+        OAuthFinishOut: {
+            mailbox: components["schemas"]["MailboxOut"];
+            /** Slug */
+            slug: string;
+        };
+        /** OAuthStartIn */
+        OAuthStartIn: {
+            /**
+             * Gateway
+             * @enum {string}
+             */
+            gateway: "gmail" | "graph";
+            /** Login Hint */
+            login_hint?: string | null;
+        };
+        /** OAuthStartOut */
+        OAuthStartOut: {
+            /** Url */
+            url: string;
         };
         /** OriginOut */
         OriginOut: {
@@ -1985,6 +2232,27 @@ export interface components {
             kind: string;
             /** To Status */
             to_status: string | null;
+        };
+        /** SenderIn */
+        SenderIn: {
+            /**
+             * Greeting
+             * @default
+             * @enum {string}
+             */
+            greeting?: "" | "Hi" | "Hello" | "Dear";
+            /**
+             * Signature Name
+             * @default
+             */
+            signature_name?: string;
+            /**
+             * Signature Title
+             * @default
+             */
+            signature_title?: string;
+            /** Style Examples */
+            style_examples?: string[];
         };
         /**
          * SenderProfileIn
@@ -3368,6 +3636,333 @@ export interface operations {
             };
         };
     };
+    all_mailboxes_api_mailboxes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"][];
+                };
+            };
+        };
+    };
+    connect_imap_api_mailboxes_imap_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth_finish_api_mailboxes_oauth_finish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuthFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthFinishOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    oauth_start_api_mailboxes_oauth_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OAuthStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OAuthStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    options_api_mailboxes_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOptionsOut"];
+                };
+            };
+        };
+    };
+    disconnect_api_mailboxes__mailbox_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_default_api_mailboxes__mailbox_id__default_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_api_mailboxes__mailbox_id__pause_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_api_mailboxes__mailbox_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_sender_api_mailboxes__mailbox_id__sender_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SenderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_mailbox_api_mailboxes__mailbox_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailboxCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     forget_api_privacy_forget_post: {
         parameters: {
             query?: never;
@@ -3860,59 +4455,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CampaignOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mailboxes_api_settings_mailboxes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MailboxOut"][];
-                };
-            };
-        };
-    };
-    add_mailbox_api_settings_mailboxes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MailboxIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MailboxOut"];
                 };
             };
             /** @description Validation Error */

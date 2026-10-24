@@ -23,6 +23,7 @@ export function PublicApp() {
   if (pathname === "/sign-in") return <SignIn next={safeNext(params.get("next"))} email={params.get("email") ?? ""} />;
   if (pathname === "/forgot-password") return <ForgotPassword />;
   if (pathname === "/reset-password") return <ResetPassword token={params.get("token") ?? ""} />;
+  if (pathname === "/oauth/callback") return <OAuthReturn params={params} />;
   const invite = pathname.match(/^\/invite\/([^/]+)\/?$/);
   if (invite) return <Invitation token={decodeURIComponent(invite[1]!)} />;
   return <Home path={pathname === "/" ? null : pathname + search} />;
@@ -292,6 +293,45 @@ function SignInFirst({ token, email, signedInAs }: { token: string; email: strin
       )}
     </div>
   );
+}
+
+// ------------------------------------------------------------------ back from Microsoft or Google
+
+/** The provider sends the browser here with a code (or an error). The workspace is found from
+ * the sign-in this session started, so the address needs no workspace in it. */
+function OAuthReturn({ params }: { params: URLSearchParams }) {
+  const code = params.get("code");
+  const state = params.get("state");
+  const refused = params.get("error_description") || params.get("error");
+  const finish = useMutation({
+    mutationFn: () => ok(client.POST("/api/mailboxes/oauth/finish", { body: { code: code ?? "", state: state ?? "" } })),
+    onSuccess: ({ slug }) => go(`${inWorkspace(slug)}settings?tab=mailboxes`),
+  });
+  useEffect(() => {
+    if (code && state && !refused) finish.mutate();
+    // once: the code can be exchanged a single time
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const back = (
+    <a href="/" className="block text-center text-[12px] font-semibold text-primary hover:underline">
+      Back to Outbound
+    </a>
+  );
+  if (refused || !code || !state)
+    return (
+      <Frame title="The mailbox was not connected">
+        <Callout tone="attention">{refused ?? "The provider did not send back what we need."} Nothing was saved. Start again from Settings → Mailboxes.</Callout>
+        {back}
+      </Frame>
+    );
+  if (finish.isError)
+    return (
+      <Frame title="The mailbox was not connected">
+        <Problem error={finish.error} />
+        {back}
+      </Frame>
+    );
+  return <Frame title="Connecting your mailbox">Finishing sign-in…</Frame>;
 }
 
 // ------------------------------------------------------------------ `/` and old links

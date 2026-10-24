@@ -1,4 +1,4 @@
-import { Link, Outlet, createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
+import { Link, Outlet, createRootRoute, createRoute, createRouter, lazyRouteComponent, redirect } from "@tanstack/react-router";
 import { Layout } from "./app/Layout";
 import { Empty, buttonClass } from "./components/ui";
 import { DashboardPage } from "./pages/Dashboard";
@@ -66,6 +66,17 @@ const settings = createRoute({
   validateSearch: (search: Record<string, unknown>): { tab?: SettingsTab } => ({ tab: SETTINGS_TABS.find((t) => t === search.tab) }),
 });
 
+// Mailboxes now live in Settings; an old link or bookmark lands there.
+function moved(path: string, tab: SettingsTab) {
+  return createRoute({
+    getParentRoute: () => root,
+    path,
+    beforeLoad: () => {
+      throw redirect({ to: "/settings", search: { tab } });
+    },
+  });
+}
+
 const routeTree = root.addChildren([
   page("/", DashboardPage),
   review,
@@ -77,7 +88,7 @@ const routeTree = root.addChildren([
   page("/runs", lazy(() => import("./pages/Runs"), "RunsPage")),
   page("/runs/$runId", lazy(() => import("./pages/RunDetail"), "RunDetailPage")),
   page("/campaigns", lazy(() => import("./pages/Campaigns"), "CampaignsPage")),
-  page("/mailboxes", lazy(() => import("./pages/Mailboxes"), "MailboxesPage")),
+  moved("/mailboxes", "mailboxes"),
   page("/reports", lazy(() => import("./pages/Reports"), "ReportsPage")),
   page("/compliance", lazy(() => import("./pages/Compliance"), "CompliancePage")),
   settings,

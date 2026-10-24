@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3, ClipboardCheck, LayoutDashboard, Mail, Megaphone, PlayCircle, Reply, Send, Settings, ShieldCheck,
+  BarChart3, ClipboardCheck, LayoutDashboard, Megaphone, PlayCircle, Reply, Send, Settings, ShieldCheck,
   TriangleAlert, UserPlus, Users,
 } from "lucide-react";
 
@@ -35,7 +35,6 @@ export const NAV: NavGroup[] = [
     items: [
       { to: "/campaigns", label: "Campaigns", icon: Megaphone },
       { to: "/sending", label: "Sending", icon: Send, soon: true, soonNote: "Automatic sending arrives in Phase 5." },
-      { to: "/mailboxes", label: "Mailboxes", icon: Mail },
     ],
   },
   { label: "Insights", items: [{ to: "/reports", label: "Reports", icon: BarChart3 }] },

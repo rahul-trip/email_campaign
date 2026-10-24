@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Tabs, Textarea } from "../components/ui";
 import { lines, when } from "../lib/format";
+import { Mailboxes } from "./Mailboxes";
 import { Account, Team } from "./SettingsTeam";
 import type { SettingsTab } from "./settingsTabs";
 
@@ -26,6 +27,7 @@ export function SettingsPage() {
         tabs={[
           ["setup", "Setup check"],
           ["profile", "Sender profile"],
+          ["mailboxes", "Mailboxes"],
           ["limits", "Limits and budget"],
           ["team", "Team"],
           ["account", "Your account"],
@@ -33,6 +35,7 @@ export function SettingsPage() {
       >
         {tab === "setup" && <Setup onOpen={setTab} />}
         {tab === "profile" && <SenderProfile />}
+        {tab === "mailboxes" && <Mailboxes />}
         {tab === "limits" && <Limits />}
         {tab === "team" && <Team />}
         {tab === "account" && <Account />}
@@ -47,7 +50,7 @@ export function SettingsPage() {
 function Setup({ onOpen }: { onOpen: (tab: Tab) => void }) {
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
   const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
-  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: () => ok(client.GET("/api/settings/mailboxes")) });
+  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: () => ok(client.GET("/api/mailboxes")) });
   const policies = useQuery({ queryKey: ["policies"], queryFn: () => ok(client.GET("/api/settings/policies")) });
   const p = (profile.data ?? {}) as Profile;
   const filled = (key: string) => String(p[key] ?? "").trim() !== "";
@@ -88,9 +91,9 @@ function Setup({ onOpen }: { onOpen: (tab: Tab) => void }) {
     },
     {
       ok: checked,
-      title: "Mailbox recorded and DNS checked",
-      detail: checked ? "SPF, DKIM and DMARC have been checked." : "Drafts use the mailbox login in the server's .env; record it here to check its DNS.",
-      action: <Link to="/mailboxes" className="text-xs font-semibold text-primary hover:underline">Mailboxes</Link>,
+      title: "A mailbox connected and its DNS checked",
+      detail: checked ? "SPF, DKIM and DMARC have been checked." : "Connect the mailbox drafts are saved in, then check its domain's SPF, DKIM and DMARC.",
+      action: <button type="button" onClick={() => onOpen("mailboxes")} className="text-xs font-semibold text-primary hover:underline">Mailboxes</button>,
     },
     {
       ok: unreviewed.length === 0,

@@ -7,8 +7,7 @@ export const PASSWORD = "e2e-password-1234567";
 const WRITE = { "X-Requested-With": "outbound" };
 
 /**
- * Every test fails if the page throws, logs an error, or gets a 5xx from the server. The 401
- * before signing in is how the app learns it must show the sign-in form, so it is allowed.
+ * Every test fails if the page throws, logs an error, or gets a 5xx from the server. A 4xx answer is a refusal the page shows to the person (a 401 before signing in, a rejected form), so its console line is allowed.
  * The guided tour is marked as seen, so it does not cover the page (tour.spec.ts tests it).
  */
 export const test = base.extend<{ problems: string[] }>({
@@ -17,7 +16,7 @@ export const test = base.extend<{ problems: string[] }>({
       const problems: string[] = [];
       page.on("pageerror", (error) => problems.push(`page error: ${error.message}`));
       page.on("console", (message) => {
-        if (message.type() === "error" && !message.text().includes("401")) problems.push(`console: ${message.text()}`);
+        if (message.type() === "error" && !/status of 4\d\d/.test(message.text())) problems.push(`console: ${message.text()}`);
       });
       page.on("response", (response) => {
         if (response.status() >= 500) problems.push(`HTTP ${response.status()} ${response.url()}`);

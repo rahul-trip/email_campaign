@@ -87,23 +87,44 @@ test("policies and privacy: a rule change saves a new version; do-not-contact an
   await expect(page.getByText(/now on the do-not-contact list/)).toBeVisible();
 });
 
-test("campaigns and mailboxes save", async ({ page }) => {
+test("campaigns save", async ({ page }) => {
   await signIn(page);
   await page.goto("/campaigns");
   await page.getByRole("button", { name: "Save campaign" }).first().click();
   await expect(page.getByText("Campaign saved.")).toBeVisible();
-  await page.goto("/mailboxes");
-  await page.getByRole("button", { name: "Record a mailbox" }).first().click();
-  const address = `me-${Date.now()}@quantra-test.com`;
-  await page.getByLabel("Address").fill(address);
-  await page.getByRole("button", { name: "Record mailbox" }).click();
-  await expect(page.getByText(address)).toBeVisible();
+});
+
+test("a mailbox is managed from Settings, and the old address lands there", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/w/default/mailboxes");
+  await expect(page).toHaveURL(/settings\?tab=mailboxes/);
+  const card = page.locator("section").filter({ hasText: "sam@quantra-e2e.example" });
+  await expect(card.getByText("Default")).toBeVisible();
+  await card.getByRole("button", { name: "Pause" }).click();
+  await expect(card.getByText("Paused")).toBeVisible();
+  await card.getByRole("button", { name: "Resume" }).click();
+  await card.getByRole("button", { name: "Who signs" }).click();
+  await page.getByLabel("Name").fill("Pat Kim");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(card.getByText("signs as Pat Kim")).toBeVisible();
+});
+
+test("connecting an IMAP server on our own network is refused", async ({ page }) => {
+  await signIn(page);
+  await page.goto("/w/default/settings?tab=mailboxes");
+  await page.getByRole("button", { name: "Any other (IMAP)" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Email address", { exact: true }).fill("someone@example.com");
+  await dialog.getByLabel("IMAP server", { exact: true }).fill("localhost");
+  await dialog.getByLabel("App password", { exact: true }).fill("not-a-real-password");
+  await dialog.getByRole("button", { name: "Test and connect" }).click();
+  await expect(dialog.getByRole("alert")).toContainText("private or reserved");
 });
 
 test("every screen opens without errors, on a laptop and a phone", async ({ page }) => {
   await signIn(page);
   await addTarget(page, { website: unique("smoke"), country: "US" });
-  const screens = ["/", "/review", "/attention", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/mailboxes", "/compliance", "/settings", "/settings?tab=team", "/settings?tab=account"];
+  const screens = ["/", "/review", "/attention", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/settings?tab=mailboxes", "/compliance", "/settings", "/settings?tab=team", "/settings?tab=account"];
   const routes = ["/sign-in", "/forgot-password", ...screens.map((route) => `/w/default${route}`)];
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });
