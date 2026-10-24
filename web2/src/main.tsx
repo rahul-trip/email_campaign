@@ -14,8 +14,12 @@ import "./styles.css";
 // workspace is ever shown in another.
 const queryClient: QueryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
-  // Any save may finish a setup step, so the checklist is read again after every one.
-  mutationCache: new MutationCache({ onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["setup"] }) }),
+  // Any save may finish a setup step or use a credit, so both are read again after every one.
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      for (const key of ["setup", "usage"]) void queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  }),
 });
 
 applyStoredTheme();

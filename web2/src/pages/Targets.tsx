@@ -5,6 +5,7 @@ import { asUpload, client, multipart, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Callout, Card, Checkbox, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../components/ui";
 import { describe, importRowStatus } from "../lib/status";
+import { useUsage } from "../lib/usage";
 import { ConfirmRow } from "./Attention";
 
 type Report = Schemas["IntakeOut"];
@@ -18,6 +19,7 @@ export function TargetsPage() {
   return (
     <>
       <PageHeader title="Add leads" subtitle="One company at a time from whatever you know, or a whole spreadsheet. The next run researches them." />
+      <WaitingRows />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
           <Tabs
@@ -265,5 +267,30 @@ function UploadFile({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
       )}
       {send.data && <ReportTable report={send.data.report} />}
     </Card>
+  );
+}
+
+
+/** Companies you added that are good leads but over this month's allowance. They are kept, and
+ * become leads as soon as credits exist. */
+function WaitingRows() {
+  const queryClient = useQueryClient();
+  const usage = useUsage();
+  const resume = useMutation({
+    mutationFn: () => ok(client.POST("/api/targets/resume")),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["companies"] }),
+  });
+  const waiting = usage.data?.waiting_rows ?? 0;
+  if (waiting === 0) return null;
+  return (
+    <Callout tone="attention" title={`${waiting} compan${waiting === 1 ? "y is" : "ies are"} waiting for credits`} className="mb-5">
+      Your allowance for added leads is used up this month. They are saved and become leads when credits exist, by themselves or when you press Resume.
+      <div className="mt-2 flex items-center gap-3">
+        <Button size="sm" busy={resume.isPending} onClick={() => resume.mutate()}>
+          Resume
+        </Button>
+        {resume.isSuccess && <span role="status">{resume.data.rows ? `${resume.data.rows} added.` : "No credits yet."}</span>}
+      </div>
+    </Callout>
   );
 }

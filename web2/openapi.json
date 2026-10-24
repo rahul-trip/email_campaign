@@ -394,6 +394,26 @@
             ],
             "title": "Created At"
           },
+          "credit_wait_step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "discovery",
+                  "manual",
+                  "research",
+                  "email",
+                  "copy",
+                  "deliver",
+                  "rewrite"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Wait Step"
+          },
           "domain": {
             "title": "Domain",
             "type": "string"
@@ -1135,6 +1155,66 @@
           "email"
         ],
         "title": "ForgotIn",
+        "type": "object"
+      },
+      "GrantOut": {
+        "properties": {
+          "amount": {
+            "title": "Amount",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "step",
+          "amount",
+          "created_at",
+          "expires_at",
+          "revoked_at",
+          "note"
+        ],
+        "title": "GrantOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2470,6 +2550,39 @@
         "title": "ReleaseIn",
         "type": "object"
       },
+      "RequestCreditsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Note",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "discovery",
+                  "manual",
+                  "research",
+                  "email",
+                  "copy",
+                  "deliver",
+                  "rewrite"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "title": "RequestCreditsIn",
+        "type": "object"
+      },
       "ResetIn": {
         "additionalProperties": false,
         "properties": {
@@ -2489,6 +2602,24 @@
           "password"
         ],
         "title": "ResetIn",
+        "type": "object"
+      },
+      "ResumedOut": {
+        "properties": {
+          "leads": {
+            "title": "Leads",
+            "type": "integer"
+          },
+          "rows": {
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "leads",
+          "rows"
+        ],
+        "title": "ResumedOut",
         "type": "object"
       },
       "ReviewDetailOut": {
@@ -3433,6 +3564,53 @@
         "title": "StatusOut",
         "type": "object"
       },
+      "StepUsageOut": {
+        "properties": {
+          "granted": {
+            "title": "Granted",
+            "type": "integer"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "used": {
+            "title": "Used",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "step",
+          "limit",
+          "granted",
+          "used",
+          "remaining"
+        ],
+        "title": "StepUsageOut",
+        "type": "object"
+      },
       "SuppressionIn": {
         "additionalProperties": false,
         "properties": {
@@ -3697,6 +3875,142 @@
           "data"
         ],
         "title": "TimelineOut",
+        "type": "object"
+      },
+      "UsageOut": {
+        "properties": {
+          "access": {
+            "enum": [
+              "full",
+              "read_only",
+              "locked"
+            ],
+            "title": "Access",
+            "type": "string"
+          },
+          "access_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Until"
+          },
+          "active_campaigns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Campaigns"
+          },
+          "announcement": {
+            "title": "Announcement",
+            "type": "string"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "boolean"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "grants": {
+            "items": {
+              "$ref": "#/components/schemas/GrantOut"
+            },
+            "title": "Grants",
+            "type": "array"
+          },
+          "mailboxes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mailboxes"
+          },
+          "period_end": {
+            "format": "date-time",
+            "title": "Period End",
+            "type": "string"
+          },
+          "period_start": {
+            "format": "date-time",
+            "title": "Period Start",
+            "type": "string"
+          },
+          "plan_code": {
+            "title": "Plan Code",
+            "type": "string"
+          },
+          "plan_name": {
+            "title": "Plan Name",
+            "type": "string"
+          },
+          "seats": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepUsageOut"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "waiting_leads": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Waiting Leads",
+            "type": "object"
+          },
+          "waiting_rows": {
+            "title": "Waiting Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_code",
+          "plan_name",
+          "period_start",
+          "period_end",
+          "access",
+          "access_until",
+          "engine",
+          "steps",
+          "grants",
+          "waiting_leads",
+          "waiting_rows",
+          "seats",
+          "mailboxes",
+          "active_campaigns",
+          "features",
+          "announcement"
+        ],
+        "title": "UsageOut",
         "type": "object"
       },
       "UserOut": {
@@ -4478,6 +4792,22 @@
           },
           {
             "in": "query",
+            "name": "waiting_for_credits",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Waiting For Credits"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -4550,6 +4880,28 @@
         "summary": "Release Policy Holds",
         "tags": [
           "leads"
+        ]
+      }
+    },
+    "/api/companies/resume": {
+      "post": {
+        "description": "Let every waiting lead and row continue, as far as the credits go.",
+        "operationId": "resume_all_api_companies_resume_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Resume All",
+        "tags": [
+          "usage"
         ]
       }
     },
@@ -5069,6 +5421,48 @@
         "summary": "Research Again",
         "tags": [
           "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/resume": {
+      "post": {
+        "operationId": "resume_one_api_companies__company_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume One",
+        "tags": [
+          "usage"
         ]
       }
     },
@@ -7218,6 +7612,28 @@
         ]
       }
     },
+    "/api/targets/resume": {
+      "post": {
+        "description": "Add the manual rows that waited for credits.",
+        "operationId": "resume_rows_api_targets_resume_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Resume Rows",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
     "/api/targets/upload": {
       "post": {
         "description": "Read a CSV or XLSX. ``preview`` (the default) checks it and saves nothing.",
@@ -7572,6 +7988,72 @@
         "summary": "Set Role",
         "tags": [
           "team"
+        ]
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "operationId": "usage_api_usage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Usage",
+        "tags": [
+          "usage"
+        ]
+      }
+    },
+    "/api/usage/request-credits": {
+      "post": {
+        "operationId": "request_credits_api_usage_request_credits_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestCreditsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Request Credits Api Usage Request Credits Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Credits",
+        "tags": [
+          "usage"
         ]
       }
     }

@@ -95,7 +95,19 @@ A new workspace starts **empty**: your company's name and website, the country r
 
 A tick appears as soon as a step is done, wherever you did it. The **Setup check** in Settings shows the same list: *missing* items stop emails being written; *worth a look* items (DNS, country-rule review, no leads yet) do not.
 
-### 3.3 The guided tour
+### 3.3 Plans, credits and waiting
+
+Your workspace is on a **plan** that allows so much of each step per month, counted from the day it started. The Free plan allows **5 leads found by search and 5 leads you add**; the other steps are not limited. Each step is counted **once per lead**: researching a lead again, retrying a failure or rerunning a run costs nothing more. Writing a lead's email again, or asking for changes to it, costs one *rewrite* each time.
+
+When an allowance runs out nothing is lost and nothing fails:
+
+- A company you add over the limit is saved as **waiting for credits** (on **Add leads**), and becomes a lead when credits exist.
+- A lead that reaches a step with no credit stops there, keeps its status (an approved email stays approved) and appears under **Needs attention → Waiting for credits**.
+- Search never looks for more companies than the credits left.
+
+Waiting work continues **by itself** as soon as credits exist: when the month renews, when the team who runs the service adds credits or raises a limit, or when they extend your access. **Resume** (on a lead, or **Resume all now**) tries at once; without a credit it says when the allowance comes back. Past the **access date** the workspace is read-only: you can read everything, but nothing can be added or run until access is extended. **Settings → Plan and usage** has **Ask for more credits**, which works even then.
+
+### 3.4 The guided tour
 
 The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher and your account button, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 
@@ -302,6 +314,7 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 | **Setup check** | What is missing before the engine can work well: the confirmed sender profile, the legal name and address, the signature, a campaign with titles and an ideal customer, a mailbox with its DNS checked, and country rules with a named reviewer. Each item links to where it is fixed |
 | **Sender profile** | Who you are, in four parts: the legal identity printed in footers, your signature, what the writer may use (*About you*, value propositions, proof points), **so only put true statements there**, and *How you write*: the greeting (Hi, Hello or Dear), what you want from these emails (the closing ask follows it), and up to four emails you have sent before. Those are read for what you offer and how direct you are, never copied: their wording, greeting and bullet lists are not reused. A preview shows the footer for each country as your profile fills it, with any missing field marked. Until you press **Confirm and save**, no emails are written |
 | **Mailboxes** | Connect Microsoft 365, Google or an IMAP mailbox, check it, pause it, choose the default and who signs from it (see 5.9) |
+| **Plan and usage** | Your plan, what each allowance has used and has left, when the allowances renew and until when you have access, any extra credits you were given, and **Ask for more credits** (the team who runs the service sees the request). Banners appear everywhere when a step is at 80% or used up, access is about to end or has ended, or the engine is stopped |
 | **Integrations** | The intake webhook: the address other systems POST targets to, and a signing secret you make here (shown once; a new one replaces the old at once). Admins only |
 | **Team** | Who works in this workspace, their role and when they last signed in, and invitations not used yet. Admins invite people (email and role), change roles, remove people, and send an invitation again or withdraw it. Members see the list only |
 | **Your account** | Change your password (the current one first; other devices are signed out), and sign out every other browser and device |

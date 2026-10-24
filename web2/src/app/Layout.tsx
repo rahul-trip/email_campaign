@@ -9,6 +9,7 @@ import { ago } from "../lib/format";
 import { useTheme, type Theme } from "../lib/theme";
 import { TourProvider, useTour } from "../tour/Tour";
 import { NAV } from "./nav";
+import { day, nearLimit, STEP_LABEL, useUsage, waitingTotal, type Usage } from "../lib/usage";
 import { go, inWorkspace, isViewing, rememberWorkspace, useCurrent } from "./session";
 
 /** A run still queued after this long means no worker is picking runs up. */
@@ -40,11 +41,12 @@ function Shell({ children }: { children: ReactNode }) {
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
   const workspace = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const rulesOff = workspace.data?.country_policy_enabled === false;
+  const usage = useUsage();
 
   const held = Object.values(status.data?.held ?? {}).reduce((sum, n) => sum + n, 0);
   const counts = {
     review: status.data?.waiting_for_review ?? 0,
-    attention: held + (status.data?.by_status?.failed ?? 0) + (waiting.data?.length ?? 0),
+    attention: held + (status.data?.by_status?.failed ?? 0) + (waiting.data?.length ?? 0) + waitingTotal(usage.data),
   };
   const active = runs.data?.find((r) => r.status === "running") ?? runs.data?.find((r) => r.status === "queued");
   const stuck = active?.status === "queued" && Date.now() - new Date(active.created_at).getTime() > WORKER_SILENT_MS;
@@ -131,6 +133,7 @@ function Shell({ children }: { children: ReactNode }) {
       <main id="main" className="px-4 pb-12 pt-[72px] sm:px-6 lg:ml-60">
         <div className="mx-auto max-w-[1440px]">
           {viewing && <ViewingBanner name={current.workspace.name} />}
+          <UsageBanners usage={usage.data} />
           {stuck && (
             <Banner tone="error">
               A run has been waiting {ago(active?.created_at)} and nothing has picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.
@@ -327,5 +330,50 @@ function UserMenu() {
         { label: <><LogOut size={14} aria-hidden /> Sign out</>, onSelect: () => signOut.mutate(), tone: "danger" },
       ]}
     />
+  );
+}
+
+const WEEK_MS = 7 * 24 * 3600 * 1000;
+
+/** What the plan says about the workspace: an announcement, access ending or ended, an engine
+ * that is stopped, and steps close to (or at) their allowance. Shown to everyone in it. */
+function UsageBanners({ usage }: { usage?: Usage }) {
+  if (!usage) return null;
+  const ending = usage.access_until ? new Date(usage.access_until).getTime() - Date.now() : null;
+  const near = nearLimit(usage);
+  return (
+    <>
+      {usage.announcement && <Banner tone="attention">{usage.announcement}</Banner>}
+      {usage.access === "read_only" && (
+        <Banner tone="error">
+          Access to this workspace ended on {day(usage.access_until)}, so it is read-only: nothing is lost, but nothing can be added or run.{" "}
+          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
+            Ask for an extension
+          </Link>
+          .
+        </Banner>
+      )}
+      {usage.access === "full" && ending !== null && ending > 0 && ending < WEEK_MS && (
+        <Banner tone="attention">
+          Your access ends on {day(usage.access_until)}.{" "}
+          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
+            Ask for more time
+          </Link>
+          .
+        </Banner>
+      )}
+      {usage.access === "full" && !usage.engine && (
+        <Banner tone="error">The engine is stopped for this workspace, so nothing runs. You can still read everything. Ask the team who runs the service.</Banner>
+      )}
+      {near.map((s) => (
+        <Banner key={s.step} tone={s.out ? "error" : "attention"}>
+          {s.out ? `No credits left for ${(STEP_LABEL[s.step] ?? s.step).toLowerCase()}` : `${s.remaining} credit${s.remaining === 1 ? "" : "s"} left for ${(STEP_LABEL[s.step] ?? s.step).toLowerCase()}`}; they renew on {day(usage.period_end)}.{" "}
+          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
+            See your plan
+          </Link>
+          .
+        </Banner>
+      ))}
+    </>
   );
 }
