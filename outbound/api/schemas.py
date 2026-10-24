@@ -795,6 +795,11 @@ class CustomerRowOut(Out):
     open_request: bool
     near_limit: bool
     features: list[str]
+    seats: int | None  # after this customer's overrides; None: unlimited
+    mailbox_limit: int | None
+    active_campaigns: int | None
+    max_leads_per_run: int | None
+    max_prospect_budget_micro_usd: int | None
 
 
 class AdminMailboxOut(Out):

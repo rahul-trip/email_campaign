@@ -104,6 +104,11 @@ def _row(row: CustomerRow) -> CustomerRowOut:
         open_request=row.open_request,
         near_limit=row.near_limit,
         features=sorted(quota.entitlements.features),
+        seats=quota.entitlements.seats,
+        mailbox_limit=quota.entitlements.mailboxes,
+        active_campaigns=quota.entitlements.active_campaigns,
+        max_leads_per_run=quota.entitlements.max_leads_per_run,
+        max_prospect_budget_micro_usd=quota.entitlements.max_prospect_budget_micro_usd,
     )
 
 

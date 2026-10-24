@@ -184,6 +184,8 @@ All routes are under `/api/admin/*`, for platform `admin` or `superadmin`. Every
 
 ### 6d.6 Admin console UI (`web2`, `/admin`)
 
+> **As built:** Overview, Customers, Customer detail, Users, Plans, Settings and Audit log are built (`web2/src/admin/`). Vendors & keys and Directory wait for 6d.4 and 6g. Browser tests: `web2/e2e/admin.spec.ts`.
+
 #### Principles
 
 - **A separate shell at `/admin`,** reached from the user menu, with an amber strip labelled **ADMIN · ALPHA**, so an admin never mistakes it for a customer's workspace. **Back to app** is always visible.
