@@ -29,6 +29,7 @@ from outbound.api.routers import (
     admin,
     auth,
     leads,
+    mailboxes,
     privacy,
     review,
     runs,
@@ -121,7 +122,7 @@ def create_app(
     # Each route checks its own permission (``require`` in deps); this adds the write header.
     csrf = [Depends(require_csrf_header)]
     app.include_router(webhook.router)  # signed, so no sign-in
-    for router in (auth, team, admin, targets, review, leads, runs, settings, privacy):
+    for router in (auth, team, admin, mailboxes, targets, review, leads, runs, settings, privacy):
         app.include_router(router.router, dependencies=csrf)
 
     @app.get("/api/health")

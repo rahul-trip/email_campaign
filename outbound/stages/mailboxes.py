@@ -160,6 +160,17 @@ class StoredMailboxes:
                 log.warning("mailbox_not_opened", mailbox_id=view.id, reason=str(error)[:200])
         return opened
 
+    def tokens_for(self, view: MailboxView) -> StoredTokens:
+        app = self.apps.get(view.gateway)
+        if app is None or not app.configured:
+            raise MailboxUnavailable(f"{view.gateway.value} sign-in is not set up on this server")
+        if not view.credentials_ref:
+            raise MailboxUnavailable(f"the mailbox {view.address} is not connected yet")
+        return StoredTokens(
+            self.uow, self.workspace_id, view.id, view.credentials_ref,
+            OAuthClient(app, client=self.client),
+        )  # fmt: skip
+
     def build(self, view: MailboxView) -> Mailbox:
         if not view.credentials_ref:
             raise MailboxUnavailable(f"the mailbox {view.address} is not connected yet")
@@ -179,13 +190,7 @@ class StoredMailboxes:
                 sent_folder=conn.get("sent_folder") or None,
                 timeout=self.timeout,
             )
-        app = self.apps.get(view.gateway)
-        if app is None or not app.configured:
-            raise MailboxUnavailable(f"{view.gateway.value} sign-in is not set up on this server")
-        tokens = StoredTokens(
-            self.uow, self.workspace_id, view.id, view.credentials_ref,
-            OAuthClient(app, client=self.client),
-        )  # fmt: skip
+        tokens = self.tokens_for(view)
         if view.gateway is MailboxGateway.GRAPH:
             return GraphMailbox(view.address, tokens, client=self.client)
         if view.gateway is MailboxGateway.GMAIL:
@@ -194,3 +199,36 @@ class StoredMailboxes:
                 client=self.client,
             )  # fmt: skip
         raise MailboxUnavailable(f"{view.gateway.value} mailboxes are not supported")
+
+
+@dataclass
+class MailboxHealth:
+    """Part of the tick: refresh OAuth tokens that are about to run out, so a revoked or
+    expired grant is found (and the mailbox marked ``needs_reconnect``) before a draft needs it.
+    """
+
+    mailboxes: StoredMailboxes
+    name: str = "mailbox_health"
+
+    def run(self) -> dict[str, int]:
+        store = self.mailboxes
+        with store.uow(store.workspace_id) as uow:
+            views = [
+                v for v in uow.mailboxes.all()
+                if v.status is MailboxStatus.ACTIVE and v.gateway is not MailboxGateway.IMAP
+            ]  # fmt: skip
+        counts = {"checked": 0, "needs_reconnect": 0, "failed": 0}
+        for view in views:
+            try:
+                tokens = store.tokens_for(view)
+                tokens.current()
+                counts["checked"] += 1
+                with store.uow(store.workspace_id) as uow:
+                    uow.mailboxes.update(view.id, last_checked_at=utcnow())
+                    uow.commit()
+            except ReconnectNeeded:
+                counts["needs_reconnect"] += 1  # StoredTokens has marked it already
+            except (MailboxUnavailable, ProviderError) as error:
+                counts["failed"] += 1
+                log.warning("mailbox_check_failed", mailbox_id=view.id, reason=str(error)[:200])
+        return counts

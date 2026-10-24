@@ -151,8 +151,8 @@ class HttpClient:
         headers = {**self._headers, **kwargs.pop("extra_headers", {})}
         if path.startswith(self._base_url + "/"):  # a next-page link: same API, never elsewhere
             url, path = path, urlsplit(path).path
-        else:
-            url = f"{self._base_url}/{path.lstrip('/')}"
+        else:  # an empty path is the base itself (an OAuth token endpoint), with no "/" added
+            url = f"{self._base_url}/{path.lstrip('/')}" if path else self._base_url
         try:
             with _gate(self._provider):  # held for the request only, never across a retry wait
                 response = self._client.request(method, url, headers=headers, **kwargs)

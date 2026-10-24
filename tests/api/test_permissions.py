@@ -35,6 +35,9 @@ OPEN = {
     "/api/auth/password/change",
     "/api/auth/invitations/{token}",
     "/api/auth/invitations/{token}/accept",
+    # The provider's return page knows no workspace: the route finds it in the session's pending
+    # sign-in and checks mailboxes.own there itself.
+    "/api/mailboxes/oauth/finish",
 }
 
 

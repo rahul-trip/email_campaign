@@ -644,11 +644,14 @@ def test_a_mailbox_dns_check_is_run_and_stored(factory: UnitOfWorkFactory, ws: s
         "_dmarc.quantra.example": ["v=DMARC1; p=quarantine"],
     }
     service = settings(factory, ws, dns_lookup=lambda name: records.get(name, []))
-    box = service.add_mailbox("Sam@Quantra.example", "env:IMAP_PASSWORD")
+    with factory(ws) as uow:
+        box = uow.mailboxes.create("Sam@Quantra.example", "Quantra.example")
+        uow.commit()
     assert (box.address, box.sending_domain) == ("sam@quantra.example", "quantra.example")
     report = service.dns_check(box.id)
     assert report["ok"] is True
-    assert service.mailboxes()[0].dns_check == report
+    with factory(ws) as uow:
+        assert uow.mailboxes.get(box.id).dns_check == report
 
 
 def test_dns_problems_are_reported_in_plain_words() -> None:
@@ -662,11 +665,6 @@ def test_dns_problems_are_reported_in_plain_words() -> None:
     assert "no DKIM key" in report.dkim.detail
     assert report.dmarc.ok and "monitoring only" in report.dmarc.detail
     assert check_domain("nothing.example", lambda name: []).spf.detail.startswith("no SPF")
-
-
-def test_a_mailbox_needs_a_real_address(factory: UnitOfWorkFactory, ws: str) -> None:
-    with pytest.raises(SettingsError):
-        settings(factory, ws).add_mailbox("not-an-address", "env:X")
 
 
 # ------------------------------------------------------------------ runs

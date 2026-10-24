@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from typing import Any
 
 from outbound.db.errors import NotFound
-from outbound.db.repositories.workspaces import MailboxView
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.entities import Campaign, CountryPolicy, Workspace
@@ -249,21 +248,6 @@ class SettingsService:
             return added
 
     # ------------------------------------------------------------------ mailboxes
-
-    def mailboxes(self) -> list[MailboxView]:
-        with self._uow(self._workspace_id) as uow:
-            return uow.mailboxes.all()
-
-    def add_mailbox(
-        self, address: str, credentials_ref: str, *, daily_cap: int = 10
-    ) -> MailboxView:
-        if "@" not in address:
-            raise SettingsError("a mailbox is an email address")
-        domain = address.rsplit("@", 1)[1]
-        with self._uow(self._workspace_id) as uow:
-            created = uow.mailboxes.create(address, domain, credentials_ref, daily_cap=daily_cap)
-            uow.commit()
-            return created
 
     def dns_check(self, mailbox_id: str) -> dict[str, object]:
         with self._uow(self._workspace_id) as uow:

@@ -9,8 +9,6 @@ from outbound.api.schemas import (
     CampaignIn,
     CampaignOut,
     CampaignPatch,
-    MailboxIn,
-    MailboxOut,
     PolicyIn,
     PolicyOut,
     SenderProfileIn,
@@ -140,24 +138,6 @@ def suppressions(svc: Annotated[Services, Depends(services)]) -> list[Suppressio
 )
 def suppress(body: SuppressionIn, svc: Annotated[Services, Depends(services)]) -> dict[str, bool]:
     return {"added": svc.settings.suppress(body.kind, body.value, body.reason)}
-
-
-@router.get(
-    "/mailboxes", response_model=list[MailboxOut], dependencies=[Depends(require(P.SETTINGS_READ))]
-)
-def mailboxes(svc: Annotated[Services, Depends(services)]) -> list[MailboxOut]:
-    return [MailboxOut.model_validate(m) for m in svc.settings.mailboxes()]
-
-
-@router.post(
-    "/mailboxes",
-    response_model=MailboxOut,
-    status_code=201,
-    dependencies=[Depends(require(P.MAILBOXES_MANAGE))],
-)
-def add_mailbox(body: MailboxIn, svc: Annotated[Services, Depends(services)]) -> MailboxOut:
-    box = svc.settings.add_mailbox(body.address, body.credentials_ref, daily_cap=body.daily_cap)
-    return MailboxOut.model_validate(box)
 
 
 @router.post("/mailboxes/{mailbox_id}/dns-check", dependencies=[Depends(require(P.MAILBOXES_OWN))])

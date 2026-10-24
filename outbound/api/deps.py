@@ -26,9 +26,11 @@ from outbound.domain.enums import PlatformRole, WorkspaceStatus
 from outbound.domain.permissions import Permission, Principal, can
 from outbound.logging import bind, get_logger
 from outbound.providers.ports import LlmClient, SearchProvider
+from outbound.providers.registry import build_oauth_apps
 from outbound.services.identity import CurrentUser, IdentityService
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
+from outbound.services.mailboxes import MailboxService
 from outbound.services.privacy import PrivacyService
 from outbound.services.reports import ReportService
 from outbound.services.review import ReviewService
@@ -53,6 +55,7 @@ class Services:
     reports: ReportService
     webhook: WebhookService
     privacy: PrivacyService
+    mailboxes: MailboxService
 
 
 def build_services(
@@ -79,7 +82,11 @@ def build_services(
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),
         privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),
-    )
+        mailboxes=MailboxService(
+            uow, container.identity, workspace_id,
+            apps=build_oauth_apps(container.settings), base_url=container.settings.app_base_url,
+        ),
+    )  # fmt: skip
 
 
 class ServicesSource(Protocol):
