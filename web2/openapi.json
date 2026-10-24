@@ -3832,6 +3832,42 @@
         "title": "WaterfallOut",
         "type": "object"
       },
+      "WebhookInfoOut": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "configured"
+        ],
+        "title": "WebhookInfoOut",
+        "type": "object"
+      },
+      "WebhookSecretOut": {
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "secret": {
+            "title": "Secret",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "secret"
+        ],
+        "title": "WebhookSecretOut",
+        "type": "object"
+      },
       "WorkspaceSettingsIn": {
         "additionalProperties": false,
         "description": "Only the settings an operator may change, each with its real type.",
@@ -5479,27 +5515,91 @@
         "summary": "Health"
       }
     },
-    "/api/intake/webhook": {
+    "/api/intake/webhook/{workspace_id}": {
       "post": {
-        "description": "Signed intake for other systems. Not behind a sign-in: the signature is the key.",
-        "operationId": "webhook_api_intake_webhook_post",
+        "description": "Signed intake for other systems, one URL and one secret per workspace. Not behind a\nsign-in: the signature is the key. A workspace that does not exist answers like one that has\nno secret, so the URL cannot be used to find workspaces.",
+        "operationId": "webhook_api_intake_webhook__workspace_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Webhook Api Intake Webhook Post",
+                  "title": "Response Webhook Api Intake Webhook  Workspace Id  Post",
                   "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Webhook",
+        "tags": [
+          "intake"
+        ]
+      }
+    },
+    "/api/integrations/webhook": {
+      "get": {
+        "operationId": "webhook_info_api_integrations_webhook_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookInfoOut"
                 }
               }
             },
             "description": "Successful Response"
           }
         },
-        "summary": "Webhook",
+        "summary": "Webhook Info",
         "tags": [
-          "intake"
+          "integrations"
+        ]
+      }
+    },
+    "/api/integrations/webhook/rotate": {
+      "post": {
+        "description": "A new secret, shown this once. Senders using the old one are refused from now on.",
+        "operationId": "rotate_webhook_secret_api_integrations_webhook_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookSecretOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rotate Webhook Secret",
+        "tags": [
+          "integrations"
         ]
       }
     },

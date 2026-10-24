@@ -8,11 +8,11 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
 from sqlalchemy import Engine
 from typer.testing import CliRunner
 
@@ -22,6 +22,7 @@ from outbound.bootstrap import container_for
 from outbound.cli.main import app as cli_app
 from outbound.config import Settings
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.enums import CredentialPurpose
 from outbound.providers.adapters.transactional_email import LogEmail
 from tests.api.conftest import ADMIN, PASSWORD, WEBHOOK_SECRET, add_user
 
@@ -48,14 +49,18 @@ def served(
 ) -> Callable[..., TestClient]:
     settings = Settings(
         _env_file=None,
-        intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
     container = container_for(settings, engine, platform_engine)
+    with container.uow(ws) as uow:  # the workspace's webhook secret
+        uow.credentials.put("intake_webhook", CredentialPurpose.INTAKE_WEBHOOK, WEBHOOK_SECRET)
+        uow.commit()
 
     def build() -> TestClient:
         app = create_app(build_services(container, ws), web_dist=site, email=LogEmail())
         add_user(app, ADMIN, ws)
-        return TestClient(app)
+        client = TestClient(app)
+        client.hook = f"/api/intake/webhook/{ws}"  # type: ignore[attr-defined]
+        return client
 
     return build
 
@@ -129,6 +134,11 @@ def test_error_answers_carry_the_headers_too(served: Callable[..., TestClient]) 
 # ------------------------------------------------------------------ webhook size limit
 
 
+def _post(served: Callable[..., TestClient], body: bytes) -> Any:
+    client = served()
+    return client.post(client.hook, content=body, headers=_signed(body))  # type: ignore[attr-defined]
+
+
 def _signed(body: bytes) -> dict[str, str]:
     stamp = str(int(time.time()))
     digest = hmac.new(WEBHOOK_SECRET.encode(), stamp.encode() + b"." + body, hashlib.sha256)
@@ -139,7 +149,7 @@ def test_an_oversized_webhook_body_is_refused_before_it_is_read(
     served: Callable[..., TestClient],
 ) -> None:
     body = json.dumps({"event_id": "big", "pad": "x" * 1_100_000}).encode()
-    response = served().post("/api/intake/webhook", content=body, headers=_signed(body))
+    response = _post(served, body)
     assert response.status_code == 413
     assert response.json()["code"] == "body_too_large"
 
@@ -148,9 +158,7 @@ def test_a_webhook_body_just_under_the_limit_is_accepted(
     served: Callable[..., TestClient],
 ) -> None:
     body = json.dumps({"event_id": "ok", "website": "acme.com"}).encode()
-    assert (
-        served().post("/api/intake/webhook", content=body, headers=_signed(body)).status_code == 200
-    )
+    assert _post(served, body).status_code == 200
 
 
 # ------------------------------------------------------------------ errors

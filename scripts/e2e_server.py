@@ -13,6 +13,7 @@ have sent, so a test can follow an invitation or reset link.
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import threading
@@ -22,12 +23,14 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from pydantic import SecretStr
 
 from outbound.api.app import WEB_DIST, create_app
 from outbound.api.deps import build_services
 from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db import migrate
+from outbound.db.crypto import new_key
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
@@ -62,6 +65,7 @@ def build() -> tuple[FastAPI, Worker]:
     settings = Settings(
         _env_file=None,
         database_url=url,
+        secrets_keys=SecretStr(json.dumps({"1": new_key()})),  # a throwaway key for this run
     )
     container = container_for(settings, engine)
     world = World()

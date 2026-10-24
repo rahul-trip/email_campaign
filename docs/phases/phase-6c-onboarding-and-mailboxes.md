@@ -164,7 +164,7 @@
   - the DMARC policy and its `rua`.
 
   Each finding comes with fix steps in plain words.
-- [ ] **The intake webhook per workspace:** `POST /api/intake/webhook/{workspace_id}`, signed with that workspace's own secret (a credential). Settings → Integrations shows it and can rotate it. The global `INTAKE_WEBHOOK_SECRET` goes.
+- [x] **The intake webhook per workspace:** `POST /api/intake/webhook/{workspace_id}`, signed with that workspace's own secret (a credential). Settings → Integrations shows it and can rotate it. The global `INTAKE_WEBHOOK_SECRET` goes.
 
 ## Tests that must exist
 

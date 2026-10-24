@@ -8,7 +8,6 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pydantic import SecretStr
 from sqlalchemy import Engine
 
 from outbound.api.app import create_app
@@ -95,7 +94,6 @@ def container(
 ) -> Container:
     settings = Settings(
         _env_file=None,
-        intake_webhook_secret=SecretStr(WEBHOOK_SECRET),
     )
     return container_for(settings, engine, platform_engine)
 

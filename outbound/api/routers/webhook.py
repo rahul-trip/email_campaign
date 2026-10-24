@@ -6,10 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Request
 from starlette.concurrency import run_in_threadpool
 
-from outbound.api.deps import ServicesSource, deployment_workspace
+from outbound.api.deps import ServicesSource
 from outbound.api.errors import ApiError
 from outbound.domain.actors import INTEGRATION_WEBHOOK
-from outbound.services.webhook import WebhookError, WebhookService, verify
+from outbound.services.webhook import WebhookError, secret_of, verify
 
 router = APIRouter(prefix="/api/intake", tags=["intake"])
 MAX_BODY_BYTES = 1_000_000
@@ -30,19 +30,16 @@ async def _read_body(request: Request) -> bytes:
     return b"".join(chunks)
 
 
-def _webhook_service(request: Request) -> WebhookService:
-    source: ServicesSource = request.app.state.services_source
-    workspace_id = deployment_workspace(request)
-    return source.for_tenant(workspace_id, actor=INTEGRATION_WEBHOOK).webhook
-
-
-@router.post("/webhook")
-async def webhook(request: Request) -> dict[str, Any]:
-    """Signed intake for other systems. Not behind a sign-in: the signature is the key."""
+@router.post("/webhook/{workspace_id}")
+async def webhook(workspace_id: str, request: Request) -> dict[str, Any]:
+    """Signed intake for other systems, one URL and one secret per workspace. Not behind a
+    sign-in: the signature is the key. A workspace that does not exist answers like one that has
+    no secret, so the URL cannot be used to find workspaces."""
     body = await _read_body(request)
     try:
+        secret = await run_in_threadpool(secret_of, request.app.state.container.uow, workspace_id)
         verify(
-            request.app.state.webhook_secret,
+            secret,
             body,
             request.headers.get("x-signature"),
             request.headers.get("x-timestamp"),
@@ -54,7 +51,9 @@ async def webhook(request: Request) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise WebhookError(422, "bad_json", "The body must be a JSON object.")
         # Intake searches and writes, so it must not run on the event loop.
-        result = await run_in_threadpool(_webhook_service(request).receive, payload)
+        source: ServicesSource = request.app.state.services_source
+        receiver = source.for_tenant(workspace_id, actor=INTEGRATION_WEBHOOK).webhook
+        result = await run_in_threadpool(receiver.receive, payload)
     except WebhookError as error:
         raise ApiError(error.status, error.code, error.detail) from None
     if result.duplicate or result.report is None:

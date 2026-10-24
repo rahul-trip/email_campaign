@@ -547,7 +547,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/intake/webhook": {
+    "/api/intake/webhook/{workspace_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -558,9 +558,48 @@ export interface paths {
         put?: never;
         /**
          * Webhook
-         * @description Signed intake for other systems. Not behind a sign-in: the signature is the key.
+         * @description Signed intake for other systems, one URL and one secret per workspace. Not behind a
+         *     sign-in: the signature is the key. A workspace that does not exist answers like one that has
+         *     no secret, so the URL cannot be used to find workspaces.
          */
-        post: operations["webhook_api_intake_webhook_post"];
+        post: operations["webhook_api_intake_webhook__workspace_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Webhook Info */
+        get: operations["webhook_info_api_integrations_webhook_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/webhook/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Webhook Secret
+         * @description A new secret, shown this once. Senders using the old one are refused from now on.
+         */
+        post: operations["rotate_webhook_secret_api_integrations_webhook_rotate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2496,6 +2535,20 @@ export interface components {
             /** Provider */
             provider: string;
         };
+        /** WebhookInfoOut */
+        WebhookInfoOut: {
+            /** Configured */
+            configured: boolean;
+            /** Path */
+            path: string;
+        };
+        /** WebhookSecretOut */
+        WebhookSecretOut: {
+            /** Path */
+            path: string;
+            /** Secret */
+            secret: string;
+        };
         /**
          * WorkspaceSettingsIn
          * @description Only the settings an operator may change, each with its real type.
@@ -3614,7 +3667,40 @@ export interface operations {
             };
         };
     };
-    webhook_api_intake_webhook_post: {
+    webhook_api_intake_webhook__workspace_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    webhook_info_api_integrations_webhook_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -3629,9 +3715,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WebhookInfoOut"];
+                };
+            };
+        };
+    };
+    rotate_webhook_secret_api_integrations_webhook_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookSecretOut"];
                 };
             };
         };

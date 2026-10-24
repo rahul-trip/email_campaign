@@ -27,11 +27,11 @@ class Container:
     platform: PlatformUnitOfWorkFactory
     identity: IdentityUnitOfWorkFactory
 
-    def workspace_id(self, name: str) -> str:
-        """The id of the named workspace, or a ConfigurationError that says what to run.
+    def require_database(self) -> None:
+        """Stop with a ConfigurationError that says what to run if the database was never set up.
 
-        A database that was never set up has no tables at all, which would otherwise surface as
-        a raw "no such table" error from deep inside the first query.
+        Such a database has no tables at all, which would otherwise surface as a raw "no such
+        table" error from deep inside the first query.
         """
         if not inspect(self.engine).has_table("workspaces"):
             raise ConfigurationError(
@@ -40,6 +40,10 @@ class Container:
                 "  uv run outbound seed\n"
                 f"(database: {self.engine.url.render_as_string(hide_password=True)})"
             )
+
+    def workspace_id(self, name: str) -> str:
+        """The id of the named workspace, or a ConfigurationError that says what to run."""
+        self.require_database()
         with self.platform() as platform:
             found = platform.workspaces.find(name)
         if found is None:

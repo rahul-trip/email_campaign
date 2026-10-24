@@ -106,7 +106,7 @@ Three research findings shaped the design:
 | 19 | Reply triage into six categories | Adopt | Phase 4 |
 | 20 | Learning from operator edits | Adopt | Generated and final bodies are stored; recent edits in the campaign become few-shot examples for the copywriter |
 | 21 | Positive-reply webhook, forget endpoint, DNS and warm-up preflight | Adopt | Phases 4–5 |
-| 22 | Inbound intake webhook | Adopt | Signed `POST /api/intake/webhook` in Phase 3 |
+| 22 | Inbound intake webhook | Adopt | Signed `POST /api/intake/webhook/{workspace_id}` (Phase 3; one URL and one encrypted secret per workspace from 6c, made in Settings → Integrations) |
 
 ## 5. Architecture
 
