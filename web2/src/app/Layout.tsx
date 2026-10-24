@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Sun, X, Zap } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Shield, Sun, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { Avatar, Menu, buttonClass } from "../components/ui";
@@ -325,6 +325,7 @@ function UserMenu() {
         </>
       }
       items={[
+        ...(me.user.platform_role ? [{ label: <><Shield size={14} aria-hidden /> Admin console</>, onSelect: () => window.location.assign("/admin") }] : []),
         { label: <><KeyRound size={14} aria-hidden /> Account and password</>, onSelect: () => void navigate({ to: "/settings", search: { tab: "account" } }) },
         { label: <><LogOut size={14} aria-hidden /> Sign out everywhere else</>, onSelect: () => others.mutate() },
         { label: <><LogOut size={14} aria-hidden /> Sign out</>, onSelect: () => signOut.mutate(), tone: "danger" },

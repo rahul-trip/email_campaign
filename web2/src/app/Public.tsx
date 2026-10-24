@@ -371,6 +371,11 @@ function Workspaces({ me }: { me: Me }) {
           ))}
         </ul>
       )}
+      {me.user.platform_role && (
+        <a href="/admin" className="flex h-9 w-full items-center justify-center rounded-lg border border-outline text-[13px] font-semibold hover:bg-surface-low">
+          Admin console
+        </a>
+      )}
       <Button variant="secondary" busy={signOut.isPending} onClick={() => signOut.mutate()} className="h-9 w-full">
         Sign out
       </Button>

@@ -3,6 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode, useEffect, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { SIGNED_OUT, actIn } from "./api/client";
+import { AdminApp } from "./admin/AdminApp";
 import { PublicApp } from "./app/Public";
 import { CurrentContext, go, inWorkspace, isViewing, rememberWorkspace, useMe } from "./app/session";
 import { Button, Empty } from "./components/ui";
@@ -25,6 +26,7 @@ const queryClient: QueryClient = new QueryClient({
 applyStoredTheme();
 
 const inside = window.location.pathname.match(/^\/w\/([^/]+)/);
+const inAdmin = /^\/admin(\/|$)/.test(window.location.pathname);
 const signIn = () => go(`/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
 
 /** A workspace's pages: who is signed in, may they open this workspace, then its router. */
@@ -80,6 +82,6 @@ if (inside && window.location.pathname === `/w/${inside[1]}`) window.history.rep
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>{inside ? <WorkspaceApp slug={decodeURIComponent(inside[1]!)} /> : <PublicApp />}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{inside ? <WorkspaceApp slug={decodeURIComponent(inside[1]!)} /> : inAdmin ? <AdminApp /> : <PublicApp />}</QueryClientProvider>
   </StrictMode>,
 );
