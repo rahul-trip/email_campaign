@@ -34,6 +34,7 @@ from outbound.domain.errors import ConfigurationError
 from outbound.domain.state_machines import STAGE_INPUT_STATUS, retry_status_for
 from outbound.logging import bind, get_logger, unbind
 from outbound.metering.metered import call_scope
+from outbound.metering.quota import STAGE_CHARGES
 from outbound.runner.guards import Guards, Refusal, RefusalKind
 from outbound.stages.base import Reader, Stage, StageContext, StageResult
 
@@ -48,6 +49,7 @@ class Outcome(StrEnum):
     FAILED = "failed"
     SUPPRESSED = "suppressed"
     DEFERRED = "deferred"  # left where it is; will be tried again later
+    WAITING = "waiting"  # left where it is until a credit for the step exists (Phase 6d)
     SKIPPED = "skipped"  # changed under us, or an operator edit won the race
 
 
@@ -255,6 +257,11 @@ class Runner:
                 next_action_at=result.next_action_at,
                 run_id=self._run_id,
             )
+            # The step succeeded, so it is charged, in the same transaction as its result. A
+            # lead already charged for it (research again, a rerun) is not charged twice.
+            charge = STAGE_CHARGES.get(stage.name)
+            if charge is not None and result.to_status is charge[1]:
+                uow.usage.charge(charge[0], company.id)
             uow.commit()
         log.info(
             "stage_done",
@@ -293,6 +300,15 @@ class Runner:
                         run_id=self._run_id,
                     )
                     outcome = Outcome.HELD
+                elif refusal.kind is RefusalKind.ACCESS:
+                    # The workspace may not run (paused, access ended, stopped). Nothing is
+                    # written and no back-off is set, so the lead continues the moment it can.
+                    outcome = Outcome.WAITING
+                elif refusal.kind is RefusalKind.CREDITS and refusal.step is not None:
+                    # Not a failure and not a hold: the lead keeps its status, loses nothing
+                    # (an approved email stays approved) and is picked up when credits exist.
+                    uow.companies.wait_for_credit(company.id, refusal.step)
+                    outcome = Outcome.WAITING
                 elif refusal.kind is RefusalKind.BUDGET and stage.name in STAGE_INPUT_STATUS:
                     self._fail(uow, stage, company, refusal.reason)
                     outcome = Outcome.FAILED

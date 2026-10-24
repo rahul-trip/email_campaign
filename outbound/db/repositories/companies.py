@@ -13,7 +13,13 @@ from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Company
-from outbound.domain.enums import CompanySource, CompanyStatus, EntityType, HoldReason
+from outbound.domain.enums import (
+    CompanySource,
+    CompanyStatus,
+    EntityType,
+    HoldReason,
+    UsageStep,
+)
 from outbound.domain.state_machines import COMPANY, STAGE_INPUT_STATUS
 
 
@@ -100,6 +106,9 @@ class CompanyRepository(ScopedRepository):
             .where(
                 CompanyRow.workspace_id == self._workspace_id,
                 CompanyRow.status == status,
+                CompanyRow.credit_wait_step.is_(
+                    None
+                ),  # waiting for credits: not due until released
                 or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
             )
             .order_by(CompanyRow.priority, CompanyRow.created_at, CompanyRow.id)
@@ -113,6 +122,7 @@ class CompanyRepository(ScopedRepository):
         stmt = select(CompanyRow.id).where(
             CompanyRow.workspace_id == self._workspace_id,
             CompanyRow.status.in_(statuses),
+            CompanyRow.credit_wait_step.is_(None),
             or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
         )
         return self._session.scalars(stmt.limit(1)).first() is not None
@@ -233,6 +243,31 @@ class CompanyRepository(ScopedRepository):
             detail["run_id"] = run_id
         self._events.append(EntityType.COMPANY, row.id, "status_changed", actor, detail)
         return snapshot(row, Company)
+
+    def wait_for_credit(self, company_id: str, step: UsageStep) -> bool:
+        """Park the lead where it is until a credit for ``step`` exists. True the first time;
+        asking again for the same step changes nothing and records nothing."""
+        row = self._row(CompanyRow, company_id)
+        if row.credit_wait_step is step:
+            return False
+        row.credit_wait_step = step
+        self._flush()
+        self._events.append(
+            EntityType.COMPANY, row.id, "waiting_for_credits", SYSTEM, {"step": step.value}
+        )
+        return True
+
+    def release_credit_wait(self, company_id: str, actor: str = SYSTEM) -> UsageStep | None:
+        """Let a waiting lead continue. Returns the step it waited on, or None if it was not
+        waiting."""
+        row = self._row(CompanyRow, company_id)
+        step = row.credit_wait_step
+        if step is None:
+            return None
+        row.credit_wait_step = None
+        self._flush()
+        self._events.append(EntityType.COMPANY, row.id, "resumed", actor, {"step": step.value})
+        return step
 
     def update_fields(
         self,

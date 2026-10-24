@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 import openpyxl
 
 from outbound.db.repositories.imports import ImportRowView
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR, SYSTEM
 from outbound.domain.countries import country_code
@@ -42,6 +43,7 @@ from outbound.domain.enums import (
     ImportSource,
     NoteSource,
     Provenance,
+    UsageStep,
 )
 from outbound.domain.errors import InvalidInput
 from outbound.domain.names import (
@@ -52,6 +54,7 @@ from outbound.domain.names import (
     split_person,
 )
 from outbound.logging import get_logger
+from outbound.metering.quota import quota_in
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import SearchHit, SearchProvider
 
@@ -305,6 +308,30 @@ class _Decision:
 # --------------------------------------------------------------------------- the service
 
 
+WAITING_FOR_CREDITS = "waiting for credits"  # the reason a pending row carries (Phase 6d)
+
+
+class _Credits:
+    """The credits left for the two intake steps, read once per call and counted down as rows
+    are accepted, so a large file does not re-read the plan for every row."""
+
+    def __init__(self, uow: UnitOfWork) -> None:
+        quota, _ = quota_in(uow, utcnow())
+        self._left: dict[UsageStep, int | None] = {
+            step: quota.remaining(step) for step in (UsageStep.DISCOVERY, UsageStep.MANUAL)
+        }
+
+    def take(self, step: UsageStep) -> bool:
+        """Use one credit if there is one (or the step is unlimited)."""
+        left = self._left[step]
+        if left is None:
+            return True
+        if left <= 0:
+            return False
+        self._left[step] = left - 1
+        return True
+
+
 class IntakeService:
     def __init__(
         self,
@@ -339,6 +366,7 @@ class IntakeService:
 
         report = IntakeReport(None, validate_only=validate_only)
         with self._uow(self._workspace_id) as uow:
+            credits = _Credits(uow)
             if campaign_id:
                 uow.campaigns.get(campaign_id)  # NotFound unless it is one of ours
             batch_id = uow.imports.create_batch(
@@ -356,6 +384,7 @@ class IntakeService:
                     company_source=company_source,
                     campaign_id=campaign_id,
                     actor=actor,
+                    credits=credits,
                 )
                 row_id = uow.imports.add_row(
                     batch_id,
@@ -382,6 +411,50 @@ class IntakeService:
         with self._uow(self._workspace_id) as uow:
             return uow.imports.rows_with_status(ImportRowStatus.NEEDS_CONFIRMATION)
 
+    def waiting_for_credits(self) -> list[ImportRowView]:
+        """Manual rows that are good leads but wait for a credit, oldest first."""
+        with self._uow(self._workspace_id) as uow:
+            pending = uow.imports.rows_with_status(ImportRowStatus.PENDING, 1000)
+        return [r for r in pending if r.reason == WAITING_FOR_CREDITS]
+
+    def release_waiting(self, *, actor: str | None = None, limit: int | None = None) -> int:
+        """Add the waiting rows as leads, oldest first, as many as the credits allow. Returns
+        how many were added; stops at the first one that still has no credit."""
+        actor = actor or self._actor
+        added = 0
+        with self._uow(self._workspace_id) as uow:
+            credits = _Credits(uow)
+            rows = [
+                r
+                for r in uow.imports.rows_with_status(ImportRowStatus.PENDING, 1000)
+                if r.reason == WAITING_FOR_CREDITS and r.resolved_domain
+            ]
+            for row in rows[: limit if limit is not None else len(rows)]:
+                decision = self._decide(
+                    uow,
+                    parse_target(row.raw),
+                    Resolution(row.resolved_domain, row.resolution_confidence),
+                    row.anchor,
+                    company_source=CompanySource.MANUAL,
+                    campaign_id=uow.imports.batch_campaign(row.batch_id),
+                    actor=actor,
+                    confirmed=True,
+                    credits=credits,
+                )
+                if decision.status is ImportRowStatus.PENDING:
+                    break  # still no credit: the rest wait too
+                uow.imports.settle_row(
+                    row.id,
+                    decision.status,
+                    resolved_domain=decision.domain,
+                    resolution_confidence=decision.confidence,
+                    reason=decision.reason,
+                    company_id=decision.company_id,
+                )
+                added += decision.status is ImportRowStatus.ACCEPTED
+            uow.commit()
+        return added
+
     def confirm(self, row_id: str, domain: str, *, actor: str | None = None) -> RowOutcome:
         """The operator says which website a waiting row means; the row is then processed."""
         actor = actor or self._actor
@@ -402,6 +475,7 @@ class IntakeService:
                 campaign_id=uow.imports.batch_campaign(row.batch_id),
                 actor=actor,
                 confirmed=True,
+                credits=_Credits(uow),
             )
             uow.imports.settle_row(
                 row_id,
@@ -456,6 +530,7 @@ class IntakeService:
         company_source: CompanySource,
         campaign_id: str | None,
         actor: str,
+        credits: _Credits,
         confirmed: bool = False,
     ) -> _Decision:
         domain = resolution.domain
@@ -502,9 +577,22 @@ class IntakeService:
                 ImportRowStatus.MERGED, domain, confidence, "already a target", existing.id
             )
 
+        step = (
+            UsageStep.DISCOVERY if company_source is CompanySource.DISCOVERY else UsageStep.MANUAL
+        )
+        if not credits.take(step):
+            if (
+                step is UsageStep.DISCOVERY
+            ):  # discovery is capped before it searches; a race ends here
+                return _Decision(
+                    ImportRowStatus.REJECTED, domain, reason="no discovery credit left"
+                )
+            # A person added it and it is a good lead: it waits, and is added when credits exist.
+            return _Decision(ImportRowStatus.PENDING, domain, confidence, WAITING_FOR_CREDITS)
         company_id, note = self._create(
             uow, domain, target, resolution, company_source, campaign_id, actor
         )
+        uow.usage.charge(step, company_id)
         return _Decision(ImportRowStatus.ACCEPTED, domain, confidence, note, company_id)
 
     def _create(

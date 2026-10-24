@@ -31,6 +31,7 @@ from outbound.domain.enums import (
     Provenance,
     SuppressionKind,
     SuppressionReason,
+    UsageStep,
     UserStatus,
     WorkspaceStatus,
 )
@@ -70,6 +71,7 @@ class Company:
     failed_stage: str | None = None
     last_error: str | None = None
     attempts: int = 0
+    credit_wait_step: UsageStep | None = None  # waiting, in place, for a credit (Phase 6d)
     next_action_at: datetime | None = None
     fit_score: int | None = None
     fit_reason: str | None = None
