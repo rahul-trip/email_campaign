@@ -211,6 +211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume All
+         * @description Let every waiting lead and row continue, as far as the credits go.
+         */
+        post: operations["resume_all_api_companies_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}": {
         parameters: {
             query?: never;
@@ -363,6 +383,23 @@ export interface paths {
         put?: never;
         /** Research Again */
         post: operations["research_again_api_companies__company_id__research_again_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume One */
+        post: operations["resume_one_api_companies__company_id__resume_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1229,6 +1266,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/targets/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Rows
+         * @description Add the manual rows that waited for credits.
+         */
+        post: operations["resume_rows_api_targets_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/targets/upload": {
         parameters: {
             query?: never;
@@ -1369,6 +1426,40 @@ export interface paths {
         patch: operations["set_role_api_team_members__user_id__patch"];
         trace?: never;
     };
+    "/api/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Usage */
+        get: operations["usage_api_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/usage/request-credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Request Credits */
+        post: operations["request_credits_api_usage_request_credits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1493,6 +1584,8 @@ export interface components {
             country_code: string | null;
             /** Created At */
             created_at: string | null;
+            /** Credit Wait Step */
+            credit_wait_step?: ("discovery" | "manual" | "research" | "email" | "copy" | "deliver" | "rewrite") | null;
             /** Domain */
             domain: string;
             /** Failed Stage */
@@ -1714,6 +1807,26 @@ export interface components {
         ForgotIn: {
             /** Email */
             email: string;
+        };
+        /** GrantOut */
+        GrantOut: {
+            /** Amount */
+            amount: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Id */
+            id: string;
+            /** Note */
+            note: string;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Step */
+            step: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2140,12 +2253,29 @@ export interface components {
         ReleaseIn: {
             resume_to?: components["schemas"]["CompanyStatus"] | null;
         };
+        /** RequestCreditsIn */
+        RequestCreditsIn: {
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+            /** Step */
+            step?: ("discovery" | "manual" | "research" | "email" | "copy" | "deliver" | "rewrite") | null;
+        };
         /** ResetIn */
         ResetIn: {
             /** Password */
             password: string;
             /** Token */
             token: string;
+        };
+        /** ResumedOut */
+        ResumedOut: {
+            /** Leads */
+            leads: number;
+            /** Rows */
+            rows: number;
         };
         /** ReviewDetailOut */
         ReviewDetailOut: {
@@ -2430,6 +2560,19 @@ export interface components {
             /** Waiting For Review */
             waiting_for_review: number;
         };
+        /** StepUsageOut */
+        StepUsageOut: {
+            /** Granted */
+            granted: number;
+            /** Limit */
+            limit: number | null;
+            /** Remaining */
+            remaining: number | null;
+            /** Step */
+            step: string;
+            /** Used */
+            used: number;
+        };
         /** SuppressionIn */
         SuppressionIn: {
             kind: components["schemas"]["SuppressionKind"];
@@ -2514,6 +2657,52 @@ export interface components {
             entity_type: string;
             /** Type */
             type: string;
+        };
+        /** UsageOut */
+        UsageOut: {
+            /**
+             * Access
+             * @enum {string}
+             */
+            access: "full" | "read_only" | "locked";
+            /** Access Until */
+            access_until: string | null;
+            /** Active Campaigns */
+            active_campaigns: number | null;
+            /** Announcement */
+            announcement: string;
+            /** Engine */
+            engine: boolean;
+            /** Features */
+            features: string[];
+            /** Grants */
+            grants: components["schemas"]["GrantOut"][];
+            /** Mailboxes */
+            mailboxes: number | null;
+            /**
+             * Period End
+             * Format: date-time
+             */
+            period_end: string;
+            /**
+             * Period Start
+             * Format: date-time
+             */
+            period_start: string;
+            /** Plan Code */
+            plan_code: string;
+            /** Plan Name */
+            plan_name: string;
+            /** Seats */
+            seats: number | null;
+            /** Steps */
+            steps: components["schemas"]["StepUsageOut"][];
+            /** Waiting Leads */
+            waiting_leads: {
+                [key: string]: number;
+            };
+            /** Waiting Rows */
+            waiting_rows: number;
         };
         /** UserOut */
         UserOut: {
@@ -2919,6 +3108,7 @@ export interface operations {
                 hold_reason?: components["schemas"]["HoldReason"] | null;
                 campaign_id?: string | null;
                 q?: string | null;
+                waiting_for_credits?: boolean | null;
                 limit?: number;
                 offset?: number;
             };
@@ -2966,6 +3156,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: number;
                     };
+                };
+            };
+        };
+    };
+    resume_all_api_companies_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumedOut"];
                 };
             };
         };
@@ -3322,6 +3532,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_one_api_companies__company_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumedOut"];
                 };
             };
             /** @description Validation Error */
@@ -4972,6 +5213,26 @@ export interface operations {
             };
         };
     };
+    resume_rows_api_targets_resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumedOut"];
+                };
+            };
+        };
+    };
     upload_targets_api_targets_upload_post: {
         parameters: {
             query?: never;
@@ -5228,6 +5489,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    usage_api_usage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageOut"];
+                };
+            };
+        };
+    };
+    request_credits_api_usage_request_credits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestCreditsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

@@ -371,17 +371,17 @@ Built in 6g: data quality, reports, reconfirmation, hit rate and savings.
 
 ### 6d.7 Customer-side screens
 
-- [ ] **Settings → Plan & usage:**
+- [x] **Settings → Plan & usage:**
   - a meter per step (used, limit, grants, reset date);
   - "active until";
   - the list of grants;
   - **Ask for more credits**.
-- [ ] **Banners:**
+- [x] **Banners:**
   - 80% and 100% of a step;
   - access ending within 7 days, or ended (read-only);
   - engine paused or workspace suspended;
   - admin announcements.
-- [ ] **Waiting for credits:**
+- [x] **Waiting for credits:**
   - a filter and count on Needs attention;
   - waiting rows on Add leads;
   - **Resume** and **Resume all**.

@@ -7,6 +7,7 @@ import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, Query
 import { lines, when } from "../lib/format";
 import { useOpen, useSetup, SetupList } from "../lib/setup";
 import { Mailboxes } from "./Mailboxes";
+import { PlanAndUsage } from "./SettingsPlan";
 import { Integrations } from "./SettingsIntegrations";
 import { Account, Team } from "./SettingsTeam";
 import type { SettingsTab } from "./settingsTabs";
@@ -31,6 +32,7 @@ export function SettingsPage() {
           ["profile", "Sender profile"],
           ["mailboxes", "Mailboxes"],
           ["limits", "Limits and budget"],
+          ["plan", "Plan and usage"],
           ["team", "Team"],
           ["integrations", "Integrations"],
           ["account", "Your account"],
@@ -40,6 +42,7 @@ export function SettingsPage() {
         {tab === "profile" && <SenderProfile />}
         {tab === "mailboxes" && <Mailboxes />}
         {tab === "limits" && <Limits />}
+        {tab === "plan" && <PlanAndUsage />}
         {tab === "team" && <Team />}
         {tab === "integrations" && <Integrations />}
         {tab === "account" && <Account />}

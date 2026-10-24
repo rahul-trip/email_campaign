@@ -13,7 +13,7 @@ export default defineConfig({
   webServer: {
     command: "cd .. && uv run python -m scripts.e2e_server",
     url: "http://127.0.0.1:8765/api/health",
-    reuseExistingServer: false,
+    reuseExistingServer: Boolean(process.env.E2E_REUSE), // set it to run against a server you started (to read its log)
     timeout: 60_000,
   },
 });

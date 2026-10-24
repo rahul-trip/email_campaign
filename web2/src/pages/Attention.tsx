@@ -7,9 +7,10 @@ import { StatusBadge } from "../components/StatusBadge";
 import { Button, Card, Empty, Input, PageHeader, Problem, Segmented, Skeleton, buttonClass } from "../components/ui";
 import { ago, words } from "../lib/format";
 import { HOLD_REASONS, describe, describeHold, leadStatus } from "../lib/status";
+import { STEP_LABEL, day, useUsage, type Usage } from "../lib/usage";
 
 type Company = Schemas["CompanyOut"];
-type Filter = "all" | "held" | "failed" | "confirm";
+type Filter = "all" | "held" | "failed" | "confirm" | "credits";
 
 export function AttentionPage() {
   const [filter, setFilter] = useState<Filter>("all");
@@ -25,11 +26,19 @@ export function AttentionPage() {
     refetchInterval: 10000,
   });
   const waiting = useQuery({ queryKey: ["waiting"], queryFn: () => ok(client.GET("/api/targets/waiting")) });
+  const usage = useUsage();
+  const credits = useQuery({
+    queryKey: ["companies", "credits"],
+    queryFn: () => ok(client.GET("/api/companies", { params: { query: { waiting_for_credits: true, limit: 200 } } })),
+    refetchInterval: 10000,
+  });
 
   const held = lists.data?.held ?? [];
   const failed = lists.data?.failed ?? [];
   const confirm = waiting.data ?? [];
-  const total = held.length + failed.length + confirm.length;
+  const parked = credits.data?.items ?? [];
+  const rows = usage.data?.waiting_rows ?? 0;
+  const total = held.length + failed.length + confirm.length + parked.length + rows;
   const groups = HOLD_REASONS.map((reason) => [reason, held.filter((c) => c.hold_reason === reason)] as const).filter(([, rows]) => rows.length > 0);
   const show = (kind: Filter) => filter === "all" || filter === kind;
 
@@ -47,6 +56,7 @@ export function AttentionPage() {
             ["held", `On hold (${held.length})`],
             ["failed", `Failed (${failed.length})`],
             ["confirm", `Websites to confirm (${confirm.length})`],
+            ["credits", `Waiting for credits (${parked.length + rows})`],
           ]}
         />
       </div>
@@ -63,6 +73,7 @@ export function AttentionPage() {
       )}
 
       <div className="space-y-5">
+        {show("credits") && parked.length + rows > 0 && <CreditWait leads={parked} rows={rows} usage={usage.data} />}
         {show("held") &&
           groups.map(([reason, rows]) => {
             const hold = describeHold(reason);
@@ -92,6 +103,60 @@ export function AttentionPage() {
         )}
       </div>
     </>
+  );
+}
+
+/** Work that stopped only because a plan allowance ran out. It continues by itself when credits
+ * exist (a new period, a grant); Resume tries now and says when credits come back if there are none. */
+function CreditWait({ leads, rows, usage }: { leads: Company[]; rows: number; usage?: Usage }) {
+  const queryClient = useQueryClient();
+  const refresh = useRefresh();
+  const done = () => {
+    refresh();
+    for (const key of ["usage", "setup"]) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
+  const all = useMutation({ mutationFn: () => ok(client.POST("/api/companies/resume")), onSuccess: done });
+  const one = useMutation({
+    mutationFn: (id: string) => ok(client.POST("/api/companies/{company_id}/resume", { params: { path: { company_id: id } } })),
+    onSuccess: done,
+  });
+  return (
+    <Card
+      tour="credit-wait"
+      title={
+        <span className="flex items-center gap-2">
+          Waiting for credits
+          <span className="rounded-full bg-surface-container px-2 font-mono text-xs">{leads.length + rows}</span>
+        </span>
+      }
+      subtitle={`Your plan's allowance for a step ran out, so these wait where they are and lose nothing. They continue by themselves when credits exist${usage ? `; the allowance renews on ${day(usage.period_end)}` : ""}.`}
+      actions={
+        <Button size="sm" busy={all.isPending} onClick={() => all.mutate()}>
+          Resume all now
+        </Button>
+      }
+    >
+      <Problem error={all.error ?? one.error} className="mb-3" />
+      {rows > 0 && (
+        <p className="mb-2 text-[13px]">
+          {rows} compan{rows === 1 ? "y" : "ies"} you added {rows === 1 ? "is" : "are"} waiting to become leads. See them under{" "}
+          <Link to="/targets" className="font-semibold text-primary hover:underline">
+            Add leads
+          </Link>
+          .
+        </p>
+      )}
+      <ul className="divide-y divide-line">
+        {leads.map((company) => (
+          <Row key={company.id} company={company} detail={`Waiting for a credit: ${(STEP_LABEL[company.credit_wait_step ?? ""] ?? company.credit_wait_step ?? "").toLowerCase()}`}>
+            <StatusBadge status={describe(leadStatus, company.status)} />
+            <Button size="sm" variant="secondary" busy={one.isPending && one.variables === company.id} onClick={() => one.mutate(company.id)}>
+              Resume
+            </Button>
+          </Row>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

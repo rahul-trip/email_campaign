@@ -71,6 +71,10 @@ def build() -> tuple[FastAPI, Worker]:
     with platform() as directory:
         workspace = directory.workspaces.by_name("default")
         assert workspace is not None
+        # The tests add many leads: this workspace is unlimited. A customer made during a test
+        # gets the Free plan, which is what the limits tests use.
+        directory.plans.set_plan(workspace.id, "unlimited")
+        directory.commit()
     with factory(workspace.id) as uow:
         uow.own_workspace.set_sender_profile({**workspace.sender_profile, **PROFILE})
         uow.commit()
