@@ -17,11 +17,20 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql.elements import ColumnElement
 
-from outbound.db.models import RunRow, WorkspacePlanRow, WorkspaceRow
+from outbound.db.identity import AuditRepository
+from outbound.db.models import (
+    CompanyRow,
+    MailboxRow,
+    ProviderCallRow,
+    RunRow,
+    UsageEventRow,
+    WorkspacePlanRow,
+    WorkspaceRow,
+)
 from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettingsRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
 from outbound.db.types import utcnow
-from outbound.domain.enums import RunStatus, WorkspaceStatus
+from outbound.domain.enums import MailboxStatus, RunStatus, UsageStep, WorkspaceStatus
 
 
 class SchedulerQueries:
@@ -78,6 +87,88 @@ class SchedulerQueries:
         return list(self._session.scalars(stmt))
 
 
+def _spend() -> ColumnElement[int]:
+    return func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)
+
+
+class AdminQueries:
+    """Figures across workspaces for the admin console: counts and sums, never anyone's rows
+    of content (no names, no addresses, no email text)."""
+
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def spend(self, start: datetime, end: datetime) -> dict[str, int]:
+        """Vendor spend per workspace in ``[start, end)``, in micro-USD."""
+        stmt = (
+            select(
+                ProviderCallRow.workspace_id,
+                func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+            )
+            .where(ProviderCallRow.created_at >= start, ProviderCallRow.created_at < end)
+            .group_by(ProviderCallRow.workspace_id)
+        )
+        return {ws: int(total) for ws, total in self._session.execute(stmt)}
+
+    def spend_by_provider(self, start: datetime, end: datetime) -> dict[str, int]:
+        stmt = (
+            select(
+                ProviderCallRow.provider, func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)
+            )
+            .where(ProviderCallRow.created_at >= start, ProviderCallRow.created_at < end)
+            .group_by(ProviderCallRow.provider)
+        )
+        return {name: int(total) for name, total in self._session.execute(stmt)}
+
+    def leads_added(self, start: datetime, end: datetime) -> int:
+        """New leads (manual and discovered) charged in ``[start, end)``, all workspaces."""
+        stmt = select(func.count()).where(
+            UsageEventRow.step.in_((UsageStep.MANUAL, UsageStep.DISCOVERY)),
+            UsageEventRow.created_at >= start,
+            UsageEventRow.created_at < end,
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def drafts_made(self, start: datetime, end: datetime) -> int:
+        stmt = select(func.count()).where(
+            UsageEventRow.step == UsageStep.DELIVER,
+            UsageEventRow.created_at >= start,
+            UsageEventRow.created_at < end,
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def waiting_leads(self) -> dict[str, int]:
+        """Leads parked for a credit, per workspace."""
+        stmt = (
+            select(CompanyRow.workspace_id, func.count())
+            .where(CompanyRow.credit_wait_step.is_not(None))
+            .group_by(CompanyRow.workspace_id)
+        )
+        return {ws: int(n) for ws, n in self._session.execute(stmt)}
+
+    def mailboxes(self) -> dict[str, tuple[int, int]]:
+        """(mailboxes, mailboxes needing attention) per workspace."""
+        stmt = select(MailboxRow.workspace_id, MailboxRow.status)
+        found: dict[str, tuple[int, int]] = {}
+        for ws, status in self._session.execute(stmt):
+            total, bad = found.get(ws, (0, 0))
+            found[ws] = (
+                total + 1,
+                bad + (status in (MailboxStatus.ERROR, MailboxStatus.NEEDS_RECONNECT)),
+            )
+        return found
+
+    def last_activity(self) -> dict[str, datetime]:
+        stmt = select(CompanyRow.workspace_id, func.max(CompanyRow.updated_at)).group_by(
+            CompanyRow.workspace_id
+        )
+        return {ws: when for ws, when in self._session.execute(stmt) if when is not None}
+
+    def lead_counts(self) -> dict[str, int]:
+        stmt = select(CompanyRow.workspace_id, func.count()).group_by(CompanyRow.workspace_id)
+        return {ws: int(n) for ws, n in self._session.execute(stmt)}
+
+
 class PlatformUnitOfWork:
     session: Session
 
@@ -88,6 +179,8 @@ class PlatformUnitOfWork:
         self.session = self._factory()
         self.workspaces = WorkspaceRepository(self.session)
         self.scheduler = SchedulerQueries(self.session)
+        self.figures = AdminQueries(self.session)
+        self.audit = AuditRepository(self.session)
         self.plans = PlanAdminRepository(self.session)
         self.settings = PlatformSettingsRepository(self.session)
         return self

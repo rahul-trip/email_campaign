@@ -327,10 +327,28 @@ class AuditRepository:
         )
         self._session.flush()
 
-    def recent(self, *, workspace_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    def recent(
+        self,
+        *,
+        workspace_id: str | None = None,
+        actor_user_id: str | None = None,
+        action: str | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """Newest first; every filter given must match."""
         stmt = select(AuditRow).order_by(AuditRow.created_at.desc(), AuditRow.id.desc())
         if workspace_id is not None:
             stmt = stmt.where(AuditRow.workspace_id == workspace_id)
+        if actor_user_id is not None:
+            stmt = stmt.where(AuditRow.actor_user_id == actor_user_id)
+        if action is not None:
+            stmt = stmt.where(AuditRow.action == action)
+        if since is not None:
+            stmt = stmt.where(AuditRow.created_at >= since)
+        if until is not None:
+            stmt = stmt.where(AuditRow.created_at < until)
         return [
             {
                 "id": row.id,

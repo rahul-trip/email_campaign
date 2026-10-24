@@ -142,6 +142,7 @@ forbidden_modules = ["outbound.db.platform"]
 ignore_imports = [
     "outbound.services.seed -> outbound.db.platform",
     "outbound.services.workspaces -> outbound.db.platform",
+    "outbound.services.admin -> outbound.db.platform",
     "outbound.services.identity -> outbound.db.platform",
 ]
 

@@ -13,6 +13,7 @@ from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import IllegalTransition
 from outbound.logging import get_logger
+from outbound.services.admin import AdminError
 from outbound.services.leads import LeadError
 from outbound.services.resume import NoCredits
 from outbound.services.review import ReviewError
@@ -58,6 +59,10 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(IllegalTransition)
     async def _state(request: Request, error: Exception) -> JSONResponse:
         return problem(409, "action_not_allowed", str(error))
+
+    @app.exception_handler(AdminError)
+    async def _admin(request: Request, error: AdminError) -> JSONResponse:
+        return problem(error.status, error.code, error.detail)
 
     @app.exception_handler(NoCredits)
     async def _no_credits(request: Request, error: NoCredits) -> JSONResponse:

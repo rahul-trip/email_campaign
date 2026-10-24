@@ -43,6 +43,7 @@ from outbound.api.routers import (
 )
 from outbound.bootstrap import Container
 from outbound.providers.ports import TransactionalEmail
+from outbound.services.admin import AdminService
 from outbound.services.identity import IdentityService
 
 # The built web app.
@@ -84,6 +85,7 @@ def create_app(
     )
     app.state.services_source = source
     app.state.container = container
+    app.state.admin = AdminService(container.platform, container.identity, container.uow)
     app.state.identity = IdentityService(
         container.identity,
         container.platform,

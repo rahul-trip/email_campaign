@@ -179,6 +179,9 @@ All routes are under `/api/admin/*`, for platform `admin` or `superadmin`. Every
 - **Settings:** `GET` and `PATCH /settings`.
 - **Audit:** `GET /audit` (filters; CSV).
 
+
+*Built (2026-10-24):* the routes above except members (role, remove, resend, force-reconnect) and the vendor routes (6d.4, next). Credit requests are `credits_requested` audit rows, open until a `credits_granted` or `credits_dismissed` row for the same customer. Every change writes its audit row in the same transaction.
+
 ### 6d.6 Admin console UI (`web2`, `/admin`)
 
 #### Principles
