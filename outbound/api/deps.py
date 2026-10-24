@@ -36,6 +36,7 @@ from outbound.services.reports import ReportService
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunService
 from outbound.services.settings import SettingsService
+from outbound.services.setup import SetupService
 from outbound.services.webhook import WebhookService
 from outbound.stages.mailboxes import Mailboxes
 
@@ -56,6 +57,7 @@ class Services:
     webhook: WebhookService
     privacy: PrivacyService
     mailboxes: MailboxService
+    setup: SetupService
 
 
 def build_services(
@@ -82,6 +84,7 @@ def build_services(
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),
         privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),
+        setup=SetupService(uow, workspace_id),
         mailboxes=MailboxService(
             uow, container.identity, workspace_id,
             apps=build_oauth_apps(container.settings), base_url=container.settings.app_base_url,
