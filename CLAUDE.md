@@ -54,6 +54,11 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - in `web2/`, a workspace's pages live under `/w/{slug}`: `src/main.tsx` builds the router with that base path, and the pages outside a workspace are in `src/app/Public.tsx`.
 
   The old operator password (`OPERATOR_PASSWORD_HASH`) is gone. To move an existing install, run `scripts/migrate_first_tenant.py`.
+- **Phase 6c (onboarding and mailboxes) is code complete** on branch `phase-6/onboarding-and-mailboxes`:
+  - each workspace connects its own mailboxes in Settings (Microsoft 365 and Google through OAuth, any IMAP account with an app password); passwords and tokens are encrypted (`outbound/db/crypto.py`, `SECRETS_KEYS`);
+  - `outbound/stages/mailboxes.py` opens a workspace's mailboxes for delivery, Sent sync and draft deletion; the `IMAP_*` and `EMAIL_*` settings are gone;
+  - new workspaces start blank (`outbound/services/workspaces.py`), with a guided setup at `/onboarding` driven by `GET /api/setup`;
+  - the intake webhook is per workspace (`/api/intake/webhook/{workspace_id}`, secret made in Settings → Integrations).
 - **Phase 6 (SaaS alpha) is planned and approved (2026-10-23):**
   - `docs/phases/phase-6-saas-ready.md` gives the overview, decisions and isolation model; the sub-phases are 6a–6g.
   - Order: 6a tenancy → 6b identity → 6c onboarding and mailboxes → 6d plans, limits and admin console → 4a opt-outs and bounces → **alpha** → 6g lead directory, in parallel with the rest of Phase 4.

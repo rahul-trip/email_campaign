@@ -166,6 +166,27 @@
   Each finding comes with fix steps in plain words.
 - [x] **The intake webhook per workspace:** `POST /api/intake/webhook/{workspace_id}`, signed with that workspace's own secret (a credential). Settings → Integrations shows it and can rotate it. The global `INTAKE_WEBHOOK_SECRET` goes.
 
+## As built (2026-10-24)
+
+Code complete on branch `phase-6/onboarding-and-mailboxes`; the gate waits on live accounts (below). Where the build differs from the tasks above:
+
+- **Credentials:** the extra-data column is `details`, not `metadata` (reserved by SQLAlchemy). The platform role gets **no** grant on `credentials`. `SECRETS_KEYS` is a JSON `{version: key}`; `outbound secrets new-key|rotate`.
+- **Sign-in apps:** `MICROSOFT_CLIENT_ID/_SECRET` and `GOOGLE_CLIENT_ID/_SECRET` in the environment (6d moves vendor and app settings into the admin console). Only configured providers are offered. The redirect address is `<APP_BASE_URL>/oauth/callback`, one for every workspace; the workspace comes from the sign-in that this session started (`sessions.data`), so the return route checks `mailboxes.own` itself.
+- **Graph tag:** a single-value extended property with our own GUID holds our Message-ID, and `internetMessageId` is set as well. **Not yet confirmed live** whether Outlook keeps both on the sent message.
+- **Gmail:** the draft is our own RFC 822 message and `rfc822msgid:` finds it. **Not yet confirmed live** that Gmail keeps the Message-ID we set.
+- **IMAP:** `UID EXPUNGE` needs UIDPLUS; without it the draft is only flagged `\\Deleted`, never purged with others. The port is 993 (TLS) or 143 (STARTTLS required), and an IMAP host that resolves to a private address is refused.
+- **Mailboxes in the engine:** `StoredMailboxes` (`outbound/stages/mailboxes.py`) replaces the single env mailbox; `MailboxHealth` runs in the tick. A paused or `needs_reconnect` mailbox makes delivery wait (the lead stays approved and is tried again), it does not fail it.
+- **Workspaces start blank** (`services/workspaces.py`). Fixing this also removed a bug in 6b's `create_customer`, which created a second, stray workspace.
+- **Webhook:** `POST /api/intake/webhook/{workspace_id}` with a per-workspace secret (a credential), made in Settings → Integrations. The global `INTAKE_WEBHOOK_SECRET` is gone.
+- **Setup list:** one server list (`GET /api/setup`) serves the Dashboard's Get started, Settings → Setup check and the wizard. *missing* blocks drafting; *warning* does not.
+- **Not built (kept for later):** "Fill from our website" (one metered research call proposing profile fields), the toast, drawer, radio group and tooltip parts (not needed by any screen yet), a per-mailbox DKIM selector field in the UI (the API reads `connection.dkim_selector`), and the Playwright flow "connect a fake mailbox → first run → draft" (the browser tests cover the wizard and the mailbox screens; the delivery path is covered by tests with fake servers).
+
+## Still to do before the gate
+
+- Live checks: a draft saved, found and deleted in a real Microsoft 365 mailbox, a Google mailbox and an IMAP mailbox (`uv run python -m scripts.live_check --address you@yours.com --workspace <slug>`), recording whether the Message-ID and tag survive a real send.
+- Apply for Google OAuth verification and Microsoft publisher verification (weeks of lead time; the alpha runs unverified).
+- Register the redirect address with both providers, and set `SECRETS_KEYS` in Doppler.
+
 ## Tests that must exist
 
 - **Crypto:** round trip, a tampered ciphertext refused, the wrong associated data refused, key rotation.
@@ -184,7 +205,7 @@
 
 ## Gate record
 
-- Date:
+- Date: 2026-10-24 (code); the gate closes after the live checks.
 - Microsoft 365 draft (customer, via the browser):
 - IMAP draft (customer, via the browser):
 - Live checks (Graph, Gmail Message-ID behaviour):
