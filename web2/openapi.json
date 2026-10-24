@@ -1162,6 +1162,79 @@
         "title": "HoldReason",
         "type": "string"
       },
+      "ImapIn": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "maxLength": 320,
+            "title": "Address",
+            "type": "string"
+          },
+          "drafts_folder": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drafts Folder"
+          },
+          "host": {
+            "maxLength": 255,
+            "title": "Host",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string"
+          },
+          "port": {
+            "default": 993,
+            "enum": [
+              993,
+              143
+            ],
+            "title": "Port",
+            "type": "integer"
+          },
+          "sent_folder": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Folder"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "required": [
+          "address",
+          "host",
+          "password"
+        ],
+        "title": "ImapIn",
+        "type": "object"
+      },
       "IncidentOut": {
         "properties": {
           "at": {
@@ -1378,32 +1451,48 @@
         "title": "LoginIn",
         "type": "object"
       },
-      "MailboxIn": {
-        "additionalProperties": false,
+      "MailboxCheckOut": {
         "properties": {
-          "address": {
-            "maxLength": 10000,
-            "title": "Address",
+          "detail": {
+            "title": "Detail",
             "type": "string"
           },
-          "credentials_ref": {
-            "maxLength": 10000,
-            "title": "Credentials Ref",
-            "type": "string"
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
           },
-          "daily_cap": {
-            "default": 10,
-            "maximum": 500.0,
-            "minimum": 1.0,
-            "title": "Daily Cap",
-            "type": "integer"
+          "status": {
+            "title": "Status",
+            "type": "string"
           }
         },
         "required": [
-          "address",
-          "credentials_ref"
+          "ok",
+          "status",
+          "detail"
         ],
-        "title": "MailboxIn",
+        "title": "MailboxCheckOut",
+        "type": "object"
+      },
+      "MailboxOptionsOut": {
+        "properties": {
+          "gateways": {
+            "items": {
+              "enum": [
+                "imap",
+                "gmail",
+                "graph"
+              ],
+              "type": "string"
+            },
+            "title": "Gateways",
+            "type": "array"
+          }
+        },
+        "required": [
+          "gateways"
+        ],
+        "title": "MailboxOptionsOut",
         "type": "object"
       },
       "MailboxOut": {
@@ -1411,6 +1500,18 @@
           "address": {
             "title": "Address",
             "type": "string"
+          },
+          "connection": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection"
           },
           "daily_cap": {
             "title": "Daily Cap",
@@ -1429,6 +1530,14 @@
             "title": "Dns Check"
           },
           "gateway": {
+            "enum": [
+              "imap",
+              "gmail",
+              "graph",
+              "emailengine",
+              "smartlead",
+              "instantly"
+            ],
             "title": "Gateway",
             "type": "string"
           },
@@ -1436,11 +1545,57 @@
             "title": "Id",
             "type": "string"
           },
+          "is_default": {
+            "default": false,
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "owner_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner User Id"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
           "sending_domain": {
             "title": "Sending Domain",
             "type": "string"
           },
           "status": {
+            "enum": [
+              "active",
+              "paused",
+              "error",
+              "needs_reconnect"
+            ],
             "title": "Status",
             "type": "string"
           }
@@ -1718,6 +1873,87 @@
           "created_at"
         ],
         "title": "NoteOut",
+        "type": "object"
+      },
+      "OAuthFinishIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 4000,
+            "title": "Code",
+            "type": "string"
+          },
+          "state": {
+            "maxLength": 200,
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "state"
+        ],
+        "title": "OAuthFinishIn",
+        "type": "object"
+      },
+      "OAuthFinishOut": {
+        "properties": {
+          "mailbox": {
+            "$ref": "#/components/schemas/MailboxOut"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "mailbox"
+        ],
+        "title": "OAuthFinishOut",
+        "type": "object"
+      },
+      "OAuthStartIn": {
+        "additionalProperties": false,
+        "properties": {
+          "gateway": {
+            "enum": [
+              "gmail",
+              "graph"
+            ],
+            "title": "Gateway",
+            "type": "string"
+          },
+          "login_hint": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login Hint"
+          }
+        },
+        "required": [
+          "gateway"
+        ],
+        "title": "OAuthStartIn",
+        "type": "object"
+      },
+      "OAuthStartOut": {
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "OAuthStartOut",
         "type": "object"
       },
       "OriginOut": {
@@ -2669,6 +2905,45 @@
           "detail"
         ],
         "title": "RunStepOut",
+        "type": "object"
+      },
+      "SenderIn": {
+        "additionalProperties": false,
+        "properties": {
+          "greeting": {
+            "default": "",
+            "enum": [
+              "",
+              "Hi",
+              "Hello",
+              "Dear"
+            ],
+            "title": "Greeting",
+            "type": "string"
+          },
+          "signature_name": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Signature Name",
+            "type": "string"
+          },
+          "signature_title": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Signature Title",
+            "type": "string"
+          },
+          "style_examples": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Style Examples",
+            "type": "array"
+          }
+        },
+        "title": "SenderIn",
         "type": "object"
       },
       "SenderProfileIn": {
@@ -5228,6 +5503,431 @@
         ]
       }
     },
+    "/api/mailboxes": {
+      "get": {
+        "operationId": "all_mailboxes_api_mailboxes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MailboxOut"
+                  },
+                  "title": "Response All Mailboxes Api Mailboxes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "All Mailboxes",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/imap": {
+      "post": {
+        "operationId": "connect_imap_api_mailboxes_imap_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImapIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connect Imap",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/oauth/finish": {
+      "post": {
+        "description": "Back from Microsoft or Google. The page there does not know the workspace, so it comes\nfrom the sign-in this session started; the person must still be allowed to act there.",
+        "operationId": "oauth_finish_api_mailboxes_oauth_finish_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthFinishIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthFinishOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Finish",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/oauth/start": {
+      "post": {
+        "operationId": "oauth_start_api_mailboxes_oauth_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthStartOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Oauth Start",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/options": {
+      "get": {
+        "operationId": "options_api_mailboxes_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOptionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Options",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}": {
+      "delete": {
+        "operationId": "disconnect_api_mailboxes__mailbox_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}/default": {
+      "post": {
+        "operationId": "make_default_api_mailboxes__mailbox_id__default_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Make Default",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}/pause": {
+      "post": {
+        "operationId": "pause_api_mailboxes__mailbox_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}/resume": {
+      "post": {
+        "operationId": "resume_api_mailboxes__mailbox_id__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}/sender": {
+      "put": {
+        "operationId": "set_sender_api_mailboxes__mailbox_id__sender_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SenderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Sender",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
+    "/api/mailboxes/{mailbox_id}/test": {
+      "post": {
+        "operationId": "test_mailbox_api_mailboxes__mailbox_id__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MailboxCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Mailbox",
+        "tags": [
+          "mailboxes"
+        ]
+      }
+    },
     "/api/privacy/forget": {
       "post": {
         "description": "Erase a person: suppress the address for good and remove what identifies them.",
@@ -5910,70 +6610,6 @@
           }
         },
         "summary": "Update Campaign",
-        "tags": [
-          "settings"
-        ]
-      }
-    },
-    "/api/settings/mailboxes": {
-      "get": {
-        "operationId": "mailboxes_api_settings_mailboxes_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/MailboxOut"
-                  },
-                  "title": "Response Mailboxes Api Settings Mailboxes Get",
-                  "type": "array"
-                }
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Mailboxes",
-        "tags": [
-          "settings"
-        ]
-      },
-      "post": {
-        "operationId": "add_mailbox_api_settings_mailboxes_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MailboxIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MailboxOut"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Add Mailbox",
         "tags": [
           "settings"
         ]

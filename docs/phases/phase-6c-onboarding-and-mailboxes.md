@@ -151,7 +151,7 @@
   - **Account:** profile, password, sessions.
   - **Workspace:** General, Company profile, Mailboxes & senders, Deliverability, Compliance, Team, Plan & usage (6d), Integrations, Data & privacy.
 
-  `/mailboxes` moves into Settings and redirects there.
+  `/mailboxes` moves into Settings and redirects there. *(Mailboxes tab, OAuth return page `/oauth/callback` and the redirect are built.)*
 - [ ] **New UI parts:** toast, stepper, drawer, radio group, tooltip.
 - [ ] **Kept up to date:** the tour, [../USER_MANUAL.md](../USER_MANUAL.md) and `screens.spec.ts`.
 
