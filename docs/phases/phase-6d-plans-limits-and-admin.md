@@ -92,15 +92,15 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 ### 6d.1 Migration 0012
 
 **Read by the customer, written by platform admins:**
-- [ ] `workspace_plans`: one per workspace; `plan_code`, `started_at` (the period anchor), `access_until`, `note`.
-- [ ] `entitlement_overrides`: `key`, `value` (JSON), `expires_at`, `note`, `set_by`, `created_at`, `revoked_at`.
-- [ ] `credit_grants`: `step`, `amount`, `expires_at` (end of period, a date, or null), `note`, `granted_by`, `created_at`, `revoked_at`.
+- [x] `workspace_plans`: one per workspace; `plan_code`, `started_at` (the period anchor), `access_until`, `note`.
+- [x] `entitlement_overrides`: `key`, `value` (JSON), `expires_at`, `note`, `set_by`, `created_at`, `revoked_at`.
+- [x] `credit_grants`: `step`, `amount`, `expires_at` (end of period, a date, or null), `note`, `granted_by`, `created_at`, `revoked_at`.
 
 **Tenant table:**
-- [ ] `usage_events`: `step`, `company_id` (no foreign key), `created_at`. Unique on (workspace, step, company) for every step except `rewrite`. The app role has INSERT and SELECT only.
+- [x] `usage_events`: `step`, `company_id` (no foreign key), `created_at`. Unique on (workspace, step, company) for every step except `rewrite`. The app role has INSERT and SELECT only.
 
 **Platform tables:**
-- [ ] `platform_settings`: one row of JSON, validated by Pydantic. It holds:
+- [x] `platform_settings`: one row of JSON, validated by Pydantic. It holds:
   - the plan catalog (step limits, seats, mailboxes, active campaigns, maximum leads per run, maximum per-prospect budget, features, period);
   - the default plan;
   - the kill switch (runs, drafts);
@@ -114,13 +114,13 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 - [ ] `platform_credentials`: `vendor`, `key_version`, `nonce`, `ciphertext`, `version`, `active`, `created_by`, `created_at`, `retired_at`.
 
 **Lead waiting:**
-- [ ] `companies.credit_wait_step` (nullable; a `CHECK` on the step names).
+- [x] `companies.credit_wait_step` (nullable; a `CHECK` on the step names).
 
-**Also:** [../SCHEMA.md](../SCHEMA.md), and the enums with their `CHECK`s.
+**Also (done):** [../SCHEMA.md](../SCHEMA.md), and the enums with their `CHECK`s.
 
 ### 6d.2 Entitlements and charging
 
-- [ ] **`domain/entitlements.py`:** the plan model, the Free plan's defaults, and the pure functions above.
+- [x] **`domain/entitlements.py`:** the plan model, the Free plan's defaults, and the pure functions above.
   - Free plan: 5 discovery and 5 manual a month, other steps unlimited, 3 seats, 1 mailbox, 2 active campaigns, 30 days of access.
 - [ ] **Charging** in `Runner._apply`, `IntakeService` and `ReviewService`. A unique-key conflict means "already charged" and is not an error.
 - [ ] **The guard** checks credits before a step that charges, and the access level before any work.

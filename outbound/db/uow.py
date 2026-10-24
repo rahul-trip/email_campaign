@@ -30,6 +30,7 @@ from outbound.db.repositories.contacts import (
 from outbound.db.repositories.erasure import ErasureRepository
 from outbound.db.repositories.imports import ImportRepository
 from outbound.db.repositories.messages import MessageRepository
+from outbound.db.repositories.plans import PlatformSettingsRepository, UsageRepository
 from outbound.db.repositories.policies import CountryPolicyRepository
 from outbound.db.repositories.reports import ReportRepository
 from outbound.db.repositories.suppressions import SuppressionRepository
@@ -77,6 +78,8 @@ class UnitOfWork:
         self.campaigns = CampaignRepository(*args)
         self.mailboxes = MailboxRepository(*args)
         self.credentials = CredentialRepository(*args, self._keyring)
+        self.usage = UsageRepository(*args)
+        self.platform_settings = PlatformSettingsRepository(self.session)
         self.runs = RunRepository(*args)
         self.calls = ProviderCallRepository(*args)
         self.erasure = ErasureRepository(*args)

@@ -60,6 +60,7 @@ from outbound.domain.enums import (
     RunStatus,
     SuppressionKind,
     SuppressionReason,
+    UsageStep,
     UserStatus,
     WorkspaceStatus,
 )
@@ -289,6 +290,8 @@ class CompanyRow(Mutable, Base):
     status: Mapped[CompanyStatus] = mapped_column(enum_type(CompanyStatus, "company_status"))
     hold_reason: Mapped[HoldReason | None] = mapped_column(enum_type(HoldReason, "hold_reason"))
     failed_stage: Mapped[str | None] = mapped_column(String(40))
+    # Set while the lead waits, in place, for a credit on this step (Phase 6d).
+    credit_wait_step: Mapped[UsageStep | None] = mapped_column(enum_type(UsageStep, "usage_step"))
     last_error: Mapped[str | None] = mapped_column(Text)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_action_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
@@ -635,3 +638,83 @@ class AuditRow(Identified, Base):
     target_id: Mapped[str | None] = mapped_column(String(64))
     note: Mapped[str | None] = mapped_column(Text)
     data: Mapped[dict[str, Any]] = mapped_column(Json, default=dict)
+
+
+# ----------------------------------------------------------------------- plans and usage (6d)
+
+
+class WorkspacePlanRow(Mutable, Base):
+    """Which plan a workspace is on and until when it may be used. Read by the workspace,
+    written by platform admins."""
+
+    __tablename__ = "workspace_plans"
+    __table_args__ = (UniqueConstraint("workspace_id"),)
+
+    plan_code: Mapped[str] = mapped_column(String(60))
+    started_at: Mapped[datetime] = mapped_column(
+        UtcDateTime
+    )  # the monthly period is counted from it
+    access_until: Mapped[datetime | None] = mapped_column(UtcDateTime)  # None: no end
+    note: Mapped[str] = mapped_column(Text, default="")
+
+
+class EntitlementOverrideRow(AppendOnly, Base):
+    """One setting changed for one customer (see ``domain.entitlements.Override``). Never edited:
+    a change is a new row, a withdrawal sets ``revoked_at``."""
+
+    __tablename__ = "entitlement_overrides"
+
+    key: Mapped[str] = mapped_column(String(80))
+    value: Mapped[dict[str, Any]] = mapped_column(Json)  # {"value": 20 | null | true}
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    note: Mapped[str] = mapped_column(Text, default="")
+    set_by: Mapped[str | None] = mapped_column(String(36))
+
+
+class CreditGrantRow(AppendOnly, Base):
+    """Extra credits for a step, given by a platform admin."""
+
+    __tablename__ = "credit_grants"
+    __table_args__ = (CheckConstraint("amount > 0", name="amount_positive"),)
+
+    step: Mapped[UsageStep] = mapped_column(enum_type(UsageStep, "usage_step"))
+    amount: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    note: Mapped[str] = mapped_column(Text, default="")
+    granted_by: Mapped[str | None] = mapped_column(String(36))
+
+
+class UsageEventRow(AppendOnly, Base):
+    """One charge: a step used on a lead. Append-only, and the lead is not a foreign key, so
+    deleting a lead does not give its credits back. A step is charged once per lead, except
+    ``rewrite``, which is charged every time."""
+
+    __tablename__ = "usage_events"
+    __table_args__ = (
+        Index(
+            "ux_usage_events_once_per_lead",
+            "workspace_id",
+            "step",
+            "company_id",
+            unique=True,
+            sqlite_where=text("step <> 'rewrite'"),
+            postgresql_where=text("step <> 'rewrite'"),
+        ),
+        Index("ix_usage_events_period", "workspace_id", "step", "created_at"),
+    )
+
+    step: Mapped[UsageStep] = mapped_column(enum_type(UsageStep, "usage_step"))
+    company_id: Mapped[str] = mapped_column(String(36))
+
+
+class PlatformSettingsRow(Identified, Base):
+    """The platform's own settings: one row (``id = 'platform'``) of JSON validated in code. A
+    platform table, with no workspace."""
+
+    __tablename__ = "platform_settings"
+
+    data: Mapped[dict[str, Any]] = mapped_column(Json)
+    version: Mapped[int] = mapped_column(Integer, default=1)  # +1 on every change
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)

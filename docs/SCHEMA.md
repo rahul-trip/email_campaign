@@ -224,6 +224,8 @@ CREATE TABLE companies (
   hold_reason       TEXT CHECK (hold_reason IN ('catch_all_unverified','catch_all_resolving','consent_required',
                       'country_unknown','entity_unknown','needs_operator')),
   failed_stage      TEXT,
+  credit_wait_step TEXT CHECK (credit_wait_step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
+                    -- set while the lead waits, in place, for a credit on this step (0012)
   last_error        TEXT,
   attempts          INTEGER NOT NULL DEFAULT 0,
   next_action_at    TIMESTAMP,                     -- follow-up due, OOO snooze, soft-bounce retry, resolver poll
@@ -385,11 +387,57 @@ CREATE TABLE events (             -- append-only
 CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, created_at);
 ```
 
+### Plans, credits and usage (migration 0012)
+
+```sql
+-- Read by the workspace (SELECT only for outbound_app), written by platform admins.
+CREATE TABLE workspace_plans (
+  plan_code     TEXT NOT NULL,            -- a code in platform_settings, or the built-in 'unlimited'
+  started_at    TIMESTAMP NOT NULL,       -- the monthly period is counted from this day
+  access_until  TIMESTAMP,                -- NULL: no end; past it the workspace is read-only
+  note          TEXT NOT NULL DEFAULT '',
+  UNIQUE (workspace_id)                   -- no row: unlimited (a workspace older than plans)
+);
+
+CREATE TABLE entitlement_overrides (      -- append-only; a change is a new row
+  key        TEXT NOT NULL,               -- limit.<step>, seats, mailboxes, active_campaigns,
+                                          -- max_leads_per_run, max_prospect_budget, feature.<name>
+  value      JSON NOT NULL,               -- {"value": 20 | null (unlimited) | true}
+  expires_at TIMESTAMP, revoked_at TIMESTAMP,
+  note       TEXT NOT NULL DEFAULT '', set_by TEXT
+);
+
+CREATE TABLE credit_grants (              -- extra credits for one step
+  step       TEXT NOT NULL CHECK (step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
+  amount     INTEGER NOT NULL CHECK (amount > 0),
+  expires_at TIMESTAMP,                    -- NULL: never
+  revoked_at TIMESTAMP, note TEXT NOT NULL DEFAULT '', granted_by TEXT
+);
+
+-- One row per charge. outbound_app may SELECT and INSERT only. company_id is deliberately not a
+-- foreign key: deleting a lead must not give its credits back.
+CREATE TABLE usage_events (
+  step       TEXT NOT NULL CHECK (step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
+  company_id TEXT NOT NULL
+);
+CREATE UNIQUE INDEX ux_usage_events_once_per_lead ON usage_events (workspace_id, step, company_id)
+  WHERE step <> 'rewrite';                -- a step is charged once per lead; a rewrite every time
+CREATE INDEX ix_usage_events_period ON usage_events (workspace_id, step, created_at);
+
+-- A platform table: one row, id 'platform'. Every role reads it; only outbound_platform writes.
+CREATE TABLE platform_settings (
+  id TEXT PRIMARY KEY,
+  data JSON NOT NULL,      -- plan catalog, default plan, kill switches, superadmin switch, banner
+  version INTEGER NOT NULL, -- +1 on every save; a save states the version it read
+  updated_at TIMESTAMP NOT NULL
+);
+```
+
 **Not in v1, added only when needed:**
 
 - The SaaS tables, each specified in its phase document and added here with its migration:
   - `users`, `memberships`, `auth_tokens`, `sessions`, `audit_log` (6b);
-  - `workspace_plans`, `entitlement_overrides`, `credit_grants`, `usage_events`, `platform_settings`, `platform_credentials` (6d);
+  - `platform_credentials` (6d, vendor keys in the database);
   - the `directory_*` tables (6g).
 - A jobs table. The runner's status and `next_action_at` queries cover scheduling at this volume.
 
@@ -405,6 +453,7 @@ CREATE INDEX ix_events_entity ON events (workspace_id, entity_type, entity_id, c
 - **No `FORCE ROW LEVEL SECURITY`.** The owner must still migrate and seed. Instead, `serve` and `worker` refuse to start in production when connected as the owner, a superuser or a BYPASSRLS role (`outbound/db/isolation.py`).
 - **Supabase's `anon` and `authenticated`** roles have every grant revoked, which closes the Data API.
 - **No `alembic_version` grant** goes to the two roles.
+- **`workspace_plans`, `entitlement_overrides`, `credit_grants`** (migration 0012) are tenant tables the workspace may only read; `outbound_platform` has a read-and-write policy on them. **`usage_events`**: `outbound_app` selects and inserts, `outbound_platform` selects. **`platform_settings`** has no workspace and no policy: grants alone decide (read for both roles, write for the platform role).
 - **`credentials`** (migration 0011) has the same `tenant_rows` policy for `outbound_app`, and **no grant at all** to `outbound_platform`: not even the scheduler reads secrets.
 
 ## 6. Safe-to-send rule (domain, not SQL)
