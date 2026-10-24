@@ -221,7 +221,8 @@ function Invitation({ token }: { token: string }) {
 function joined(me: Me, name: string): string {
   const found = me.workspaces.find((w) => w.name === name && w.role);
   if (found) rememberWorkspace(found.slug);
-  return found ? inWorkspace(found.slug) : "/";
+  // A new workspace's admin starts with the guided setup; everyone else on the dashboard.
+  return found ? inWorkspace(found.slug, found.role === "admin" ? "/onboarding" : "/") : "/";
 }
 
 function NewAccount({ token, email, title, subtitle, workspace }: { token: string; email: string; title: string; subtitle: string; workspace: string }) {

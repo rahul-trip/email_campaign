@@ -61,7 +61,7 @@ export function CampaignsPage() {
   );
 }
 
-function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campaign; onSaved: () => void; onCancel?: () => void }) {
+export function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campaign; onSaved: () => void; onCancel?: () => void }) {
   const [name, setName] = useState(campaign?.name ?? "");
   const [titles, setTitles] = useState((campaign?.target_titles ?? []).join("\n"));
   const [icp, setIcp] = useState(campaign?.icp_description ?? "");

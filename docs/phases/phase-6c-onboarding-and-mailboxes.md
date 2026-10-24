@@ -137,7 +137,7 @@
 
 ### 6c.8 Onboarding, setup check and Settings
 
-- [ ] **The wizard,** after the invite is accepted:
+- [x] **The wizard,** after the invite is accepted:
   1. workspace details (prefilled when an admin created the workspace) and accepting the DPA;
   2. company profile;
   3. sender identity;
@@ -146,8 +146,8 @@
   6. first leads.
 
   Steps after the first can be skipped and resumed.
-- [ ] **`GET /api/setup`** returns each setup item as ok, warning or missing, with the fix. It replaces the browser-side check in `web2/src/pages/Settings.tsx:39-95`. The Dashboard shows **Get started** until everything is green.
-- [ ] **Settings sections:**
+- [x] **`GET /api/setup`** returns each setup item as ok, warning or missing, with the fix. It replaces the browser-side check in `web2/src/pages/Settings.tsx:39-95`. The Dashboard shows **Get started** until everything is green.
+- [x] **Settings sections:**
   - **Account:** profile, password, sessions.
   - **Workspace:** General, Company profile, Mailboxes & senders, Deliverability, Compliance, Team, Plan & usage (6d), Integrations, Data & privacy.
 

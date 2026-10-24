@@ -84,7 +84,18 @@ uv run outbound worker     # does the work you start from the browser
 - **Your account** (the round button at the top right): change your password, sign out every other device, or sign out.
 - **Superadmin view (alpha only).** The platform's superadmin can open any workspace to help. A red banner, *Superadmin view of …, read-only*, stays at the top the whole time, nothing can be changed, and every such visit is recorded. **Exit** leaves it.
 
-### 3.2 The guided tour
+### 3.2 Setting up a new workspace
+
+A new workspace starts **empty**: your company's name and website, the country rules and one empty campaign, nothing else. When an admin accepts the invitation they land on **Set up your workspace**, four steps (open it again any time at `/onboarding`, or from the **Get started** card on the Dashboard):
+
+1. **Your company:** the sender profile (what the writer may truthfully say, the legal name and postal address the footers print, who signs). Nothing is written until you confirm it.
+2. **A mailbox:** where approved emails are saved as drafts. You can skip it and connect one later.
+3. **Who to reach:** the job titles you want and your ideal customer.
+4. **Your first leads.**
+
+A tick appears as soon as a step is done, wherever you did it. The **Setup check** in Settings shows the same list: *missing* items stop emails being written; *worth a look* items (DNS, country-rule review, no leads yet) do not.
+
+### 3.3 The guided tour
 
 The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher and your account button, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 

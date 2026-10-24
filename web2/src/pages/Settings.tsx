@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Lock } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { ArrowRight, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { client, ok } from "../api/client";
-import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Tabs, Textarea } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Skeleton, Tabs, Textarea, buttonClass } from "../components/ui";
 import { lines, when } from "../lib/format";
+import { useOpen, useSetup, SetupList } from "../lib/setup";
 import { Mailboxes } from "./Mailboxes";
 import { Integrations } from "./SettingsIntegrations";
 import { Account, Team } from "./SettingsTeam";
@@ -35,7 +36,7 @@ export function SettingsPage() {
           ["account", "Your account"],
         ]}
       >
-        {tab === "setup" && <Setup onOpen={setTab} />}
+        {tab === "setup" && <Setup />}
         {tab === "profile" && <SenderProfile />}
         {tab === "mailboxes" && <Mailboxes />}
         {tab === "limits" && <Limits />}
@@ -49,90 +50,23 @@ export function SettingsPage() {
 
 // ------------------------------------------------------------------ setup check
 
-/** What is missing before the engine can work well, built from what is saved. */
-function Setup({ onOpen }: { onOpen: (tab: Tab) => void }) {
-  const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
-  const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
-  const mailboxes = useQuery({ queryKey: ["mailboxes"], queryFn: () => ok(client.GET("/api/mailboxes")) });
-  const policies = useQuery({ queryKey: ["policies"], queryFn: () => ok(client.GET("/api/settings/policies")) });
-  const p = (profile.data ?? {}) as Profile;
-  const filled = (key: string) => String(p[key] ?? "").trim() !== "";
-  const ready = campaigns.data?.find((c) => c.target_titles.length > 0 && c.icp_description);
-  const allowing = (policies.data ?? []).filter((x) => x.rule !== "block");
-  const unreviewed = allowing.filter((x) => !x.reviewed_by);
-  const checked = (mailboxes.data ?? []).some((m) => m.dns_check);
-  const loading = profile.isPending || campaigns.isPending || mailboxes.isPending || policies.isPending;
-
-  const items: { ok: boolean; title: string; detail: string; action: ReactNode; required?: boolean }[] = [
-    {
-      ok: Boolean(p.reviewed_at),
-      required: true,
-      title: "Sender profile confirmed",
-      detail: p.reviewed_at ? `Confirmed ${when(String(p.reviewed_at))}.` : "No emails are written until you have read the profile and saved it.",
-      action: <Button size="sm" variant="secondary" onClick={() => onOpen("profile")}>Open profile</Button>,
-    },
-    {
-      ok: filled("legal_name") && filled("postal_address"),
-      required: true,
-      title: "Legal name and postal address",
-      detail: "Every country footer prints them; a footer with a gap stops the email being written.",
-      action: <Button size="sm" variant="secondary" onClick={() => onOpen("profile")}>Fill in</Button>,
-    },
-    {
-      ok: filled("signature_name"),
-      required: true,
-      title: "Signature",
-      detail: "Your name ends every email.",
-      action: <Button size="sm" variant="secondary" onClick={() => onOpen("profile")}>Fill in</Button>,
-    },
-    {
-      ok: Boolean(ready),
-      required: true,
-      title: "A campaign with job titles and an ideal customer",
-      detail: ready ? `"${ready.name}" is ready.` : "Without them people cannot be ranked and fit cannot be scored well.",
-      action: <Link to="/campaigns" className="text-xs font-semibold text-primary hover:underline">Campaigns</Link>,
-    },
-    {
-      ok: checked,
-      title: "A mailbox connected and its DNS checked",
-      detail: checked ? "SPF, DKIM and DMARC have been checked." : "Connect the mailbox drafts are saved in, then check its domain's SPF, DKIM and DMARC.",
-      action: <button type="button" onClick={() => onOpen("mailboxes")} className="text-xs font-semibold text-primary hover:underline">Mailboxes</button>,
-    },
-    {
-      ok: unreviewed.length === 0,
-      title: "Country rules reviewed",
-      detail: unreviewed.length ? `${unreviewed.length} countr${unreviewed.length === 1 ? "y allows" : "ies allow"} email without a named reviewer: ${unreviewed.map((x) => x.country_code).join(", ")}. A lawyer should check them.` : "Every country that allows email has a named reviewer.",
-      action: <Link to="/compliance" className="text-xs font-semibold text-primary hover:underline">Policies</Link>,
-    },
-  ];
-  const missing = items.filter((i) => !i.ok);
+/** What is missing before the engine can work well: the server's list, the same one everywhere. */
+function Setup() {
+  const setup = useSetup();
+  const open = useOpen();
+  const missing = setup.data?.items.filter((i) => i.status !== "ok").length ?? 0;
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <Card tour="setup-check" title="Setup check" subtitle={loading ? "Checking…" : missing.length === 0 ? "Everything is in place." : `${missing.length} of ${items.length} need attention.`}>
-        <ul className="divide-y divide-line">
-          {items.map((item) => (
-            <li key={item.title} className="flex items-start gap-3 py-3">
-              {loading ? (
-                <Circle className="mt-0.5 size-4 shrink-0 text-outline" aria-hidden />
-              ) : item.ok ? (
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-good" aria-label="Done" />
-              ) : (
-                <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${item.required ? "text-error" : "text-attention"}`} aria-label={item.required ? "Missing" : "Warning"} />
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium">{item.title}</div>
-                <div className="text-xs text-muted">{item.detail}</div>
-              </div>
-              {!item.ok && !loading && <div className="shrink-0">{item.action}</div>}
-            </li>
-          ))}
-        </ul>
+      <Card tour="setup-check" title="Setup check" subtitle={!setup.data ? "Checking…" : missing === 0 ? "Everything is in place." : `${missing} of ${setup.data.items.length} need attention.`}>
+        {setup.data ? <SetupList items={setup.data.items} onOpen={open} /> : <Skeleton rows={4} />}
+        {setup.data && !setup.data.done && (
+          <Link to="/onboarding" className={buttonClass("primary", "md", "mt-3")}>Guide me through it</Link>
+        )}
       </Card>
       <Card title="Elsewhere" className="h-fit">
         <ul className="space-y-2 text-[13px]">
           {[
             ["/campaigns", "Campaigns", "Job titles, ideal customer, questions"],
-            ["/mailboxes", "Mailboxes", "Where drafts go; DNS check"],
             ["/compliance", "Policies and privacy", "Country rules, do not contact, erasure"],
           ].map(([to, title, detail]) => (
             <li key={to}>
@@ -176,7 +110,7 @@ const LISTS: [string, string, string][] = [
   ["target_verticals", "Target industries", "One per line."],
 ];
 
-function SenderProfile() {
+export function SenderProfile() {
   const queryClient = useQueryClient();
   const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
   const policies = useQuery({ queryKey: ["policies"], queryFn: () => ok(client.GET("/api/settings/policies")) });

@@ -88,3 +88,30 @@ test("signing out ends the session and an old link asks to sign in again", async
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page).toHaveURL(/next=%2Fw%2Fdefault%2Fleads/);
 });
+
+test("a new customer's admin is taken to the guided setup, which starts empty", async ({ page, browser }) => {
+  await signIn(page, STAFF, false);
+  await expect(page.getByRole("heading", { name: "Choose a workspace" })).toBeVisible();
+  const email = `boss-${Date.now().toString(36)}@globex.example`;
+  const made = await page.request.post("/api/admin/customers", { data: { name: "Globex Ltd", website: "globex.example", admin_email: email }, headers: WRITE });
+  expect(made.status()).toBe(201);
+  const token = await emailedToken(page, "invite", email);
+
+  const boss = await (await browser.newContext()).newPage();
+  await boss.addInitScript(() => localStorage.setItem("outbound.tour", "done"));
+  await boss.goto(`/invite/${token}`);
+  await expect(boss.getByRole("heading", { name: "Join Globex Ltd" })).toBeVisible();
+  await boss.getByLabel("Choose a password").fill("violet harbour quietly sixteen");
+  await boss.getByText("I accept the Terms of Service").click();
+  await boss.getByRole("button", { name: "Create my account" }).click();
+
+  await expect(boss).toHaveURL(/\/w\/globex-ltd\/onboarding$/);
+  await expect(boss.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
+  await expect(boss.getByRole("button", { name: /Your company/ })).toHaveAttribute("aria-current", "step");
+  // nothing of anyone else's was copied in
+  await expect(boss.getByText("Quantra")).toHaveCount(0);
+  await boss.getByRole("button", { name: /A mailbox/ }).click();
+  await expect(boss.getByText("No mailbox connected")).toBeVisible();
+  await boss.getByRole("link", { name: "Dashboard" }).click();
+  await expect(boss.getByText("Get started")).toBeVisible();
+});

@@ -8,7 +8,7 @@
  */
 
 /** Where a section lives. The two lead pages need a real lead, so the tour opens the newest one. */
-export type Place = "/" | "/targets" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
+export type Place = "/" | "/onboarding" | "/targets" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
 
 export type Step = {
   /** The `data-tour` name of the element to point at; none means a centred message. */
@@ -251,6 +251,18 @@ export const SECTIONS: Section[] = [
         target: "setup-check",
         title: "Confirm your sender profile",
         body: "Every statement in the profile ends up in emails under your name. Read it, keep only what is true, and press Confirm and save: no email is written until you do.",
+      },
+    ],
+  },
+  {
+    id: "onboarding",
+    title: "Setting up",
+    place: "/onboarding",
+    steps: [
+      {
+        target: "onboarding-steps",
+        title: "Four steps to your first email",
+        body: "A new workspace starts empty. Your company (what you may truthfully say, and who signs), a mailbox for the drafts, who you want to reach, and your first leads. A tick appears as soon as a step is done, wherever you did it; the Dashboard shows Get started until the essentials are in place.",
       },
     ],
   },

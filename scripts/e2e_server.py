@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from pydantic import SecretStr
 
 from outbound.api.app import WEB_DIST, create_app
-from outbound.api.deps import build_services
+from outbound.api.deps import ServicesFactory
 from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db import migrate
@@ -35,8 +35,7 @@ from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.session import make_engine, make_session_factory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import PlatformRole
-from outbound.metering.metered import MeteredLlm
-from outbound.pipeline import assemble, build_meter
+from outbound.pipeline import assemble
 from outbound.providers.adapters.transactional_email import LogEmail
 from outbound.services.seed import seed_defaults
 from outbound.worker import Worker
@@ -84,11 +83,11 @@ def build() -> tuple[FastAPI, Worker]:
     world = World()
     pipeline = assemble(container, workspace.id, world.providers())
     web_dist = Path(os.environ["E2E_WEB_DIST"]) if os.environ.get("E2E_WEB_DIST") else WEB_DIST
-    # Revisions on Review use the fake world's model too, metered like the real one.
-    writer = MeteredLlm(world.llm, build_meter(container, workspace.id))
     outbox = LogEmail()
+    # Like a real run: services are built per request for whichever workspace is asked for, so a
+    # workspace made during a test works. Rewrites use the fake world's model, metered as usual.
     app = create_app(
-        build_services(container, workspace.id, writer=writer),
+        ServicesFactory(container, search=world.search, writer=world.llm),
         web_dist=web_dist,
         email=outbox,
     )
