@@ -157,7 +157,7 @@
 
 ### 6c.9 Deliverability and integrations
 
-- [ ] **The DNS check** (`services/dns_check.py`) gains:
+- [x] **The DNS check** (`services/dns_check.py`) gains:
   - MX;
   - the SPF lookup count (at most 10);
   - DKIM through the provider's selector (`google`; `selector1` and `selector2`) or one the user enters, instead of today's fixed list;

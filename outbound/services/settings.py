@@ -17,7 +17,14 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
-from outbound.services.dns_check import TxtLookup, check_domain, system_lookup
+from outbound.services.dns_check import (
+    COMMON_DKIM_SELECTORS,
+    MxLookup,
+    TxtLookup,
+    check_domain,
+    system_lookup,
+    system_mx,
+)
 
 SENDER_FIELDS = frozenset(
     {
@@ -61,11 +68,18 @@ class SettingsService:
         workspace_id: str,
         *,
         dns_lookup: TxtLookup = system_lookup,
+        mx_lookup: MxLookup | None = None,
         actor: str = OPERATOR,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._dns = dns_lookup
+        # MX is looked up for real only when the TXT lookup is the real one too (tests inject both)
+        self._mx = (
+            mx_lookup
+            if mx_lookup is not None
+            else (system_mx if dns_lookup is system_lookup else None)
+        )
         self._actor = actor
 
     # ------------------------------------------------------------------ profile and settings
@@ -252,7 +266,14 @@ class SettingsService:
     def dns_check(self, mailbox_id: str) -> dict[str, object]:
         with self._uow(self._workspace_id) as uow:
             mailbox = uow.mailboxes.get(mailbox_id)
-        report = check_domain(mailbox.sending_domain, self._dns).to_json()
+        given = (mailbox.connection or {}).get("dkim_selector")  # one the person entered
+        report = check_domain(
+            mailbox.sending_domain,
+            self._dns,
+            [*([given] if given else []), *COMMON_DKIM_SELECTORS],
+            mx_lookup=self._mx,
+            gateway=mailbox.gateway.value,
+        ).to_json()
         with self._uow(self._workspace_id) as uow:
             uow.mailboxes.set_dns_check(mailbox_id, report)
             uow.commit()

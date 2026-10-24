@@ -820,3 +820,56 @@ def test_a_lead_whose_email_has_left_is_not_researched_again(
     )
     with pytest.raises(LeadError, match="already left"):
         leads(factory, ws).research_again(company.id)
+
+
+# ------------------------------------------------------------------ the DNS check, in depth
+
+
+def txt(records: dict[str, list[str]]):  # type: ignore[no-untyped-def]
+    return lambda name: records.get(name, [])
+
+
+def test_spf_lookups_are_counted_through_includes_and_the_limit_is_enforced() -> None:
+    from outbound.services.dns_check import spf_lookups
+
+    records = {
+        "_spf.google.com": ["v=spf1 include:_netblocks.google.com ~all"],
+        "_netblocks.google.com": ["v=spf1 ip4:1.2.3.4 ~all"],
+    }
+    assert spf_lookups("v=spf1 include:_spf.google.com mx -all", txt(records)) == 3
+    greedy = "v=spf1 " + " ".join(f"include:s{i}.example" for i in range(11)) + " -all"
+    report = check_domain("a.example", txt({"a.example": [greedy]}))
+    assert not report.spf.ok and "11 DNS lookups" in report.spf.detail
+    ok = check_domain(
+        "a.example", txt({"a.example": ["v=spf1 include:_spf.google.com ~all"], **records})
+    )
+    assert ok.spf.ok and "2 of 10 lookups" in ok.spf.detail
+
+
+def test_the_providers_own_dkim_selector_is_tried_first_and_a_given_one_is_added() -> None:
+    domain_key = {"selector2._domainkey.q.example": ["v=DKIM1; p=XYZ"]}
+    graph = check_domain("q.example", txt(domain_key), gateway="graph")
+    assert graph.dkim.ok and "selector2" in graph.dkim.detail
+    custom = check_domain(
+        "q.example", txt({"mine._domainkey.q.example": ["v=DKIM1; p=A"]}), ["mine"]
+    )
+    assert custom.dkim.ok and "mine" in custom.dkim.detail
+    assert not check_domain("q.example", txt({})).dkim.ok
+
+
+def test_mx_is_checked_only_when_it_can_be_looked_up() -> None:
+    assert check_domain("q.example", txt({})).mx is None
+    none = check_domain("q.example", txt({}), mx_lookup=lambda _: [])
+    assert none.mx is not None and not none.mx.ok and "replies" in none.mx.detail
+    some = check_domain("q.example", txt({}), mx_lookup=lambda _: ["aspmx.l.google.com"])
+    assert some.mx is not None and some.mx.ok and "mx" in some.to_json()
+
+
+def test_dmarc_without_report_address_says_how_to_get_reports() -> None:
+    plain = check_domain("q.example", txt({"_dmarc.q.example": ["v=DMARC1; p=quarantine"]})).dmarc
+    assert plain.ok and "rua=" in plain.detail
+    full = check_domain(
+        "q.example", txt({"_dmarc.q.example": ["v=DMARC1; p=reject; rua=mailto:r@q.example"]})
+    ).dmarc
+    assert full.ok and "rua" not in full.detail
+    assert "rua=mailto:dmarc@q.example" in check_domain("q.example", txt({})).dmarc.detail
