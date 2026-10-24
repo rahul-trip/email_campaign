@@ -109,7 +109,7 @@
 
 ### 6c.6 The mailbox service and wiring
 
-- [ ] **`services/mailboxes.py`:** connect, test, pause, resume, set the default, disconnect (revoke at the provider, delete the credential) and reconnect.
+- [x] **`services/mailboxes.py`:** connect, test, pause, resume, set the default, disconnect (revoke at the provider, delete the credential) and reconnect.
   - OAuth returns to an app page, which posts `code` and `state` to the API.
   - `state` and the PKCE verifier live in the session row (`sessions.data`).
 - [x] **`MailboxResolver`** replaces the single env mailbox, `Providers.mailbox` (`pipeline.py:105, 172-174`):
@@ -117,12 +117,12 @@
   - `SentSync` goes through each mailbox in the workspace;
   - `PrivacyService` (`api/app.py:150`) deletes drafts in the mailbox that holds them.
 - [x] **Copy chooses the sender:** the campaign's `mailbox_id`, else the workspace default. It sets `messages.mailbox_id`, which is never set today. The signature comes from that mailbox's `sender` JSON, falling back to the workspace profile.
-- [ ] **Health job** (part of the tick):
+- [x] **Health job** (part of the tick):
   - it refreshes tokens and marks `needs_reconnect`, with a banner and an email to the mailbox's owner and the workspace admins;
   - deliveries through that mailbox wait and resume after reconnecting;
   - when a mailbox is removed, its approved emails are held until another mailbox is chosen.
 - [ ] **Remove** `IMAP_*`, `EMAIL_*`, `FROM_NAME` and the folder settings from `config.py` and `.env.example`. `scripts/migrate_first_tenant.py` moves today's mailbox into tenant #1, with its password encrypted.
-- [ ] **Permissions:** members connect and edit only their own mailboxes (`mailboxes.own`); admins manage all of them (`mailboxes.manage`).
+- [x] **Permissions:** members connect and edit only their own mailboxes (`mailboxes.own`); admins manage all of them (`mailboxes.manage`).
 
 ### 6c.7 Company profile and sender identity
 

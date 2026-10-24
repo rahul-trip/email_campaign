@@ -19,7 +19,7 @@ from typing import Any
 
 import httpx
 
-from outbound.providers.errors import ProviderAuthError
+from outbound.providers.errors import ProviderAuthError, ProviderError
 from outbound.providers.http import HttpClient
 from outbound.providers.mime import build_message, inbound_message, parse, sent_message
 from outbound.providers.ports import AccessTokens, InboundMessage, OutgoingDraft, SentMessage
@@ -126,3 +126,15 @@ class GmailMailbox:
     @staticmethod
     def _auth(token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
+
+
+def account_address(access_token: str, *, client: httpx.Client | None = None) -> str:
+    """The address of the account a token belongs to, right after connecting."""
+    http = HttpClient("gmail", BASE_URL, client=client)
+    profile = http.request(
+        "GET", "/profile", headers={"Authorization": f"Bearer {access_token}"}
+    ) or {}  # fmt: skip
+    address = str(profile.get("emailAddress") or "").strip().lower()
+    if "@" not in address:
+        raise ProviderError("gmail", "the account has no email address")
+    return address

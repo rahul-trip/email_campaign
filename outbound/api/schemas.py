@@ -614,17 +614,62 @@ class SuppressionOut(Out):
     created_at: datetime
 
 
-class MailboxIn(In):
-    address: str
-    credentials_ref: str
-    daily_cap: int = Field(default=10, ge=1, le=500)
-
-
 class MailboxOut(Out):
     id: str
     address: str
-    gateway: str
+    gateway: Literal["imap", "gmail", "graph", "emailengine", "smartlead", "instantly"]
     sending_domain: str
     daily_cap: int
-    status: str
+    status: Literal["active", "paused", "error", "needs_reconnect"]
     dns_check: dict[str, Any] | None
+    owner_user_id: str | None = None
+    is_default: bool = False
+    sender: dict[str, Any] | None = None
+    connection: dict[str, Any] | None = None  # host, port, user name, folders; never a secret
+    last_checked_at: datetime | None = None
+
+
+class MailboxOptionsOut(Out):
+    gateways: list[Literal["imap", "gmail", "graph"]]  # what this server can connect
+
+
+class OAuthStartIn(In):
+    gateway: Literal["gmail", "graph"]
+    login_hint: str | None = Field(default=None, max_length=320)
+
+
+class OAuthStartOut(Out):
+    url: str
+
+
+class OAuthFinishIn(In):
+    code: str = Field(max_length=4000)
+    state: str = Field(max_length=200)
+
+
+class OAuthFinishOut(Out):
+    slug: str  # the workspace the mailbox was connected to, where the page goes back to
+    mailbox: MailboxOut
+
+
+class ImapIn(In):
+    address: str = Field(max_length=320)
+    host: str = Field(max_length=255)
+    port: Literal[993, 143] = 993
+    username: str | None = Field(default=None, max_length=320)
+    password: str = Field(min_length=1, max_length=500)
+    drafts_folder: str | None = Field(default=None, max_length=200)
+    sent_folder: str | None = Field(default=None, max_length=200)
+
+
+class SenderIn(In):
+    signature_name: str = Field(default="", max_length=200)
+    signature_title: str = Field(default="", max_length=200)
+    greeting: Literal["", "Hi", "Hello", "Dear"] = ""
+    style_examples: list[str] = Field(default_factory=list, max_length=4)
+
+
+class MailboxCheckOut(Out):
+    ok: bool
+    status: str
+    detail: str

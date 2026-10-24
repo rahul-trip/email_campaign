@@ -197,3 +197,16 @@ class GraphMailbox:
     @staticmethod
     def _auth(token: str) -> dict[str, str]:
         return {"Authorization": f"Bearer {token}"}
+
+
+def account_address(access_token: str, *, client: httpx.Client | None = None) -> str:
+    """The address of the account a token belongs to, right after connecting."""
+    http = HttpClient("graph", BASE_URL, client=client)
+    me = http.request(
+        "GET", "/me", params={"$select": "mail,userPrincipalName"},
+        headers={"Authorization": f"Bearer {access_token}"},
+    ) or {}  # fmt: skip
+    address = str(me.get("mail") or me.get("userPrincipalName") or "").strip().lower()
+    if "@" not in address:
+        raise ProviderError("graph", "the account has no email address")
+    return address

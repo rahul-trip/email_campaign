@@ -57,7 +57,7 @@ from outbound.stages.deliver import DeliverStage
 from outbound.stages.email.poller import CatchAllPoller
 from outbound.stages.email.stage import EmailDeps, EmailStage
 from outbound.stages.gate import GateStage
-from outbound.stages.mailboxes import Mailboxes, StoredMailboxes, one
+from outbound.stages.mailboxes import Mailboxes, MailboxHealth, StoredMailboxes, one
 from outbound.stages.research.graph import ResearchDeps
 from outbound.stages.research.stage import ResearchStage
 from outbound.stages.sync import SentSync
@@ -171,6 +171,8 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     if has_mailbox:
         stages.append(DeliverStage(mailboxes))
         jobs.append(SentSync(uow, workspace_id, mailboxes))
+        if isinstance(mailboxes, StoredMailboxes):
+            jobs.append(MailboxHealth(mailboxes))
 
     runner = Runner(uow, workspace_id, stages, Guards(budget))
     return Pipeline(

@@ -131,6 +131,12 @@ class ImapMailbox:
 
     # ------------------------------------------------------------------ the port
 
+    def check(self) -> dict[str, str]:
+        """Sign in and find the Drafts and Sent folders: what Settings runs before saving a
+        mailbox, so a wrong password or server is reported then, not at the first draft."""
+        with self._session() as conn:
+            return {"drafts": self._folder(conn, "drafts"), "sent": self._folder(conn, "sent")}
+
     def append_draft(self, draft: OutgoingDraft) -> str:
         message = build_message(draft, from_address=self.address, from_name=self._from_name)
         with self._session() as conn:

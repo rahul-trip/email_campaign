@@ -448,16 +448,15 @@ def test_a_mailbox_dns_check_is_run_from_the_settings_screen(
 ) -> None:
     records = {"quantra.example": ["v=spf1 -all"], "_dmarc.quantra.example": ["v=DMARC1; p=reject"]}
     lookup: TxtLookup = lambda name: records.get(name, [])  # noqa: E731
-    app, _ = make_app(dns_lookup=lookup)
+    app, services = make_app(dns_lookup=lookup)
     api = sign_in(app, ADMIN)
-    box = api.post(
-        "/api/settings/mailboxes",
-        json={"address": "sam@quantra.example", "credentials_ref": "env:IMAP_PASSWORD"},
-    ).json()
-    report = api.post(f"/api/settings/mailboxes/{box['id']}/dns-check").json()
+    with services.container.uow(services.workspace_id) as uow:
+        box = uow.mailboxes.create("sam@quantra.example", "quantra.example")
+        uow.commit()
+    report = api.post(f"/api/settings/mailboxes/{box.id}/dns-check").json()
     assert report["spf"]["ok"] and report["dmarc"]["ok"] and not report["dkim"]["ok"]
     assert report["ok"] is False
-    assert api.get("/api/settings/mailboxes").json()[0]["dns_check"]["ok"] is False
+    assert api.get("/api/mailboxes").json()[0]["dns_check"]["ok"] is False
 
 
 # ------------------------------------------------------------------ the signed webhook
