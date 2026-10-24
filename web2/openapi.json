@@ -3218,6 +3218,76 @@
         "title": "SenderProfileIn",
         "type": "object"
       },
+      "SetupItemOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warning",
+              "missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "where": {
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "status",
+          "detail",
+          "where"
+        ],
+        "title": "SetupItemOut",
+        "type": "object"
+      },
+      "SetupOut": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SetupItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupItemOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "done",
+          "next"
+        ],
+        "title": "SetupOut",
+        "type": "object"
+      },
       "SkipCheckIn": {
         "additionalProperties": false,
         "properties": {
@@ -7062,6 +7132,27 @@
         "summary": "Update Workspace Settings",
         "tags": [
           "settings"
+        ]
+      }
+    },
+    "/api/setup": {
+      "get": {
+        "operationId": "setup_api_setup_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Setup",
+        "tags": [
+          "setup"
         ]
       }
     },

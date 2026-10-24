@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode, useEffect, useMemo } from "react";
 import { createRoot } from "react-dom/client";
@@ -12,8 +12,10 @@ import "./styles.css";
 
 // One client per page load. Switching workspace loads the page again, so nothing cached for one
 // workspace is ever shown in another.
-const queryClient = new QueryClient({
+const queryClient: QueryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  // Any save may finish a setup step, so the checklist is read again after every one.
+  mutationCache: new MutationCache({ onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["setup"] }) }),
 });
 
 applyStoredTheme();

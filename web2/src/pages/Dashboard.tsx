@@ -3,10 +3,12 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, Play, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { client, ok } from "../api/client";
+import { useCurrent } from "../app/session";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card, Label, PageHeader, Skeleton, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, duration, percent, usd } from "../lib/format";
+import { useSetup } from "../lib/setup";
 import { describe, describeHold, leadStatus, runStatus } from "../lib/status";
 
 /** The main path, left to right. Each stage counts the leads whose status is that stage's. */
@@ -54,6 +56,8 @@ export function DashboardPage() {
           </Link>
         }
       />
+
+      <GetStarted />
 
       <Label className="mb-2">Needs you</Label>
       <div data-tour="needs-you" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -302,5 +306,26 @@ export function RunCounts({ counts }: { counts: Record<string, unknown> | null |
         </li>
       ))}
     </ul>
+  );
+}
+
+
+/** Until every required step is done, the dashboard leads with what is left. */
+function GetStarted() {
+  const { workspace } = useCurrent();
+  const setup = useSetup();
+  if (!setup.data || setup.data.done || workspace.role !== "admin") return null;
+  const left = setup.data.items.filter((i) => i.status === "missing");
+  return (
+    <Card tour="get-started" className="mb-6" tone="attention" title="Get started" subtitle={`${left.length} thing${left.length === 1 ? "" : "s"} to do before the engine can draft your first email.`}>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
+        <span>
+          Next: <strong>{setup.data.next?.title}</strong>
+        </span>
+        <Link to="/onboarding" className={buttonClass("primary")}>
+          Continue setup
+        </Link>
+      </div>
+    </Card>
   );
 }

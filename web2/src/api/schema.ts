@@ -1178,6 +1178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Setup */
+        get: operations["setup_api_setup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -2338,6 +2355,30 @@ export interface components {
             technologies?: string[] | null;
             /** Value Propositions */
             value_propositions?: string[] | null;
+        };
+        /** SetupItemOut */
+        SetupItemOut: {
+            /** Detail */
+            detail: string;
+            /** Key */
+            key: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warning" | "missing";
+            /** Title */
+            title: string;
+            /** Where */
+            where: string;
+        };
+        /** SetupOut */
+        SetupOut: {
+            /** Done */
+            done: boolean;
+            /** Items */
+            items: components["schemas"]["SetupItemOut"][];
+            next: components["schemas"]["SetupItemOut"] | null;
         };
         /** SkipCheckIn */
         SkipCheckIn: {
@@ -4854,6 +4895,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_api_setup_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
                 };
             };
         };
