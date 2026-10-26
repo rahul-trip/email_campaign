@@ -5519,6 +5519,27 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "VendorCapIn": {
+        "additionalProperties": false,
+        "properties": {
+          "cap_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micro Usd"
+          }
+        },
+        "required": [
+          "cap_micro_usd"
+        ],
+        "title": "VendorCapIn",
+        "type": "object"
+      },
       "VendorKeyIn": {
         "additionalProperties": false,
         "properties": {
@@ -5539,6 +5560,17 @@
           "can_roll_back": {
             "title": "Can Roll Back",
             "type": "boolean"
+          },
+          "cap_micro_usd": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micro Usd"
           },
           "code": {
             "title": "Code",
@@ -5587,6 +5619,10 @@
             "title": "Source",
             "type": "string"
           },
+          "spend_micro_usd": {
+            "title": "Spend Micro Usd",
+            "type": "integer"
+          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -5602,7 +5638,9 @@
           "set_at",
           "set_by",
           "paused",
-          "can_roll_back"
+          "can_roll_back",
+          "spend_micro_usd",
+          "cap_micro_usd"
         ],
         "title": "VendorOut",
         "type": "object"
@@ -7271,6 +7309,58 @@
           }
         },
         "summary": "Update Llm",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/cap": {
+      "put": {
+        "operationId": "set_vendor_cap_api_admin_vendors__vendor__cap_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorCapIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Vendor Cap",
         "tags": [
           "admin"
         ]

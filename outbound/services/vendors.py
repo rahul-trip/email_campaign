@@ -10,13 +10,14 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from pydantic import SecretStr
 
 from outbound.config import Settings
-from outbound.db.platform import PlatformUnitOfWorkFactory
+from outbound.db.platform import PlatformUnitOfWork, PlatformUnitOfWorkFactory
+from outbound.db.types import utcnow
 from outbound.domain.errors import InvalidInput
 from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
 from outbound.logging import get_logger
@@ -38,12 +39,21 @@ class VendorStatus:
     set_by: str | None
     paused: bool
     can_roll_back: bool
+    spend_micro_usd: int  # this calendar month
+    cap_micro_usd: int | None
 
 
 class VendorService:
-    def __init__(self, platform: PlatformUnitOfWorkFactory, base: Settings) -> None:
+    def __init__(
+        self,
+        platform: PlatformUnitOfWorkFactory,
+        base: Settings,
+        *,
+        now: Callable[[], datetime] = utcnow,
+    ) -> None:
         self._platform = platform
         self._base = base
+        self._now = now
 
     # ------------------------------------------------------------------ what is live
 
@@ -74,6 +84,7 @@ class VendorService:
         with self._platform() as p:
             settings, _ = p.settings.get()
             stored = p.vendor_keys.summaries()
+            spent = self._spend(p)
         out: list[VendorStatus] = []
         for vendor in VENDORS:
             found = stored.get(vendor.code)
@@ -90,9 +101,67 @@ class VendorService:
                     found.set_at if found else None, found.set_by if found else None,
                     vendor.code in settings.paused_vendors,
                     bool(found and found.can_roll_back),
+                    spent.get(vendor.code, 0), settings.vendor_caps.get(vendor.code),
                 )
             )  # fmt: skip
         return out
+
+    def set_cap(self, vendor: str, cap_micro_usd: int | None, *, by: str | None) -> None:
+        """A monthly spend cap for a vendor; ``None`` removes it. See ``enforce_caps``."""
+        _known(vendor)
+        if cap_micro_usd is not None and cap_micro_usd < 0:
+            raise InvalidInput("a cap cannot be negative")
+        with self._platform() as p:
+            current, version = p.settings.get()
+            caps = {k: v for k, v in current.vendor_caps.items() if k != vendor}
+            if cap_micro_usd is not None:
+                caps[vendor] = cap_micro_usd
+            p.settings.save(replace(current, vendor_caps=caps), expected_version=version)
+            p.audit.record(
+                "vendor_cap_set", actor_user_id=by, target_type="vendor", target_id=vendor,
+                data={"cap_micro_usd": cap_micro_usd},
+            )  # fmt: skip
+            p.commit()
+
+    def enforce_caps(self) -> list[str]:
+        """Pause every vendor that has spent its monthly cap. Returns the ones paused now; a
+        person resumes them (after raising the cap, or next month). Run from the worker."""
+        paused: list[str] = []
+        with self._platform() as p:
+            current, version = p.settings.get()
+            spent = self._spend(p)
+            over = [
+                code
+                for code, cap in current.vendor_caps.items()
+                if spent.get(code, 0) >= cap and code not in current.paused_vendors
+            ]
+            if not over:
+                return []
+            p.settings.save(
+                replace(current, paused_vendors=current.paused_vendors | frozenset(over)),
+                expected_version=version,
+            )
+            for code in over:
+                p.audit.record(
+                    "vendor_paused_by_cap", actor_user_id=None, target_type="vendor",
+                    target_id=code, data={"spend_micro_usd": spent.get(code, 0)},
+                )  # fmt: skip
+                paused.append(code)
+            p.commit()
+        log.warning("vendors_paused_by_cap", vendors=paused)
+        return paused
+
+    def _spend(self, p: PlatformUnitOfWork) -> dict[str, int]:
+        """This month's cost per vendor. The language model's ledger name is its provider
+        preset, so it is whatever no other vendor claims."""
+        now = self._now()
+        start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        ledger = p.figures.spend_by_provider(start, start + timedelta(days=32))
+        spent = {code: total for code, total in ledger.items() if code in BY_CODE}
+        spent["llm"] = sum(
+            t for name, t in ledger.items() if name not in BY_CODE and name != "directory"
+        )
+        return spent
 
     def llm_settings(self) -> dict[str, Any]:
         """The LLM settings as they are now: the environment's, with the database's on top."""

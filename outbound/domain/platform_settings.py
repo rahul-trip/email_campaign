@@ -22,6 +22,7 @@ class PlatformSettings:
     announcement: str = ""  # shown in every workspace
     paused_vendors: frozenset[str] = frozenset()  # their keys are ignored until resumed
     llm: dict[str, Any] = field(default_factory=dict)  # overrides of the LLM_* settings
+    vendor_caps: dict[str, int] = field(default_factory=dict)  # micro-USD a month, per vendor
 
     def plan(self, code: str) -> Plan:
         """The plan with this code; the default plan if it was removed from the catalog."""
@@ -83,6 +84,7 @@ def to_json(settings: PlatformSettings) -> dict[str, Any]:
         "announcement": settings.announcement,
         "paused_vendors": sorted(settings.paused_vendors),
         "llm": settings.llm,
+        "vendor_caps": settings.vendor_caps,
     }
 
 
@@ -98,4 +100,5 @@ def from_json(data: dict[str, Any]) -> PlatformSettings:
         announcement=str(data.get("announcement") or ""),
         paused_vendors=frozenset(str(v) for v in data.get("paused_vendors", [])),
         llm={str(k): v for k, v in (data.get("llm") or {}).items() if k in LLM_FIELDS},
+        vendor_caps={str(k): int(v) for k, v in (data.get("vendor_caps") or {}).items()},
     )

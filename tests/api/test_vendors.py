@@ -101,3 +101,33 @@ def test_import_env_copies_once(app_and_services: tuple[FastAPI, Services]) -> N
     assert service.import_env() == ["hunter"]
     assert service.import_env() == []
     assert ADMIN  # the fixture's admin exists; imported keys do not depend on it
+
+
+def test_a_vendor_that_spent_its_cap_is_paused_once(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    from datetime import UTC, datetime
+
+    from outbound.db.models import ProviderCallRow
+    from outbound.domain.enums import CallOutcome
+
+    _, services = app_and_services
+    staff.put("/api/admin/vendors/hunter/key", json={"key": PLACEHOLDER})
+    staff.put("/api/admin/vendors/hunter/cap", json={"cap_micro_usd": 1_000_000})
+    service = VendorService(services.container.platform, services.container.settings)
+    assert service.enforce_caps() == []  # nothing spent yet
+    with services.container.uow(services.workspace_id) as uow:
+        uow.session.add(
+            ProviderCallRow(
+                workspace_id=services.workspace_id, provider="hunter", operation="find",
+                request_hash="x" * 64,
+                outcome=CallOutcome.MISS, cost_micro_usd=1_500_000, created_at=datetime.now(UTC),
+            )
+        )  # fmt: skip
+        uow.commit()
+    assert service.enforce_caps() == ["hunter"]
+    assert service.enforce_caps() == []  # already paused
+    row = vendor(staff.get("/api/admin/vendors").json(), "hunter")
+    assert (
+        row["paused"] and row["spend_micro_usd"] == 1_500_000 and row["cap_micro_usd"] == 1_000_000
+    )

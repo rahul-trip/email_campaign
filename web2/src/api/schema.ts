@@ -437,6 +437,23 @@ export interface paths {
         patch: operations["update_llm_api_admin_vendors_llm_patch"];
         trace?: never;
     };
+    "/api/admin/vendors/{vendor}/cap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Vendor Cap */
+        put: operations["set_vendor_cap_api_admin_vendors__vendor__cap_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/vendors/{vendor}/key": {
         parameters: {
             query?: never;
@@ -3643,6 +3660,11 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** VendorCapIn */
+        VendorCapIn: {
+            /** Cap Micro Usd */
+            cap_micro_usd: number | null;
+        };
         /** VendorKeyIn */
         VendorKeyIn: {
             /** Key */
@@ -3652,6 +3674,8 @@ export interface components {
         VendorOut: {
             /** Can Roll Back */
             can_roll_back: boolean;
+            /** Cap Micro Usd */
+            cap_micro_usd: number | null;
             /** Code */
             code: string;
             /** Key */
@@ -3668,6 +3692,8 @@ export interface components {
             set_by: string | null;
             /** Source */
             source: string;
+            /** Spend Micro Usd */
+            spend_micro_usd: number;
             /** Version */
             version: number;
         };
@@ -4585,6 +4611,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LlmSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_vendor_cap_api_admin_vendors__vendor__cap_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorCapIn"];
             };
         };
         responses: {
