@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import csv
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -732,9 +732,19 @@ def discovery_query(icp: str) -> str:
     return f"companies offering products or services for: {' '.join(icp.split())}"
 
 
-def discover_rows(
-    search: SearchProvider, queries: Iterable[str], *, per_query: int = 10
-) -> list[dict[str, Any]]:
+@dataclass(frozen=True)
+class Candidates:
+    rows: list[dict[str, Any]]
+    already_leads: int  # good results skipped because the workspace already has them
+
+
+def discover_candidates(
+    search: SearchProvider,
+    queries: Iterable[str],
+    *,
+    per_query: int = 10,
+    skip: Collection[str] = (),
+) -> Candidates:
     """Candidate target rows from web searches, for ``discovery`` mode (website only).
 
     A hit's page title is not the company's name (it is often an article's headline), so no
@@ -744,9 +754,12 @@ def discover_rows(
     """
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
+    known = {d.lower() for d in skip}
+    already = 0
     for query in queries:
         found = 0
-        for hit in search.search(query, max_results=per_query * 2):
+        # Ask for plenty: the best matches are often companies the workspace already has.
+        for hit in search.search(query, max_results=per_query * 3):
             if found >= per_query:
                 break
             domain = registrable_domain(hit.url)
@@ -760,6 +773,16 @@ def discover_rows(
             ):
                 continue
             seen.add(domain)
+            if domain.lower() in known:
+                already += 1  # a lead already: skipped, so it does not use up a place
+                continue
             found += 1
             rows.append({"website": domain, "notes": f"Found by discovery: {hit.url}"})
-    return rows
+    return Candidates(rows, already)
+
+
+def discover_rows(
+    search: SearchProvider, queries: Iterable[str], *, per_query: int = 10
+) -> list[dict[str, Any]]:
+    """The candidate rows alone (see ``discover_candidates``)."""
+    return discover_candidates(search, queries, per_query=per_query).rows

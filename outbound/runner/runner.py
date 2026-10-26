@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import time
 from collections import Counter
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -94,7 +94,12 @@ class Runner:
     # ------------------------------------------------------------------ pipeline
 
     def run_pipeline(
-        self, *, limit: int = 50, only: Collection[str] | None = None, run_id: str | None = None
+        self,
+        *,
+        limit: int = 50,
+        only: Collection[str] | None = None,
+        run_id: str | None = None,
+        extra_counts: Mapping[str, Counter[str]] | None = None,
     ) -> RunReport:
         """Run every stage in order over the work that is due; at most ``limit`` leads each.
 
@@ -108,6 +113,7 @@ class Runner:
                 uow.runs.mark_running(run_id)
             uow.commit()
         report = RunReport(run_id)
+        report.counts.update(extra_counts or {})  # what happened before the stages (discovery)
         status = RunStatus.SUCCEEDED
         started = time.monotonic()
         bind(run_id=run_id, workspace_id=self._workspace_id)  # on every log line until we leave

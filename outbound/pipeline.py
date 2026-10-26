@@ -7,6 +7,7 @@ meter here, so a stage cannot be handed an unmetered one by mistake.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 
 from outbound.bootstrap import Container
@@ -50,7 +51,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
 from outbound.services.inbox import InboxSync
-from outbound.services.intake import IntakeService, discover_rows, discovery_query
+from outbound.services.intake import IntakeService, discover_candidates, discovery_query
 from outbound.services.privacy import PrivacyService
 from outbound.services.resume import ResumeService
 from outbound.services.review import ReviewService
@@ -234,16 +235,29 @@ def execute_run(
     run_id: str | None = None,
 ) -> RunReport:
     """Optionally look for new companies, then run the pipeline. Used by the CLI and the worker."""
+    extra: dict[str, Counter[str]] = {}
     if request.mode is not RunMode.MANUAL:
-        discover_companies(pipeline, container, workspace_id, request.campaign, request.discover)
+        found = discover_companies(
+            pipeline, container, workspace_id, request.campaign, request.discover
+        )
+        # Shown on the Runs page, so a search that found only known companies says so.
+        extra["discovery"] = Counter(
+            {"new leads": found.added, "already leads": found.already_leads}
+        )
     return pipeline.runner.run_pipeline(
-        limit=request.limit, only=set(request.only) or None, run_id=run_id
+        limit=request.limit, only=set(request.only) or None, run_id=run_id, extra_counts=extra
     )
+
+
+@dataclass(frozen=True)
+class Discovery:
+    added: int = 0
+    already_leads: int = 0
 
 
 def discover_companies(
     pipeline: Pipeline, container: Container, workspace_id: str, campaign_name: str, count: int
-) -> int:
+) -> Discovery:
     """Search the web for companies that fit the campaign and add them as discovered targets."""
     with container.uow(workspace_id) as uow:
         campaign = uow.campaigns.by_name(campaign_name)
@@ -257,22 +271,29 @@ def discover_companies(
     with container.uow(workspace_id) as uow:
         quota, _ = quota_in(uow, utcnow())
     if not quota.engine:
-        return 0
+        return Discovery()
     left = quota.remaining(UsageStep.DISCOVERY)
     if left is not None:
         count = min(count, left)  # never search for companies there is no credit to add
     if count <= 0:
         log.info("discovery_skipped", reason="no discovery credit left")
-        return 0
+        return Discovery()
+    with container.uow(workspace_id) as uow:
+        known = uow.companies.known_domains()
     query = discovery_query(campaign.icp_description or "")
-    rows = discover_rows(pipeline.search, [query], per_query=count)
+    found = discover_candidates(pipeline.search, [query], per_query=count, skip=known)
     report = pipeline.intake.run(
-        rows,
+        found.rows,
         source=ImportSource.CLI,
         company_source=CompanySource.DISCOVERY,
         campaign_id=campaign.id,
     )
-    return report.count(ImportRowStatus.ACCEPTED)
+    added = report.count(ImportRowStatus.ACCEPTED)
+    log.info(
+        "discovery_done", asked=count, new_candidates=len(found.rows),
+        already_leads=found.already_leads, added=added,
+    )  # fmt: skip
+    return Discovery(added, found.already_leads)
 
 
 def writer_or_none(settings: Settings) -> LlmClient | None:
