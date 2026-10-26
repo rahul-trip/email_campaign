@@ -431,6 +431,23 @@ CREATE TABLE platform_settings (
   version INTEGER NOT NULL, -- +1 on every save; a save states the version it read
   updated_at TIMESTAMP NOT NULL
 );
+-- `data` also holds `paused_vendors` (keys ignored until resumed) and `llm` (overrides of the LLM_* settings).
+
+-- A platform table (migration 0013): only outbound_platform holds a grant. Replacing a key adds a
+-- version and retires the old one, which is kept 30 days for a rollback.
+CREATE TABLE platform_credentials (
+  id TEXT PRIMARY KEY,
+  vendor TEXT NOT NULL,        -- a code in outbound/domain/vendors.py
+  version INTEGER NOT NULL,    -- 1, 2, ...; UNIQUE (vendor, version)
+  key_version INTEGER NOT NULL, -- the SECRETS_KEYS entry that sealed it
+  nonce BLOB NOT NULL,
+  ciphertext BLOB NOT NULL,    -- AES-256-GCM; associated data 'platform|vendor|version'
+  last4 TEXT NOT NULL,         -- the only part ever shown
+  active BOOLEAN NOT NULL,     -- one active row per vendor
+  created_by TEXT,
+  created_at TIMESTAMP NOT NULL,
+  retired_at TIMESTAMP
+);
 ```
 
 **Not in v1, added only when needed:**

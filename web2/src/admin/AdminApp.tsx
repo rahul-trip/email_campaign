@@ -1,7 +1,7 @@
 /** The platform's own console (/admin): a separate shell so staff never mistake it for a
  * customer's workspace. Only platform admins and the alpha's superadmin get in. */
 import { Outlet, RouterProvider, createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
-import { ArrowLeft, ClipboardList, LayoutDashboard, LogOut, Settings, ShieldCheck, SlidersHorizontal, Users, UserCog, Zap } from "lucide-react";
+import { ArrowLeft, ClipboardList, KeyRound, LayoutDashboard, LogOut, Settings, ShieldCheck, SlidersHorizontal, Users, UserCog, Zap } from "lucide-react";
 import { useMemo, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { SIGNED_OUT, actIn, client } from "../api/client";
@@ -15,6 +15,7 @@ const NAV = [
   { to: "/users", label: "Users", icon: UserCog },
   { to: "/plans", label: "Plans", icon: SlidersHorizontal },
   { to: "/settings", label: "Settings", icon: Settings },
+  { to: "/vendors", label: "Vendors & keys", icon: KeyRound },
   { to: "/audit", label: "Audit log", icon: ClipboardList },
 ] as const;
 
@@ -101,6 +102,7 @@ const tree = root.addChildren([
   page("/users", lazy(() => import("./Users"), "UsersPage")),
   page("/plans", lazy(() => import("./Plans"), "PlansPage")),
   page("/settings", lazy(() => import("./AdminSettings"), "AdminSettingsPage")),
+  page("/vendors", lazy(() => import("./Vendors"), "VendorsPage")),
   page("/audit", lazy(() => import("./Audit"), "AuditPage")),
 ]);
 

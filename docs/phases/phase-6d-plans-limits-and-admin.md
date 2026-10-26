@@ -147,6 +147,8 @@ Customers see their usage. A lead stopped by a limit resumes by itself as soon a
 
 ### 6d.4 Vendor keys and model settings in the database
 
+> **As built (2026-10-26):** migration 0013 and `platform_credentials`; `VendorService` (`services/vendors.py`) lays the database's keys and LLM overrides over `Settings`, and `LiveProviders` rebuilds the adapters when the version stamp changes (checked each time the worker assembles a run). `outbound vendors import-env`, `secrets rotate` (re-seals platform keys too), `/api/admin/vendors` (list, replace, rollback, reveal, pause, LLM settings) and the **Vendors and keys** screen. A paused vendor's key is ignored, and a paused finder leaves the chain. **Not built:** *Test a key* (no vendor call from the console yet), platform spend caps with automatic pause, and the API process does not rebuild adapters because it builds none.
+
 - [ ] **`platform_credentials`** is encrypted with `db/crypto.py`. The previous version of each key is kept for 30 days for a one-click rollback.
 - [ ] **`VendorConfig`:** keys, chain, prices, caps, pauses and LLM settings, built from `platform_credentials` and `platform_settings`. In development and tests it is merged over the `Settings` defaults.
   - `real_providers` (`pipeline.py:96-119`) takes a `VendorConfig`.

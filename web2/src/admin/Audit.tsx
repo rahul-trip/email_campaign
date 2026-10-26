@@ -26,7 +26,7 @@ export function AuditPage() {
         <Field label="Action">
           <Select value={action} onChange={(e) => setAction(e.target.value)}>
             <option value="">All</option>
-            {["credits_granted", "credits_requested", "grant_revoked", "override_set", "override_revoked", "plan_changed", "plan_saved", "access_extended", "status_changed", "work_resumed", "user_disabled", "user_enabled", "platform_role_set", "platform_settings_changed", "superadmin_viewed_workspace", "customer_created"].map((a) => (
+            {["credits_granted", "credits_requested", "grant_revoked", "override_set", "override_revoked", "plan_changed", "plan_saved", "access_extended", "status_changed", "work_resumed", "user_disabled", "user_enabled", "platform_role_set", "platform_settings_changed", "superadmin_viewed_workspace", "vendor_key_replaced", "vendor_key_revealed", "vendor_key_rolled_back", "vendor_paused", "vendor_resumed", "llm_settings_changed", "vendor_keys_imported", "customer_created"].map((a) => (
               <option key={a} value={a}>
                 {a.replaceAll("_", " ")}
               </option>

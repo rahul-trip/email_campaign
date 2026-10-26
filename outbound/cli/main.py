@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 
 from outbound.bootstrap import build_container
-from outbound.cli import ops, profile, secrets, serve
+from outbound.cli import ops, profile, secrets, serve, vendors
 from outbound.cli import privacy as privacy_cli
 from outbound.cli.common import (
     DatabaseUrl,
@@ -32,6 +32,7 @@ serve.register(app)
 profile.register(app)
 privacy_cli.register(app)
 secrets.register(app)
+vendors.register(app)
 
 
 @db_app.command("upgrade")

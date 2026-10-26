@@ -45,6 +45,7 @@ from outbound.bootstrap import Container
 from outbound.providers.ports import TransactionalEmail
 from outbound.services.admin import AdminService
 from outbound.services.identity import IdentityService
+from outbound.services.vendors import VendorService
 
 # The built web app.
 WEB_DIST = Path(__file__).resolve().parents[2] / "web2" / "dist"
@@ -86,6 +87,7 @@ def create_app(
     app.state.services_source = source
     app.state.container = container
     app.state.admin = AdminService(container.platform, container.identity, container.uow)
+    app.state.vendors = VendorService(container.platform, container.settings)
     app.state.identity = IdentityService(
         container.identity,
         container.platform,

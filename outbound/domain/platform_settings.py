@@ -9,6 +9,7 @@ from typing import Any
 
 from outbound.domain.entitlements import FREE, UNLIMITED, Plan
 from outbound.domain.enums import UsageStep
+from outbound.domain.vendors import LLM_FIELDS
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,8 @@ class PlatformSettings:
     kill_drafts: bool = False  # nothing is saved to a mailbox for anyone
     superadmin_enabled: bool = True  # alpha only
     announcement: str = ""  # shown in every workspace
+    paused_vendors: frozenset[str] = frozenset()  # their keys are ignored until resumed
+    llm: dict[str, Any] = field(default_factory=dict)  # overrides of the LLM_* settings
 
     def plan(self, code: str) -> Plan:
         """The plan with this code; the default plan if it was removed from the catalog."""
@@ -78,6 +81,8 @@ def to_json(settings: PlatformSettings) -> dict[str, Any]:
         "kill_drafts": settings.kill_drafts,
         "superadmin_enabled": settings.superadmin_enabled,
         "announcement": settings.announcement,
+        "paused_vendors": sorted(settings.paused_vendors),
+        "llm": settings.llm,
     }
 
 
@@ -91,4 +96,6 @@ def from_json(data: dict[str, Any]) -> PlatformSettings:
         kill_drafts=bool(data.get("kill_drafts", False)),
         superadmin_enabled=bool(data.get("superadmin_enabled", True)),
         announcement=str(data.get("announcement") or ""),
+        paused_vendors=frozenset(str(v) for v in data.get("paused_vendors", [])),
+        llm={str(k): v for k, v in (data.get("llm") or {}).items() if k in LLM_FIELDS},
     )

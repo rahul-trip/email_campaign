@@ -551,12 +551,13 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 
 ## 14a. The admin console (platform staff)
 
-Platform admins and superadmins open **Admin console** from the user menu (or the workspace chooser). An amber **ADMIN · ALPHA** strip marks it. It has six pages:
+Platform admins and superadmins open **Admin console** from the user menu (or the workspace chooser). An amber **ADMIN · ALPHA** strip marks it. It has seven pages:
 
 - **Overview:** customers, leads added, drafts made, spend, what waits for credits, and what needs a decision (credit requests, expiring access, mailbox problems).
 - **Customers:** search and filter; **Invite customer** creates the workspace and emails its first admin. A customer's page has **Grant credits** (optionally resuming waiting work at once), **Extend access**, a plan change, a status change (active, paused, suspended), per-step limit overrides, members, mailboxes and activity. A customer past its access date is read-only until you extend it.
 - **Users:** disable or enable an account, sign it out everywhere, and (superadmin) set a platform role.
 - **Plans:** edit the catalog and choose the default for new customers. A saved change applies to every customer on the plan.
+- **Vendors and keys:** the key of each paid service, always shown as `••••` and its last four characters. **Add key** or **Replace** takes effect on the worker's next run, and the old key is kept 30 days (**Roll back**). **Reveal** shows a key once and is recorded in the audit log. **Pause** makes the engine ignore a vendor. The language-model settings (model, address, temperature) are here too.
 - **Settings:** stop the engine for everyone (typed confirmation), an announcement banner, and the alpha-only superadmin switch.
 - **Audit log:** every admin change, filterable, with a CSV export.
 

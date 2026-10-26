@@ -403,6 +403,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/vendors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vendors */
+        get: operations["vendors_api_admin_vendors_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/vendors/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Llm */
+        patch: operations["update_llm_api_admin_vendors_llm_patch"];
+        trace?: never;
+    };
+    "/api/admin/vendors/{vendor}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace Vendor Key */
+        put: operations["replace_vendor_key_api_admin_vendors__vendor__key_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/vendors/{vendor}/paused": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Pause Vendor */
+        put: operations["pause_vendor_api_admin_vendors__vendor__paused_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/vendors/{vendor}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reveal Vendor Key */
+        post: operations["reveal_vendor_key_api_admin_vendors__vendor__reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/vendors/{vendor}/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Roll Back Vendor Key */
+        post: operations["roll_back_vendor_key_api_admin_vendors__vendor__rollback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/invitations/{token}": {
         parameters: {
             query?: never;
@@ -2533,6 +2635,21 @@ export interface components {
             /** Notes */
             notes: components["schemas"]["NoteOut"][];
         };
+        /** LlmSettingsIn */
+        LlmSettingsIn: {
+            /** Llm Base Url */
+            llm_base_url?: string | null;
+            /** Llm Copy Model */
+            llm_copy_model?: string | null;
+            /** Llm Max Tokens */
+            llm_max_tokens?: number | null;
+            /** Llm Model */
+            llm_model?: string | null;
+            /** Llm Provider */
+            llm_provider?: string | null;
+            /** Llm Temperature */
+            llm_temperature?: number | null;
+        };
         /** LoginIn */
         LoginIn: {
             /** Email */
@@ -3057,6 +3174,11 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** RevealedKeyOut */
+        RevealedKeyOut: {
+            /** Key */
+            key: string;
+        };
         /** ReviewDetailOut */
         ReviewDetailOut: {
             item: components["schemas"]["ReviewItemOut"];
@@ -3520,6 +3642,48 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VendorKeyIn */
+        VendorKeyIn: {
+            /** Key */
+            key: string;
+        };
+        /** VendorOut */
+        VendorOut: {
+            /** Can Roll Back */
+            can_roll_back: boolean;
+            /** Code */
+            code: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Paused */
+            paused: boolean;
+            /** Role */
+            role: string;
+            /** Set At */
+            set_at: string | null;
+            /** Set By */
+            set_by: string | null;
+            /** Source */
+            source: string;
+            /** Version */
+            version: number;
+        };
+        /** VendorPauseIn */
+        VendorPauseIn: {
+            /** Paused */
+            paused: boolean;
+        };
+        /** VendorsOut */
+        VendorsOut: {
+            /** Llm */
+            llm: {
+                [key: string]: string | number;
+            };
+            /** Vendors */
+            vendors: components["schemas"]["VendorOut"][];
         };
         /** WaitingRowOut */
         WaitingRowOut: {
@@ -4378,6 +4542,191 @@ export interface operations {
                     "application/json": {
                         [key: string]: number;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    vendors_api_admin_vendors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+        };
+    };
+    update_llm_api_admin_vendors_llm_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_vendor_key_api_admin_vendors__vendor__key_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_vendor_api_admin_vendors__vendor__paused_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorPauseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_vendor_key_api_admin_vendors__vendor__reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealedKeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    roll_back_vendor_key_api_admin_vendors__vendor__rollback_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
                 };
             };
             /** @description Validation Error */

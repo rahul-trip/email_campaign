@@ -61,13 +61,12 @@ def container_for(
     """
     platform_sessions = make_session_factory(platform_engine or engine)
     sessions = make_session_factory(engine)
+    keyring = Keyring.from_setting(settings.secrets_keys.get_secret_value())
     return Container(
         settings,
         engine,
-        UnitOfWorkFactory(
-            sessions, keyring=Keyring.from_setting(settings.secrets_keys.get_secret_value())
-        ),
-        PlatformUnitOfWorkFactory(platform_sessions),
+        UnitOfWorkFactory(sessions, keyring=keyring),
+        PlatformUnitOfWorkFactory(platform_sessions, keyring),
         IdentityUnitOfWorkFactory(sessions),
     )
 

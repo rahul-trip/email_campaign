@@ -2225,6 +2225,83 @@
         "title": "LeadOut",
         "type": "object"
       },
+      "LlmSettingsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "llm_base_url": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Base Url"
+          },
+          "llm_copy_model": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Copy Model"
+          },
+          "llm_max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Max Tokens"
+          },
+          "llm_model": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Model"
+          },
+          "llm_provider": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Provider"
+          },
+          "llm_temperature": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Temperature"
+          }
+        },
+        "title": "LlmSettingsIn",
+        "type": "object"
+      },
       "LoginIn": {
         "additionalProperties": false,
         "properties": {
@@ -3935,6 +4012,19 @@
         "title": "ResumedOut",
         "type": "object"
       },
+      "RevealedKeyOut": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "RevealedKeyOut",
+        "type": "object"
+      },
       "ReviewDetailOut": {
         "properties": {
           "item": {
@@ -5427,6 +5517,142 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VendorKeyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "maxLength": 10000,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "title": "VendorKeyIn",
+        "type": "object"
+      },
+      "VendorOut": {
+        "properties": {
+          "can_roll_back": {
+            "title": "Can Roll Back",
+            "type": "boolean"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "set_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set At"
+          },
+          "set_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set By"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "role",
+          "key",
+          "source",
+          "version",
+          "set_at",
+          "set_by",
+          "paused",
+          "can_roll_back"
+        ],
+        "title": "VendorOut",
+        "type": "object"
+      },
+      "VendorPauseIn": {
+        "additionalProperties": false,
+        "properties": {
+          "paused": {
+            "title": "Paused",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paused"
+        ],
+        "title": "VendorPauseIn",
+        "type": "object"
+      },
+      "VendorsOut": {
+        "properties": {
+          "llm": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "title": "Llm",
+            "type": "object"
+          },
+          "vendors": {
+            "items": {
+              "$ref": "#/components/schemas/VendorOut"
+            },
+            "title": "Vendors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "vendors",
+          "llm"
+        ],
+        "title": "VendorsOut",
         "type": "object"
       },
       "WaitingRowOut": {
@@ -6983,6 +7209,256 @@
           }
         },
         "summary": "Sign Out User",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors": {
+      "get": {
+        "operationId": "vendors_api_admin_vendors_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Vendors",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/llm": {
+      "patch": {
+        "operationId": "update_llm_api_admin_vendors_llm_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmSettingsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Llm",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/key": {
+      "put": {
+        "operationId": "replace_vendor_key_api_admin_vendors__vendor__key_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replace Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/paused": {
+      "put": {
+        "operationId": "pause_vendor_api_admin_vendors__vendor__paused_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorPauseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Vendor",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/reveal": {
+      "post": {
+        "operationId": "reveal_vendor_key_api_admin_vendors__vendor__reveal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealedKeyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/rollback": {
+      "post": {
+        "operationId": "roll_back_vendor_key_api_admin_vendors__vendor__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Roll Back Vendor Key",
         "tags": [
           "admin"
         ]
