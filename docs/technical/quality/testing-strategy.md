@@ -2,8 +2,8 @@
 type: explanation
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6
 ---
 
 # Testing strategy
@@ -25,30 +25,30 @@ How Outbound is tested, what each kind of test proves, and the rules every test 
 
 ```mermaid
 flowchart TB
-    E2E["Browser tests (Playwright)<br/>web2/e2e: 18 tests<br/>real API + worker, fake vendors"]
-    API["API tests: tests/api (98)<br/>TestClient against the real app and database"]
+    E2E["Browser tests (Playwright)<br/>web2/e2e: 38+ tests across 7 spec files<br/>real API + worker, fake vendors"]
+    API["API tests: tests/api (183)<br/>TestClient against the real app and database"]
     SYS["Pipeline end-to-end: tests/db/test_pipeline_e2e.py<br/>targets → drafts with the fake world"]
-    DB["Repository, service, stage and runner tests: tests/db (475)<br/>SQLite or Postgres"]
-    ST["Graph and waterfall tests: tests/stages (128)<br/>no database, scripted model"]
-    PR["Adapter tests: tests/providers (200)<br/>fixtures from vendor docs + shared contracts"]
-    DOM["Domain tests: tests/domain (529)<br/>pure functions, no I/O"]
+    DB["Repository, service, stage and runner tests: tests/db (652)<br/>SQLite or Postgres, including row-level security"]
+    ST["Graph and waterfall tests: tests/stages (154)<br/>no database, scripted model"]
+    PR["Adapter tests: tests/providers (269)<br/>fixtures from vendor docs + shared contracts"]
+    DOM["Domain tests: tests/domain (592)<br/>pure functions, no I/O"]
     E2E --> API --> SYS --> DB --> ST --> PR --> DOM
 ```
 
 | Layer | Where | Count (collected) | Proves |
 |---|---|---|---|
-| Domain | `tests/domain/` | 529 | State tables, policies, ranking, linter, names, money, ids. Fast and exhaustive (parametrised) |
-| Adapters | `tests/providers/` | 200 | Each vendor's documented responses map to our models; retries and errors (`test_http.py`); the registry. **Contract tests** (`tests/contract/`) run the same assertions against every adapter of a port |
-| Stages without a database | `tests/stages/` | 128 | The research and copy graphs with a scripted model; the waterfall's source order; email patterns |
-| Database | `tests/db/` | 475 | Repositories, constraints, migrations (up, down, parity with models, `CHECK` = enums), services, stages with the runner, metering, erasure (scanning every column), the data-fix script |
-| API | `tests/api/` | 98 | Every endpoint, auth, CSRF, errors, headers, path traversal, the webhook, request logging, a worker loop |
-| CLI, config, logging, hygiene | `tests/*.py` | 42 | Commands, the settings switch, log shape and redaction, the no-network rule |
+| Domain | `tests/domain/` | 592 | State tables, policies, ranking, linter, names, money, ids, entitlements, directory rules, inbox classification. Fast and exhaustive (parametrised) |
+| Adapters | `tests/providers/` | 269 | Each vendor's documented responses map to our models; retries and errors (`test_http.py`); the registry; OAuth, Microsoft Graph, Gmail API and the IMAP SSRF guard (`netguard.py`). **Contract tests** (`tests/contract/`) run the same assertions against every adapter of a port |
+| Stages without a database | `tests/stages/` | 154 | The research and copy graphs with a scripted model; the waterfall's source order (the shared directory first); email patterns |
+| Database | `tests/db/` | 652 | Repositories, constraints, migrations (up, down, parity with models, `CHECK` = enums), row-level security and the isolation self-check, the scheduler's cross-workspace queries, services, stages with the runner, metering, erasure (scanning every column), the data-fix script |
+| API | `tests/api/` | 183 | Every endpoint, sign-in and session revocation, every route's declared permission, CSRF, errors, headers, path traversal, the per-workspace webhook, request logging, a worker loop |
+| CLI, config, logging, hygiene | `tests/*.py` | 45 | Commands, the settings switch (three database URLs), log shape and redaction, the no-network rule |
 | Scripts | `tests/scripts/` | 24 | The bake-off's collection and simulation |
-| Browser | `web2/e2e/` | 18 | Whole operator flows, every screen on desktop and phone, the guided tour's targets |
-| Legacy | `agent/tests/` | 63 | The retiring `agent/` package (deleted after the first live run) |
-| **Python total** | | **1,559** | |
+| Browser | `web2/e2e/` | 38+ (7 spec files, including `credits.spec.ts`) | Whole operator and admin flows, every screen on desktop and phone, the guided tour's targets, the credit wait/resume flow |
+| Legacy | `agent/tests/` | 61 | The retiring `agent/` package (deleted after the first live run) |
+| **Python total** | | **1,982 collected** (`uv run pytest --collect-only -q`) | |
 
-The counts in [CLAUDE.md](../../../CLAUDE.md) and [phases/README.md](../../phases/README.md) are older ([R-19](../tech-debt-and-risks.md#r-19--p3--housekeeping-stale-references-and-inconsistent-versions)).
+The counts in [CLAUDE.md](../../../CLAUDE.md) and [phases/README.md](../../phases/README.md) are each that phase's own dated closing snapshot, not meant to track the current total — see [R-19](../tech-debt-and-risks.md#r-19--p3--housekeeping-stale-references-and-inconsistent-versions).
 
 ## Shared test infrastructure
 
