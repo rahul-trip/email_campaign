@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6a/6c/6d
 ---
 
 # Configuration and bootstrap
@@ -12,28 +12,30 @@ applies_to: Phase 3b
 
 ## Purpose
 
-This is where a process gets its settings and builds its objects. Settings come from the environment only; secrets never live in code. One composition root builds the database engine and the unit-of-work factory. `pipeline.assemble` wraps every vendor in its meter and builds the stages, jobs and services. Nothing else constructs these objects, so there are no hidden globals, and tests build the same graph with fakes ([ADR 0001](../adr/0001-modular-monolith.md)).
+This is where a process gets its settings and builds its objects. Settings come from the environment only; secrets never live in code. One composition root builds three database engines (owner/migrate, tenant, platform) and their unit-of-work factories, plus the `Keyring` that seals and opens per-workspace mailbox and vendor credentials. `pipeline.assemble` wraps every vendor in its meter and builds the stages, jobs and services for one workspace. Nothing else constructs these objects, so there are no hidden globals, and tests build the same graph with fakes ([ADR 0001](../adr/0001-modular-monolith.md)).
 
 ## Responsibilities
 
-- **Load and validate settings**, deciding the database URL.
-- **Build the `Container`** (settings, engine, unit-of-work factory), and resolve a workspace name with a helpful error.
+- **Load and validate settings**, deciding the three database URLs ([tenancy and isolation](tenancy-and-isolation.md#three-connections)).
+- **Build the `Container`** (settings, engine, `uow`, `platform`, `identity` unit-of-work factories, `Keyring`), and resolve a workspace name with a helpful error.
 - **Build the real providers** from settings, or report what is missing.
-- **Build the meter** with prices and caps, the metered providers, and the stages and jobs that the configured vendors allow.
+- **Build the meter** with prices and caps, the metered providers (including the shared [lead directory](lead-directory.md) as the free first finder), and the stages and jobs that the configured vendors and connected mailboxes allow.
 - **Execute a run request** (discovery, then the pipeline) for the CLI and the worker.
 
-**Not its job:** the list of every setting, which is in the [configuration reference](../operations/configuration-reference.md).
+**Not its job:** the list of every setting, which is in the [configuration reference](../operations/configuration-reference.md); a workspace's own entitlements and credit limits, read separately by the runner's guards ([plans, credits and admin](plans-credits-and-admin.md)).
 
 ## Public interface
 
 | Symbol | Kind | What it does |
 |---|---|---|
-| `outbound/config.py::Settings` | pydantic-settings model | 52 fields, 16 of them `SecretStr` |
-| `outbound/bootstrap.py::build_container` | function | `Settings` → `Container(settings, engine, uow)` |
-| `outbound/bootstrap.py::Container.workspace_id` | method | Name → id. Raises `ConfigurationError` with the commands to run if the database is not migrated or seeded |
-| `outbound/pipeline.py::real_providers` | function | `Providers` from settings. A missing required key raises `NotConfigured` naming it; no resolver or no mailbox is allowed |
+| `outbound/config.py::Settings` | pydantic-settings model | 58 fields, 17 of them `SecretStr` |
+| `outbound/bootstrap.py::Container` | dataclass | `settings`, `engine`, `uow` (tenant `UnitOfWorkFactory`), `platform` (`PlatformUnitOfWorkFactory`), `identity` (`IdentityUnitOfWorkFactory`) |
+| `outbound/bootstrap.py::build_container` | function | `Settings` → `Container`, building the tenant and platform engines (the same engine when `PLATFORM_DATABASE_URL` is unset) and the `Keyring` from `SECRETS_KEYS` |
+| `outbound/bootstrap.py::Container.workspace_id` | method | Name → id, resolved through `container.platform()`. Raises `ConfigurationError` with the commands to run if the database is not migrated or seeded |
+| `outbound/pipeline.py::real_providers` | function | `Providers` from settings. A missing required key raises `NotConfigured` naming it; no resolver is allowed |
 | `outbound/pipeline.py::build_meter` | function | The one way to get a `Meter`: merged prices, monthly caps, the workspace's per-prospect ceiling |
-| `outbound/pipeline.py::assemble` | function | `(container, workspace_id, providers) → Pipeline` (runner, tick, review, runs, intake, meter, search, stage names, `has_mailbox`) |
+| `outbound/pipeline.py::assemble` | function | `(container, workspace_id, providers) → Pipeline` (runner, tick, review, runs, intake, meter, search, stage names, `has_mailbox`) — always for **one** workspace; the worker calls it fresh per job |
+| `outbound/pipeline.py::mailboxes_for` | function | The workspace's own connected mailboxes (`StoredMailboxes`, DB-backed, OAuth-refreshed), or a test/script's injected single mailbox |
 | `outbound/pipeline.py::execute_run` | function | Discovery unless `mode` is `manual`, then `runner.run_pipeline` |
 | `outbound/pipeline.py::discover_companies` | function | Search for companies that fit the campaign and add them through intake |
 | `outbound/pipeline.py::metered_search_or_none` | function | Tavily behind the meter, or `None` without a key (the API's intake) |
@@ -69,28 +71,28 @@ Unknown variables are ignored (`extra="ignore"`). In the container, `.dockerigno
 - **`_known_log_level`:** upper-cases the level and refuses unknown ones.
 - **`_split_chain`:** reads `FINDER_CHAIN=hunter,zerobounce` as a list.
 
-**Secrets** are `SecretStr`. They print as `**********` and are unwrapped only where they are used: the registry building an adapter, the API reading the session and webhook secrets, the pipeline checking the Tavily key. `POSTGRES_URL`, `DATABASE_URL` and `OPERATOR_PASSWORD_HASH` are plain strings. The first two hold a password, so they are logged only through SQLAlchemy's `render_as_string(hide_password=True)`.
+**Secrets** are `SecretStr`. They print as `**********` and are unwrapped only where they are used: the registry building an adapter, `Keyring.from_setting` unwrapping `SECRETS_KEYS` once at bootstrap, the pipeline checking the Tavily key. `POSTGRES_URL`/`POSTGRES_PLATFORM_URL`/`POSTGRES_MIGRATE_URL` and `DATABASE_URL`/`PLATFORM_DATABASE_URL`/`MIGRATE_DATABASE_URL` are plain strings, since they hold a password; they are logged only through SQLAlchemy's `render_as_string(hide_password=True)`. `OPERATOR_PASSWORD_HASH` and `SESSION_SECRET` no longer exist — Phase 6b replaced them with per-account passwords and revocable sessions ([identity and access](identity-and-access.md)).
 
 **Checks at start-up, outside `Settings`:**
 
-- `serve` needs `OPERATOR_PASSWORD_HASH` and a `SESSION_SECRET` of at least 16 characters.
+- `serve`/`worker` run `outbound/db/isolation.py::isolation_problems` and refuse to start in production on an unsafe database role or exposed Data API grant ([tenancy and isolation](tenancy-and-isolation.md)).
 - `serve` refuses a non-loopback host without `COOKIE_SECURE`.
-- The worker needs every provider in the chain configured.
+- The worker needs every provider in the chain configured; a workspace's own mailbox (if any) is read from the database, not from a start-up setting, so a missing mailbox no longer stops the worker — it just means that workspace has no deliver stage until one is connected.
 
 ## How the pipeline is assembled
 
-`assemble(container, workspace_id, providers)`:
+`assemble(container, workspace_id, providers)` — called fresh for **one** workspace, every time the worker picks up a job for it (the runner keeps per-run state, so pipelines are not cached across workspaces or across runs):
 
-1. Reads the workspace, and builds `BudgetPolicy.from_workspace_settings` (per-prospect ceiling plus `MONTHLY_CAPS_MICRO_USD`) and the meter (`DEFAULT_PRICES` merged with `PROVIDER_PRICES`).
+1. Reads the workspace, and builds `BudgetPolicy.live_from(MONTHLY_CAPS_MICRO_USD)` and the meter (`DEFAULT_PRICES` merged with `PROVIDER_PRICES`).
 2. Wraps every vendor:
    - `MeteredSearch`;
-   - `MeteredLlm` (`DEFAULT_LLM_PRICES` merged with `LLM_PRICES`);
+   - `MeteredLlm` (`DEFAULT_LLM_PRICES` merged with `LLM_PRICES`; a separate `MeteredLlm` for `LLM_COPY_MODEL` if set, else the same instance is reused for research and copy);
    - `MeteredRegistry` (if Companies House is configured);
-   - one `MeteredFinder` per finder;
+   - the shared [lead directory](lead-directory.md) as the first finder, always, wrapped with `ttl=None` (never cached — every lookup is its own ledger row, `billed=False`, so hit rate and savings can be read back exactly), then one `MeteredFinder` per configured vendor finder;
    - `MeteredVerifier`;
    - `MeteredResolver` (if a resolver is configured).
-3. Builds the stages: `Research`, `Gate`, `Contacts`, `Email`, `Copy`, and `Deliver` **only if a mailbox is configured**.
-4. Builds the jobs: `CatchAllPoller` **only with a resolver**, and `SentSync` **only with a mailbox**.
+3. Builds the stages: `Research`, `Gate`, `Contacts`, `Email`, `Copy`, and `Deliver` **only if the workspace has at least one connected mailbox** (`mailboxes_for`/`_any_mailbox` — read from the `mailboxes` table, not a setting).
+4. Builds the jobs: `CatchAllPoller` **only with a resolver**; with a mailbox, also `SentSync`, `InboxSync` ([inbox and opt-outs](inbox-and-opt-outs.md)), and `MailboxHealth` (only for `StoredMailboxes`, the real per-workspace case, not a test's injected single mailbox). `ResumeService` is always inserted first in the tick's job list, so a credit that appeared since the last tick (a new billing period, an admin's grant) releases leads waiting on it *before* that same tick's pipeline pass looks for work ([plans, credits and admin](plans-credits-and-admin.md)).
 5. Builds `Runner(…, Guards(budget))`, `Tick`, `ReviewService`, `RunService`, `IntakeService`.
 
 | Missing | Effect |
@@ -98,7 +100,8 @@ Unknown variables are ignored (`extra="ignore"`). In the container, `.dockerigno
 | Tavily or LLM key, or a finder or verifier in the chain | `NotConfigured`: the worker and `run` stop with the name |
 | Resolver | Catch-all addresses are held as `catch_all_unverified` |
 | Companies House key | UK incorporation from site markers only |
-| IMAP login | No deliver stage and no Sent sync; leads stop at `approved` |
+| No mailbox connected for this workspace | No deliver stage, no Sent/inbox sync, no mailbox health job; leads stop at `approved` until one is connected |
+| No entitlement credit left for a step | The lead waits (not failed); `ResumeService` releases it once credit returns |
 
 Tests build the same pipeline with `tests/stages/world.py::World.providers()` in place of `real_providers`.
 
@@ -114,14 +117,15 @@ All of it. Each setting's name, type, default, whether it is secret, and where i
 
 ## Observability
 
-`service_started` (from `serve` and `worker`) logs the role, the workspace and the database URL with the password hidden. The `environment` setting is printed on every log line.
+`service_started` (from `serve` and `worker`) logs the role and the database URL with the password hidden — no longer a single workspace name, since both now serve every active workspace. The `environment` setting is printed on every log line.
 
 ## Security and privacy
 
-See [secrets management](../security/secrets-management.md).
+See [secrets management](../security/secrets-management.md) and [tenancy and isolation](tenancy-and-isolation.md).
 
 - Secrets come only from the environment and `.env`, which is git-ignored and scanned by gitleaks.
 - In production they come from Doppler.
+- `SECRETS_KEYS` is unwrapped once, at bootstrap, into the `Keyring` every `UnitOfWork` carries — never re-read per call.
 
 ## Tests
 
@@ -136,13 +140,14 @@ See [secrets management](../security/secrets-management.md).
 ## Known limitations
 
 - The `agent/.env` fallback is still read ([R-19](../tech-debt-and-risks.md#r-19--p3--housekeeping-stale-references-and-inconsistent-versions)).
-- The API's workspace comes from `WORKSPACE_NAME`, while the CLI's comes from `--workspace` ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces)).
-- The budget is read once at assembly ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)).
-- Two settings name the catch-all resolver: `CATCH_ALL_RESOLVER`, and `catch_all_resolver` in the workspace settings; only the first is used (Phase 3b B9).
+- `WORKSPACE_NAME`/`--workspace` no longer exist for `serve`/`worker` (both now serve every active workspace), which closes the earlier risk of the two binding to different single workspaces ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces), now closed) — a workspace mismatch is simply not possible any more at this layer.
+- The budget is read once per `assemble()` call — now once per *job*, since the worker reassembles the pipeline for every piece of work rather than once per process, narrowing (though not eliminating) the earlier "budget change invisible to a running process" gap ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)).
+- `PLATFORM_DATABASE_URL` falling back to `DATABASE_URL` when unset is correct for SQLite and single-role rehearsal, but would misconfigure the scheduler's role in production if left unset there ([tenancy and isolation](tenancy-and-isolation.md#known-limitations)).
+- Two settings name the catch-all resolver: `CATCH_ALL_RESOLVER`, and `catch_all_resolver` in the workspace settings; only the first is used (carried forward from Phase 3b, B9).
 
 ## Planned
 
-- Phase 6 reads per-workspace settings and users from the database: [phase-6-saas-ready.md](../../phases/phase-6-saas-ready.md).
+Usage-based billing integration and a narrower `PLATFORM_DATABASE_URL` default are tracked in the [tech-debt register](../tech-debt-and-risks.md).
 
 ## How to refresh this page
 
