@@ -261,10 +261,10 @@ def test_discovery_adds_no_more_leads_than_credits_and_does_not_search_without_a
     with platform() as p:
         p.plans.add_override(ws, "limit.discovery", 2)
         p.commit()
-    assert discover_companies(pipeline, container, ws, "default", 10) == 2  # not ten
+    assert discover_companies(pipeline, container, ws, "default", 10).added == 2  # not ten
     assert used(factory, ws)["discovery"] == 2
     searches = len(world.search.searches)
-    assert discover_companies(pipeline, container, ws, "default", 10) == 0  # none left
+    assert discover_companies(pipeline, container, ws, "default", 10).added == 0  # none left
     assert len(world.search.searches) == searches  # and it did not even search
 
 
@@ -314,3 +314,31 @@ def test_asking_for_changes_is_refused_before_the_model_is_asked_when_none_are_l
     with pytest.raises(ReviewError, match="no rewrite credits are left"):
         ReviewService(factory, ws, world.llm).revise(queued.message.id, "shorter please")
     assert (len(world.llm.calls) if hasattr(world.llm, "calls") else 0) == calls  # no model call
+
+
+def test_a_search_that_finds_only_known_companies_says_so_on_the_run(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    """The real complaint: Discover found the same top results every time, so nothing was added
+    and the run looked empty. Known companies are skipped, and the run reports them."""
+    from collections import Counter
+
+    from outbound.pipeline import discover_companies, execute_run
+    from outbound.services.runs import RunMode, RunRequest
+
+    ws, pipeline, world = started(engine, factory, platform)
+    container = container_for(Settings(_env_file=None), engine)
+    world.search.hits = [
+        SearchHit(url=f"https://company{n}.com/about", title="About us", snippet="")
+        for n in range(4)
+    ]
+    first = discover_companies(pipeline, container, ws, "default", 2)
+    assert (first.added, first.already_leads) == (2, 0)
+    # The same results come back: two are leads now, so the next two are taken instead.
+    second = discover_companies(pipeline, container, ws, "default", 2)
+    assert (second.added, second.already_leads) == (2, 2)
+    third = discover_companies(pipeline, container, ws, "default", 1)
+    assert (third.added, third.already_leads) == (0, 4)  # nothing new: all four are leads
+
+    run = execute_run(pipeline, container, ws, RunRequest(mode=RunMode.DISCOVERY, discover=2))
+    assert run.counts["discovery"] == Counter({"new leads": 0, "already leads": 4})
