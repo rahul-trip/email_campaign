@@ -148,8 +148,12 @@ def register(app: typer.Typer) -> None:
 
         container = build_container(settings_for(database_url))
         refuse_unsafe_database(container)
+        from outbound.services.vendors import LiveProviders, VendorService
+
+        # Rebuilt whenever an admin changes a key or a model setting, without a restart.
+        live = LiveProviders(VendorService(container.platform, container.settings), real_providers)
         try:
-            providers = real_providers(container.settings)  # built once, shared by workspaces
+            live.get()
         except NotConfigured as error:
             typer.echo(f"not configured: {error}", err=True)
             raise typer.Exit(1) from error
@@ -165,7 +169,7 @@ def register(app: typer.Typer) -> None:
         tick_every = timedelta(minutes=tick_minutes) if tick_minutes > 0 else None
         engine = Worker(
             container,
-            lambda workspace_id: assemble(container, workspace_id, providers),
+            lambda workspace_id: assemble(container, workspace_id, live.get()),
             threads=threads,
             tick_every=tick_every,
         )

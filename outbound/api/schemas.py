@@ -959,3 +959,42 @@ class PlatformSettingsIn(In):
 
 class PlatformRoleIn(In):
     role: Literal["admin", "superadmin"] | None
+
+
+class VendorOut(Out):
+    code: str
+    name: str
+    role: str
+    key: str  # masked, never the key
+    source: str  # database, environment or none
+    version: int
+    set_at: datetime | None
+    set_by: str | None
+    paused: bool
+    can_roll_back: bool
+
+
+class VendorsOut(Out):
+    vendors: list[VendorOut]
+    llm: dict[str, str | int | float]
+
+
+class VendorKeyIn(In):
+    key: str
+
+
+class VendorPauseIn(In):
+    paused: bool
+
+
+class LlmSettingsIn(In):
+    llm_provider: str | None = None
+    llm_model: str | None = None
+    llm_base_url: str | None = None
+    llm_copy_model: str | None = None
+    llm_temperature: float | None = None
+    llm_max_tokens: int | None = None
+
+
+class RevealedKeyOut(Out):
+    key: str

@@ -27,6 +27,7 @@ EXPECTED_TABLES = {
     "credentials",
     "workspace_plans", "entitlement_overrides", "credit_grants", "usage_events",
     "platform_settings",
+    "platform_credentials",
 }  # fmt: skip
 
 
@@ -41,8 +42,8 @@ def table_names(url: str) -> set[str]:
 def test_the_models_describe_exactly_the_tables_of_the_spec() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
     assert (
-        len(EXPECTED_TABLES) == 28
-    )  # schema v1's 17, 6b's five identity tables, 6c's one, 6d's five
+        len(EXPECTED_TABLES) == 29
+    )  # schema v1's 17, 6b's five identity tables, 6c's one, 6d's six
 
 
 def test_upgrade_builds_every_table_and_records_the_head_revision(fresh_url: str) -> None:

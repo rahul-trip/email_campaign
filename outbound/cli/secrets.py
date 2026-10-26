@@ -35,4 +35,7 @@ def rotate(database_url: DatabaseUrl = None) -> None:
         with container.uow(workspace.id) as uow:
             total += uow.credentials.reseal_all()
             uow.commit()
+    with container.platform() as platform:
+        total += platform.vendor_keys.reseal_all()
+        platform.commit()
     typer.echo(f"{total} secret(s) re-encrypted across {len(workspaces)} workspace(s)")

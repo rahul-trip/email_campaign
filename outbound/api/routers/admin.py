@@ -30,6 +30,7 @@ from outbound.api.schemas import (
     GrantedOut,
     GrantIn,
     GrantOut,
+    LlmSettingsIn,
     MemberOut,
     OverrideIn,
     OverrideOut,
@@ -41,7 +42,12 @@ from outbound.api.schemas import (
     PlatformRoleIn,
     PlatformSettingsIn,
     PlatformSettingsOut,
+    RevealedKeyOut,
     StatusChangeIn,
+    VendorKeyIn,
+    VendorOut,
+    VendorPauseIn,
+    VendorsOut,
 )
 from outbound.domain.entitlements import Plan
 from outbound.domain.enums import PlatformRole, UsageStep, UserStatus, WorkspaceStatus
@@ -53,10 +59,12 @@ from outbound.services.admin import (
     CustomerRow,
 )
 from outbound.services.identity import CurrentUser, IdentityError, IdentityService
+from outbound.services.vendors import VendorService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 Reader = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_READ))]
 Writer = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_WRITE))]
+KeyHolder = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_KEYS))]
 
 
 def admin(request: Request) -> AdminService:
@@ -65,6 +73,14 @@ def admin(request: Request) -> AdminService:
 
 
 Admin = Annotated[AdminService, Depends(admin)]
+
+
+def vendor_service(request: Request) -> VendorService:
+    service: VendorService = request.app.state.vendors
+    return service
+
+
+Vendors = Annotated[VendorService, Depends(vendor_service)]
 
 
 # ------------------------------------------------------------------ mapping
@@ -476,3 +492,51 @@ def audit_csv(
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="audit.csv"'},
     )
+
+
+# ------------------------------------------------------------------ vendors and keys
+
+
+def _vendors(service: VendorService) -> VendorsOut:
+    return VendorsOut(
+        vendors=[VendorOut(**v.__dict__) for v in service.statuses()],
+        llm=service.llm_settings(),
+    )
+
+
+@router.get("/vendors", response_model=VendorsOut)
+def vendors(_: Reader, service: Vendors) -> VendorsOut:
+    return _vendors(service)
+
+
+@router.put("/vendors/{vendor}/key", response_model=VendorsOut)
+def replace_vendor_key(
+    vendor: str, body: VendorKeyIn, staff: KeyHolder, service: Vendors
+) -> VendorsOut:
+    service.replace_key(vendor, body.key, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.post("/vendors/{vendor}/rollback", response_model=VendorsOut)
+def roll_back_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> VendorsOut:
+    service.roll_back(vendor, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.post("/vendors/{vendor}/reveal", response_model=RevealedKeyOut)
+def reveal_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> RevealedKeyOut:
+    return RevealedKeyOut(key=service.reveal(vendor, by=staff.user.id))
+
+
+@router.put("/vendors/{vendor}/paused", response_model=VendorsOut)
+def pause_vendor(
+    vendor: str, body: VendorPauseIn, staff: KeyHolder, service: Vendors
+) -> VendorsOut:
+    service.pause(vendor, body.paused, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.patch("/vendors/llm", response_model=VendorsOut)
+def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
+    service.update_llm(body.model_dump(exclude_none=True), by=staff.user.id)
+    return _vendors(service)

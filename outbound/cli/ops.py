@@ -25,6 +25,7 @@ from outbound.services import defaults
 from outbound.services.reports import ReportService
 from outbound.services.review import ReviewError, ReviewService
 from outbound.services.runs import RunMode, RunRequest
+from outbound.services.vendors import VendorService
 
 review_app = typer.Typer(
     no_args_is_help=True, help="Read, edit, approve or reject generated emails."
@@ -36,7 +37,8 @@ LONG_AGO = timedelta(days=3650)
 
 def _pipeline(container: Container, workspace_id: str) -> Pipeline:
     try:
-        return assemble(container, workspace_id, real_providers(container.settings))
+        settings, _ = VendorService(container.platform, container.settings).effective_settings()
+        return assemble(container, workspace_id, real_providers(settings))
     except NotConfigured as error:
         typer.echo(f"not configured: {error}", err=True)
         raise typer.Exit(1) from error

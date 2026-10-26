@@ -17,6 +17,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.sql.elements import ColumnElement
 
+from outbound.db.crypto import Keyring
 from outbound.db.identity import AuditRepository
 from outbound.db.models import (
     CompanyRow,
@@ -28,6 +29,7 @@ from outbound.db.models import (
     WorkspaceRow,
 )
 from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettingsRepository
+from outbound.db.repositories.vendors import VendorKeyRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
 from outbound.db.types import utcnow
 from outbound.domain.enums import MailboxStatus, RunStatus, UsageStep, WorkspaceStatus
@@ -172,11 +174,15 @@ class AdminQueries:
 class PlatformUnitOfWork:
     session: Session
 
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    def __init__(
+        self, session_factory: sessionmaker[Session], keyring: Keyring | None = None
+    ) -> None:
         self._factory = session_factory
+        self._keyring = keyring or Keyring({})
 
     def __enter__(self) -> Self:
         self.session = self._factory()
+        self.vendor_keys = VendorKeyRepository(self.session, self._keyring)
         self.workspaces = WorkspaceRepository(self.session)
         self.scheduler = SchedulerQueries(self.session)
         self.figures = AdminQueries(self.session)
@@ -202,8 +208,11 @@ class PlatformUnitOfWork:
 
 
 class PlatformUnitOfWorkFactory:
-    def __init__(self, session_factory: sessionmaker[Session]) -> None:
+    def __init__(
+        self, session_factory: sessionmaker[Session], keyring: Keyring | None = None
+    ) -> None:
         self._factory = session_factory
+        self._keyring = keyring
 
     def __call__(self) -> PlatformUnitOfWork:
-        return PlatformUnitOfWork(self._factory)
+        return PlatformUnitOfWork(self._factory, self._keyring)

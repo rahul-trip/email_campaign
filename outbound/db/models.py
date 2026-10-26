@@ -164,6 +164,26 @@ class MailboxRow(Mutable, Base):
     )
 
 
+class PlatformCredentialRow(Identified, Base):
+    """A vendor API key the platform pays for, encrypted. A platform table: only the platform
+    role may touch it. Replacing a key adds a version and retires the old one, which is kept for
+    30 days so a bad key can be rolled back."""
+
+    __tablename__ = "platform_credentials"
+    __table_args__ = (UniqueConstraint("vendor", "version"),)
+
+    vendor: Mapped[str] = mapped_column(String(60), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    key_version: Mapped[int] = mapped_column(Integer)  # which SECRETS_KEYS entry sealed it
+    nonce: Mapped[bytes] = mapped_column(LargeBinary(12))
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary)
+    last4: Mapped[str] = mapped_column(String(4))
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    retired_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
 class CredentialRow(Mutable, Base):
     """A workspace's secret, encrypted (AES-256-GCM, ``outbound.db.crypto``). The database only
     ever holds ciphertext; the key is in the environment (``SECRETS_KEYS``)."""
