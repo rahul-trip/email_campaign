@@ -321,8 +321,6 @@ def test_a_search_that_finds_only_known_companies_says_so_on_the_run(
 ) -> None:
     """The real complaint: Discover found the same top results every time, so nothing was added
     and the run looked empty. Known companies are skipped, and the run reports them."""
-    from collections import Counter
-
     from outbound.pipeline import discover_companies, execute_run
     from outbound.services.runs import RunMode, RunRequest
 
@@ -338,7 +336,9 @@ def test_a_search_that_finds_only_known_companies_says_so_on_the_run(
     second = discover_companies(pipeline, container, ws, "default", 2)
     assert (second.added, second.already_leads) == (2, 2)
     third = discover_companies(pipeline, container, ws, "default", 1)
-    assert (third.added, third.already_leads) == (0, 4)  # nothing new: all four are leads
+    # Nothing new: every search (the fake ignores the wording) returns the four known leads.
+    assert third.added == 0 and third.already_leads == 4 * third.searches
 
     run = execute_run(pipeline, container, ws, RunRequest(mode=RunMode.DISCOVERY, discover=2))
-    assert run.counts["discovery"] == Counter({"new leads": 0, "already leads": 4})
+    discovery = run.counts["discovery"]
+    assert discovery["new leads"] == 0 and discovery["already leads"] == 4 * discovery["searches"]

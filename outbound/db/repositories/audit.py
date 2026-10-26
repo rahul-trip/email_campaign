@@ -187,6 +187,22 @@ class RunRepository(ScopedRepository):
         return int(self._session.scalar(stmt) or 0)
 
 
+@dataclass(frozen=True)
+class RunCallSummary:
+    """What one run asked of one vendor operation, added up."""
+
+    provider: str
+    operation: str
+    calls: int  # every row, including answers reused from the cache
+    found: int  # paid calls that returned something
+    nothing: int  # paid calls that found nothing
+    reused: int  # answered from the cache, at no cost
+    errors: int
+    blocked: int  # refused by a spending limit
+    cost_micro_usd: int
+    avg_latency_ms: int | None
+
+
 class ProviderCallRepository(ScopedRepository):
     def record(
         self,
@@ -218,6 +234,52 @@ class ProviderCallRepository(ScopedRepository):
         self._session.add(row)
         self._session.flush()
         return row.id
+
+    def summary_for_run(self, run_id: str) -> list[RunCallSummary]:
+        """The run's vendor calls grouped by vendor and operation, the costliest first."""
+        stmt = (
+            select(
+                ProviderCallRow.provider,
+                ProviderCallRow.operation,
+                ProviderCallRow.outcome,
+                func.count(),
+                func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                func.avg(ProviderCallRow.latency_ms),
+            )
+            .where(
+                ProviderCallRow.workspace_id == self._workspace_id,
+                ProviderCallRow.run_id == run_id,
+            )
+            .group_by(ProviderCallRow.provider, ProviderCallRow.operation, ProviderCallRow.outcome)
+        )
+        merged: dict[tuple[str, str], dict[str, Any]] = {}
+        for provider, operation, outcome, count, cost, latency in self._session.execute(stmt):
+            row = merged.setdefault(
+                (provider, operation),
+                {"found": 0, "nothing": 0, "reused": 0, "errors": 0, "blocked": 0,
+                 "calls": 0, "cost": 0, "latency": []},
+            )  # fmt: skip
+            key = {
+                CallOutcome.HIT: "found",
+                CallOutcome.MISS: "nothing",
+                CallOutcome.CACHE_HIT: "reused",
+                CallOutcome.ERROR: "errors",
+                CallOutcome.BLOCKED_BY_CAP: "blocked",
+            }[outcome]
+            row[key] += int(count)
+            row["calls"] += int(count)
+            row["cost"] += int(cost)
+            if latency is not None:
+                row["latency"].append(float(latency))
+        out = [
+            RunCallSummary(
+                provider, operation, r["calls"], r["found"], r["nothing"], r["reused"],
+                r["errors"], r["blocked"], r["cost"],
+                round(sum(r["latency"]) / len(r["latency"])) if r["latency"] else None,
+            )
+            for (provider, operation), r in merged.items()
+        ]  # fmt: skip
+        return sorted(out, key=lambda c: (-c.cost_micro_usd, c.provider, c.operation))
 
     def cached_response(
         self, provider: str, operation: str, request_hash: str, since: datetime

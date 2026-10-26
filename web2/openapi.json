@@ -1881,6 +1881,29 @@
         "title": "DirectorySkipIn",
         "type": "object"
       },
+      "DiscoverySearchOut": {
+        "properties": {
+          "already_leads": {
+            "title": "Already Leads",
+            "type": "integer"
+          },
+          "new_leads": {
+            "title": "New Leads",
+            "type": "integer"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query",
+          "new_leads",
+          "already_leads"
+        ],
+        "title": "DiscoverySearchOut",
+        "type": "object"
+      },
       "EmailOut": {
         "properties": {
           "email": {
@@ -4471,6 +4494,71 @@
           "row_id"
         ],
         "title": "RowOut",
+        "type": "object"
+      },
+      "RunCallOut": {
+        "properties": {
+          "avg_latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Latency Ms"
+          },
+          "blocked": {
+            "title": "Blocked",
+            "type": "integer"
+          },
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "nothing": {
+            "title": "Nothing",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reused": {
+            "title": "Reused",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider",
+          "operation",
+          "calls",
+          "found",
+          "nothing",
+          "reused",
+          "errors",
+          "blocked",
+          "cost_micro_usd",
+          "avg_latency_ms"
+        ],
+        "title": "RunCallOut",
         "type": "object"
       },
       "RunIn": {
@@ -10880,6 +10968,53 @@
         ]
       }
     },
+    "/api/runs/{run_id}/calls": {
+      "get": {
+        "description": "What the run asked of each vendor and what it cost, costliest first.",
+        "operationId": "run_calls_api_runs__run_id__calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunCallOut"
+                  },
+                  "title": "Response Run Calls Api Runs  Run Id  Calls Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Calls",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/runs/{run_id}/cancel": {
       "post": {
         "operationId": "cancel_api_runs__run_id__cancel_post",
@@ -10964,6 +11099,53 @@
           }
         },
         "summary": "Run Leads",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/searches": {
+      "get": {
+        "description": "The searches a run made to find new companies, and what each found.",
+        "operationId": "run_searches_api_runs__run_id__searches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DiscoverySearchOut"
+                  },
+                  "title": "Response Run Searches Api Runs  Run Id  Searches Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Searches",
         "tags": [
           "runs"
         ]

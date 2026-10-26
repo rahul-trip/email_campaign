@@ -47,12 +47,14 @@ class FakeLlm:
         "You revise a cold email exactly": "revise",
         "You write the first email from one person": "actor",
         "You check a cold email before it goes": "critic",
+        "You plan web searches that find companies": "discovery",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
         self.calls: list[str] = []
         self.users: dict[str, str] = {}
         self.replies: dict[str, Any] = {
+            "discovery": {"queries": ["grid forecasting for wind farm operators in Germany"]},
             "site": {
                 "sector": "grid forecasting software",
                 "summary": "Acme builds grid forecasting software for utilities.",

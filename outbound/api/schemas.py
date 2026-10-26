@@ -535,6 +535,25 @@ class RunLeadOut(Out):
     steps: list[RunStepOut]
 
 
+class DiscoverySearchOut(Out):
+    query: str
+    new_leads: int
+    already_leads: int
+
+
+class RunCallOut(Out):
+    provider: str
+    operation: str
+    calls: int
+    found: int
+    nothing: int
+    reused: int
+    errors: int
+    blocked: int
+    cost_micro_usd: int
+    avg_latency_ms: int | None
+
+
 class StatusOut(Out):
     by_status: dict[str, int]
     held: dict[str, int]

@@ -91,12 +91,12 @@ export const SECTIONS: Section[] = [
       {
         target: "start-run",
         title: "Start the engine",
-        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies. The worker process does the work, so you can leave the page.",
+        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies, from a new angle each run, so it keeps finding ones you do not have yet. The worker process does the work, so you can leave the page.",
       },
       {
         target: "recent-runs",
         title: "Watch it work",
-        body: "Progress and spend update while a run is going. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run to see every lead it moved on, held, failed or will retry, with each step; click a lead to go to it.",
+        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, the searches it made, what each vendor cost, and every lead it touched; click a lead to go to it.",
       },
     ],
   },
