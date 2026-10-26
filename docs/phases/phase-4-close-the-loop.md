@@ -21,6 +21,8 @@
 - A referral reply creates a new rank-0 contact that goes through verification automatically.
 - Tested on fixture mailboxes, then on a live mailbox with one test lead.
 
+> **4a as built (2026-10-26):** `outbound/domain/inbox.py` classifies by rule (hard and soft bounce, opt-out, auto-reply, other); `outbound/services/inbox.py` (`InboxSync`, a tick job) reads each mailbox, matches mail to our emails by threading headers, then by the bounced or sending address, and ignores everything else without keeping it. An opt-out runs `PrivacyService.suppress_contact`; a hard bounce runs `PrivacyService.bounced` (address invalid, suppressed, sent message `bounced`, drafts deleted, lead on to the next person). **Not in 4a:** the model classifier, positive, question, referral and out-of-office handling, soft-bounce retry, the Replies screen, and a test on a live mailbox. Tests: `tests/domain/test_inbox.py`, `tests/db/test_inbox_sync.py`.
+
 ## Scope
 
 **In:**

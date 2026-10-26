@@ -49,7 +49,9 @@ from outbound.providers.registry import (
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
+from outbound.services.inbox import InboxSync
 from outbound.services.intake import IntakeService, discover_rows, discovery_query
+from outbound.services.privacy import PrivacyService
 from outbound.services.resume import ResumeService
 from outbound.services.review import ReviewService
 from outbound.services.runs import RunMode, RunRequest, RunService
@@ -176,6 +178,9 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     if has_mailbox:
         stages.append(DeliverStage(mailboxes))
         jobs.append(SentSync(uow, workspace_id, mailboxes))
+        jobs.append(
+            InboxSync(uow, workspace_id, mailboxes, PrivacyService(uow, workspace_id, mailboxes))
+        )
         if isinstance(mailboxes, StoredMailboxes):
             jobs.append(MailboxHealth(mailboxes))
 

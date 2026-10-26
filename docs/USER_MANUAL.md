@@ -549,6 +549,12 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 
 ---
 
+## 14b. Opt-outs and bounces
+
+Each tick the engine reads the inbox of every connected mailbox for replies to your emails. A reply that asks to be left alone ("unsubscribe", "remove me", "do not contact me") puts the person on the do-not-contact list, cancels their other emails and deletes their drafts. An email that bounces for good marks the address invalid, adds it to the list, and moves the lead on to the next person. Other replies are kept for you; the engine does not act on them yet. Mail that is not about one of your emails is never kept.
+
+---
+
 ## 14a. The admin console (platform staff)
 
 Platform admins and superadmins open **Admin console** from the user menu (or the workspace chooser). An amber **ADMIN · ALPHA** strip marks it. It has seven pages:
