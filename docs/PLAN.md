@@ -8,7 +8,8 @@
 
 Related documents:
 
-- [SCHEMA.md](SCHEMA.md) is the column-level spec for schema v1.
+- [technical/](technical/README.md) is the engineering documentation: architecture, HLD, per-module LLDs, decision records (ADRs), data, API, integrations, security and privacy, operations and runbooks. It is the source of truth for *how* the system is built; this plan stays the source for *what* it does and *why*.
+- [technical/data/schema.md](technical/data/schema.md) is the column-level spec for schema v1.
 - [phases/](phases/README.md) holds one document per delivery phase, with tasks, files and exit gates.
 - [archive/](archive/README.md) keeps the superseded specs and notes, for history only.
 
@@ -110,46 +111,9 @@ Three research findings shaped the design:
 
 ## 5. Architecture
 
-The engine is a modular monolith: one Python package, `outbound/`. It replaced the legacy `agent/` package, which is deleted after the first live run (the last step of Phase 2).
+> **Moved.** The architecture is now described in [technical/architecture/architecture.md](technical/architecture/architecture.md) (arc42 and C4 views, the technology stack, the package layout) and [technical/hld/hld.md](technical/hld/hld.md) (processes, the queue, the multi-tenant worker, tenancy and row-level security, integrations, limits). The decisions behind it are recorded as [ADRs](technical/adr/README.md).
 
-```
- CLI (Typer)     API (FastAPI) + Worker (ticks every 15 min)   `outbound tick` (cron, optional)
-        \                   |                        /
-         +----------- Services (use cases) ---------+
-                            |
-                         Runner  -- picks companies by status, guards, commits each lead
-                            |
-   Stage handlers: Intake · Research* · Gate · Contacts · Email · Copy* · Review · Deliver · Sync
-                            |                                   (* = LangGraph subgraph inside)
-        +-------------------+---------------------+
-   Domain core          Repositories          Provider ports (Metered: cache, caps, cost)
-   (no I/O)             + unit of work               |
-                            |                  Adapters: Tavily, finders, verifiers,
-                     SQLite → Postgres          resolver, LLM, IMAP / gateway
-```
-
-**Package layout**
-
-```
-outbound/
-  domain/      entities, enums, state machines, policies (compliance, safe-to-send, fit gate),
-               contact ranking, copy linter, footer, edit distance — no I/O
-  db/          SQLAlchemy models, Alembic migrations, repositories (including reports), unit of work
-  providers/   ports (Protocols), adapters, registry, and the meter (metered.py, budget.py, pricing.py)
-  prompts/     every instruction given to a model, one module per role
-  stages/      one handler per stage; research/ and copy/ hold LangGraph subgraphs; email/ holds the
-               waterfall and the catch-all poller; sync.py is the Sent-folder sync
-  runner/      the status runner, its guards, and the tick
-  services/    use cases shared by CLI and API: intake, review, leads, runs, settings, reports,
-               webhook, forget, seed, legacy import
-  api/         FastAPI app, auth, routers and schemas
-  cli/         Typer commands
-  config.py    pydantic-settings; secrets come from the environment only
-  bootstrap.py builds the engine and unit-of-work factory once
-  pipeline.py  wires stages to metered providers (real ones, or fakes in tests)
-  worker.py    executes runs queued by the API
-web2/          React app (served from web2/dist); its API client is generated from the OpenAPI document.
-```
+The engine is a modular monolith: one Python package, `outbound/`, in layers that import only downward ([ADR 0001](technical/adr/0001-modular-monolith.md)). It replaced the legacy `agent/` package, deleted after the first live run. A plain Python runner moves each company through its statuses; LangGraph runs only inside research and copy ([ADR 0004](technical/adr/0004-langgraph-only-in-research-and-copy.md)). The companies table is the queue ([ADR 0002](technical/adr/0002-the-table-is-the-queue.md)); from 6a, the worker serves every workspace fairly and the platform-wide view (what is due, admin reads) goes through a separate `outbound_platform` connection that never sees a tenant's rows except what the scheduler needs to pick work ([the tenancy LLD](technical/lld/tenancy-and-isolation.md)).
 
 **How one lead moves.** The runner reads a company due in a stage's input status, runs the guards (suppression, country policy after the gate, per-prospect budget), then calls the stage with no transaction open. The stage may call vendors (always through the meter) and returns a `StageResult`: the next status, engine-written fields, and any child rows to add. The runner writes all of it in one short transaction that checks `row_version`. A failure is recorded on the company with its stage and error, and the run moves on.
 
@@ -166,27 +130,19 @@ web2/          React app (served from web2/dist); its API client is generated fr
 | Command | stage handlers behind one `Stage` protocol, returning a `StageResult` | The runner treats every stage the same way and does all the writing |
 | Composition root with constructor injection | `bootstrap.py` | No globals; tests inject fakes |
 
+Each pattern is also an [ADR](technical/adr/README.md); the LLD of the module names which one.
+
 **Two hard contracts**
 
 1. No database transaction stays open across a network call.
 2. Every paid call commits its own `provider_calls` row, so its cost is recorded even if the stage then fails.
 
-**Tenant context (Phase 6; the parts marked built exist since 6a).**
-- **Workspace identity on every request:**
-  - the SPA sends `X-Workspace-Id`, taken from the `/w/{slug}` URL;
-  - the `tenant()` dependency checks the session, the membership and role, and the access level;
-  - it then builds that request's services with `ServicesFactory.for_tenant(workspace_id, actor)`.
-- **Unit of work (built):** every unit of work is bound to one workspace, and a Session `after_begin` listener sets `app.workspace_id` in every transaction for Postgres row-level security. The API builds a request's services from a `ServicesFactory`; until 6b the workspace is the deployment's configured one.
-- **Reads across workspaces (built)** (the admin console, the scheduler's "what is due", aggregates) go through `PlatformUnitOfWork` (`db/platform.py`), on its own `outbound_platform` connection; import-linter keeps tenant code from importing it.
-- **The worker (built)** claims runs for every workspace fairly, with a thread pool and one running pipeline per workspace, assembles a pipeline per run, ticks each active workspace every 15 minutes, and fails runs whose heartbeat stopped.
-- **Planned modules:**
-  - `domain`: `permissions.py`, `entitlements.py`, `directory.py`;
-  - `db`: `platform.py`, `crypto.py`;
-  - `providers/adapters`: `ms_graph.py`, `gmail_api.py`;
-  - `services`: `identity.py`, `members.py`, `mailboxes.py`, `workspaces.py`, `admin.py`;
-  - `api/routers/admin.py`.
-
-  The layer order does not change.
+**Tenant context (Phase 6).** All of 6a–6d are built now; nothing below is still planned. Full detail, verified against the code, is in [technical/hld/hld.md §5](technical/hld/hld.md#5-tenancy), [technical/lld/tenancy-and-isolation.md](technical/lld/tenancy-and-isolation.md) and [technical/lld/identity-and-access.md](technical/lld/identity-and-access.md).
+- **Workspace identity on every request:** the SPA sends `X-Workspace-Id`, taken from the `/w/{slug}` URL; the `tenant()` dependency (`api/deps.py`) checks the session, the membership and role (or a read-only superadmin view), and whether access has ended; it then builds that request's services for that workspace.
+- **Unit of work:** every tenant unit of work is bound to one workspace, and a Session `after_begin` listener sets `app.workspace_id` in every transaction for Postgres row-level security (`outbound/db/session.py`).
+- **Reads across workspaces** (the scheduler's "what is due", the admin console) go through `PlatformUnitOfWork` (`db/platform.py`), on its own `outbound_platform` connection, which has no row-level-security bypass and cannot write a tenant's rows; import-linter keeps tenant code (stages, the runner, services) from importing it.
+- **Identity and sessions** (`db/identity.py`) — users, memberships, invitation and reset tokens, sessions, the audit log — are platform tables with no row-level security, reached only through named queries, never through tenant code.
+- **The worker** claims runs for every workspace fairly (least-recently-served first, a thread pool), assembles a pipeline per run, ticks each active workspace every 15 minutes, and fails runs whose heartbeat stopped for 30 minutes.
 
 **Deliberately not used:** Celery, Redis or any queue (status plus `next_action_at` is the queue, and the worker polls the `runs` table for runs the API queued), an event bus, CQRS, microservices, a plugin framework, and generic base-repository hierarchies.
 
@@ -194,7 +150,7 @@ web2/          React app (served from web2/dist); its API client is generated fr
 
 ## 6. Schema
 
-Schema v1 has 17 tables in five areas. The company row is the lead. See [SCHEMA.md](SCHEMA.md).
+Schema v1 started at 17 tables in five areas; the SaaS tables bring it to 35. The company row is the lead. See [technical/data/schema.md](technical/data/schema.md) for every table, and [technical/data/migrations.md](technical/data/migrations.md) for how it got here.
 
 | Area | Tables |
 |---|---|
@@ -205,6 +161,10 @@ Schema v1 has 17 tables in five areas. The company row is the lead. See [SCHEMA.
 | Runs, cost and audit | `runs`, `provider_calls`, `events` |
 
 ## 7. Lifecycles
+
+Every lifecycle, copied from the code with a diagram, is in [technical/hld/state-machines.md](technical/hld/state-machines.md); the full layered safety model is in [technical/hld/safety-model.md](technical/hld/safety-model.md). This section keeps the product-level summary.
+
+**Workspace status** (Phase 6a; `outbound/domain/enums.py::WorkspaceStatus`): `active` → `paused` (a platform admin stopped its engine; people can still sign in and read) or `suspended` (nobody can use it) → `pending_deletion` (restorable until due) → `deleted` (a tombstone; cost history keeps its key). A workspace past its plan's access date is `active` but read-only (a quota check, not a status).
 
 **Company status** (the runner routes on this alone)
 
@@ -254,6 +214,8 @@ Two rules come from the transition tables in `outbound/domain/state_machines.py`
 **Approval confirms every skip.** An email that relies on a skipped check (the country rule skipped for the lead or switched off for the workspace, an address used without proof, or a person a search could not place and the operator confirmed) is approved only with an explicit acknowledgement (`acknowledge_skips`; the Review screen's tick box, or `--acknowledge-skips` on the CLI), recorded in an `approved_with_skips` event. Approval also refuses a suppressed address. **Automatic sending (Phase 5) must never send a message that relies on a skipped check**; such a message always waits for a person.
 
 ## 8. Pipeline stages
+
+Sequence diagrams for every stage, with exact code citations, are in [technical/hld/pipeline-flow.md](technical/hld/pipeline-flow.md) and the stage [LLDs](technical/README.md#low-level-design). The email stage now checks the [verified lead directory](technical/lld/lead-directory.md) first (6g), and pipeline stages are now gated by [credits](technical/lld/plans-credits-and-admin.md) as well as by budget.
 
 | Stage | Moves | What it does | Paid calls |
 |---|---|---|---|
@@ -321,7 +283,7 @@ Rules:
 - Errors are problem-details responses (RFC 9457) with stable codes.
 - The API never runs the pipeline in a request: it queues a run and `outbound worker` executes it.
 - FastAPI serves the built app, so production is two processes: `outbound serve` and `outbound worker`.
-- Deployment ([DEPLOY.md](DEPLOY.md)): one Docker image, run as three containers (`migrate`, `api`, `worker`) in the compose project `outbound` on a shared GCP VM. The VM builds the image. A manual GitHub Actions workflow deploys any commit over SSH, given the host and user, and rolls back to the previous release if `/api/health` fails. Secrets come from Doppler at container start (`doppler run`), the database is Supabase Postgres through its session pooler (`DATABASE_BACKEND` switches between local SQLite and Postgres) (the move planned for Phase 6, without its auth and row-level security yet), and the VM's existing reverse proxy terminates https in front of a loopback-only port. uvicorn trusts `X-Forwarded-For` (`FORWARDED_ALLOW_IPS`), so the login throttle sees real clients.
+- Deployment: one Docker image, run as three containers (`migrate`, `api`, `worker`) in the compose project `outbound` on a shared GCP VM, reaching Supabase Postgres as the least-privilege `outbound_app` (and `outbound_platform` for the worker's cross-workspace reads) rather than the table owner. See [technical/operations/deployment.md](technical/operations/deployment.md) and [technical/operations/release-and-rollback.md](technical/operations/release-and-rollback.md).
 
 ## 11. Compliance and deliverability
 
@@ -364,6 +326,8 @@ Operator tasks: keep a legitimate-interests assessment on file, name a grievance
 - Breaker: ≥3 hard bounces per 100 sends, or ≥2 in 24 h. A soft bounce is retried once after 48 h.
 
 ## 12. Providers and cost
+
+Each vendor's endpoints, mapping, prices, cache and live-check status are in [technical/integrations/](technical/integrations/README.md), including the two new mailbox gateways (Microsoft Graph, Gmail API) and the platform's own vendor-key store.
 
 The research estimated about $0.06–0.07 per prospect plus LLM tokens, but that assumed a cheap pay-as-you-go finder. The vendors' own docs show no such finder API: **OrbiSearch is verify-only, and ZeroBounce's finder costs 20 credits (about $0.16) per address found.** The $0.50 ceiling should still hold, at roughly $0.17–0.20 per prospect with ZeroBounce finding and a cheap verifier, but the cost of the finding step is now the number to beat. The Phase 0 bake-off measures real accuracy and cost per safe email, and also tests other API finders (Anymail Finder and Findymail advertise one; neither is evaluated yet).
 
@@ -409,6 +373,8 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 
 ## 14. Testing and quality bar
 
+How the code is tested, and where each rule below is proven, is in [technical/quality/testing-strategy.md](technical/quality/testing-strategy.md).
+
 - **No network calls in CI.**
 - **Layers tested:**
   - schema (migrations up and down on SQLite and Postgres; every constraint);
@@ -435,6 +401,8 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 
 ## 15. Risks
 
+Known technical defects and gaps (not product risks) are tracked in [technical/tech-debt-and-risks.md](technical/tech-debt-and-risks.md).
+
 | Risk | Mitigation |
 |---|---|
 | Vendor figures differ from the research | Bake-off first; every vendor sits behind one port |
@@ -444,7 +412,7 @@ Default prices live in `outbound/providers/pricing.py` and can be overridden wit
 | UK legal-entity detection misses a company | Companies House as a second source; operator can confirm by hand |
 | A country rule is misread | Lawyer review before Phase 5; anything unknown is held |
 | Scope creep | Deferred items stay deferred until a measured need appears |
-| Supabase's Data API exposes the tables (found 2026-10-23) | Data API off and anon grants revoked now (3b E8); a CI catalog test from 6a |
+| Supabase's Data API exposes the tables (found 2026-10-23) | **Closed:** migration 0009 revokes the `anon`/`authenticated` grants, and `outbound/db/isolation.py` refuses to start in production if they ever come back |
 | Row-level security silently bypassed | The app never connects as the owner; a startup self-check; the suite runs as `outbound_app` |
 | No MFA in the alpha, and the superadmin can read every workspace | Few platform accounts, long passwords, shorter staff sessions, audit of every view; MFA and the removal of superadmin come first after the alpha (6f) |
 | Vendor keys stored in the database | Encrypted, with the key in Doppler; platform-only access; reveals audited; versions kept for rollback |

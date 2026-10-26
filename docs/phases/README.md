@@ -6,7 +6,7 @@ The next phase starts only after the gate passes, with two exceptions:
 - Phases 0 and 1 can run at the same time.
 - 6g and the rest of Phase 4 run in parallel once the alpha has started.
 
-The order follows the plan: **schema, then relationships, then backend engine, then frontend**. The design behind each phase is in [../PLAN.md](../PLAN.md); the data model is in [../SCHEMA.md](../SCHEMA.md).
+The order follows the plan: **schema, then relationships, then backend engine, then frontend**. The design behind each phase is in [../PLAN.md](../PLAN.md); the data model is in [../technical/data/schema.md](../technical/data/schema.md), and the engineering documentation in [../technical/](../technical/README.md).
 
 | Phase | Document | Delivers | Gate | Depends on |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 
 1. Create a branch named `phase-N/<short-task>` for each task. Keep PRs small: one task, or one coherent group of tasks.
 2. Every task lists the files it touches and a **done when** line. A task is done when its tests are green in CI and the done-when line is true.
-3. If a task changes behaviour, the same PR updates [../PLAN.md](../PLAN.md). If it changes data, the same PR adds an Alembic migration and updates [../SCHEMA.md](../SCHEMA.md).
+3. If a task changes behaviour, the same PR updates [../PLAN.md](../PLAN.md). If it changes data, the same PR adds an Alembic migration and updates [../technical/data/schema.md](../technical/data/schema.md). The other technical pages it touches are listed in the [doc-update matrix](../technical/README.md#keeping-the-pages-true).
 4. To close a phase:
    - Run the gate, then write the result (date, numbers, who checked) in that phase's **Gate record** section.
    - Tick the phase in the status table below.

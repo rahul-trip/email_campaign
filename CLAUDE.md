@@ -17,16 +17,19 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
 
 | Document | Use it for |
 |---|---|
-| [docs/PLAN.md](docs/PLAN.md) | Decisions, architecture, stages, compliance, providers |
-| [docs/SCHEMA.md](docs/SCHEMA.md) | The data model: every table, column, constraint and relationship |
+| [docs/PLAN.md](docs/PLAN.md) | What and why: scope, decisions, lifecycles and product rules, compliance policy, providers and cost targets |
+| [docs/technical/](docs/technical/README.md) | How: architecture (arc42, C4), HLD and per-module LLDs, ADRs, data, API, integrations, security and privacy, operations and runbooks, and the [tech debt and risks register](docs/technical/tech-debt-and-risks.md) |
+| [docs/technical/data/schema.md](docs/technical/data/schema.md) | The data model: every table, column, constraint and relationship |
 | [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | How the operator uses the app. Update it when a screen, command, status or message changes |
-| [docs/DEPLOY.md](docs/DEPLOY.md) | Running it on the VM: Docker image, compose stack, deploy workflow, Doppler, Supabase |
+| [docs/technical/operations/deployment.md](docs/technical/operations/deployment.md) | Running it on the VM: Docker image, compose stack, deploy workflow, Doppler, Supabase |
 | [docs/design.md](docs/design.md) | Design system & tokens (synced with Stitch project `Design System Generator`) |
 | [docs/phases/](docs/phases/README.md) | What to build now: one document per phase, with tasks, files and a gate |
 
 - Work on the current phase only; the phase status table in `docs/phases/README.md` says which one that is.
 - A PR that changes behaviour updates `docs/PLAN.md`.
-- A PR that changes data adds an Alembic migration and updates `docs/SCHEMA.md`.
+- A PR that changes data adds an Alembic migration and updates `docs/technical/data/schema.md`.
+- A PR also updates the technical pages its change touches, as listed in the doc-update matrix in [docs/technical/README.md](docs/technical/README.md#keeping-the-pages-true) and the pull request template: the module's LLD, the configuration or API reference, a runbook for a new way to fail, an ADR for an architecturally significant decision, and the register for a defect found or fixed. Cite code as `path::Symbol`, never by line number.
+- `docs/SCHEMA.md` and `docs/DEPLOY.md` are pointers kept for old links; do not add to them.
 - The team reviews in the Claude Doc ["Outbound Engine: End-to-End Plan"](https://claude.ai/code/artifact/4cea76e3-1e09-442e-a719-22299ed78ece). The repo files are what you build from.
 - `docs/archive/` contains superseded specs and history. Do not build from it.
 
@@ -36,7 +39,7 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
 - **Phase 1:** code complete and verified on SQLite and on PostgreSQL 16.2. Its CI workflow has not run yet. See `docs/phases/phase-1-schema-and-persistence.md`.
 - **Phase 2 (engine on the CLI):** code complete and verified with fake vendors on SQLite and PostgreSQL 16.2 (1,163 tests). The gate (8 of 10 first emails sent unedited, a zero-cost rerun) waits on live keys and a real run. See `docs/phases/phase-2-engine-on-cli.md`, "Closing the phase".
 - **Phase 3b (hardening) is next:** `docs/phases/phase-3b-hardening.md` lists the gaps found after Phase 3 and the order to fix them.
-  - **Do first, E8:** Supabase's Data API probably exposes the production tables. Turn it off and revoke the `anon` and `authenticated` grants (`docs/DEPLOY.md` §1.2).
+  - **Do first, E8:** Supabase's Data API probably exposes the production tables. Turn it off and revoke the `anon` and `authenticated` grants (`docs/technical/operations/deployment.md` §1.2). **Status: closed** — migration 0009 revokes those grants and `outbound/db/isolation.py` refuses to start if they ever come back; see [the threat model](docs/technical/security/threat-model.md).
   - Its §8 lists what must be finished before 6a.
 - **Phase 6a (tenancy foundation) is code complete** on branch `phase-6/tenancy-foundation`. It covers:
   - row-level security, with `outbound_app` and `outbound_platform` roles;
@@ -45,7 +48,7 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - services per request;
   - one worker for every workspace, with a 15-minute tick.
 
-  On Postgres the tests run as the production roles. Before deploying, set up the roles (`docs/DEPLOY.md` §1.2a).
+  On Postgres the tests run as the production roles. Before deploying, set up the roles (`docs/technical/operations/deployment.md` §1.2a; see also [tenancy and isolation](docs/technical/lld/tenancy-and-isolation.md)).
 - **Phase 6b (identity and access) is code complete** on branch `phase-6/identity-and-access`:
   - people sign in with an email and password into revocable sessions (`outbound/services/identity.py`); accounts come only by invitation, or from `outbound users create`;
   - every route declares one permission (`require(...)` in `outbound/api/deps.py`), and every request names its workspace in `X-Workspace-Id`;
@@ -75,7 +78,7 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - `services/`: intake, review, reports, forget, seed, legacy import. `prompts/`: every model instruction.
   - `api/`: FastAPI app, auth, routers, schemas. `cli/`: `db`, `seed`, `targets`, `run`, `tick`, `retry`, `status`, `review`, `report`, `serve`, `worker`, `auth`, `import-legacy-xlsx`.
   - `web2/`: modernized React app implementing Google Stitch design system tokens (`docs/design.md`) and complete screen suite (Dashboard Variant 2, Review, Attention, Leads, LeadDetail, LeadJourney, Targets, Runs, Reports, Campaigns, Mailboxes, Compliance, Settings). Verify with `npm --prefix web2 run build`. Develop with `cd web2 && npm run dev` (port 5174, proxies `/api` to `:8000`; set `API_TARGET=http://127.0.0.1:8765` to use the fake-vendor server from `uv run python -m scripts.e2e_server`, and sign in as `operator@e2e.example` / `e2e-password-1234567`). Shared components live in `web2/src/components/ui.tsx`; status words and colours in `web2/src/lib/status.ts`.
-- **Deployment:** `Dockerfile` (one image), `deploy/compose.yml` (`migrate`, `api`, `worker`; project `outbound`), `deploy/remote-deploy.sh` (build on the VM, health check, rollback), `deploy/local-test.sh` (the same deploy rehearsed locally, with a local Postgres and https proxy) and `.github/workflows/deploy.yml` (manual: host, username, ref). Secrets come from Doppler via `doppler run`; the database is Supabase Postgres (session pooler). See `docs/DEPLOY.md`.
+- **Deployment:** `Dockerfile` (one image), `deploy/compose.yml` (`migrate`, `api`, `worker`; project `outbound`), `deploy/remote-deploy.sh` (build on the VM, health check, rollback), `deploy/local-test.sh` (the same deploy rehearsed locally, with a local Postgres and https proxy) and `.github/workflows/deploy.yml` (manual: host, username, ref). Secrets come from Doppler via `doppler run`; the database is Supabase Postgres (session pooler), reached as the least-privilege `outbound_app` role (never the table owner). See `docs/technical/operations/deployment.md` and `docs/technical/operations/release-and-rollback.md` before relying on a rollback.
 - **`agent/`** is the legacy pipeline. Do not touch it. Its reusable parts are ported into `outbound/`, and it is deleted (with the `legacy` dependency group) after the first live run.
 - **Environment:** `uv sync` builds `.venv` on Python 3.12 with the dev tools and the `legacy` dependency group. `.venv` is not tracked in git.
 - **Secrets:** the root `.env` holds real vendor keys and must never be committed. `outbound/config.py` reads it through pydantic-settings (`agent/.env` is still read as a fallback but no longer exists). `test_keys.py` in the root is the operator's own key smoke test; it is untracked and excluded from linting.
@@ -102,13 +105,13 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
 7. **Operator input wins.** The engine never overwrites a field listed in `manual_fields`; it records its own value as an event instead.
 8. **Safety gates are server-side.** Suppression, country policy and safe-to-send are checked again right before every draft or send.
 9. **LangGraph only inside Stage 2 (Research) and Stage 6 (Copy)**, as stateless subgraphs with no checkpointer. The outer flow is the plain Python runner, which routes on company status.
-10. **The schema only changes through Alembic,** and the same PR updates `docs/SCHEMA.md`. `CHECK` value lists must equal the matching enums in `outbound/domain/enums.py`.
+10. **The schema only changes through Alembic,** and the same PR updates `docs/technical/data/schema.md`. `CHECK` value lists must equal the matching enums in `outbound/domain/enums.py`.
 11. **Every API route declares its permission** with `require(Permission.X)` from Phase 6b on (`outbound/domain/permissions.py`). A test fails any tenant route that does not.
 
 ## Code standards
 
 - Python 3.12, managed with `uv`. Type every public function. `ruff` handles both lint and format; `mypy` runs strict on `outbound/domain`.
-- Design patterns are listed in `docs/PLAN.md` §5: ports and adapters, chain of responsibility for the waterfall, the `Metered` decorator, repository plus unit of work, state machine, policy objects, and constructor injection wired in `outbound/bootstrap.py`.
+- Design patterns are described in `docs/technical/architecture/architecture.md` and its ADRs: ports and adapters, chain of responsibility for the waterfall, the `Metered` decorator, repository plus unit of work, state machine, policy objects, and constructor injection wired in `outbound/bootstrap.py`.
 - Value conventions:
   - IDs are UUIDv7 strings.
   - Times are UTC.
