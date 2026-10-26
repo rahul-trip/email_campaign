@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6a/6b/6c
 ---
 
 # Secrets management
@@ -22,18 +22,19 @@ Every secret Outbound uses: where it lives, who reads it, and how to rotate it. 
 
 | Secret | Purpose | Lives in | Read by | Rotate |
 |---|---|---|---|---|
-| `SESSION_SECRET` | Signs the session cookie (at least 16 characters; use 32+ random bytes: `openssl rand -hex 32`) | Doppler `prd` (and `dev`), `.env` | `api` | Set a new value in Doppler, then redeploy or restart `api`. **Every session ends**: the operator signs in again. This is also the only way to revoke a stolen session |
-| `OPERATOR_PASSWORD_HASH` | The operator password, as an Argon2 hash (`uv run outbound auth hash-password`) | Doppler, `.env` | `api` | Make a new hash, set it, restart `api`. Rotate `SESSION_SECRET` too if the old password may be known |
-| `INTAKE_WEBHOOK_SECRET` | HMAC key for the webhook (blank disables it) | Doppler, `.env`; shared with the caller | `api` | Agree a switch time with the caller, set the new value, restart `api`. There is no overlap window: requests signed with the old key fail with `401 bad_signature` |
-| `POSTGRES_URL` (contains the database password) | The production database | Doppler `prd` | all containers | Reset the password in Supabase (Project Settings → Database), update `POSTGRES_URL` (URL-encoded), restart the stack |
-| `EMAIL_PASSWORD` | The IMAP mailbox | Doppler, `.env` | `worker`, `api` (draft deletion) | Change it at the mail provider (use an app password if available), update Doppler, restart |
-| `HUNTER_API_KEY`, `ZEROBOUNCE_API_KEY`, `MYEMAILVERIFIER_API_KEY`, `ORBISEARCH_API_KEY`, `ENRICHLEY_API_KEY`, `SCRUBBY_API_KEY`, `TAVILY_API_KEY`, `COMPANIES_HOUSE_API_KEY` | Vendor accounts (spend) | Doppler, `.env` | `worker`, `api` (Tavily for intake) | Create a new key in the vendor's dashboard, update Doppler, restart, **then** revoke the old key |
-| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `COPILOT_API_KEY`, `LLM_API_KEY` | The model provider (spend) | Doppler, `.env` | `worker` | As for vendor keys |
+| `SECRETS_KEYS` | AES-256-GCM key(s) that encrypt every workspace's mailbox credentials and platform vendor keys, versioned (`outbound secrets new-key`) | Doppler `prd` (and `dev`), `.env` | `api`, `worker` | **Add a new version, never remove the old one until nothing references it** — removing a version makes every credential sealed under it permanently unreadable ([R-25](../tech-debt-and-risks.md#r-25--p2--secrets-secrets_keys-is-a-single-point-of-failure-for-every-workspaces-encrypted-credentials)). Rotation itself is just adding a new highest version; old credentials re-seal under it the next time they are written |
+| `MICROSOFT_CLIENT_SECRET`, `GOOGLE_CLIENT_SECRET` | The platform's own OAuth app secrets (not any customer's credentials — [mailboxes and OAuth](../lld/mailboxes-and-oauth.md)) | Doppler, `.env` | `api` | Rotate in the Entra/Google Cloud console first, then update Doppler and restart; existing customer mailbox connections are unaffected (they hold their own tokens, not this secret) |
+| `SMTP_PASSWORD` | The platform's own transactional-mail relay (invites, resets) | Doppler, `.env` | `api` | Change it at the relay, update Doppler, restart |
+| `POSTGRES_URL`, `POSTGRES_PLATFORM_URL`, `POSTGRES_MIGRATE_URL` (each contains a password) | The production database, as three roles — [tenancy and isolation](../lld/tenancy-and-isolation.md) | Doppler `prd` | `api`, `worker` (first two); `migrate` (the third) | Reset the password for the affected role in Supabase (Project Settings → Database), update the matching `POSTGRES_*` variable (URL-encoded), restart the affected containers only |
+| `HUNTER_API_KEY`, `ZEROBOUNCE_API_KEY`, `MYEMAILVERIFIER_API_KEY`, `ORBISEARCH_API_KEY`, `ENRICHLEY_API_KEY`, `SCRUBBY_API_KEY`, `TAVILY_API_KEY`, `COMPANIES_HOUSE_API_KEY` | **Platform-wide fallback vendor accounts.** From 6d, a platform admin can instead store a vendor key per workspace or platform-wide in the database, encrypted under `SECRETS_KEYS` and rotated from the admin console (`PUT /api/admin/vendors/{vendor}/key`, with versioned rollback) — these environment variables remain as the `outbound vendors import-env` seed path | Doppler, `.env`, or the database | `worker`, `api` | Environment keys: as before. Database keys: rotate from the admin console, which keeps the old version for one-click rollback |
+| `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `COPILOT_API_KEY`, `LLM_API_KEY` | The model provider (spend) | Doppler, `.env`, or the database (6d) | `worker` | As for vendor keys above |
 | `DOPPLER_TOKEN` (service token, read-only, `outbound/prd`) | Lets containers fetch secrets | GitHub environment `production`; written to `/opt/outbound/doppler.env` (mode 600) by each deploy | `doppler run` in every container | Create a new service token in Doppler, update the GitHub secret, redeploy, revoke the old token |
 | `DEPLOY_SSH_KEY` | SSH from GitHub Actions to the VM's deploy user (who is in the `docker` group, so effectively root) | GitHub environment `production`; public half in the VM's `authorized_keys` | the deploy workflow | `ssh-keygen -t ed25519`; add the new public key; update the secret; remove the old public key |
 | Doppler `dev` config | The local rehearsal (`deploy/local-test.sh`) | Doppler; a read-only dev token in `.deploy-local/doppler.env` (git-ignored) | local Docker | As above. **`dev` holds real vendor and mailbox keys** |
 
-Not secret, but kept with the secrets: `SSH_KNOWN_HOSTS` (GitHub), `SCRUBBY_BASE_URL`, `IMAP_HOST`, `EMAIL_ADDRESS`.
+**Removed since Phase 3b:** `SESSION_SECRET` (sessions are now revocable rows, not signed tokens — revoking one no longer requires rotating a shared secret and ending every session at once: [identity and access](../lld/identity-and-access.md)), `OPERATOR_PASSWORD_HASH` (real per-account passwords instead), `INTAKE_WEBHOOK_SECRET` (now per workspace, rotated from Settings → Integrations, not a platform-wide Doppler value), `EMAIL_PASSWORD`/`IMAP_HOST`/`EMAIL_ADDRESS` (each workspace's own mailbox credential, encrypted under `SECRETS_KEYS` in the database, not a platform secret at all).
+
+Not secret, but kept with the secrets: `SSH_KNOWN_HOSTS` (GitHub), `SCRUBBY_BASE_URL`, `APP_BASE_URL`.
 
 ## Where values come from at runtime
 
