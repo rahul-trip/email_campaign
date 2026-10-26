@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
 
-from outbound.db.models import CompanyRow, MessageRow
+from outbound.db.models import CompanyRow, InboundMessageRow, MessageRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Message
-from outbound.domain.enums import EntityType, MessageState
+from outbound.domain.enums import EntityType, InboundCategory, MessageState
 from outbound.domain.state_machines import MESSAGE
 
 # Columns a transition may set alongside the new state.
@@ -113,6 +114,28 @@ class MessageRepository(ScopedRepository):
         )
         return [snapshot(row, Message) for row in self._session.scalars(stmt)]
 
+    def by_rfc_id(self, rfc_message_id: str) -> Message | None:
+        """The message we sent (or drafted) under this Message-ID, if any."""
+        stmt = select(MessageRow).where(
+            MessageRow.workspace_id == self._workspace_id,
+            MessageRow.rfc_message_id == rfc_message_id,
+        )
+        row = self._session.scalars(stmt).first()
+        return snapshot(row, Message) if row else None
+
+    def sent_to(self, contact_email_id: str) -> list[Message]:
+        """Messages that went out to this address, newest first."""
+        stmt = (
+            select(MessageRow)
+            .where(
+                MessageRow.workspace_id == self._workspace_id,
+                MessageRow.contact_email_id == contact_email_id,
+                MessageRow.state == MessageState.SENT,
+            )
+            .order_by(MessageRow.sent_at.desc())
+        )
+        return [snapshot(row, Message) for row in self._session.scalars(stmt)]
+
     def rfc_id_taken(self, rfc_message_id: str) -> bool:
         stmt = select(MessageRow.id).where(
             MessageRow.workspace_id == self._workspace_id,
@@ -178,3 +201,60 @@ class MessageRepository(ScopedRepository):
             {"from": previous.value, "to": to.value},
         )
         return snapshot(row, Message)
+
+
+class InboundRepository(ScopedRepository):
+    """Replies and bounces that belong to our own emails. Mail from anyone else is not kept."""
+
+    def known(self, rfc_message_id: str) -> bool:
+        stmt = select(InboundMessageRow.id).where(
+            InboundMessageRow.workspace_id == self._workspace_id,
+            InboundMessageRow.rfc_message_id == rfc_message_id,
+        )
+        return self._session.scalars(stmt).first() is not None
+
+    def latest(self, mailbox_id: str) -> datetime | None:
+        stmt = select(func.max(InboundMessageRow.received_at)).where(
+            InboundMessageRow.workspace_id == self._workspace_id,
+            InboundMessageRow.mailbox_id == mailbox_id,
+        )
+        return self._session.scalar(stmt)
+
+    def add(
+        self,
+        *,
+        mailbox_id: str,
+        rfc_message_id: str,
+        received_at: datetime,
+        category: InboundCategory,
+        confidence: float,
+        from_address: str | None,
+        body_excerpt: str,
+        message_id: str | None,
+        company_id: str | None,
+        contact_id: str | None,
+        extracted: dict[str, Any] | None = None,
+    ) -> str:
+        row = InboundMessageRow(
+            workspace_id=self._workspace_id,
+            mailbox_id=mailbox_id,
+            rfc_message_id=rfc_message_id,
+            received_at=received_at,
+            category=category,
+            confidence=confidence,
+            from_address=from_address,
+            body_excerpt=body_excerpt,
+            message_id=message_id,
+            company_id=company_id,
+            contact_id=contact_id,
+            extracted=extracted,
+        )
+        self._session.add(row)
+        self._session.flush()
+        return row.id
+
+    def mark_handled(self, inbound_id: str, at: datetime) -> None:
+        row = self._session.get(InboundMessageRow, inbound_id)
+        if row is not None and row.workspace_id == self._workspace_id:
+            row.handled_at = at
+            self._session.flush()

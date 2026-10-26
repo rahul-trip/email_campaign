@@ -14,14 +14,16 @@ from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.domains import registrable_domain
 from outbound.domain.enums import (
+    WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     ContactStatus,
+    EmailStatus,
     MessageState,
     SuppressionKind,
     SuppressionReason,
 )
 from outbound.domain.errors import InvalidInput
-from outbound.domain.state_machines import COMPANY, CONTACT
+from outbound.domain.state_machines import COMPANY, CONTACT, EMAIL
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.services.forget import (
@@ -105,6 +107,47 @@ class PrivacyService:
             uow.commit()
         deleted, left = self._delete_drafts(tuple(draft_ids))
         self._log("suppress_contact", actor, True, cancelled, deleted, left, contact_id=contact_id)
+        return PrivacyResult(True, cancelled, deleted, left)
+
+    def bounced(self, contact_email_id: str, *, actor: str | None = None) -> PrivacyResult:
+        """An address that cannot receive mail: stop using it, never try it again, and let the
+        lead go on to the next person if there is one."""
+        actor = actor or self._actor
+        with self._uow(self._workspace_id) as uow:
+            address = uow.emails.get(contact_email_id)
+            contact = uow.contacts.get(address.contact_id)
+            if EMAIL.allows(address.status, EmailStatus.INVALID):
+                uow.emails.transition(contact_email_id, EmailStatus.INVALID, actor=actor)
+            if address.email:
+                uow.suppressions.add(
+                    SuppressionKind.EMAIL, address.email, SuppressionReason.HARD_BOUNCE, actor=actor
+                )
+            for sent in uow.messages.sent_to(contact_email_id)[:1]:
+                uow.messages.transition(
+                    sent.id, MessageState.BOUNCED, expected_version=sent.row_version, actor=actor
+                )
+            cancelled, draft_ids = stop_contact(uow, contact.id, actor)
+            if CONTACT.allows(contact.status, ContactStatus.BOUNCED):
+                uow.contacts.transition(
+                    contact.id, ContactStatus.BOUNCED, actor=actor, reason="hard bounce"
+                )
+            others = [
+                c
+                for c in uow.contacts.for_company(contact.company_id)
+                if c.id != contact.id and c.status in WORKABLE_CONTACT_STATUSES
+            ]
+            company = uow.companies.get(contact.company_id)
+            if others and COMPANY.allows(company.status, CompanyStatus.CONTACTS_FOUND):
+                uow.companies.transition(
+                    company.id,
+                    CompanyStatus.CONTACTS_FOUND,
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason="the address bounced; on to the next person",
+                )
+            uow.commit()
+        deleted, left = self._delete_drafts(tuple(draft_ids))
+        self._log("bounced", actor, True, cancelled, deleted, left, contact_id=contact.id)
         return PrivacyResult(True, cancelled, deleted, left)
 
     def suppress_company(self, company_id: str, *, actor: str | None = None) -> PrivacyResult:

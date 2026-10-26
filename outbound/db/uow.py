@@ -29,7 +29,7 @@ from outbound.db.repositories.contacts import (
 )
 from outbound.db.repositories.erasure import ErasureRepository
 from outbound.db.repositories.imports import ImportRepository
-from outbound.db.repositories.messages import MessageRepository
+from outbound.db.repositories.messages import InboundRepository, MessageRepository
 from outbound.db.repositories.plans import PlatformSettingsRepository, UsageRepository
 from outbound.db.repositories.policies import CountryPolicyRepository
 from outbound.db.repositories.reports import ReportRepository
@@ -72,6 +72,7 @@ class UnitOfWork:
         self.notes = NoteRepository(*args)
         self.consents = ConsentRepository(*args)
         self.messages = MessageRepository(*args)
+        self.inbound = InboundRepository(*args)
         self.imports = ImportRepository(*args)
         self.suppressions = SuppressionRepository(*args)
         self.policies = CountryPolicyRepository(*args)

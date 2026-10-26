@@ -26,7 +26,9 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 
 ## 4a — opt-outs and hard bounces
 
-Not started. See the task list in `phase-4-close-the-loop.md`.
+**Done:** rule classifier, `InboxSync` tick job, opt-out and hard-bounce handlers, tests on fixture mailboxes (SQLite and Postgres).
+
+**Left:** a live-mailbox check of both cases (the 4a gate). Everything else in Phase 4 is after the alpha: the model classifier, positive, question, referral and out-of-office handling, soft-bounce retry, follow-ups, the reply webhook and the Replies screen.
 
 ## 6g — verified lead directory
 
