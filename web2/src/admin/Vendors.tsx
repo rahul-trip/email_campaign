@@ -11,6 +11,7 @@ export function VendorsPage() {
   const queryClient = useQueryClient();
   const vendors = useQuery({ queryKey: ["admin", "vendors"], queryFn: () => ok(client.GET("/api/admin/vendors")) });
   const [replacing, setReplacing] = useState<Vendor | null>(null);
+  const [capping, setCapping] = useState<Vendor | null>(null);
   const [revealed, setRevealed] = useState<{ vendor: Vendor; key: string } | null>(null);
   const refresh = (data: unknown) => queryClient.setQueryData(["admin", "vendors"], data);
   const rollback = useMutation({ mutationFn: (v: Vendor) => ok(client.POST("/api/admin/vendors/{vendor}/rollback", path(v.code))), onSuccess: refresh });
@@ -37,6 +38,7 @@ export function VendorsPage() {
                     <Th>Does</Th>
                     <Th>Key</Th>
                     <Th>Set</Th>
+                    <Th>Spend this month</Th>
                     <Th>Status</Th>
                     <Th />
                   </tr>
@@ -51,6 +53,13 @@ export function VendorsPage() {
                         {v.source === "environment" && <span className="ml-2 text-[11px] text-muted">from the environment</span>}
                       </Td>
                       <Td className="text-muted">{v.set_at ? <When iso={v.set_at} time /> : "—"}</Td>
+                      <Td className="whitespace-nowrap text-xs">
+                        ${(v.spend_micro_usd / 1e6).toFixed(2)}
+                        {v.cap_micro_usd != null ? ` of $${(v.cap_micro_usd / 1e6).toFixed(0)}` : ""}
+                        <button type="button" className="ml-2 text-primary hover:underline" onClick={() => setCapping(v)}>
+                          {v.cap_micro_usd != null ? "Change cap" : "Set cap"}
+                        </button>
+                      </Td>
                       <Td>{v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : <Pill tone="good">live</Pill>}</Td>
                       <Td className="space-x-1 text-right whitespace-nowrap">
                         <Button size="sm" variant="secondary" onClick={() => setReplacing(v)}>
@@ -82,6 +91,7 @@ export function VendorsPage() {
         )}
       </QueryState>
       {replacing && <ReplaceKey vendor={replacing} onClose={() => setReplacing(null)} onDone={(data) => { refresh(data); setReplacing(null); }} />}
+      {capping && <CapDialog vendor={capping} onClose={() => setCapping(null)} onDone={(data) => { refresh(data); setCapping(null); }} />}
       {revealed && (
         <Dialog title={`${revealed.vendor.name} key`} onClose={() => setRevealed(null)} footer={<Button onClick={() => setRevealed(null)}>Done</Button>}>
           <Callout tone="attention">This view is recorded in the audit log.</Callout>
@@ -165,5 +175,34 @@ function LlmCard({ llm, onSaved }: { llm: Record<string, string | number>; onSav
       </div>
       <Problem error={save.error} className="mt-3" />
     </Card>
+  );
+}
+
+function CapDialog({ vendor, onClose, onDone }: { vendor: Vendor; onClose: () => void; onDone: (data: unknown) => void }) {
+  const [dollars, setDollars] = useState(vendor.cap_micro_usd == null ? "" : String(vendor.cap_micro_usd / 1e6));
+  const save = useMutation({
+    mutationFn: () => ok(client.PUT("/api/admin/vendors/{vendor}/cap", { ...path(vendor.code), body: { cap_micro_usd: dollars.trim() === "" ? null : Math.round(Number(dollars) * 1e6) } })),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog
+      title={`Monthly cap for ${vendor.name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button busy={save.isPending} onClick={() => save.mutate()}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <Field label="Cap in US dollars" hint="When this month's spend reaches it, the vendor is paused and staff are emailed. Empty: no cap.">
+        <Input type="number" min={0} step="1" value={dollars} onChange={(e) => setDollars(e.target.value)} className="w-40" />
+      </Field>
+      <Problem error={save.error} />
+    </Dialog>
   );
 }

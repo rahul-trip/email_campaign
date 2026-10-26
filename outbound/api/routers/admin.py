@@ -44,6 +44,7 @@ from outbound.api.schemas import (
     PlatformSettingsOut,
     RevealedKeyOut,
     StatusChangeIn,
+    VendorCapIn,
     VendorKeyIn,
     VendorOut,
     VendorPauseIn,
@@ -539,4 +540,12 @@ def pause_vendor(
 @router.patch("/vendors/llm", response_model=VendorsOut)
 def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
     service.update_llm(body.model_dump(exclude_none=True), by=staff.user.id)
+    return _vendors(service)
+
+
+@router.put("/vendors/{vendor}/cap", response_model=VendorsOut)
+def set_vendor_cap(
+    vendor: str, body: VendorCapIn, staff: KeyHolder, service: Vendors
+) -> VendorsOut:
+    service.set_cap(vendor, body.cap_micro_usd, by=staff.user.id)
     return _vendors(service)

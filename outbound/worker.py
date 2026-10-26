@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import contextvars
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -58,6 +58,7 @@ class Worker:
         tick_every: timedelta | None = timedelta(minutes=15),
         stale_after: timedelta = timedelta(minutes=30),
         tick_limit: int = 50,
+        periodic: Sequence[Callable[[], object]] = (),
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._container = container
@@ -66,6 +67,7 @@ class Worker:
         self._tick_every = tick_every
         self._stale_after = stale_after
         self._tick_limit = tick_limit
+        self._periodic = list(periodic)  # platform-wide jobs, once per tick interval
         self._now = now
         self._last_served: dict[str, datetime] = {}
         self._last_tick: dict[str, datetime] = {}
@@ -161,6 +163,14 @@ class Worker:
 
     # ------------------------------------------------------------------ loops
 
+    def run_periodic(self) -> None:
+        """Platform-wide jobs (notices). A failing one is logged and does not stop the others."""
+        for job in self._periodic:
+            try:
+                job()
+            except Exception as error:
+                log.exception("periodic_failed", error_type=type(error).__name__)
+
     def run_once(self) -> bool:
         """One pass in this thread (tests, scripts): every planned job, one after another.
         Returns whether anything was done."""
@@ -174,6 +184,7 @@ class Worker:
         """Plan, hand jobs to the thread pool, and look again; until ``stop`` says so."""
         running: dict[Future[bool], str] = {}
         last_recovery = 0.0
+        last_periodic = 0.0
         with ThreadPoolExecutor(max_workers=self._threads, thread_name_prefix="work") as pool:
             while not stop():
                 for future in [f for f in running if f.done()]:
@@ -182,6 +193,10 @@ class Worker:
                     if time.monotonic() - last_recovery > 60:
                         self.recover_stale()
                         last_recovery = time.monotonic()
+                    every = self._tick_every.total_seconds() if self._tick_every else None
+                    if every and time.monotonic() - last_periodic > every:
+                        last_periodic = time.monotonic()
+                        self.run_periodic()
                     for job in self.plan()[: self._threads - len(running)]:
                         self._busy.add(job.workspace_id)
                         running[pool.submit(self.execute, job)] = job.workspace_id

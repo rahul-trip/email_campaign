@@ -972,6 +972,8 @@ class VendorOut(Out):
     set_by: str | None
     paused: bool
     can_roll_back: bool
+    spend_micro_usd: int
+    cap_micro_usd: int | None
 
 
 class VendorsOut(Out):
@@ -998,3 +1000,7 @@ class LlmSettingsIn(In):
 
 class RevealedKeyOut(Out):
     key: str
+
+
+class VendorCapIn(In):
+    cap_micro_usd: int | None

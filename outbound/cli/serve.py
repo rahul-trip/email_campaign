@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 
@@ -12,6 +12,10 @@ from outbound.db.isolation import isolation_problems
 from outbound.domain.enums import MembershipRole, PlatformRole
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
+
+if TYPE_CHECKING:
+    from outbound.services.notices import NoticeService
+    from outbound.services.vendors import VendorService
 
 log = get_logger(__name__)
 
@@ -167,13 +171,34 @@ def register(app: typer.Typer) -> None:
         )
         typer.echo("worker ready; waiting for queued runs (Ctrl-C to stop)")
         tick_every = timedelta(minutes=tick_minutes) if tick_minutes > 0 else None
+        from outbound.providers.registry import build_transactional_email
+        from outbound.services.admin import AdminService
+        from outbound.services.notices import NoticeService
+
+        vendors = VendorService(container.platform, container.settings)
+        notices = NoticeService(
+            AdminService(container.platform, container.identity, container.uow),
+            container.identity,
+            build_transactional_email(container.settings),
+            container.settings.app_base_url,
+        )
         engine = Worker(
             container,
             lambda workspace_id: assemble(container, workspace_id, live.get()),
             threads=threads,
             tick_every=tick_every,
+            periodic=[lambda: _enforce_caps(vendors, notices), notices.run],
         )
         try:
             engine.run_forever(poll_seconds=poll_seconds)
         except KeyboardInterrupt:
             typer.echo("stopped")
+
+
+def _enforce_caps(vendors: VendorService, notices: NoticeService) -> None:
+    paused = vendors.enforce_caps()
+    if paused:
+        notices.to_staff(
+            "A vendor was paused: its monthly cap was reached",
+            f"Paused: {', '.join(paused)}. Raise the cap or resume it in the admin console.",
+        )
