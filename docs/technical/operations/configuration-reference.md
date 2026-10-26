@@ -2,16 +2,18 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6a/6b/6c
 ---
 
 # Configuration reference
 
 Every setting the engine reads. There are two kinds:
 
-- **Environment settings:** 52 fields of `outbound/config.py::Settings`, read at process start.
+- **Environment settings:** 58 fields of `outbound/config.py::Settings`, read at process start.
 - **Workspace settings:** stored in `workspaces.settings` and edited in the app.
+
+**Removed since Phase 3b:** `OPERATOR_PASSWORD_HASH`, `SESSION_SECRET`, `SESSION_HOURS`, `WORKSPACE_NAME`, `INTAKE_WEBHOOK_SECRET`, `IMAP_HOST`, `IMAP_PORT`, `IMAP_USE_SSL`, `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `FROM_NAME`, `DRAFTS_FOLDER`, `SENT_FOLDER`, `INBOX_FOLDER`, `IMAP_TIMEOUT_SECONDS` — real accounts and revocable sessions replaced the single operator password ([identity and access](../lld/identity-and-access.md)), and per-workspace, database-backed mailboxes replaced the one IMAP mailbox in the environment ([mailboxes and OAuth](../lld/mailboxes-and-oauth.md)).
 
 How settings load, their precedence and their validation are in [configuration and bootstrap](../lld/configuration-and-bootstrap.md). Secrets and their rotation are in [secrets management](../security/secrets-management.md).
 
@@ -27,13 +29,19 @@ Locally, everything comes from `.env` (template: `.env.example`).
 
 ## Database
 
+Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isolation.md#three-connections) for why.
+
 | Variable | Type | Default | Secret | Where | Purpose |
 |---|---|---|---|---|---|
 | `DATABASE_BACKEND` | `sqlite` \| `postgres` | `sqlite` | | C (`postgres`) | Which database to use when `DATABASE_URL` is empty |
 | `SQLITE_PATH` | str | `outbound.db` | | — | SQLite file for the `sqlite` backend |
-| `POSTGRES_URL` | str | — | (holds a password) | D | Supabase session-pooler URL, with `?sslmode=require` |
+| `POSTGRES_URL` | str | — | (holds a password) | D | Supabase session-pooler URL, with `?sslmode=require`; connects as `outbound_app` |
+| `POSTGRES_PLATFORM_URL` | str | — (falls back to `POSTGRES_URL`) | (holds a password) | D | The cross-workspace, read-mostly connection; connects as `outbound_platform`. Leaving it unset in production means the scheduler runs as `outbound_app` instead — see [R-26](../tech-debt-and-risks.md#r-26--p3--configuration-platform_database_url-silently-falls-back-to-database_url) |
+| `POSTGRES_MIGRATE_URL` | str | — (falls back to `POSTGRES_URL`) | (holds a password) | D (migrate container only) | The owner connection; the only role Alembic may run as |
 | `DATABASE_URL` | str | — | (holds a password) | — | Overrides the switch (tests, `--database-url`) |
-| `DATABASE_POOL_SIZE` | int | 5 | | D if needed | Connections per process; lower it for small Supabase plans ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
+| `PLATFORM_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_PLATFORM_URL`'s resolution |
+| `MIGRATE_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_MIGRATE_URL`'s resolution |
+| `DATABASE_POOL_SIZE` | int | 5 | | D if needed | Connections per process, per engine; lower it for small Supabase plans ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
 
 ## Logging
 
@@ -74,23 +82,21 @@ Locally, everything comes from `.env` (template: `.env.example`).
 | `GEMINI_API_KEY` | str | — | yes | D | Key for `gemini` |
 | `COPILOT_API_KEY` | str | — | yes | D | Key for `github_copilot` |
 | `LLM_API_KEY` | str | — | yes | D | Key for `openai_compatible`, and the fallback for any preset |
+| `LLM_COPY_MODEL` | str | — (falls back to `LLM_MODEL`) | | D if different | A separate, usually stronger, model for the copy stage; research can stay on a cheaper model |
+| `LLM_REASONING_EFFORT` | `low` \| `medium` \| `high` \| `""` | `""` | | D if used | Sent as `reasoning.effort` to a model that accepts it (e.g. via OpenRouter); counts against `LLM_MAX_TOKENS` |
 
-## Mailbox (IMAP)
+## Mailboxes and OAuth
 
-Without `IMAP_HOST` and `EMAIL_ADDRESS`, there is no deliver stage and no Sent sync.
+There is no single operator mailbox any more — each workspace connects its own, in Settings → Mailboxes, stored (encrypted) in the `mailboxes`/`credentials` tables. See [mailboxes and OAuth](../lld/mailboxes-and-oauth.md). These settings configure the platform's own OAuth applications and the IMAP connection guard, not any one mailbox.
 
 | Variable | Type | Default | Secret | Where | Purpose |
 |---|---|---|---|---|---|
-| `IMAP_HOST` | str | — | | D | Mail server |
-| `IMAP_PORT` | int | 993 | | — | Port |
-| `IMAP_USE_SSL` | bool | true | | — | IMAPS |
-| `EMAIL_ADDRESS` | str | — | | D | Login and sender address |
-| `EMAIL_PASSWORD` | str | — | yes | D | Password (an app password if the provider offers one) |
-| `FROM_NAME` | str | — | | D | Display name on drafts |
-| `DRAFTS_FOLDER` | str | `INBOX.Drafts` | | D if different | Where drafts are saved |
-| `SENT_FOLDER` | str | `INBOX.Sent` | | D if different | What the Sent sync reads |
-| `INBOX_FOLDER` | str | `INBOX` | | — | Phase 4 |
-| `IMAP_TIMEOUT_SECONDS` | float | 30 | | — | Per IMAP session |
+| `MICROSOFT_CLIENT_ID` | str | — | | D | The platform's multi-tenant Entra app id; without it, "Connect Microsoft 365" is not offered |
+| `MICROSOFT_CLIENT_SECRET` | str | — | yes | D | Its client secret |
+| `GOOGLE_CLIENT_ID` | str | — | | D | The platform's Google Cloud OAuth client id; without it, "Connect Google Workspace" is not offered |
+| `GOOGLE_CLIENT_SECRET` | str | — | yes | D | Its client secret |
+| `MAILBOX_TIMEOUT_SECONDS` | float | 30 | | — | Per mailbox network call (IMAP, Graph, Gmail API) |
+| `SECRETS_KEYS` | JSON, `{"<version>": "<base64 32 bytes>"}` | — | yes | D | Encrypts every workspace's mailbox credentials and the platform's vendor keys (AES-256-GCM). The highest version always encrypts; `outbound secrets new-key` generates one. Losing it makes every stored credential permanently unreadable ([R-25](../tech-debt-and-risks.md#r-25--p2--secrets-secrets_keys-is-a-single-point-of-failure-for-every-workspaces-encrypted-credentials)) |
 
 ## Spend
 
@@ -102,19 +108,25 @@ Without `IMAP_HOST` and `EMAIL_ADDRESS`, there is no deliver stage and no Sent s
 
 Example: `LLM_PRICES={"claude-sonnet-5-5": [3000000, 15000000]}` records $3 per million input tokens and $15 per million output tokens. Use your provider's current prices.
 
-## Web app and API
+## Identity, web app and API
+
+Accounts, sessions and permissions replaced the single operator password in Phase 6b — see [identity and access](../lld/identity-and-access.md).
 
 | Variable | Type | Default | Secret | Where | Purpose |
 |---|---|---|---|---|---|
-| `OPERATOR_PASSWORD_HASH` | str | — | (sensitive) | D | Argon2 hash from `outbound auth hash-password`; `serve` will not start without it |
-| `SESSION_SECRET` | str | — | yes | D | Signs the session cookie (≥ 16 characters; use 64 hex characters) |
-| `SESSION_HOURS` | int | 12 | | — | Session lifetime |
-| `INTAKE_WEBHOOK_SECRET` | str | — | yes | D if used | Enables and signs the webhook |
-| `COOKIE_SECURE` | bool | false | | C (`true`) | `Secure` cookie flag. `serve` refuses a non-loopback host without it |
+| `SECRETS_KEYS` | JSON | — | yes | D | Also used here indirectly: see Mailboxes and OAuth above |
+| `APP_BASE_URL` | str | `http://127.0.0.1:8000` | | C/D (the real host) | The host invitation, reset and OAuth-redirect links start with |
+| `SUPERADMIN_ENABLED` | bool | true | | D (`false` to disable) | Alpha-only: lets a platform superadmin read any workspace, read-only |
+| `TERMS_VERSION` | str | `2026-10` | | D if changed | The Terms version a person accepts when they set a password |
+| `EMAIL_FROM` | str | `Outbound <no-reply@localhost>` | | D | From-address on invitation/reset emails |
+| `SMTP_HOST` | str | — (blank: log instead of send) | | D in production | The platform's own outbound mail relay for invites and resets — never a customer's mailbox |
+| `SMTP_PORT` | int | 587 | | — | — |
+| `SMTP_USERNAME` | str | — | | D if used | — |
+| `SMTP_PASSWORD` | str | — | yes | D if used | — |
+| `COOKIE_SECURE` | bool | false | | C (`true`) | `Secure` cookie flag (and the `__Host-` cookie name). `serve` refuses a non-loopback host without it |
 | `API_HOST` | str | `127.0.0.1` | | C (`0.0.0.0` inside the container) | Bind address |
 | `API_PORT` | int | 8000 | | C | Port inside the container (published on `127.0.0.1:$OUTBOUND_PORT`, default 8010) |
 | `FORWARDED_ALLOW_IPS` | str | `127.0.0.1` | | C (`*`) | Proxies whose `X-Forwarded-For` is trusted |
-| `WORKSPACE_NAME` | str | `default` | | — | The API's workspace. **Leave it at `default`**: the worker and CLI do not read it ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces)) |
 
 **Deployment-only variables** (read by the deploy scripts, not by `Settings`):
 
@@ -140,13 +152,16 @@ These are stored in `workspaces.settings` and edited in the app (Settings, and P
 | `breaker` | `{hard_per_100: 3, hard_per_24h: 2}` | no | Phase 5 bounce circuit breaker |
 | `catch_all_resolver` | `scrubby` | no | **Unused**: the environment's `CATCH_ALL_RESOLVER` decides (Phase 3b B9) |
 | `reply_webhook_url` | null | no | Phase 4 |
+| `directory_share_operator_contacts` | false | the key is read; no screen yet | Whether an operator-typed contact may be contributed to the [lead directory](../lld/lead-directory.md) |
+
+A workspace's **plan, entitlements, overrides and grants** are a separate, platform-admin-managed layer on top of these settings — not stored in `workspaces.settings` at all. See [plans, credits and admin](../lld/plans-credits-and-admin.md).
 
 ## How to refresh this page
 
 ```bash
 uv run python -c "
 from outbound.config import Settings
-for n, f in Settings.model_fields.items(): print(n.upper(), f.annotation, f.default)" | wc -l      # 52
+for n, f in Settings.model_fields.items(): print(n.upper(), f.annotation, f.default)" | wc -l      # 58
 grep -n "environment:" -A12 deploy/compose.yml
 sed -n '/def default_workspace_settings/,/}/p' outbound/services/defaults.py
 grep -n "SETTING_FIELDS" -A10 outbound/services/settings.py
