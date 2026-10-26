@@ -173,9 +173,14 @@ def register(app: typer.Typer) -> None:
         tick_every = timedelta(minutes=tick_minutes) if tick_minutes > 0 else None
         from outbound.providers.registry import build_transactional_email
         from outbound.services.admin import AdminService
+        from outbound.services.directory import DirectoryService, finder_price
         from outbound.services.notices import NoticeService
 
         vendors = VendorService(container.platform, container.settings)
+        directory = DirectoryService(
+            container.platform,
+            finder_price_micro_usd=finder_price(container.settings),
+        )
         notices = NoticeService(
             AdminService(container.platform, container.identity, container.uow),
             container.identity,
@@ -187,7 +192,7 @@ def register(app: typer.Typer) -> None:
             lambda workspace_id: assemble(container, workspace_id, live.get()),
             threads=threads,
             tick_every=tick_every,
-            periodic=[lambda: _enforce_caps(vendors, notices), notices.run],
+            periodic=[lambda: _enforce_caps(vendors, notices), notices.run, directory.run],
         )
         try:
             engine.run_forever(poll_seconds=poll_seconds)

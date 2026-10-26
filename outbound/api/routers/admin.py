@@ -26,6 +26,11 @@ from outbound.api.schemas import (
     CustomerOut,
     CustomerRowOut,
     DefaultPlanIn,
+    DirectoryFiguresOut,
+    DirectoryFlagOut,
+    DirectoryHistoryOut,
+    DirectoryOverviewOut,
+    DirectoryResolveIn,
     ExtendAccessIn,
     GrantedOut,
     GrantIn,
@@ -59,6 +64,7 @@ from outbound.services.admin import (
     CustomerDetail,
     CustomerRow,
 )
+from outbound.services.directory import DirectoryService
 from outbound.services.identity import CurrentUser, IdentityError, IdentityService
 from outbound.services.vendors import VendorService
 
@@ -549,3 +555,42 @@ def set_vendor_cap(
 ) -> VendorsOut:
     service.set_cap(vendor, body.cap_micro_usd, by=staff.user.id)
     return _vendors(service)
+
+
+# ------------------------------------------------------------------ the lead directory
+
+
+def directory_service(request: Request) -> DirectoryService:
+    service: DirectoryService = request.app.state.directory
+    return service
+
+
+Directory = Annotated[DirectoryService, Depends(directory_service)]
+
+
+def _directory(service: DirectoryService) -> DirectoryOverviewOut:
+    found = service.overview()
+    return DirectoryOverviewOut(
+        figures=DirectoryFiguresOut(**found.figures.__dict__),
+        flags=[DirectoryFlagOut(**f.__dict__) for f in found.flags],
+    )
+
+
+@router.get("/directory", response_model=DirectoryOverviewOut)
+def directory(_: Reader, service: Directory) -> DirectoryOverviewOut:
+    return _directory(service)
+
+
+@router.post("/directory/flags/{flag_id}/resolve", response_model=DirectoryOverviewOut)
+def resolve_directory_flag(
+    flag_id: str, body: DirectoryResolveIn, staff: Writer, service: Directory
+) -> DirectoryOverviewOut:
+    service.resolve(flag_id, accept=body.accept, note=body.note, by=staff.user.id)
+    return _directory(service)
+
+
+@router.get("/directory/history", response_model=list[DirectoryHistoryOut])
+def directory_history(
+    key: Annotated[str, Query(min_length=3)], _: Reader, service: Directory
+) -> list[DirectoryHistoryOut]:
+    return [DirectoryHistoryOut(**row) for row in service.history(key)]

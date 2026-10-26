@@ -28,6 +28,7 @@ from outbound.db.models import (
     WorkspacePlanRow,
     WorkspaceRow,
 )
+from outbound.db.repositories.directory import DirectoryAdminRepository
 from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettingsRepository
 from outbound.db.repositories.vendors import VendorKeyRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
@@ -183,6 +184,7 @@ class PlatformUnitOfWork:
     def __enter__(self) -> Self:
         self.session = self._factory()
         self.vendor_keys = VendorKeyRepository(self.session, self._keyring)
+        self.directory = DirectoryAdminRepository(self.session)
         self.workspaces = WorkspaceRepository(self.session)
         self.scheduler = SchedulerQueries(self.session)
         self.figures = AdminQueries(self.session)

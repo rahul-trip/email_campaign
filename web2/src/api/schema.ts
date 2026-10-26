@@ -229,6 +229,57 @@ export interface paths {
         patch: operations["change_status_api_admin_customers__workspace_id__status_patch"];
         trace?: never;
     };
+    "/api/admin/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory */
+        get: operations["directory_api_admin_directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/directory/flags/{flag_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Directory Flag */
+        post: operations["resolve_directory_flag_api_admin_directory_flags__flag_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/directory/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory History */
+        get: operations["directory_history_api_admin_directory_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/overview": {
         parameters: {
             query?: never;
@@ -778,6 +829,57 @@ export interface paths {
          * @description Permanently delete a lead. The body must repeat the lead's domain to confirm.
          */
         post: operations["delete_lead_api_companies__company_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory Badge */
+        get: operations["directory_badge_api_companies__company_id__directory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/directory/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Directory Report */
+        post: operations["directory_report_api_companies__company_id__directory_report_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/directory/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Directory Skip */
+        put: operations["directory_skip_api_companies__company_id__directory_skip_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2450,6 +2552,97 @@ export interface components {
             drafts_left: string[];
             /** Messages Removed */
             messages_removed: number;
+        };
+        /** DirectoryBadgeOut */
+        DirectoryBadgeOut: {
+            /** Can Skip */
+            can_skip: boolean;
+            /** In Directory */
+            in_directory: boolean;
+            /** Skipping */
+            skipping: boolean;
+            /** Verified Month */
+            verified_month: string | null;
+        };
+        /** DirectoryFiguresOut */
+        DirectoryFiguresOut: {
+            /** Companies */
+            companies: number;
+            /** Emails */
+            emails: number;
+            /** Hits */
+            hits: number;
+            /** Lookups */
+            lookups: number;
+            /** Open Reports */
+            open_reports: number;
+            /** People */
+            people: number;
+            /** Saved Micro Usd */
+            saved_micro_usd: number;
+            /** Unfolded */
+            unfolded: number;
+        };
+        /** DirectoryFlagOut */
+        DirectoryFlagOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Field */
+            field: string;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+            /** Target Key */
+            target_key: string;
+            /** Target Type */
+            target_type: string;
+        };
+        /** DirectoryHistoryOut */
+        DirectoryHistoryOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** DirectoryOverviewOut */
+        DirectoryOverviewOut: {
+            figures: components["schemas"]["DirectoryFiguresOut"];
+            /** Flags */
+            flags: components["schemas"]["DirectoryFlagOut"][];
+        };
+        /** DirectoryReportIn */
+        DirectoryReportIn: {
+            /** Field */
+            field: string;
+            /**
+             * Reason
+             * @default
+             */
+            reason?: string;
+        };
+        /** DirectoryResolveIn */
+        DirectoryResolveIn: {
+            /** Accept */
+            accept: boolean;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+        };
+        /** DirectorySkipIn */
+        DirectorySkipIn: {
+            /** Skip */
+            skip: boolean;
         };
         /** EmailOut */
         EmailOut: {
@@ -4265,6 +4458,92 @@ export interface operations {
             };
         };
     };
+    directory_api_admin_directory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryOverviewOut"];
+                };
+            };
+        };
+    };
+    resolve_directory_flag_api_admin_directory_flags__flag_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                flag_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectoryResolveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryOverviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directory_history_api_admin_directory_history_get: {
+        parameters: {
+            query: {
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryHistoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     overview_api_admin_overview_get: {
         parameters: {
             query?: never;
@@ -5261,6 +5540,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteLeadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directory_badge_api_companies__company_id__directory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryBadgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directory_report_api_companies__company_id__directory_report_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectoryReportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directory_skip_api_companies__company_id__directory_skip_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectorySkipIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryBadgeOut"];
                 };
             };
             /** @description Validation Error */

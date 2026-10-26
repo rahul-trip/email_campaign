@@ -144,6 +144,7 @@ ignore_imports = [
     "outbound.services.workspaces -> outbound.db.platform",
     "outbound.services.admin -> outbound.db.platform",
     "outbound.services.vendors -> outbound.db.platform",
+    "outbound.services.directory -> outbound.db.platform",
     "outbound.services.identity -> outbound.db.platform",
 ]
 

@@ -1642,6 +1642,227 @@
         "title": "DeleteLeadOut",
         "type": "object"
       },
+      "DirectoryBadgeOut": {
+        "properties": {
+          "can_skip": {
+            "title": "Can Skip",
+            "type": "boolean"
+          },
+          "in_directory": {
+            "title": "In Directory",
+            "type": "boolean"
+          },
+          "skipping": {
+            "title": "Skipping",
+            "type": "boolean"
+          },
+          "verified_month": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified Month"
+          }
+        },
+        "required": [
+          "in_directory",
+          "verified_month",
+          "can_skip",
+          "skipping"
+        ],
+        "title": "DirectoryBadgeOut",
+        "type": "object"
+      },
+      "DirectoryFiguresOut": {
+        "properties": {
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "emails": {
+            "title": "Emails",
+            "type": "integer"
+          },
+          "hits": {
+            "title": "Hits",
+            "type": "integer"
+          },
+          "lookups": {
+            "title": "Lookups",
+            "type": "integer"
+          },
+          "open_reports": {
+            "title": "Open Reports",
+            "type": "integer"
+          },
+          "people": {
+            "title": "People",
+            "type": "integer"
+          },
+          "saved_micro_usd": {
+            "title": "Saved Micro Usd",
+            "type": "integer"
+          },
+          "unfolded": {
+            "title": "Unfolded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "companies",
+          "people",
+          "emails",
+          "open_reports",
+          "unfolded",
+          "lookups",
+          "hits",
+          "saved_micro_usd"
+        ],
+        "title": "DirectoryFiguresOut",
+        "type": "object"
+      },
+      "DirectoryFlagOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "target_key": {
+            "title": "Target Key",
+            "type": "string"
+          },
+          "target_type": {
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target_type",
+          "target_key",
+          "field",
+          "reason",
+          "created_at"
+        ],
+        "title": "DirectoryFlagOut",
+        "type": "object"
+      },
+      "DirectoryHistoryOut": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "target",
+          "source"
+        ],
+        "title": "DirectoryHistoryOut",
+        "type": "object"
+      },
+      "DirectoryOverviewOut": {
+        "properties": {
+          "figures": {
+            "$ref": "#/components/schemas/DirectoryFiguresOut"
+          },
+          "flags": {
+            "items": {
+              "$ref": "#/components/schemas/DirectoryFlagOut"
+            },
+            "title": "Flags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "figures",
+          "flags"
+        ],
+        "title": "DirectoryOverviewOut",
+        "type": "object"
+      },
+      "DirectoryReportIn": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "maxLength": 10000,
+            "title": "Field",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "DirectoryReportIn",
+        "type": "object"
+      },
+      "DirectoryResolveIn": {
+        "additionalProperties": false,
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accept"
+        ],
+        "title": "DirectoryResolveIn",
+        "type": "object"
+      },
+      "DirectorySkipIn": {
+        "additionalProperties": false,
+        "properties": {
+          "skip": {
+            "title": "Skip",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "skip"
+        ],
+        "title": "DirectorySkipIn",
+        "type": "object"
+      },
       "EmailOut": {
         "properties": {
           "email": {
@@ -6848,6 +7069,126 @@
         ]
       }
     },
+    "/api/admin/directory": {
+      "get": {
+        "operationId": "directory_api_admin_directory_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Directory",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/directory/flags/{flag_id}/resolve": {
+      "post": {
+        "operationId": "resolve_directory_flag_api_admin_directory_flags__flag_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "flag_id",
+            "required": true,
+            "schema": {
+              "title": "Flag Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryResolveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryOverviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Directory Flag",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/directory/history": {
+      "get": {
+        "operationId": "directory_history_api_admin_directory_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "minLength": 3,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DirectoryHistoryOut"
+                  },
+                  "title": "Response Directory History Api Admin Directory History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory History",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/overview": {
       "get": {
         "operationId": "overview_api_admin_overview_get",
@@ -8246,6 +8587,145 @@
         "summary": "Delete Lead",
         "tags": [
           "privacy"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/directory": {
+      "get": {
+        "operationId": "directory_badge_api_companies__company_id__directory_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryBadgeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory Badge",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/directory/report": {
+      "post": {
+        "operationId": "directory_report_api_companies__company_id__directory_report_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryReportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory Report",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/directory/skip": {
+      "put": {
+        "operationId": "directory_skip_api_companies__company_id__directory_skip_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectorySkipIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryBadgeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory Skip",
+        "tags": [
+          "leads"
         ]
       }
     },

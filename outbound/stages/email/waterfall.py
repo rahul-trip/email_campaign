@@ -82,6 +82,8 @@ class Target:
     pattern: str | None = None
     site_emails: Sequence[str] = ()
     safe_to_send_only: bool = True
+    # Finders left out for this company (the shared directory, when the lead skips it).
+    skip_finders: frozenset[str] = frozenset()
     # True for an address that must never be contacted (the do-not-contact list). Checked
     # before an address is verified, so no money is spent on it and it is never chosen.
     is_blocked: Callable[[str], bool] = lambda address: False
@@ -148,6 +150,8 @@ class Waterfall:
             linkedin_url=contact.linkedin_url,
         )
         for finder in self._finders:
+            if finder.name in target.skip_finders:
+                continue
             try:
                 found = finder.find(query, target.domain)
             except ProviderError as error:

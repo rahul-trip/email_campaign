@@ -27,6 +27,7 @@ from outbound.db.repositories.contacts import (
     ContactRepository,
     NoteRepository,
 )
+from outbound.db.repositories.directory import DirectoryRepository
 from outbound.db.repositories.erasure import ErasureRepository
 from outbound.db.repositories.imports import ImportRepository
 from outbound.db.repositories.messages import InboundRepository, MessageRepository
@@ -73,6 +74,7 @@ class UnitOfWork:
         self.consents = ConsentRepository(*args)
         self.messages = MessageRepository(*args)
         self.inbound = InboundRepository(*args)
+        self.directory = DirectoryRepository(self.session, self.workspace_id)
         self.imports = ImportRepository(*args)
         self.suppressions = SuppressionRepository(*args)
         self.policies = CountryPolicyRepository(*args)

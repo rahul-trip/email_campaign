@@ -90,6 +90,7 @@ def forget_email(uow: UnitOfWork, email: str, *, actor: str = OPERATOR) -> Forge
     address = normalise(email)
     # Suppress first, even for an address we do not hold, so it can never be imported later.
     uow.suppressions.add(SuppressionKind.EMAIL, address, SuppressionReason.FORGET, actor=actor)
+    uow.directory.remove_person(address)  # and the shared directory, for every customer
 
     known = uow.emails.by_address(address)
     if known is None:

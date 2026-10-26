@@ -59,7 +59,7 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - `outbound/stages/mailboxes.py` opens a workspace's mailboxes for delivery, Sent sync and draft deletion; the `IMAP_*` and `EMAIL_*` settings are gone;
   - new workspaces start blank (`outbound/services/workspaces.py`), with a guided setup at `/onboarding` driven by `GET /api/setup`;
   - the intake webhook is per workspace (`/api/intake/webhook/{workspace_id}`, secret made in Settings → Integrations).
-- **Phase 6d (plans, limits and admin console) is mostly built** on branch `phase-6/plans-limits-admin`: per-step credits charged once per lead, leads that wait and resume, the console at `/admin`, vendor keys in the database (`outbound vendors import-env`), notices, and vendor spend caps. `docs/phases/PROGRESS-6.md` lists what is done and what is left; keep it updated.
+- **Phase 6d (plans, limits and admin console) is mostly built** on branch `phase-6/plans-limits-admin`: per-step credits charged once per lead, leads that wait and resume, the console at `/admin`, vendor keys in the database (`outbound vendors import-env`), notices, and vendor spend caps. The inbox is read for opt-outs and hard bounces (4a), and a shared verified lead directory is the first link of the email waterfall (6g, migration 0014). `docs/phases/PROGRESS-6.md` lists what is done and what is left; keep it updated.
 - **Phase 6 (SaaS alpha) is planned and approved (2026-10-23):**
   - `docs/phases/phase-6-saas-ready.md` gives the overview, decisions and isolation model; the sub-phases are 6a–6g.
   - Order: 6a tenancy → 6b identity → 6c onboarding and mailboxes → 6d plans, limits and admin console → 4a opt-outs and bounces → **alpha** → 6g lead directory, in parallel with the rest of Phase 4.

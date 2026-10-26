@@ -292,3 +292,30 @@ class UserStatus(StrEnum):
 class AuthTokenPurpose(StrEnum):
     INVITE = "invite"
     RESET = "reset"
+
+
+class DirectoryStatus(StrEnum):
+    """Whether the verified lead directory may serve a fact."""
+
+    VERIFIED = "verified"
+    DISPUTED = "disputed"  # someone reported it wrong; not served until reconfirmed
+    INVALID = "invalid"  # confirmed wrong; kept so it is not learned again
+
+
+class EmploymentStatus(StrEnum):
+    CURRENT = "current"
+    LEFT = "left"
+    UNKNOWN = "unknown"
+
+
+class FlagStatus(StrEnum):
+    OPEN = "open"
+    CONFIRMED = "confirmed"  # the report was right
+    REJECTED = "rejected"  # the report was wrong; the fact is served again
+
+
+class DirectoryTarget(StrEnum):
+    EMAIL = "email"
+    PERSON = "person"
+    COMPANY = "company"
+    PATTERN = "pattern"  # a company's email pattern

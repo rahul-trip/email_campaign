@@ -24,7 +24,7 @@ test("a platform admin opens the console, finds a customer and grants credits", 
 test("the other console pages load", async ({ page }) => {
   await signIn(page, STAFF, false);
   await expect(page.getByRole("heading", { name: "Choose a workspace" })).toBeVisible();
-  for (const name of ["Users", "Plans", "Settings"]) {
+  for (const name of ["Users", "Plans", "Settings", "Lead directory"]) {
     await page.goto("/admin");
     await page.getByRole("link", { name, exact: true }).click();
     await expect(page.getByRole("heading", { name, exact: false }).first()).toBeVisible();

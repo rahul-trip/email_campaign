@@ -9,11 +9,12 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 
 from outbound.bootstrap import Container, container_for
 from outbound.config import Settings
 from outbound.db.models import ProviderCallRow, WorkspaceRow
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import (
     CallOutcome,
@@ -29,6 +30,7 @@ from outbound.providers.ports import (
     SentMessage,
 )
 from outbound.runner.runner import Outcome
+from outbound.services.directory import DirectoryService
 from outbound.services.reports import ReportService
 from outbound.services.runs import RunService
 from tests.stages.fakes import FakeLlm
@@ -270,3 +272,57 @@ def test_a_lead_the_run_failed_is_listed_with_the_error(
     [lead] = RunService(factory, ws).leads(run.run_id)
     assert lead.outcome == "failed"
     assert lead.steps[-1].to_status == "failed" and "JSON" in (lead.steps[-1].detail or "")
+
+
+def test_a_person_verified_for_one_customer_costs_the_next_no_finder_call(
+    engine: Engine,
+    factory: UnitOfWorkFactory,
+    ws: str,
+    other_ws: str,
+    platform: PlatformUnitOfWorkFactory,
+) -> None:
+    """The 6g gate: the free first link, the skip option, and the ledger that proves both."""
+    first_world, second_world, third_world = World(), World(), World()
+    row = [ROWS[0]]
+
+    pipeline, _ = build(engine, factory, ws, first_world)
+    pipeline.intake.run(row)
+    pipeline.runner.run_pipeline()
+    assert first_world.finder.calls == 1  # nobody had verified Jane Doe yet
+    with platform() as p:  # leave out the learned pattern, so only the person's fact can answer
+        p.session.execute(text("DELETE FROM directory_observations WHERE target_type = 'pattern'"))
+        p.commit()
+    DirectoryService(platform, finder_price_micro_usd=24_500).run()
+
+    pipeline, _ = build(engine, factory, other_ws, second_world)
+    pipeline.intake.run(row)
+    pipeline.runner.run_pipeline()
+    assert statuses(factory, other_ws) == {"acme.co.uk": C.COPY_READY}
+    assert second_world.finder.calls == 0  # the directory answered; no paid finder was called
+    assert second_world.verifier.calls == 1  # and the address was still checked once
+    with factory(other_ws) as uow:
+        rows = list(
+            uow.session.scalars(
+                select(ProviderCallRow).where(
+                    ProviderCallRow.workspace_id == other_ws,
+                    ProviderCallRow.provider == "directory",
+                )
+            )
+        )
+        address = uow.emails.by_address("jane.doe@acme.co.uk")
+    assert [(r.outcome, r.cost_micro_usd) for r in rows] == [(CallOutcome.HIT, 0)]
+    assert address is not None and address.found_by == "directory"
+
+    # A lead set to skip the directory goes to the vendors, and its result feeds the directory.
+    with platform() as p:
+        third = p.workspaces.create("third", {"legal_name": "third"}, {"safe_to_send_only": True})
+        p.commit()
+    pipeline, _ = build(engine, factory, third.id, third_world)
+    pipeline.intake.run(row)
+    with factory(third.id) as uow:
+        company = uow.companies.by_domain("acme.co.uk")
+        assert company is not None
+        uow.companies.set_skip_directory(company.id, True, actor="operator")
+        uow.commit()
+    pipeline.runner.run_pipeline()
+    assert third_world.finder.calls == 1
