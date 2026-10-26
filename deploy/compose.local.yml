@@ -20,9 +20,23 @@ services:
       retries: 30
     restart: unless-stopped
 
+  # Extra settings for this laptop only: ${OUTBOUND_HOME}/local.env (git-ignored) holds the database
+  # roles' URLs and SECRETS_KEYS, which Doppler's dev config does not carry (docs/DEPLOY.md, 5).
+  # On an Apple M4 laptop also put OPENSSL_armcap=0 there, or Python dies with "Illegal instruction".
   migrate:
+    env_file: [ "${OUTBOUND_HOME:-/opt/outbound}/doppler.env", "${OUTBOUND_HOME:-/opt/outbound}/local.env" ]
     depends_on:
       db: { condition: service_healthy }
+
+  api:
+    environment:
+      ENVIRONMENT: local  # not "production": invitations and resets go to the log (no SMTP here)
+    env_file: [ "${OUTBOUND_HOME:-/opt/outbound}/doppler.env", "${OUTBOUND_HOME:-/opt/outbound}/local.env" ]
+
+  worker:
+    environment:
+      ENVIRONMENT: local
+    env_file: [ "${OUTBOUND_HOME:-/opt/outbound}/doppler.env", "${OUTBOUND_HOME:-/opt/outbound}/local.env" ]
 
   proxy:
     image: caddy:2.8.4

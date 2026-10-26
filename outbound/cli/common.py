@@ -24,7 +24,9 @@ WorkspaceName = Annotated[
 
 def settings_for(database_url: str | None) -> Settings:
     settings = Settings()
-    if database_url:
+    # The option also reads DATABASE_URL, which Settings already has: only a different address given
+    # on purpose replaces all three, so migrations keep running as the owner (MIGRATE_DATABASE_URL).
+    if database_url and database_url != settings.database_url:
         settings = settings.model_copy(
             update={
                 "database_url": database_url,
