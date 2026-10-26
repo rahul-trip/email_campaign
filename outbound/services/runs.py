@@ -8,7 +8,7 @@ from enum import StrEnum
 from typing import Any
 
 from outbound.db.errors import NotFound
-from outbound.db.repositories.audit import RunView
+from outbound.db.repositories.audit import RunCallSummary, RunView
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import RunKind, RunStatus
 from outbound.services import defaults
@@ -81,6 +81,13 @@ class RunStep:
     detail: str | None  # the reason, hold reason or error
 
 
+@dataclass(frozen=True)
+class DiscoverySearch:
+    query: str
+    new_leads: int
+    already_leads: int
+
+
 class RunService:
     def __init__(self, uow_factory: UnitOfWorkFactory, workspace_id: str) -> None:
         self._uow = uow_factory
@@ -149,6 +156,25 @@ class RunService:
                     )
                 )
             return found
+
+    def calls(self, run_id: str) -> list[RunCallSummary]:
+        """What the run spent, by vendor and operation."""
+        with self._uow(self._workspace_id) as uow:
+            uow.runs.get(run_id)  # NotFound for an unknown run or another workspace's
+            return uow.calls.summary_for_run(run_id)
+
+    def searches(self, run_id: str) -> list[DiscoverySearch]:
+        """The web searches a run made to find new companies, with what each one found."""
+        with self._uow(self._workspace_id) as uow:
+            uow.runs.get(run_id)  # NotFound for an unknown run or another workspace's
+            return [
+                DiscoverySearch(
+                    str(e.data.get("query", "")),
+                    int(e.data.get("new", 0)),
+                    int(e.data.get("already_leads", 0)),
+                )
+                for e in uow.events.for_run(run_id, ("discovery_query",))
+            ]
 
     def cancel(self, run_id: str) -> RunView:
         with self._uow(self._workspace_id) as uow:

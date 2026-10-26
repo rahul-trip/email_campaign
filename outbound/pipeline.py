@@ -13,8 +13,15 @@ from dataclasses import dataclass, field
 from outbound.bootstrap import Container
 from outbound.config import Settings
 from outbound.db.types import utcnow
+from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Workspace
-from outbound.domain.enums import CompanySource, ImportRowStatus, ImportSource, UsageStep
+from outbound.domain.enums import (
+    CompanySource,
+    EntityType,
+    ImportRowStatus,
+    ImportSource,
+    UsageStep,
+)
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
 from outbound.metering.budget import BudgetPolicy
@@ -50,6 +57,7 @@ from outbound.providers.registry import (
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
+from outbound.services.discovery import HISTORY, plan_queries
 from outbound.services.inbox import InboxSync
 from outbound.services.intake import IntakeService, discover_candidates, discovery_query
 from outbound.services.privacy import PrivacyService
@@ -97,6 +105,7 @@ class Pipeline:
     intake: IntakeService
     meter: Meter
     search: SearchProvider
+    llm: LlmClient | None = None  # plans discovery searches; behind the meter
     stage_names: list[str] = field(default_factory=list)
     has_mailbox: bool = False
 
@@ -203,6 +212,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         intake=intake,
         meter=meter,
         search=search,
+        llm=llm,
         stage_names=[stage.name for stage in stages],
         has_mailbox=has_mailbox,
     )
@@ -238,11 +248,15 @@ def execute_run(
     extra: dict[str, Counter[str]] = {}
     if request.mode is not RunMode.MANUAL:
         found = discover_companies(
-            pipeline, container, workspace_id, request.campaign, request.discover
+            pipeline, container, workspace_id, request.campaign, request.discover, run_id=run_id
         )
         # Shown on the Runs page, so a search that found only known companies says so.
         extra["discovery"] = Counter(
-            {"new leads": found.added, "already leads": found.already_leads}
+            {
+                "new leads": found.added,
+                "already leads": found.already_leads,
+                "searches": found.searches,
+            }
         )
     return pipeline.runner.run_pipeline(
         limit=request.limit, only=set(request.only) or None, run_id=run_id, extra_counts=extra
@@ -253,14 +267,28 @@ def execute_run(
 class Discovery:
     added: int = 0
     already_leads: int = 0
+    searches: int = 0
+
+
+MAX_SEARCHES = 4  # per run: enough angles to find new companies, not a runaway bill
 
 
 def discover_companies(
-    pipeline: Pipeline, container: Container, workspace_id: str, campaign_name: str, count: int
+    pipeline: Pipeline,
+    container: Container,
+    workspace_id: str,
+    campaign_name: str,
+    count: int,
+    *,
+    run_id: str | None = None,
 ) -> Discovery:
-    """Search the web for companies that fit the campaign and add them as discovered targets."""
+    """Search the web for companies that fit the campaign and add them as discovered targets.
+
+    Every run looks from new angles (see ``services.discovery``), skipping companies the
+    workspace already has, until ``count`` new ones are found or the searches are used up."""
     with container.uow(workspace_id) as uow:
         campaign = uow.campaigns.by_name(campaign_name)
+        workspace = uow.workspace()
     if campaign is None:
         raise LookupError(f"no campaign named {campaign_name!r}")
     if not (campaign.icp_description or "").strip():
@@ -268,6 +296,7 @@ def discover_companies(
             f"describe the ideal customer on the {campaign_name!r} campaign first: "
             "discovery searches for companies that fit it"
         )
+    profile = dict(workspace.sender_profile) if workspace is not None else {}
     with container.uow(workspace_id) as uow:
         quota, _ = quota_in(uow, utcnow())
     if not quota.engine:
@@ -280,20 +309,46 @@ def discover_companies(
         return Discovery()
     with container.uow(workspace_id) as uow:
         known = uow.companies.known_domains()
-    query = discovery_query(campaign.icp_description or "")
-    found = discover_candidates(pipeline.search, [query], per_query=count, skip=known)
-    report = pipeline.intake.run(
-        found.rows,
-        source=ImportSource.CLI,
-        company_source=CompanySource.DISCOVERY,
-        campaign_id=campaign.id,
+        earlier = uow.events.latest(
+            EntityType.WORKSPACE, workspace_id, "discovery_query", HISTORY * 2
+        )
+    used = [
+        str(e.data.get("query", "")) for e in earlier if e.data.get("campaign") == campaign.name
+    ]
+    queries = plan_queries(
+        llm=pipeline.llm,
+        base=discovery_query(campaign.icp_description or ""),
+        profile=profile,
+        icp=campaign.icp_description or "",
+        used=used[-HISTORY:],
+        count=MAX_SEARCHES,
     )
-    added = report.count(ImportRowStatus.ACCEPTED)
-    log.info(
-        "discovery_done", asked=count, new_candidates=len(found.rows),
-        already_leads=found.already_leads, added=added,
-    )  # fmt: skip
-    return Discovery(added, found.already_leads)
+    added = already = searches = 0
+    for query in queries:
+        if added >= count:
+            break
+        found = discover_candidates(pipeline.search, [query], per_query=count - added, skip=known)
+        searches += 1
+        report = pipeline.intake.run(
+            found.rows,
+            source=ImportSource.CLI,
+            company_source=CompanySource.DISCOVERY,
+            campaign_id=campaign.id,
+        )
+        new = report.count(ImportRowStatus.ACCEPTED)
+        added += new
+        already += found.already_leads
+        known |= {str(row["website"]).lower() for row in found.rows}
+        # Remembered, so the next run takes a different angle; shown on the run's page.
+        with container.uow(workspace_id) as uow:
+            uow.events.append(
+                EntityType.WORKSPACE, workspace_id, "discovery_query", SYSTEM,
+                {"query": query, "campaign": campaign.name, "run_id": run_id,
+                 "new": new, "already_leads": found.already_leads},
+            )  # fmt: skip
+            uow.commit()
+    log.info("discovery_done", asked=count, searches=searches, added=added, already_leads=already)
+    return Discovery(added, already, searches)
 
 
 def writer_or_none(settings: Settings) -> LlmClient | None:

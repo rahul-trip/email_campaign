@@ -1709,6 +1709,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Calls
+         * @description What the run asked of each vendor and what it cost, costliest first.
+         */
+        get: operations["run_calls_api_runs__run_id__calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -1738,6 +1758,26 @@ export interface paths {
          * @description Every lead the run moved, held, failed or deferred, each with its steps.
          */
         get: operations["run_leads_api_runs__run_id__leads_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/{run_id}/searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Searches
+         * @description The searches a run made to find new companies, and what each found.
+         */
+        get: operations["run_searches_api_runs__run_id__searches_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2724,6 +2764,15 @@ export interface components {
             /** Skip */
             skip: boolean;
         };
+        /** DiscoverySearchOut */
+        DiscoverySearchOut: {
+            /** Already Leads */
+            already_leads: number;
+            /** New Leads */
+            new_leads: number;
+            /** Query */
+            query: string;
+        };
         /** EmailOut */
         EmailOut: {
             /** Email */
@@ -3534,6 +3583,29 @@ export interface components {
             row_number: number | null;
             /** Status */
             status: string;
+        };
+        /** RunCallOut */
+        RunCallOut: {
+            /** Avg Latency Ms */
+            avg_latency_ms: number | null;
+            /** Blocked */
+            blocked: number;
+            /** Calls */
+            calls: number;
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Errors */
+            errors: number;
+            /** Found */
+            found: number;
+            /** Nothing */
+            nothing: number;
+            /** Operation */
+            operation: string;
+            /** Provider */
+            provider: string;
+            /** Reused */
+            reused: number;
         };
         /** RunIn */
         RunIn: {
@@ -7294,6 +7366,37 @@ export interface operations {
             };
         };
     };
+    run_calls_api_runs__run_id__calls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_api_runs__run_id__cancel_post: {
         parameters: {
             query?: never;
@@ -7343,6 +7446,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunLeadOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_searches_api_runs__run_id__searches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoverySearchOut"][];
                 };
             };
             /** @description Validation Error */

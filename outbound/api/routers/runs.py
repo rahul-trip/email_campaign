@@ -6,7 +6,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, require, services
-from outbound.api.schemas import CostOut, QualityOut, RunIn, RunLeadOut, RunOut, StatusOut
+from outbound.api.schemas import (
+    CostOut,
+    DiscoverySearchOut,
+    QualityOut,
+    RunCallOut,
+    RunIn,
+    RunLeadOut,
+    RunOut,
+    StatusOut,
+)
 from outbound.db.types import utcnow
 from outbound.domain.permissions import Permission as P
 from outbound.services.runs import RunRequest
@@ -47,6 +56,28 @@ def run(run_id: str, svc: Annotated[Services, Depends(services)]) -> RunOut:
 def run_leads(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[RunLeadOut]:
     """Every lead the run moved, held, failed or deferred, each with its steps."""
     return [RunLeadOut.model_validate(lead) for lead in svc.runs.leads(run_id)]
+
+
+@router.get(
+    "/runs/{run_id}/calls",
+    response_model=list[RunCallOut],
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
+def run_calls(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[RunCallOut]:
+    """What the run asked of each vendor and what it cost, costliest first."""
+    return [RunCallOut.model_validate(c) for c in svc.runs.calls(run_id)]
+
+
+@router.get(
+    "/runs/{run_id}/searches",
+    response_model=list[DiscoverySearchOut],
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
+def run_searches(
+    run_id: str, svc: Annotated[Services, Depends(services)]
+) -> list[DiscoverySearchOut]:
+    """The searches a run made to find new companies, and what each found."""
+    return [DiscoverySearchOut.model_validate(x) for x in svc.runs.searches(run_id)]
 
 
 @router.post(

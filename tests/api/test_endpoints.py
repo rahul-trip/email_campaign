@@ -1082,3 +1082,34 @@ def test_the_operator_can_ask_for_an_email_to_be_rewritten(
     assert data["body"].startswith("Dear Jane,") and data["body"].endswith(FOOTER)
     assert "word_count" in data["lint_report"]
     assert api.post(f"/api/review/{mid}/revise", json={"instructions": ""}).status_code == 422
+
+
+def test_a_runs_vendor_calls_are_added_up_by_vendor_and_operation(
+    api: Api, services: Services
+) -> None:
+    from outbound.domain.enums import CallOutcome
+
+    run = api.post("/api/runs", json={}).json()
+    assert api.get(f"/api/runs/{run['id']}/calls").json() == []
+    assert api.get("/api/runs/nope/calls").status_code == 404
+    with services.container.uow(services.workspace_id) as uow:
+        for outcome, cost, ms in (
+            (CallOutcome.HIT, 24_500, 100),
+            (CallOutcome.MISS, 24_500, 300),
+            (CallOutcome.CACHE_HIT, 0, None),
+            (CallOutcome.ERROR, 0, 50),
+        ):
+            uow.calls.record(
+                provider="hunter", operation="find", request_hash="h" * 64, outcome=outcome,
+                cost_micro_usd=cost, latency_ms=ms, run_id=run["id"],
+            )  # fmt: skip
+        uow.calls.record(
+            provider="tavily", operation="search", request_hash="t" * 64,
+            outcome=CallOutcome.HIT, cost_micro_usd=8_000, run_id=run["id"],
+        )  # fmt: skip
+        uow.commit()
+    hunter, tavily = api.get(f"/api/runs/{run['id']}/calls").json()  # costliest first
+    assert (hunter["provider"], hunter["calls"], hunter["cost_micro_usd"]) == ("hunter", 4, 49_000)
+    assert (hunter["found"], hunter["nothing"], hunter["reused"], hunter["errors"]) == (1, 1, 1, 1)
+    assert hunter["avg_latency_ms"] == 150
+    assert (tavily["provider"], tavily["cost_micro_usd"]) == ("tavily", 8_000)

@@ -94,6 +94,21 @@ class EventRepository:
         )
         return [snapshot(row, Event) for row in self._session.scalars(stmt)]
 
+    def latest(self, entity_type: EntityType, entity_id: str, type: str, limit: int) -> list[Event]:
+        """The newest ``limit`` events of one type on one entity, oldest first."""
+        stmt = (
+            select(EventRow)
+            .where(
+                EventRow.workspace_id == self._workspace_id,
+                EventRow.entity_type == entity_type,
+                EventRow.entity_id == entity_id,
+                EventRow.type == type,
+            )
+            .order_by(EventRow.created_at.desc(), EventRow.id.desc())
+            .limit(limit)
+        )
+        return [snapshot(row, Event) for row in reversed(list(self._session.scalars(stmt)))]
+
     def for_entity(self, entity_type: EntityType, entity_id: str) -> list[Event]:
         stmt = (
             select(EventRow)
