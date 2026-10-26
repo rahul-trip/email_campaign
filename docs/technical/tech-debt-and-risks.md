@@ -2,19 +2,20 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6
 ---
 
 # Tech debt and risks
 
 This register is the one place that lists what is known to be wrong, missing or fragile in the system as built. Other pages link here by ID (`R-nn`) and do not repeat the detail.
 
-Entries come from three sources:
+Entries come from four sources:
 
 - the Phase 3b audit ([phase-3b-hardening.md](../phases/phase-3b-hardening.md)), whose IDs (`A1`, `B7` …) are kept;
 - PLAN.md [§15 Risks](../PLAN.md#15-risks);
-- reading the code to write these pages (2026-10-21).
+- reading the code to write these pages (2026-10-21);
+- re-verifying every entry, and reading the Phase 6 SaaS transformation, for this update (2026-10-27).
 
 A register entry is not a decision to fix. Fixes are planned in the phase documents.
 
@@ -47,16 +48,6 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
   - `migrate` treats "database ahead of code" as success and logs it.
 - **Links:** [release-and-rollback.md](operations/release-and-rollback.md), [migrations.md](data/migrations.md), ADR [0018](adr/0018-additive-only-migrations.md).
 
-### R-02 · P1 · Pipeline: scheduled work never runs in production (B7)
-
-- **What:** retries of failed leads, the catch-all poller and the Sent-folder sync run only inside `outbound tick` (`outbound/runner/tick.py::Tick.run`). Nothing in `deploy/compose.yml` runs `tick`: there is no cron service, and the worker does not tick. An approved email is drafted only when the next pipeline run reaches the deliver stage.
-- **Effect:**
-  - Catch-all leads stay held.
-  - Sent emails are never recorded, so the unedited-copy SLO cannot be measured.
-  - Failed leads are never retried automatically.
-- **Read:** `deploy/compose.yml`, `outbound/worker.py`.
-- **Links:** Phase 3b B7, [runbook: tick not running](operations/runbooks/tick-not-running.md).
-
 ### R-03 · P1 · Cost: model calls are recorded at $0 (B5)
 
 - **What:** `outbound/providers/pricing.py::DEFAULT_LLM_PRICES` is empty, so unless `LLM_PRICES` is set, every LLM call writes a `provider_calls` row with `cost_micro_usd = 0`.
@@ -72,16 +63,6 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
 - **Effect:** a resolver call is never refused for budget, even at the cap. The ledger still records its real cost afterwards.
 - **Verified:** `price_of` returns 0 for missing keys (`outbound/providers/pricing.py::price_of`).
 - **Links:** [metering LLD](lld/metering.md).
-
-### R-05 · P1 · Runs: a stopped worker leaves its run `running`; runs can overlap (B2, B3)
-
-- **What:**
-  - There is no SIGTERM handling. PID 1 in each container is `doppler run`, with no init and Docker's default 10-second grace, so a deploy or restart kills a run mid-lead.
-  - There is no stale-run recovery (B3), so the run stays `running` for ever in the Runs screen.
-  - There is no single-run lock (B2), so the worker, a CLI `run` and a `tick` can work on the same leads. Optimistic locking prevents a double *write*, but both may pay for the same vendor call.
-- **Read:** `outbound/cli/serve.py::worker`, `outbound/worker.py`, `outbound/db/repositories/audit.py::RunRepository.claim_next`.
-- **Mitigation until fixed:** deploy only when no run is in progress ([DEPLOY.md](../DEPLOY.md) §2).
-- **Links:** Phase 3b B2, B3, [runbook: run stuck running](operations/runbooks/run-stuck-running.md).
 
 ### R-06 · P1 · Operations: health checks do not see a broken worker or database
 
@@ -120,8 +101,8 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
 
 ### R-10 · P1 · Budget: a running worker does not see budget changes (B4)
 
-- **What:** the per-prospect ceiling is read once, when the pipeline is assembled (`outbound/pipeline.py::build_meter`). A lowered budget is ignored until the worker restarts.
-- **Links:** Phase 3b B4.
+- **What:** the per-prospect ceiling is read once per `assemble()` call (`outbound/pipeline.py::build_meter`). Since the Phase 6a worker rewrite this is once per *job* (the worker reassembles the pipeline fresh for every piece of work, [runner and worker](lld/runner-and-worker.md)), not once per process restart as before — a narrower window, but a budget change still is not seen by a job already assembled and in flight.
+- **Links:** Phase 3b B4, [ADR 0025](adr/0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md).
 
 ### R-11 · P2 · Configuration: Doppler overrides compose, not the other way round
 
@@ -197,7 +178,7 @@ Read in `outbound/api/auth.py` and `deploy/`:
   - ~~`README.md` says `web/` is the app that is served~~ (fixed in the documentation PR, 2026-10-21).
   - `scripts/export_openapi.py` documents output to `web/openapi.json`.
   - `web2/src/lib/status.ts` cites a "design brief, Section 7" that does not exist.
-  - The test count in `CLAUDE.md` (1,163) and in [phases/README.md](../phases/README.md) (1,236) is stale. 1,559 tests are collected on 2026-10-21.
+  - `CLAUDE.md`'s 1,163 and [phases/README.md](../phases/README.md)'s 1,236 are each that phase's own closing gate record (Phase 2's and Phase 1's respectively), not meant to track the current count — but neither is labelled as a snapshot, so a reader can mistake them for "how many tests exist today." 1,982 are collected as of 2026-10-27 (1,559 on 2026-10-21, before this count).
   - The phases table still lists Phase 3b as "Planned".
   - The `outbound/runner/runner.py` module docstring says a rerun "repeats no paid call". Vendor lookups are cached, but model calls are not (by design), so an interrupted stage asks the model again.
   - The version is `0.0.1` in `pyproject.toml` (and in every log line), `0.3.0` in the API, and `0.1.0` in `web2/package.json`. A deployed release is identified only by its commit SHA.
@@ -218,15 +199,6 @@ Read in `outbound/api/auth.py` and `deploy/`:
 - **Effect:** small. Wanted titles and operator choices come first, and this only decides ties. No test or document says whether it is intended.
 - **Fix:** decide the intended order. If C-level should come first, keep the matching order and rank by a separate list. Then add a test.
 
-### R-22 · P3 · Configuration: the API and the worker can bind to different workspaces
-
-- **What:** the API binds to the workspace named by the `WORKSPACE_NAME` setting (`outbound/api/app.py::create_app_from_container`). `outbound seed` (run by the `migrate` service), `outbound worker` and every other CLI command take `--workspace`, default `default`, and ignore `WORKSPACE_NAME` (`outbound/cli/serve.py::worker`). `deploy/compose.yml` passes no `--workspace`.
-- **Effect:** latent while `WORKSPACE_NAME` is unset (both are `default`). If it is set in Doppler or `.env`:
-  - the API either fails to start (the workspace was never seeded) or queues runs in a workspace the worker never polls;
-  - runs then stay `queued` for ever. The web app shows "worker stuck" after 45 s.
-- **Read:** `outbound/config.py::Settings.workspace_name`, `outbound/cli/common.py::WorkspaceName`.
-- **Fix:** have the CLI default to `WORKSPACE_NAME`, or remove the setting until Phase 6.
-
 ### R-23 · P2 · Privacy: no way to answer a subject-access request
 
 - **What:** GDPR Art. 15 (and the UK GDPR) gives a person the right to a copy of the data held about them. The system can erase a person (`PrivacyService.forget`), but it has no command, endpoint or screen that gathers what is held about one address or name across `contacts`, `contact_emails`, `consents`, `notes`, `messages`, `provider_calls`, `import_rows` and `events`.
@@ -240,12 +212,56 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 - C4 (in part), C6, D1–D4 and E4;
 - long functions and magic numbers;
-- composite foreign keys before Phase 6;
 - typed models for the JSON columns.
+
+## New entries from the Phase 6 SaaS transformation
+
+### R-24 · P2 · Security: the OAuth apps are not yet verified with Microsoft or Google
+
+- **What:** the platform's multi-tenant Microsoft Entra and Google Cloud OAuth applications have not gone through either provider's app-verification process. A new customer connecting a mailbox sees an "unverified app" warning on the consent screen, and Google in particular limits daily grants for an unverified app.
+- **Read:** `outbound/providers/oauth.py`, `outbound/providers/adapters/ms_graph.py`, `gmail_api.py`.
+- **Links:** [mailboxes and OAuth](lld/mailboxes-and-oauth.md#known-limitations).
+
+### R-25 · P2 · Secrets: `SECRETS_KEYS` is a single point of failure for every workspace's encrypted credentials
+
+- **What:** every workspace's mailbox OAuth tokens, IMAP app password, and the platform's own vendor keys are AES-256-GCM-encrypted under `SECRETS_KEYS` (`outbound/db/crypto.py::Keyring`). Losing this value, with no backup, makes every stored credential permanently unreadable at once — across every customer, not just one.
+- **Read:** `outbound/db/crypto.py`, `outbound/config.py::Settings.secrets_keys`.
+- **Links:** [tenancy and isolation](lld/tenancy-and-isolation.md), [secrets management](security/secrets-management.md).
+
+### R-26 · P3 · Configuration: `PLATFORM_DATABASE_URL` silently falls back to `DATABASE_URL`
+
+- **What:** if `PLATFORM_DATABASE_URL`/`POSTGRES_PLATFORM_URL` is left unset in a Postgres production deployment, the scheduler and admin console connect as `outbound_app` rather than the intended read-only `outbound_platform` role. This fails safe in the sense that `outbound_app`'s row-level security would simply find no workspace due (narrower access, not broader), but it is a misconfiguration that should be caught rather than silently tolerated.
+- **Read:** `outbound/config.py::Settings._pick_database`, `outbound/bootstrap.py::build_container`.
+- **Links:** [tenancy and isolation](lld/tenancy-and-isolation.md#known-limitations).
+
+### R-27 · Note · The superadmin cross-workspace view is alpha-only and unaudited beyond the first access
+
+- **What:** `SUPERADMIN_ENABLED` lets any platform-role-`SUPERADMIN` user read any workspace, read-only, with only the *first* access per browser session per workspace written to `audit_log` — a long session's repeat views are not individually logged. This is a deliberate, documented trade-off for the alpha (per-click audit logging of every read was judged excessive for a read-only internal tool), not an oversight, but is worth tightening before a wider launch.
+- **Read:** `outbound/api/deps.py::_audit_view`, `outbound/domain/permissions.py::Principal.superadmin_view`.
+- **Links:** [identity and access](lld/identity-and-access.md#planned).
 
 ## Closed entries
 
-None yet. When an entry is fixed, move it here with the fixing PR and date. Do not delete it.
+### R-02 · Pipeline: scheduled work never runs in production (B7) — closed 2026-10-23
+
+- **Was:** retries, the catch-all poller and the Sent-folder sync ran only inside a manually-invoked `outbound tick`, which nothing in production ever called.
+- **Fixed by:** the Phase 6a worker rewrite (`outbound/worker.py::Worker`) gives every active workspace a tick on a timer (`--tick-minutes`, default 15), calling `Tick.run(limit, skip_idle=True)` — no cron service or manual invocation needed.
+- **Evidence:** `outbound/worker.py::Worker.plan` (tick jobs for active workspaces), `tests/test_worker.py`.
+- **Links:** commit `5d9372f`, [ADR 0025](adr/0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md), [runner and worker](lld/runner-and-worker.md#the-worker-one-process-every-workspace).
+
+### R-05 · Runs: a stopped worker leaves its run `running`; runs can overlap (B2, B3) — closed 2026-10-23
+
+- **Was:** no SIGTERM handling, no stale-run recovery, no single-run lock — a killed worker left its run `running` forever.
+- **Fixed by:** `Worker.recover_stale()`, run roughly every 60 seconds, fails any run whose heartbeat has gone silent past `stale_after` (default 30 minutes). SIGTERM handling is still absent, but its consequence (a stuck `running` row) is now bounded and self-healing rather than permanent. The worker's own `plan()` also now gives at most one job per workspace per pass and skips a workspace already busy, substantially narrowing (though, per R-15, not eliminating at the database level) the double-run overlap this entry also described.
+- **Evidence:** `outbound/worker.py::Worker.recover_stale`, `outbound/db/platform.py::SchedulerQueries.with_stale_runs`, `tests/test_worker.py`, `tests/db/test_scheduler.py`.
+- **Links:** commit `5d9372f`, [ADR 0025](adr/0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md), [runner and worker](lld/runner-and-worker.md#the-worker-one-process-every-workspace).
+
+### R-22 · Configuration: the API and the worker can bind to different workspaces — closed 2026-10-23
+
+- **Was:** the API bound to one workspace via `WORKSPACE_NAME`; the worker and CLI took a separate `--workspace` flag, defaulting independently and risking a mismatch.
+- **Fixed by:** neither `serve` nor `worker` binds to a single workspace any more — the API resolves a workspace per request (from `X-Workspace-Id`, via `/w/{slug}` in the browser) and the worker serves every active workspace. There is no longer a setting or flag for either to disagree about.
+- **Evidence:** `outbound/config.py` (no `workspace_name` field), `outbound/worker.py` (no `--workspace` option), `outbound/api/deps.py::tenant`.
+- **Links:** commit `5d9372f`, [ADR 0025](adr/0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md).
 
 ## How to refresh this page
 
