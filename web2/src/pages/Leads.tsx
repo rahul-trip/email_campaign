@@ -6,7 +6,7 @@ import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Card, Empty, PageHeader, Problem, Select, Skeleton, Table, Td, Th, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
-import { ago } from "../lib/format";
+import { ago, when } from "../lib/format";
 import { HOLD_REASONS, LEAD_STATUSES, STAGES, describe, describeHold, leadStatus, stagesDone } from "../lib/status";
 
 export type LeadsSearch = { q?: string; status?: string; hold?: string; page?: number };
@@ -131,6 +131,7 @@ export function LeadsPage() {
                 <Th className="text-center">Country</Th>
                 <Th className="text-center">Fit</Th>
                 <Th className="hidden text-center md:table-cell">Priority</Th>
+                <Th className="hidden xl:table-cell">Added</Th>
                 <Th className="hidden xl:table-cell">Last change</Th>
                 <Th>
                   <span className="sr-only">Links</span>
@@ -171,7 +172,12 @@ export function LeadsPage() {
                       )}
                     </Td>
                     <Td className="hidden text-center font-mono text-xs md:table-cell">{company.priority}</Td>
-                    <Td className="hidden text-xs text-muted xl:table-cell">{ago(company.updated_at ?? company.created_at)}</Td>
+                    <Td className="hidden whitespace-nowrap text-xs text-muted xl:table-cell">
+                      <span title={when(company.created_at)}>{ago(company.created_at)}</span>
+                    </Td>
+                    <Td className="hidden whitespace-nowrap text-xs text-muted xl:table-cell">
+                      <span title={when(company.updated_at)}>{ago(company.updated_at ?? company.created_at)}</span>
+                    </Td>
                     <Td className="text-right">
                       <Link to="/leads/$companyId/journey" params={{ companyId: company.id }} data-tour={row === 0 ? "leads-journey" : undefined} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
                         <GitFork className="size-3" aria-hidden /> Journey

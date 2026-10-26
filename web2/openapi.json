@@ -1106,6 +1106,18 @@
       },
       "ContactOut": {
         "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "emails": {
             "items": {
               "$ref": "#/components/schemas/EmailOut"
@@ -1142,6 +1154,11 @@
           "rank": {
             "title": "Rank",
             "type": "integer"
+          },
+          "refresh_email": {
+            "default": false,
+            "title": "Refresh Email",
+            "type": "boolean"
           },
           "seniority": {
             "anyOf": [
@@ -1695,6 +1712,404 @@
         "title": "DirectoryBadgeOut",
         "type": "object"
       },
+      "DirectoryCompaniesOut": {
+        "properties": {
+          "companies": {
+            "items": {
+              "$ref": "#/components/schemas/DirectoryCompanyOut"
+            },
+            "title": "Companies",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "companies",
+          "total"
+        ],
+        "title": "DirectoryCompaniesOut",
+        "type": "object"
+      },
+      "DirectoryCompanyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "country_code": {
+            "anyOf": [
+              {
+                "maxLength": 2,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "email_pattern": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Pattern"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "DirectoryCompanyIn",
+        "type": "object"
+      },
+      "DirectoryCompanyOut": {
+        "properties": {
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "email_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Pattern"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "pattern_confidence": {
+            "title": "Pattern Confidence",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "name",
+          "country_code",
+          "email_pattern",
+          "pattern_confidence",
+          "status"
+        ],
+        "title": "DirectoryCompanyOut",
+        "type": "object"
+      },
+      "DirectoryEntriesOut": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DirectoryEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entries",
+          "total"
+        ],
+        "title": "DirectoryEntriesOut",
+        "type": "object"
+      },
+      "DirectoryEntryIn": {
+        "additionalProperties": false,
+        "properties": {
+          "company_domain": {
+            "maxLength": 253,
+            "title": "Company Domain",
+            "type": "string"
+          },
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          },
+          "first_name": {
+            "maxLength": 150,
+            "title": "First Name",
+            "type": "string"
+          },
+          "last_name": {
+            "maxLength": 150,
+            "title": "Last Name",
+            "type": "string"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "email",
+          "first_name",
+          "last_name",
+          "company_domain"
+        ],
+        "title": "DirectoryEntryIn",
+        "type": "object"
+      },
+      "DirectoryEntryOut": {
+        "properties": {
+          "company_domain": {
+            "title": "Company Domain",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "employment_status": {
+            "title": "Employment Status",
+            "type": "string"
+          },
+          "first_name": {
+            "title": "First Name",
+            "type": "string"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_name": {
+            "title": "Last Name",
+            "type": "string"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "person_id": {
+            "title": "Person Id",
+            "type": "string"
+          },
+          "provenance": {
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "verified_at": {
+            "format": "date-time",
+            "title": "Verified At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "status",
+          "provenance",
+          "source",
+          "verified_at",
+          "person_id",
+          "full_name",
+          "first_name",
+          "last_name",
+          "title",
+          "linkedin_url",
+          "company_domain",
+          "employment_status"
+        ],
+        "title": "DirectoryEntryOut",
+        "type": "object"
+      },
+      "DirectoryEntryPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "employment_status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "current",
+                  "left",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employment Status"
+          },
+          "first_name": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Name"
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "verified",
+                  "disputed",
+                  "invalid"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "DirectoryEntryPatch",
+        "type": "object"
+      },
       "DirectoryFiguresOut": {
         "properties": {
           "companies": {
@@ -1947,6 +2362,18 @@
             "default": false,
             "title": "Verification Skipped",
             "type": "boolean"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
           },
           "verified_by": {
             "anyOf": [
@@ -2205,6 +2632,41 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HistoryOut": {
+        "properties": {
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "what",
+          "actor"
+        ],
+        "title": "HistoryOut",
         "type": "object"
       },
       "HoldReason": {
@@ -2485,6 +2947,26 @@
           "notes"
         ],
         "title": "LeadOut",
+        "type": "object"
+      },
+      "LinkedInOut": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "LinkedInOut",
         "type": "object"
       },
       "LlmSettingsIn": {
@@ -2817,6 +3299,18 @@
             "title": "Contact Id",
             "type": "string"
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
           "edit_distance": {
             "anyOf": [
               {
@@ -2898,6 +3392,18 @@
           "subject": {
             "title": "Subject",
             "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
           }
         },
         "required": [
@@ -4304,6 +4810,19 @@
         "title": "ResumedOut",
         "type": "object"
       },
+      "RetryEmailOut": {
+        "properties": {
+          "queued_run_id": {
+            "title": "Queued Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "queued_run_id"
+        ],
+        "title": "RetryEmailOut",
+        "type": "object"
+      },
       "RevealedKeyOut": {
         "properties": {
           "key": {
@@ -4319,6 +4838,14 @@
       },
       "ReviewDetailOut": {
         "properties": {
+          "history": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/HistoryOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
           "item": {
             "$ref": "#/components/schemas/ReviewItemOut"
           },
@@ -7366,6 +7893,333 @@
         ]
       }
     },
+    "/api/admin/directory/companies": {
+      "get": {
+        "operationId": "directory_companies_api_admin_directory_companies_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Page",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryCompaniesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory Companies",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/directory/companies/{domain}": {
+      "delete": {
+        "operationId": "remove_directory_company_api_admin_directory_companies__domain__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Directory Company",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "operationId": "save_directory_company_api_admin_directory_companies__domain__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryCompanyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryCompanyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Directory Company",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/directory/entries": {
+      "get": {
+        "operationId": "directory_entries_api_admin_directory_entries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Page",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryEntriesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directory Entries",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "add_directory_entry_api_admin_directory_entries_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryEntryIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryEntryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Directory Entry",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/directory/entries/{entry_id}": {
+      "delete": {
+        "operationId": "remove_directory_entry_api_admin_directory_entries__entry_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "block",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Block",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Directory Entry",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "change_directory_entry_api_admin_directory_entries__entry_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectoryEntryPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectoryEntryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Directory Entry",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/directory/flags/{flag_id}/resolve": {
       "post": {
         "operationId": "resolve_directory_flag_api_admin_directory_flags__flag_id__resolve_post",
@@ -9908,6 +10762,92 @@
         ]
       }
     },
+    "/api/contacts/{contact_id}/find-linkedin": {
+      "post": {
+        "description": "One search for this person's LinkedIn profile; saved only when it clearly fits.",
+        "operationId": "find_linkedin_api_contacts__contact_id__find_linkedin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find Linkedin",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/contacts/{contact_id}/retry-email": {
+      "post": {
+        "description": "Look for this person's email again, with fresh vendor answers, in a run queued now.",
+        "operationId": "retry_email_api_contacts__contact_id__retry_email_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryEmailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Email",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/contacts/{contact_id}/suppress": {
       "post": {
         "description": "Never contact this person again; their unsent emails are cancelled.",
@@ -11480,6 +12420,48 @@
           }
         },
         "summary": "Update Sender Profile",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/sender-profile/template": {
+      "get": {
+        "description": "A file with every key of the sender profile: empty, or with today's values to edit.\nUpload it back with PUT /sender-profile.",
+        "operationId": "sender_profile_template_api_settings_sender_profile_template_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "current",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Current",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Sender Profile Template",
         "tags": [
           "settings"
         ]

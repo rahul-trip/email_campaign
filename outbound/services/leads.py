@@ -44,9 +44,12 @@ from outbound.domain.state_machines import (
     resume_status_for,
     retry_status_for,
 )
+from outbound.metering.metered import call_scope
 from outbound.metering.quota import credit_left
+from outbound.providers.ports import SearchProvider
 from outbound.services.journey import Journey, JourneyData, build_journey
 from outbound.stages.policy import policy_decision_for
+from outbound.stages.research.linkedin import find_linkedin
 
 EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 
@@ -141,11 +144,17 @@ class WaterfallStep:
 
 class LeadService:
     def __init__(
-        self, uow_factory: UnitOfWorkFactory, workspace_id: str, *, actor: str = OPERATOR
+        self,
+        uow_factory: UnitOfWorkFactory,
+        workspace_id: str,
+        *,
+        actor: str = OPERATOR,
+        search: SearchProvider | None = None,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._actor = actor
+        self._search = search  # behind the meter; finds a person's LinkedIn profile
 
     def search(
         self,
@@ -247,6 +256,71 @@ class LeadService:
             updated = uow.companies.update_fields(
                 company_id, changes, actor=actor, expected_version=expected_version
             )
+            uow.commit()
+            return updated
+
+    def find_linkedin(self, contact_id: str, *, actor: str | None = None) -> str | None:
+        """Look for this person's LinkedIn profile with one search. The address is kept only
+        when the profile's headline names the same person; None when nothing clearly fits."""
+        actor = actor or self._actor
+        if self._search is None:
+            raise LeadError(
+                "searching is not set up (no Tavily key), so LinkedIn cannot be looked up"
+            )
+        with self._uow(self._workspace_id) as uow:
+            contact = uow.contacts.get(contact_id)
+            company = uow.companies.get(contact.company_id)
+        if not contact.full_name:
+            raise LeadError("this person has no name yet, so there is nothing to search for")
+        with call_scope(company_id=company.id, contact_id=contact_id):
+            link = find_linkedin(
+                self._search, contact.full_name, company.name or "", company.domain
+            )
+        if link is None:
+            return None
+        with self._uow(self._workspace_id) as uow:
+            if uow.contacts.linkedin_taken(link):
+                return None  # another person on this workspace already has that profile
+            uow.contacts.update_fields(contact_id, {"linkedin_url": link}, actor=actor)
+            uow.commit()
+        return link
+
+    def retry_email(self, contact_id: str, *, actor: str | None = None) -> Company:
+        """Look for this person's email again, with fresh vendor answers, on the next run.
+
+        Allowed while no email has been written to the lead: it is failed at the email step, or
+        waiting at, or just past, it. Later on, use *Write to this person instead*."""
+        actor = actor or self._actor
+        with self._uow(self._workspace_id) as uow:
+            contact = uow.contacts.get(contact_id)
+            if contact.status not in WORKABLE_CONTACT_STATUSES:
+                raise LeadError("this person cannot be worked on any more")
+            company = uow.companies.get(contact.company_id)
+            if (
+                (company.status is CompanyStatus.FAILED and company.failed_stage == "email")
+                or company.status is CompanyStatus.EMAIL_READY
+                or (
+                    company.status is CompanyStatus.HELD
+                    and company.hold_reason
+                    in (HoldReason.CATCH_ALL_UNVERIFIED, HoldReason.CATCH_ALL_RESOLVING)
+                )
+            ):
+                updated = uow.companies.transition(
+                    company.id,
+                    CompanyStatus.CONTACTS_FOUND,
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason="email search asked for again",
+                    next_action_at=None,
+                )
+            elif company.status is CompanyStatus.CONTACTS_FOUND:
+                updated = company
+            else:
+                raise LeadError(
+                    f"the lead is {company.status.value}: its email is past the search. "
+                    "Use Write to this person instead."
+                )
+            uow.contacts.set_refresh_email(contact_id, True)
             uow.commit()
             return updated
 

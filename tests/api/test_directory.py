@@ -146,3 +146,70 @@ def test_a_person_removes_themselves_from_the_directory_by_confirming_by_email(
     assert again.status_code == 400  # a link works once
     audit = staff.get("/api/admin/audit", params={"action": "directory_removal_confirmed"}).json()
     assert len(audit) == 1 and "jane" not in str(audit)  # the address is not written down
+
+
+# ------------------------------------------------------------------ staff browse, add, edit, remove
+
+
+def test_staff_browse_add_edit_and_remove_directory_entries(
+    staff: Api, api: Api, lead: str, services: Services
+) -> None:
+    listed = staff.get("/api/admin/directory/entries").json()
+    assert listed["total"] == 1 and listed["entries"][0]["email"] == "jane.doe@acme.com"
+    assert staff.get("/api/admin/directory/entries", params={"q": "nobody"}).json()["total"] == 0
+    assert staff.get("/api/admin/directory/entries", params={"q": "ACME"}).json()["total"] == 1
+    assert api.get("/api/admin/directory/entries").status_code == 403
+
+    new = {"email": "sam.lee@acme.com", "first_name": "Sam", "last_name": "Lee",
+           "company_domain": "acme.com", "title": "CTO"}  # fmt: skip
+    made = staff.post("/api/admin/directory/entries", json=new)
+    assert made.status_code == 201 and made.json()["source"] == "staff"
+    assert staff.post("/api/admin/directory/entries", json=new).status_code == 422  # twice
+    with services.container.uow(services.workspace_id) as uow:  # served like any fact
+        assert uow.directory.find_email("acme.com", "Sam", "Lee", datetime.now(UTC))
+
+    entry = made.json()["id"]
+    changed = staff.patch(
+        f"/api/admin/directory/entries/{entry}",
+        json={
+            "title": "CEO",
+            "employment_status": "left",
+            "linkedin_url": "https://www.linkedin.com/in/sam",
+        },
+    ).json()
+    assert changed["title"] == "CEO" and changed["employment_status"] == "left"
+    with services.container.uow(services.workspace_id) as uow:  # someone who left is not served
+        assert uow.directory.find_email("acme.com", "Sam", "Lee", datetime.now(UTC)) is None
+    staff.patch(f"/api/admin/directory/entries/{entry}", json={"status": "invalid"})
+    assert (
+        staff.patch(f"/api/admin/directory/entries/{entry}", json={"status": "bogus"}).status_code
+        == 422
+    )
+
+    assert (
+        staff.delete(f"/api/admin/directory/entries/{entry}", params={"block": "true"}).status_code
+        == 204
+    )
+    assert (
+        staff.post("/api/admin/directory/entries", json=new).status_code == 422
+    )  # blocked for good
+    assert staff.get("/api/admin/directory/entries").json()["total"] == 1
+    actions = {e["action"] for e in staff.get("/api/admin/audit").json()}
+    assert {
+        "directory_entry_added",
+        "directory_entry_changed",
+        "directory_entry_removed",
+    } <= actions
+
+
+def test_staff_manage_the_directorys_company_patterns(staff: Api, lead: str) -> None:
+    saved = staff.put(
+        "/api/admin/directory/companies/Acme.com",
+        json={"name": "Acme", "country_code": "gb", "email_pattern": "{first}.{last}"},
+    ).json()
+    assert saved["domain"] == "acme.com" and saved["country_code"] == "GB"
+    assert saved["pattern_confidence"] == 3
+    assert staff.get("/api/admin/directory/companies").json()["total"] == 1
+    assert staff.put("/api/admin/directory/companies/nodots", json={}).status_code == 422
+    assert staff.delete("/api/admin/directory/companies/acme.com").status_code == 204
+    assert staff.get("/api/admin/directory/companies").json()["total"] == 0

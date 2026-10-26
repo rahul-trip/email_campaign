@@ -179,6 +179,7 @@ class EmailOut(Out):
     is_primary: bool
     found_by: str | None
     verified_by: str | None
+    verified_at: datetime | None = None
     verification_skipped: bool = False
 
 
@@ -191,6 +192,8 @@ class ContactOut(Out):
     linkedin_url: str | None
     source: str
     status: str
+    created_at: datetime | None = None
+    refresh_email: bool = False  # "Find email again" is waiting for the next run
     emails: list[EmailOut]
 
 
@@ -206,6 +209,8 @@ class MessageOut(Out):
     lint_report: dict[str, Any] | None
     snippets: dict[str, Any] | None
     sent_at: datetime | None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     row_version: int
 
 
@@ -401,9 +406,17 @@ class ReviewItemOut(Out):
     skips: list[SkipOut] = []
 
 
+class HistoryOut(Out):
+    at: datetime
+    what: str  # written, edited, approved, drafted, sent, ...
+    actor: str
+    detail: str | None = None
+
+
 class ReviewDetailOut(Out):
     item: ReviewItemOut
     notes: list[str]
+    history: list[HistoryOut] = []
 
 
 class ApproveIn(In):
@@ -1087,3 +1100,73 @@ class DirectoryHistoryOut(Out):
 
 class AdminRoleIn(In):
     role: Literal["admin", "member"]
+
+
+class LinkedInOut(Out):
+    url: str | None  # None: nothing clearly fit, so nothing was saved
+
+
+class RetryEmailOut(Out):
+    queued_run_id: str
+
+
+class DirectoryEntryOut(Out):
+    id: str
+    email: str
+    status: str
+    provenance: str
+    source: str
+    verified_at: datetime
+    person_id: str
+    full_name: str
+    first_name: str
+    last_name: str
+    title: str | None
+    linkedin_url: str | None
+    company_domain: str
+    employment_status: str
+
+
+class DirectoryEntriesOut(Out):
+    entries: list[DirectoryEntryOut]
+    total: int
+
+
+class DirectoryEntryIn(In):
+    email: str = Field(max_length=320)
+    first_name: str = Field(max_length=150)
+    last_name: str = Field(max_length=150)
+    company_domain: str = Field(max_length=253)
+    title: str | None = Field(default=None, max_length=300)
+    linkedin_url: str | None = Field(default=None, max_length=500)
+
+
+class DirectoryEntryPatch(In):
+    email: str | None = Field(default=None, max_length=320)
+    first_name: str | None = Field(default=None, max_length=150)
+    last_name: str | None = Field(default=None, max_length=150)
+    title: str | None = Field(default=None, max_length=300)
+    linkedin_url: str | None = Field(default=None, max_length=500)
+    status: Literal["verified", "disputed", "invalid"] | None = None
+    employment_status: Literal["current", "left", "unknown"] | None = None
+
+
+class DirectoryCompanyOut(Out):
+    id: str
+    domain: str
+    name: str | None
+    country_code: str | None
+    email_pattern: str | None
+    pattern_confidence: int
+    status: str
+
+
+class DirectoryCompaniesOut(Out):
+    companies: list[DirectoryCompanyOut]
+    total: int
+
+
+class DirectoryCompanyIn(In):
+    name: str | None = Field(default=None, max_length=300)
+    country_code: str | None = Field(default=None, max_length=2)
+    email_pattern: str | None = Field(default=None, max_length=100)

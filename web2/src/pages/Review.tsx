@@ -7,7 +7,7 @@ import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton, Textarea } from "../components/ui";
 import { cx } from "../lib/cx";
-import { words } from "../lib/format";
+import { ago, when, words } from "../lib/format";
 import { describe, emailStatus, isSafeToSend } from "../lib/status";
 
 type Item = Schemas["ReviewItemOut"];
@@ -165,6 +165,11 @@ function Queue({ items, current, onPick }: { items: Item[]; current: string; onP
                 </div>
                 <div className="mt-0.5 truncate text-xs">{item.contact.full_name ?? "Name unknown"}</div>
                 <div className="truncate text-[11px] text-muted">{item.contact.title ?? "Title unknown"}</div>
+                {item.message.created_at && (
+                  <div className="mt-0.5 text-[11px] text-muted" title={when(item.message.created_at)}>
+                    Written {ago(item.message.created_at)}
+                  </div>
+                )}
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-1.5">
                   <span className="truncate font-mono text-[10px] text-muted">{item.message.subject}</span>
                   {item.flagged && (
@@ -257,6 +262,12 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
                   <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container">Not verified: you skipped the check</span>
                 )}
               </div>
+              {item.message.created_at && (
+                <p className="mt-1 text-xs text-muted" data-tour="review-written">
+                  Written {when(item.message.created_at)} ({ago(item.message.created_at)})
+                  {item.message.updated_at && item.message.updated_at !== item.message.created_at && ` · last changed ${ago(item.message.updated_at)}`}
+                </p>
+              )}
               <p className="mt-1 text-xs text-muted">
                 Subject: <strong className="font-semibold text-ink">{item.message.subject}</strong>
                 {address && (
@@ -265,6 +276,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
                     {words(address.provenance)}
                     {address.found_by && `, found by ${address.found_by}`}
                     {address.verified_by && `, checked by ${address.verified_by}`}
+                    {address.verified_at && ` ${ago(address.verified_at)}`}
                   </>
                 )}
               </p>
@@ -399,12 +411,12 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
         </Card>
 
         <div className="xl:hidden">
-          <Context company={company} hooks={hooks} answers={answers} notes={detail.data?.notes ?? []} lint={lint} failing={failing} flagged={item.flagged} decision={decision} />
+          <Context company={company} hooks={hooks} answers={answers} notes={detail.data?.notes ?? []} lint={lint} failing={failing} flagged={item.flagged} decision={decision} history={detail.data?.history ?? []} />
         </div>
       </div>
 
       <div className="hidden xl:block">
-        <Context company={company} hooks={hooks} answers={answers} notes={detail.data?.notes ?? []} lint={lint} failing={failing} flagged={item.flagged} decision={decision} />
+        <Context company={company} hooks={hooks} answers={answers} notes={detail.data?.notes ?? []} lint={lint} failing={failing} flagged={item.flagged} decision={decision} history={detail.data?.history ?? []} />
       </div>
 
       {rejecting && <RejectDialog messageId={messageId} company={company.name ?? company.domain} onClose={() => setRejecting(false)} onDone={finished} />}
@@ -421,6 +433,7 @@ function Context({
   failing,
   flagged,
   decision,
+  history,
 }: {
   company: Schemas["CompanyOut"];
   hooks: string[];
@@ -430,6 +443,7 @@ function Context({
   failing: Set<string>;
   flagged: boolean;
   decision: { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
+  history: Schemas["HistoryOut"][];
 }) {
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const checks = checksFor(Number(settings.data?.email_min_words ?? 120), Number(settings.data?.email_max_words ?? 200));
@@ -474,6 +488,22 @@ function Context({
           </Callout>
         ))}
       </Card>
+
+      {history.length > 0 && (
+        <Card tour="review-history" title="History of this email">
+          <ol className="space-y-2 text-[13px]">
+            {history.map((h, i) => (
+              <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="font-medium">{h.what}</span>
+                <span className="text-xs text-muted" title={when(h.at)}>
+                  {ago(h.at)} · {h.actor === "system" ? "the engine" : h.actor === "operator" ? "you" : h.actor.replace(":", " ")}
+                </span>
+                {h.detail && <span className="basis-full text-xs text-muted">{h.detail}</span>}
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
 
       <Card title="Checks" actions={flagged ? <span className="rounded bg-attention-container px-1.5 py-0.5 text-[11px] font-semibold text-on-attention-container">Flagged</span> : undefined}>
         <ul className="space-y-1.5 text-[13px]">

@@ -490,6 +490,8 @@ CREATE TABLE directory_suppressions (   -- people removed for good: hashes only
   id TEXT PRIMARY KEY, value_hash TEXT NOT NULL UNIQUE, created_at TIMESTAMP NOT NULL
 );
 -- Migration 0015: auth_tokens.purpose also allows 'remove_data' (the public "Remove my data" link).
+-- Migration 0016: contacts.refresh_email BOOLEAN NOT NULL DEFAULT false -- set by "Find email again";
+-- the email step tries that person alone with fresh vendor answers, then clears it.
 ALTER TABLE companies ADD COLUMN skip_directory BOOLEAN NOT NULL DEFAULT false;
   -- find this lead's emails with the vendors, not the directory (needs `directory_bypass`)
 ```

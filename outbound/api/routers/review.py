@@ -10,6 +10,7 @@ from outbound.api.schemas import (
     CompanyOut,
     ContactOut,
     EmailOut,
+    HistoryOut,
     MessageOut,
     RejectIn,
     ReviewDetailOut,
@@ -47,7 +48,11 @@ def queue(svc: Annotated[Services, Depends(services)]) -> list[ReviewItemOut]:
 )
 def show(message_id: str, svc: Annotated[Services, Depends(services)]) -> ReviewDetailOut:
     detail = svc.review.show(message_id)
-    return ReviewDetailOut(item=_item(detail.item), notes=detail.notes)
+    return ReviewDetailOut(
+        item=_item(detail.item),
+        notes=detail.notes,
+        history=[HistoryOut.model_validate(h) for h in detail.history],
+    )
 
 
 @router.post(

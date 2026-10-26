@@ -65,6 +65,7 @@ class CallScope:
     run_id: str | None = None
     company_id: str | None = None
     contact_id: str | None = None
+    fresh: bool = False  # ignore stored answers: the operator asked to try again
 
 
 _scope: ContextVar[CallScope | None] = ContextVar("call_scope", default=None)
@@ -76,6 +77,7 @@ def call_scope(
     run_id: str | None = None,
     company_id: str | None = None,
     contact_id: str | None = None,
+    fresh: bool = False,
 ) -> Iterator[None]:
     """Attribute every metered call inside the block. Unnamed fields keep the outer value."""
     outer = current_scope()
@@ -84,6 +86,7 @@ def call_scope(
         run_id=run_id or outer.run_id,
         company_id=company_id or outer.company_id,
         contact_id=contact_id or outer.contact_id,
+        fresh=fresh or outer.fresh,
     )
     token = _scope.set(inner)
     try:
@@ -148,6 +151,8 @@ class Meter:
         """A stored answer to this exact request, recorded as a free cache hit; else ``None``."""
         digest = request_hash(provider, operation, request)
         scope = current_scope()
+        if scope.fresh:
+            return None
         with self._uow(self._workspace_id) as uow:
             stored = uow.calls.cached_response(provider, operation, digest, self._clock() - ttl)
             if stored is None:

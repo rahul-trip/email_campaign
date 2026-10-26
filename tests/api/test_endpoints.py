@@ -272,6 +272,12 @@ def test_the_review_queue_shows_the_email_with_context(
     assert item["contact"]["emails"][0]["email"] == "jane@acme.com"
     detail = api.get(f"/api/review/{mid}").json()
     assert detail["item"]["company"]["domain"] == "acme.com"
+    # When it was written, and its history so far, are shown.
+    assert item["message"]["created_at"] and item["contact"]["created_at"]
+    assert [h["what"] for h in detail["history"]] == ["Written"]
+    api.post(f"/api/review/{mid}/approve", json={})
+    history = api.get(f"/api/review/{mid}").json()["history"]
+    assert [h["what"] for h in history] == ["Written", "Approved"]
 
 
 def test_approving_with_an_edit_stores_both_texts(
@@ -1113,3 +1119,27 @@ def test_a_runs_vendor_calls_are_added_up_by_vendor_and_operation(
     assert (hunter["found"], hunter["nothing"], hunter["reused"], hunter["errors"]) == (1, 1, 1, 1)
     assert hunter["avg_latency_ms"] == 150
     assert (tavily["provider"], tavily["cost_micro_usd"]) == ("tavily", 8_000)
+
+
+def test_the_profile_file_has_every_key_and_uploads_back(api: Api) -> None:
+    from outbound.services.settings import SENDER_FIELDS
+
+    empty = api.get("/api/settings/sender-profile/template")
+    assert empty.status_code == 200
+    assert "attachment" in empty.headers["content-disposition"]
+    blank = empty.json()
+    assert set(blank) == SENDER_FIELDS  # the format and the profile cannot drift apart
+    assert blank["company_name"] == "" and blank["value_propositions"] == []
+
+    filled = {**blank, "company_name": "Quantra", "legal_name": "Quantra Ltd", "greeting": "Hello",
+              "value_propositions": ["Forecasts that hold"]}  # fmt: skip
+    assert api.put("/api/settings/sender-profile", json=filled).status_code == 200
+    mine = api.get("/api/settings/sender-profile/template", params={"current": "true"}).json()
+    assert mine["company_name"] == "Quantra" and mine["value_propositions"] == [
+        "Forecasts that hold"
+    ]
+    assert api.put("/api/settings/sender-profile", json=mine).status_code == 200  # round trip
+    assert api.put("/api/settings/sender-profile", json={**blank, "surprise": 1}).status_code == 422
+    assert (
+        api.put("/api/settings/sender-profile", json={**blank, "greeting": "Yo"}).status_code == 422
+    )

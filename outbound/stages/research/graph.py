@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Hashable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any, TypedDict
@@ -45,14 +45,17 @@ from outbound.stages.research.facts import (
     find_incorporation_markers,
     infer_country,
 )
+from outbound.stages.research.linkedin import find_linkedin
 
 log = get_logger(__name__)
 
 PAGE_PATHS = ("", "/about", "/team", "/news", "/contact")  # five URLs = one extract credit
-PAGE_CHARS = 6_000
-TOTAL_CHARS = 18_000
+# Generous, so no page is cut short before the model reads it (one extract credit either way).
+PAGE_CHARS = 12_000
+TOTAL_CHARS = 40_000
 TEAM_HINTS = ("team", "leadership", "people", "about", "management")
-MAX_PEOPLE = 5
+LINKEDIN_LOOKUPS = 10  # one search each; the lead page's button covers the rest
+MAX_PEOPLE = 25  # a guard against a page that lists a whole company; nobody real is dropped
 COMPANY_NEWS_DAYS = 180
 MARKET_NEWS_DAYS = 90
 MARKET_TERMS = "(regulation OR tender OR market OR funding OR acquisition)"
@@ -215,7 +218,7 @@ def published_addresses(pages: dict[str, str], domain: str) -> list[str]:
             own = host == domain or host.endswith("." + domain)  # not "notacme.com" for "acme.com"
             if own and address not in found:
                 found.append(address)
-    return found[:10]
+    return found
 
 
 def _clean_name(name: str) -> str:
@@ -366,8 +369,8 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         company_range = range(1, len(company_hits) + 1)
         market_range = range(len(company_hits) + 1, len(everything) + 1)
         return {
-            "news_items": items(picked.company, company_range)[:3],
-            "triggers": items(picked.market, market_range)[:2],
+            "news_items": items(picked.company, company_range),
+            "triggers": items(picked.market, market_range),
         }
 
     def signals_node(state: ResearchState) -> ResearchState:
@@ -411,7 +414,18 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
             ]
         if not people and inp.target_titles:
             people = search_people(deps.search, name, inp.domain, inp.target_titles)
-        return {"people_found": _unique(people)[:MAX_PEOPLE]}
+        found = _unique(people)[:MAX_PEOPLE]
+        # A person with no profile link gets one search for it (a button on the lead page
+        # does the same for anyone past the limit, or whose search found nothing).
+        looked = 0
+        for i, person in enumerate(found):
+            if person.linkedin_url or looked >= LINKEDIN_LOOKUPS:
+                continue
+            looked += 1
+            link = find_linkedin(deps.search, person.name, name, inp.domain)
+            if link:
+                found[i] = replace(person, linkedin_url=link)
+        return {"people_found": found}
 
     def fit_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]

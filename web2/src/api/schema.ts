@@ -281,6 +281,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/directory/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory Companies */
+        get: operations["directory_companies_api_admin_directory_companies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/directory/companies/{domain}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save Directory Company */
+        put: operations["save_directory_company_api_admin_directory_companies__domain__put"];
+        post?: never;
+        /** Remove Directory Company */
+        delete: operations["remove_directory_company_api_admin_directory_companies__domain__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/directory/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Directory Entries */
+        get: operations["directory_entries_api_admin_directory_entries_get"];
+        put?: never;
+        /** Add Directory Entry */
+        post: operations["add_directory_entry_api_admin_directory_entries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/directory/entries/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Directory Entry */
+        delete: operations["remove_directory_entry_api_admin_directory_entries__entry_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Directory Entry */
+        patch: operations["change_directory_entry_api_admin_directory_entries__entry_id__patch"];
+        trace?: never;
+    };
     "/api/admin/directory/flags/{flag_id}/resolve": {
         parameters: {
             query?: never;
@@ -1219,6 +1290,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}/find-linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find Linkedin
+         * @description One search for this person's LinkedIn profile; saved only when it clearly fits.
+         */
+        post: operations["find_linkedin_api_contacts__contact_id__find_linkedin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contacts/{contact_id}/retry-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Email
+         * @description Look for this person's email again, with fresh vendor answers, in a run queued now.
+         */
+        post: operations["retry_email_api_contacts__contact_id__retry_email_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}/suppress": {
         parameters: {
             query?: never;
@@ -1891,6 +2002,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/sender-profile/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sender Profile Template
+         * @description A file with every key of the sender profile: empty, or with today's values to edit.
+         *     Upload it back with PUT /sender-profile.
+         */
+        get: operations["sender_profile_template_api_settings_sender_profile_template_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/suppressions": {
         parameters: {
             query?: never;
@@ -2494,6 +2626,8 @@ export interface components {
         };
         /** ContactOut */
         ContactOut: {
+            /** Created At */
+            created_at?: string | null;
             /** Emails */
             emails: components["schemas"]["EmailOut"][];
             /** Full Name */
@@ -2504,6 +2638,11 @@ export interface components {
             linkedin_url: string | null;
             /** Rank */
             rank: number;
+            /**
+             * Refresh Email
+             * @default false
+             */
+            refresh_email?: boolean;
             /** Seniority */
             seniority: string | null;
             /** Source */
@@ -2684,6 +2823,112 @@ export interface components {
             /** Verified Month */
             verified_month: string | null;
         };
+        /** DirectoryCompaniesOut */
+        DirectoryCompaniesOut: {
+            /** Companies */
+            companies: components["schemas"]["DirectoryCompanyOut"][];
+            /** Total */
+            total: number;
+        };
+        /** DirectoryCompanyIn */
+        DirectoryCompanyIn: {
+            /** Country Code */
+            country_code?: string | null;
+            /** Email Pattern */
+            email_pattern?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** DirectoryCompanyOut */
+        DirectoryCompanyOut: {
+            /** Country Code */
+            country_code: string | null;
+            /** Domain */
+            domain: string;
+            /** Email Pattern */
+            email_pattern: string | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string | null;
+            /** Pattern Confidence */
+            pattern_confidence: number;
+            /** Status */
+            status: string;
+        };
+        /** DirectoryEntriesOut */
+        DirectoryEntriesOut: {
+            /** Entries */
+            entries: components["schemas"]["DirectoryEntryOut"][];
+            /** Total */
+            total: number;
+        };
+        /** DirectoryEntryIn */
+        DirectoryEntryIn: {
+            /** Company Domain */
+            company_domain: string;
+            /** Email */
+            email: string;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Linkedin Url */
+            linkedin_url?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** DirectoryEntryOut */
+        DirectoryEntryOut: {
+            /** Company Domain */
+            company_domain: string;
+            /** Email */
+            email: string;
+            /** Employment Status */
+            employment_status: string;
+            /** First Name */
+            first_name: string;
+            /** Full Name */
+            full_name: string;
+            /** Id */
+            id: string;
+            /** Last Name */
+            last_name: string;
+            /** Linkedin Url */
+            linkedin_url: string | null;
+            /** Person Id */
+            person_id: string;
+            /** Provenance */
+            provenance: string;
+            /** Source */
+            source: string;
+            /** Status */
+            status: string;
+            /** Title */
+            title: string | null;
+            /**
+             * Verified At
+             * Format: date-time
+             */
+            verified_at: string;
+        };
+        /** DirectoryEntryPatch */
+        DirectoryEntryPatch: {
+            /** Email */
+            email?: string | null;
+            /** Employment Status */
+            employment_status?: ("current" | "left" | "unknown") | null;
+            /** First Name */
+            first_name?: string | null;
+            /** Last Name */
+            last_name?: string | null;
+            /** Linkedin Url */
+            linkedin_url?: string | null;
+            /** Status */
+            status?: ("verified" | "disputed" | "invalid") | null;
+            /** Title */
+            title?: string | null;
+        };
         /** DirectoryFiguresOut */
         DirectoryFiguresOut: {
             /** Companies */
@@ -2791,6 +3036,8 @@ export interface components {
              * @default false
              */
             verification_skipped?: boolean;
+            /** Verified At */
+            verified_at?: string | null;
             /** Verified By */
             verified_by: string | null;
         };
@@ -2877,6 +3124,20 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HistoryOut */
+        HistoryOut: {
+            /** Actor */
+            actor: string;
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Detail */
+            detail?: string | null;
+            /** What */
+            what: string;
         };
         /**
          * HoldReason
@@ -2973,6 +3234,11 @@ export interface components {
             messages: components["schemas"]["MessageOut"][];
             /** Notes */
             notes: components["schemas"]["NoteOut"][];
+        };
+        /** LinkedInOut */
+        LinkedInOut: {
+            /** Url */
+            url: string | null;
         };
         /** LlmSettingsIn */
         LlmSettingsIn: {
@@ -3078,6 +3344,8 @@ export interface components {
         MessageOut: {
             /** Contact Id */
             contact_id: string;
+            /** Created At */
+            created_at?: string | null;
             /** Edit Distance */
             edit_distance: number | null;
             /** Final Body */
@@ -3104,6 +3372,8 @@ export interface components {
             step: number;
             /** Subject */
             subject: string;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /** MyWorkspace */
         MyWorkspace: {
@@ -3523,6 +3793,11 @@ export interface components {
             /** Rows */
             rows: number;
         };
+        /** RetryEmailOut */
+        RetryEmailOut: {
+            /** Queued Run Id */
+            queued_run_id: string;
+        };
         /** RevealedKeyOut */
         RevealedKeyOut: {
             /** Key */
@@ -3530,6 +3805,11 @@ export interface components {
         };
         /** ReviewDetailOut */
         ReviewDetailOut: {
+            /**
+             * History
+             * @default []
+             */
+            history?: components["schemas"]["HistoryOut"][];
             item: components["schemas"]["ReviewItemOut"];
             /** Notes */
             notes: string[];
@@ -4730,6 +5010,233 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectoryOverviewOut"];
+                };
+            };
+        };
+    };
+    directory_companies_api_admin_directory_companies_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryCompaniesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_directory_company_api_admin_directory_companies__domain__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                domain: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectoryCompanyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryCompanyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_directory_company_api_admin_directory_companies__domain__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                domain: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directory_entries_api_admin_directory_entries_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_directory_entry_api_admin_directory_entries_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectoryEntryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_directory_entry_api_admin_directory_entries__entry_id__delete: {
+        parameters: {
+            query?: {
+                block?: boolean;
+            };
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_directory_entry_api_admin_directory_entries__entry_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DirectoryEntryPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryEntryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6558,6 +7065,68 @@ export interface operations {
             };
         };
     };
+    find_linkedin_api_contacts__contact_id__find_linkedin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retry_email_api_contacts__contact_id__retry_email_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryEmailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     suppress_contact_api_contacts__contact_id__suppress_post: {
         parameters: {
             query?: never;
@@ -7739,6 +8308,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sender_profile_template_api_settings_sender_profile_template_get: {
+        parameters: {
+            query?: {
+                current?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

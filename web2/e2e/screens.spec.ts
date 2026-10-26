@@ -162,7 +162,7 @@ test("country rules can be switched off for the workspace, with a banner, and ba
 test("an admin turns the intake webhook on and sees the secret once", async ({ page }) => {
   await signIn(page);
   await page.goto("/w/default/settings?tab=integrations");
-  await expect(page.getByText("/api/intake/webhook/")).toBeVisible();
+  await expect(page.getByText("/api/intake/webhook/").first()).toBeVisible();
   await page.getByRole("button", { name: "Turn the webhook on" }).click();
   await expect(page.getByText("whsec_")).toBeVisible();
   await page.reload();

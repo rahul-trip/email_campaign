@@ -9,6 +9,7 @@ refused.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.types import utcnow
@@ -16,7 +17,7 @@ from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.copy_lint import LintRules
 from outbound.domain.editing import edit_distance
-from outbound.domain.entities import Company, Contact, ContactEmail, Message
+from outbound.domain.entities import Company, Contact, ContactEmail, Event, Message
 from outbound.domain.enums import (
     CompanyStatus,
     ContactStatus,
@@ -59,9 +60,42 @@ class QueueItem:
 
 
 @dataclass(frozen=True)
+class HistoryLine:
+    at: datetime
+    what: str
+    actor: str
+    detail: str | None
+
+
+@dataclass(frozen=True)
 class ReviewDetail:
     item: QueueItem
     notes: list[str]
+    history: list[HistoryLine]
+
+
+_STATE_WORDS = {
+    "generated": "Written",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "drafted": "Saved as a draft",
+    "sent": "Sent",
+    "bounced": "Bounced",
+    "cancelled": "Cancelled",
+}
+
+
+def _history_line(event: Event) -> HistoryLine:
+    """One line of an email's life, in words: written, edited, approved, drafted, sent."""
+    data = event.data
+    if event.type == "created":
+        what = "Written"
+    elif event.type == "status_changed":
+        what = _STATE_WORDS.get(str(data.get("to")), str(data.get("to") or "Changed"))
+    else:
+        what = event.type.replace("_", " ").capitalize()
+    detail = data.get("reason") or data.get("detail")
+    return HistoryLine(event.created_at, what, event.actor, str(detail) if detail else None)
 
 
 def footer_of(body: str) -> str | None:
@@ -110,7 +144,10 @@ class ReviewService:
         with self._uow(self._workspace_id) as uow:
             item = self._item(uow, self._message(uow, message_id))
             notes = [n.body for n in uow.notes.for_company(item.company.id)]
-        return ReviewDetail(item, notes)
+            history = [
+                _history_line(e) for e in uow.events.for_entity(EntityType.MESSAGE, message_id)
+            ]
+        return ReviewDetail(item, notes, history)
 
     def approve(
         self,

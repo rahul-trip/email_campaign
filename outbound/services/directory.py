@@ -11,10 +11,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from outbound.config import Settings
 from outbound.db.platform import PlatformUnitOfWorkFactory
-from outbound.db.repositories.directory import DirectoryFigures, FlagView
+from outbound.db.repositories.directory import CompanyView, DirectoryFigures, EntryView, FlagView
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
@@ -166,6 +167,65 @@ class DirectoryService:
                 target_id=flag_id,
                 note=note or None,
             )
+            p.commit()
+
+    # ------------------------------------------------------------------ browse and edit
+
+    def entries(self, q: str, page: int, size: int = 25) -> tuple[list[EntryView], int]:
+        with self._platform() as p:
+            return p.directory.entries(q, size, max(0, page) * size)
+
+    def add_entry(self, *, by: str, **fields: Any) -> EntryView:
+        with self._platform() as p:
+            made = p.directory.add_entry(now=self._now(), **fields)
+            p.audit.record(
+                "directory_entry_added", actor_user_id=by, target_type="directory_email",
+                target_id=made.id, data={"company": made.company_domain},
+            )  # fmt: skip
+            p.commit()
+        return made
+
+    def update_entry(self, entry_id: str, changes: dict[str, Any], *, by: str) -> EntryView:
+        with self._platform() as p:
+            made = p.directory.update_entry(entry_id, changes, self._now())
+            p.audit.record(
+                "directory_entry_changed", actor_user_id=by, target_type="directory_email",
+                target_id=entry_id, data={"fields": sorted(changes)},
+            )  # fmt: skip
+            p.commit()
+        return made
+
+    def delete_entry(self, entry_id: str, *, block: bool, by: str) -> None:
+        with self._platform() as p:
+            p.directory.delete_entry(entry_id, block=block)
+            # The address itself is not written to the audit log; the entry id and choice are.
+            p.audit.record(
+                "directory_entry_removed", actor_user_id=by, target_type="directory_email",
+                target_id=entry_id, data={"blocked": block},
+            )  # fmt: skip
+            p.commit()
+
+    def companies(self, q: str, page: int, size: int = 25) -> tuple[list[CompanyView], int]:
+        with self._platform() as p:
+            return p.directory.companies(q, size, max(0, page) * size)
+
+    def save_company(self, domain: str, *, by: str, **fields: Any) -> CompanyView:
+        with self._platform() as p:
+            made = p.directory.save_company(domain, now=self._now(), **fields)
+            p.audit.record(
+                "directory_company_saved", actor_user_id=by, target_type="directory_company",
+                target_id=made.domain,
+            )  # fmt: skip
+            p.commit()
+        return made
+
+    def delete_company(self, domain: str, *, by: str) -> None:
+        with self._platform() as p:
+            p.directory.delete_company(domain)
+            p.audit.record(
+                "directory_company_removed", actor_user_id=by, target_type="directory_company",
+                target_id=domain.lower(),
+            )  # fmt: skip
             p.commit()
 
     def history(self, key: str) -> list[dict[str, object]]:

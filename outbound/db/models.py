@@ -454,6 +454,8 @@ class ContactRow(Mutable, Base):
     title: Mapped[str | None] = mapped_column(String(300))
     seniority: Mapped[str | None] = mapped_column(String(100))
     linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    # Set by "Find email again": the email step tries this person with fresh vendor answers.
+    refresh_email: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     rank: Mapped[int] = mapped_column(Integer)
     source: Mapped[ContactSource] = mapped_column(enum_type(ContactSource, "contact_source"))
     status: Mapped[ContactStatus] = mapped_column(
