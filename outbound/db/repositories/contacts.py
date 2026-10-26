@@ -118,6 +118,12 @@ class ContactRepository(ScopedRepository):
             )
         self._flush()
 
+    def set_refresh_email(self, contact_id: str, refresh: bool) -> None:
+        row = self._row(ContactRow, contact_id)
+        if row.refresh_email != refresh:
+            row.refresh_email = refresh
+            self._flush()
+
     def update_fields(self, contact_id: str, changes: Mapping[str, Any], *, actor: str) -> Contact:
         row = self._row(ContactRow, contact_id)
         self._apply_changes(

@@ -167,6 +167,16 @@ export function LeadDetailPage() {
         <StatusBadge status={describe(leadStatus, company.status)} />
         {hold && <span className="rounded-full bg-attention-container px-2 py-0.5 text-xs font-medium text-on-attention-container">{hold.label}</span>}
         <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs">company type: {words(company.legal_entity_type)}</span>
+        {company.created_at && (
+          <span className="text-xs text-muted" title={when(company.created_at)}>
+            Added {ago(company.created_at)} ({words(company.source)})
+          </span>
+        )}
+        {company.updated_at && (
+          <span className="text-xs text-muted" title={when(company.updated_at)}>
+            · last changed {ago(company.updated_at)}
+          </span>
+        )}
         {company.manual_fields.length > 0 && <span className="text-xs text-muted">Set by you, kept as you set it: {company.manual_fields.map(words).join(", ")}</span>}
       </div>
 
@@ -230,7 +240,12 @@ export function LeadDetailPage() {
                       <span className="min-w-0 flex-1 truncate text-[13px]">{m.subject}</span>
                       <StatusBadge status={describe(messageState, m.state)} />
                       {m.edit_distance != null && <span className="text-[11px] text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
-                      {m.sent_at && <span className="text-[11px] text-muted">sent {ago(m.sent_at)}</span>}
+                      {m.created_at && (
+                        <span className="text-[11px] text-muted" title={when(m.created_at)}>
+                          written {ago(m.created_at)}
+                        </span>
+                      )}
+                      {m.sent_at && <span className="text-[11px] text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
                       {m.state === "generated" && (
                         <Link
                           data-tour="lead-open-review"
@@ -423,6 +438,8 @@ const NOT_RESEARCHABLE = new Set(["new", "in_sequence", "replied", "completed", 
 
 // A lead in one of these can be pointed at a different person before the email reaches the mailbox.
 const RECIPIENT_CHANGEABLE = new Set(["contacts_found", "email_ready", "copy_ready", "approved", "failed", "held"]);
+// Where a person's email can be looked for again: before any email has been written to the lead.
+const EMAIL_RETRY = new Set(["contacts_found", "email_ready", "failed", "held"]);
 const WORKABLE = new Set(["candidate", "active"]);
 
 function Person({
@@ -441,6 +458,7 @@ function Person({
   writtenTo: boolean;
 }) {
   const companyId = company.id;
+  const queryClient = useQueryClient();
   const [panel, setPanel] = useState<"edit" | "consent" | null>(null);
   const [suppressing, setSuppressing] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -473,6 +491,20 @@ function Person({
     },
   });
   const gone = contact.status === "forgotten";
+  const findLinkedin = useMutation({
+    mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/find-linkedin", { params: { path: { contact_id: contact.id } } })),
+    onSuccess: (found) => {
+      if (found.url) onChanged();
+    },
+  });
+  const retryEmail = useMutation({
+    mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/retry-email", { params: { path: { contact_id: contact.id } } })),
+    onSuccess: () => {
+      for (const key of ["runs", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
+      onChanged();
+    },
+  });
+  const canRetryEmail = !gone && WORKABLE.has(contact.status) && EMAIL_RETRY.has(company.status);
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -488,10 +520,28 @@ function Person({
             )}
             {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
             {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">The email is to this person</span>}
-            {contact.linkedin_url && (
-              <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="text-[11px] text-primary hover:underline">
-                LinkedIn
+            {contact.linkedin_url ? (
+              <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline">
+                LinkedIn <ExternalLink className="size-3" aria-hidden />
               </a>
+            ) : (
+              !gone && (
+                <button
+                  type="button"
+                  onClick={() => findLinkedin.mutate()}
+                  disabled={findLinkedin.isPending || !contact.full_name}
+                  className="text-[11px] font-medium text-primary hover:underline disabled:opacity-60"
+                  title="One search for this person's LinkedIn profile"
+                >
+                  {findLinkedin.isPending ? "Searching…" : "Find LinkedIn"}
+                </button>
+              )
+            )}
+            {findLinkedin.isSuccess && !findLinkedin.data.url && <span className="text-[11px] text-muted">No clear match found</span>}
+            {contact.created_at && (
+              <span className="text-[11px] text-muted" title={when(contact.created_at)}>
+                found {ago(contact.created_at)}
+              </span>
             )}
           </div>
           <ul className="mt-1.5 space-y-1 pl-8">
@@ -504,11 +554,13 @@ function Person({
                   {words(email.provenance)}
                   {email.found_by && ` · found by ${email.found_by}`}
                   {email.verified_by && ` · checked by ${email.verified_by}`}
+                  {email.verified_at && ` ${ago(email.verified_at)}`}
                 </span>
                 {!gone && WORKABLE.has(contact.status) && <SkipCheck email={email} personName={contact.full_name} />}
               </li>
             ))}
             {contact.emails.length === 0 && <li className="text-xs text-muted">No address yet.</li>}
+            {contact.refresh_email && <li className="text-xs font-medium text-primary">Email search queued: it runs on the next run.</li>}
           </ul>
         </div>
         {!gone && (
@@ -524,6 +576,11 @@ function Person({
             <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "consent" ? null : "consent")}>
               Record consent
             </Button>
+            {canRetryEmail && !contact.refresh_email && (
+              <Button variant="ghost" size="sm" busy={retryEmail.isPending} onClick={() => retryEmail.mutate()} title="Search for this person's email again, with fresh answers from the vendors">
+                <RefreshCw className="size-3.5" aria-hidden /> Find email again
+              </Button>
+            )}
             {canChoose && (
               <Button variant="ghost" size="sm" onClick={() => setChoosing(true)}>
                 Write to this person instead
@@ -540,6 +597,7 @@ function Person({
           </div>
         )}
       </div>
+      <Problem error={findLinkedin.error ?? retryEmail.error} className="mt-2" />
       {panel === "edit" && (
         <EditPerson
           contact={contact}
@@ -756,8 +814,8 @@ function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
   if (items.length === 0) return null;
   return (
     <>
-      <Label className="mb-1 mt-3">{title}</Label>
-      <ul className="space-y-1.5 text-[13px]">
+      {title && <Label className="mb-1 mt-3">{title}</Label>}
+      <ul className="space-y-2 text-[13px]">
         {items.map((item) => (
           <li key={item.url}>
             <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
@@ -773,54 +831,121 @@ function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
   );
 }
 
+/** A titled block of the research, with a rule above it so the card reads as sections. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-line pt-3 first:border-0 first:pt-0">
+      <Label className="mb-1.5">{title}</Label>
+      {children}
+    </section>
+  );
+}
+
+function Bullets({ items }: { items: string[] }) {
+  return (
+    <ul className="list-disc space-y-1 pl-4 text-[13px] leading-relaxed">
+      {items.map((item, i) => (
+        <li key={i}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** Everything research found, grouped under headings; nothing is cut short. */
 function Research({ company }: { company: Company }) {
   const research = (company.research ?? {}) as Record<string, unknown>;
-  const hooks = (research.hooks as string[] | undefined) ?? [];
+  const list = (key: string) => ((research[key] as string[] | undefined) ?? []).filter(Boolean);
+  const hooks = list("hooks");
+  const products = list("products");
+  const siteNews = list("news");
+  const tech = list("tech");
   const newsItems = (research.news_items as NewsItem[] | undefined) ?? [];
   const triggers = (research.triggers as NewsItem[] | undefined) ?? [];
   const answers = Object.entries(company.research_answers ?? {});
+  const hiring = String(research.hiring ?? "").trim();
+  const sector = String(research.sector ?? "").trim();
   const decision = (company.policy_decision ?? {}) as { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
-  if (!research.summary && hooks.length === 0 && answers.length === 0 && !company.fit_reason && newsItems.length === 0) return null;
+  const empty = !research.summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
+  if (empty) return null;
   return (
-    <Card tour="lead-research" title="Research">
-      {Boolean(research.summary) && <p className="text-[13px] leading-relaxed">{String(research.summary)}</p>}
-      {company.fit_reason && (
-        <p className="mt-2 text-xs text-muted">
-          <strong className="text-ink">Fit {company.fit_score}/100:</strong> {company.fit_reason}
-        </p>
-      )}
-      <NewsList title="Recent news about them" items={newsItems} />
-      <NewsList title="Market news that may matter to them" items={triggers} />
-      {hooks.length > 0 && (
-        <>
-          <Label className="mb-1 mt-3">Findings</Label>
-          <ul className="list-disc space-y-0.5 pl-4 text-[13px]">
-            {hooks.map((hook) => (
-              <li key={hook}>{hook}</li>
-            ))}
-          </ul>
-        </>
-      )}
-      {answers.length > 0 && (
-        <>
-          <Label className="mb-1 mt-3">Your research questions</Label>
-          <dl className="space-y-1.5 text-[13px]">
-            {answers.map(([q, a]) => (
-              <div key={q}>
-                <dt className="text-xs text-muted">{q}</dt>
-                <dd>{String(a)}</dd>
-              </div>
-            ))}
-          </dl>
-        </>
-      )}
-      {decision.outcome && (
-        <p className="mt-3 border-t border-line pt-2 text-xs text-muted">
-          Country rule: {words(decision.rule ?? decision.outcome)}
-          {decision.policy_version != null && ` (version ${decision.policy_version})`}
-          {decision.reasons && decision.reasons.length > 0 && ` · ${decision.reasons.join("; ")}`}
-        </p>
-      )}
+    <Card tour="lead-research" title="Research" subtitle={company.updated_at ? `Last updated ${ago(company.updated_at)} (${when(company.updated_at)})` : undefined}>
+      <div className="space-y-3">
+        {(Boolean(research.summary) || sector) && (
+          <Section title="What they do">
+            {sector && <span className="mb-1.5 inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">{sector}</span>}
+            {Boolean(research.summary) && <p className="whitespace-pre-line text-[13px] leading-relaxed">{String(research.summary)}</p>}
+          </Section>
+        )}
+        {company.fit_reason && (
+          <Section title="How well they fit">
+            <p className="text-[13px] leading-relaxed">
+              <strong>{company.fit_score}/100.</strong> {company.fit_reason}
+            </p>
+          </Section>
+        )}
+        {products.length > 0 && (
+          <Section title={`Products and services (${products.length})`}>
+            <Bullets items={products} />
+          </Section>
+        )}
+        {hooks.length > 0 && (
+          <Section title={`Worth mentioning in an email (${hooks.length})`}>
+            <Bullets items={hooks} />
+          </Section>
+        )}
+        {siteNews.length > 0 && (
+          <Section title={`From their own site (${siteNews.length})`}>
+            <Bullets items={siteNews} />
+          </Section>
+        )}
+        {newsItems.length > 0 && (
+          <Section title={`Recent news about them (${newsItems.length})`}>
+            <NewsList title="" items={newsItems} />
+          </Section>
+        )}
+        {triggers.length > 0 && (
+          <Section title={`Market news that may matter to them (${triggers.length})`}>
+            <NewsList title="" items={triggers} />
+          </Section>
+        )}
+        {hiring && (
+          <Section title="Hiring">
+            <p className="whitespace-pre-line text-[13px] leading-relaxed">{hiring}</p>
+          </Section>
+        )}
+        {tech.length > 0 && (
+          <Section title="Technology they use">
+            <ul className="flex flex-wrap gap-1.5">
+              {tech.map((t, i) => (
+                <li key={i} className="rounded-md border border-line bg-surface-low px-2 py-0.5 text-xs">
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        )}
+        {answers.length > 0 && (
+          <Section title="Your research questions">
+            <dl className="space-y-2.5 text-[13px]">
+              {answers.map(([q, a]) => (
+                <div key={q}>
+                  <dt className="text-xs font-medium text-muted">{q}</dt>
+                  <dd className="mt-0.5 whitespace-pre-line leading-relaxed">{String(a) || <span className="text-muted">No answer found.</span>}</dd>
+                </div>
+              ))}
+            </dl>
+          </Section>
+        )}
+        {decision.outcome && (
+          <Section title="Country rule">
+            <p className="text-xs text-muted">
+              {words(decision.rule ?? decision.outcome)}
+              {decision.policy_version != null && ` (version ${decision.policy_version})`}
+              {decision.reasons && decision.reasons.length > 0 && ` · ${decision.reasons.join("; ")}`}
+            </p>
+          </Section>
+        )}
+      </div>
     </Card>
   );
 }

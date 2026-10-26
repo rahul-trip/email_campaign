@@ -202,13 +202,16 @@ function destination(place: Place, leadId: string | undefined): string {
   return place;
 }
 
+// Room the card needs: the longest step's text with its buttons.
+const CARD_ROOM = 340;
+
 /** Below the element if it fits, else above it, else bottom-right; centred when nothing is pointed at. */
 function cardPosition(box: Box | null): CSSProperties {
   const width = Math.min(CARD_WIDTH, window.innerWidth - 16);
   if (!box) return { width, top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
   const left = Math.min(Math.max(8, box.left), window.innerWidth - width - 8);
   const below = box.top + box.height + PAD + 12;
-  if (window.innerHeight - below >= 250) return { width, top: below, left };
-  if (box.top - PAD - 12 >= 250) return { width, bottom: window.innerHeight - box.top + PAD + 12, left };
+  if (window.innerHeight - below >= CARD_ROOM) return { width, top: below, left };
+  if (box.top - PAD - 12 >= CARD_ROOM) return { width, bottom: window.innerHeight - box.top + PAD + 12, left };
   return { width, bottom: 16, right: 16 };
 }

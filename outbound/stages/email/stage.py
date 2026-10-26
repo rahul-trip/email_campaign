@@ -69,7 +69,10 @@ class EmailStage:
                 for c in uow.contacts.for_company(company.id)
                 if c.status in WORKABLE_CONTACT_STATUSES
             ]
-        )[:MAX_CONTACTS]
+        )
+        # "Find email again" on a person: only they are tried, with fresh vendor answers.
+        asked = [(c, e) for c, e in people if c.refresh_email]
+        people = (asked or people)[:MAX_CONTACTS]
         target = Target(
             domain=company.domain,
             name=display_name(company.name, company.domain),
@@ -89,7 +92,7 @@ class EmailStage:
         for contact, emails in people:
             # Every paid call is recorded against the person it was for, so erasing the person
             # can find and clear it.
-            with call_scope(contact_id=contact.id):
+            with call_scope(contact_id=contact.id, fresh=contact.refresh_email):
                 outcome = self._waterfall.run(contact, emails, target)
             records.extend(outcome.records)
             problems.extend(outcome.problems)
@@ -103,6 +106,8 @@ class EmailStage:
 
         def write(uow: UnitOfWork) -> None:
             _save(uow, records, chosen)
+            for contact, _ in asked:  # they have been tried again
+                uow.contacts.set_refresh_email(contact.id, False)
             if chosen is not None and chosen_contact is not None:
                 _contribute(uow, company, chosen_contact, chosen, ctx.now)
                 learned_here = _learn_pattern(company.email_pattern, chosen, chosen_contact)

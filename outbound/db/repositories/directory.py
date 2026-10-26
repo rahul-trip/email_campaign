@@ -254,6 +254,37 @@ class DirectoryFigures:
 
 
 @dataclass(frozen=True)
+class EntryView:
+    """One address in the directory with the person it belongs to, for staff to browse."""
+
+    id: str  # the address row
+    email: str
+    status: str
+    provenance: str
+    source: str
+    verified_at: datetime
+    person_id: str
+    full_name: str
+    first_name: str
+    last_name: str
+    title: str | None
+    linkedin_url: str | None
+    company_domain: str
+    employment_status: str
+
+
+@dataclass(frozen=True)
+class CompanyView:
+    id: str
+    domain: str
+    name: str | None
+    country_code: str | None
+    email_pattern: str | None
+    pattern_confidence: int
+    status: str
+
+
+@dataclass(frozen=True)
 class FlagView:
     id: str
     target_type: str
@@ -454,6 +485,193 @@ class DirectoryAdminRepository:
                         person.employment_status = EmploymentStatus.LEFT
         self._session.flush()
 
+    # ------------------------------------------------------------------ browse and edit
+
+    def entries(self, q: str, limit: int, offset: int) -> tuple[list[EntryView], int]:
+        """Addresses with their people, newest verification first; ``q`` matches the address,
+        the name or the company's domain."""
+        stmt = select(DirectoryEmailRow, DirectoryPersonRow).join(
+            DirectoryPersonRow, DirectoryPersonRow.id == DirectoryEmailRow.person_id
+        )
+        needle = q.strip().lower()
+        if needle:
+            like = f"%{needle}%"
+            stmt = stmt.where(
+                func.lower(DirectoryEmailRow.email).like(like)
+                | func.lower(DirectoryPersonRow.full_name).like(like)
+                | func.lower(DirectoryPersonRow.company_domain).like(like)
+            )
+        total = int(self._session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        rows = self._session.execute(
+            stmt.order_by(DirectoryEmailRow.verified_at.desc()).limit(limit).offset(offset)
+        )
+        return [_entry(e, p) for e, p in rows], total
+
+    def entry(self, email_id: str) -> EntryView:
+        row = self._session.execute(
+            select(DirectoryEmailRow, DirectoryPersonRow)
+            .join(DirectoryPersonRow, DirectoryPersonRow.id == DirectoryEmailRow.person_id)
+            .where(DirectoryEmailRow.id == email_id)
+        ).first()
+        if row is None:
+            raise InvalidInput("that directory entry does not exist")
+        return _entry(*row)
+
+    def add_entry(
+        self,
+        *,
+        email: str,
+        first_name: str,
+        last_name: str,
+        company_domain: str,
+        title: str | None,
+        linkedin_url: str | None,
+        now: datetime,
+    ) -> EntryView:
+        """A person and address added by hand, served like any verified fact."""
+        address = email.strip().lower()
+        if "@" not in address:
+            raise InvalidInput("give a full email address")
+        if self._session.scalars(
+            select(DirectorySuppressionRow.value_hash).where(
+                DirectorySuppressionRow.value_hash == hash_value(address)
+            )
+        ).first():
+            raise InvalidInput("this person asked to be removed and cannot be added again")
+        if self._session.scalars(
+            select(DirectoryEmailRow.id).where(DirectoryEmailRow.email == address)
+        ).first():
+            raise InvalidInput("that address is already in the directory")
+        first, last = person_key(first_name, last_name)
+        if not (first and last):
+            raise InvalidInput("a first and a last name are needed")
+        domain = company_domain.strip().lower()
+        if "." not in domain:
+            raise InvalidInput("give the company's domain, for example acme.com")
+        person = self._session.scalars(
+            select(DirectoryPersonRow).where(
+                DirectoryPersonRow.company_domain == domain,
+                DirectoryPersonRow.first_name == first,
+                DirectoryPersonRow.last_name == last,
+            )
+        ).first()
+        if person is None:
+            person = DirectoryPersonRow(
+                company_domain=domain,
+                full_name=f"{first_name.strip()} {last_name.strip()}",
+                first_name=first,
+                last_name=last,
+                title=(title or None),
+                linkedin_url=(linkedin_url or None),
+                last_confirmed_at=now,
+            )
+            self._session.add(person)
+            self._session.flush()
+        row = DirectoryEmailRow(
+            email=address, person_id=person.id, provenance="staff", source="staff",
+            verified_at=now,
+        )  # fmt: skip
+        self._session.add(row)
+        self._session.flush()
+        return _entry(row, person)
+
+    def update_entry(self, email_id: str, changes: dict[str, Any], now: datetime) -> EntryView:
+        """Change an entry's address, status, or its person's details."""
+        row = self._session.get(DirectoryEmailRow, email_id)
+        if row is None:
+            raise InvalidInput("that directory entry does not exist")
+        person = self._session.get(DirectoryPersonRow, row.person_id)
+        if person is None:  # cannot happen: the address has a person (a foreign key)
+            raise InvalidInput("that directory entry has no person")
+        if changes.get("email"):
+            address = str(changes["email"]).strip().lower()
+            taken = self._session.scalars(
+                select(DirectoryEmailRow.id).where(
+                    DirectoryEmailRow.email == address, DirectoryEmailRow.id != email_id
+                )
+            ).first()
+            if "@" not in address or taken:
+                raise InvalidInput("that address is not valid or is already in the directory")
+            row.email = address
+        if changes.get("status"):
+            row.status = DirectoryStatus(changes["status"])
+        if changes.get("employment_status"):
+            person.employment_status = EmploymentStatus(changes["employment_status"])
+        for name in ("title", "linkedin_url"):
+            if name in changes:
+                setattr(person, name, changes[name] or None)
+        for name in ("first_name", "last_name"):
+            if changes.get(name):
+                setattr(person, name, person_key(str(changes[name]), "x")[0])
+        if changes.get("first_name") or changes.get("last_name"):
+            person.full_name = f"{changes.get('first_name') or person.first_name} " + (
+                str(changes.get("last_name") or person.last_name)
+            )
+        row.verified_at = now  # staff looked at it
+        self._session.flush()
+        return _entry(row, person)
+
+    def delete_entry(self, email_id: str, *, block: bool) -> str:
+        """Remove an address (and its person if it was their last). With ``block`` it is also
+        never added again. Returns the address that was removed."""
+        row = self._session.get(DirectoryEmailRow, email_id)
+        if row is None:
+            raise InvalidInput("that directory entry does not exist")
+        address = row.email
+        if block:
+            self.remove_address(address)
+        else:
+            self._session.delete(row)
+            self._session.execute(
+                delete(DirectoryObservationRow).where(DirectoryObservationRow.target_key == address)
+            )
+            self._session.flush()
+            self._drop_orphans()
+        return address
+
+    def companies(self, q: str, limit: int, offset: int) -> tuple[list[CompanyView], int]:
+        stmt = select(DirectoryCompanyRow)
+        if q.strip():
+            stmt = stmt.where(func.lower(DirectoryCompanyRow.domain).like(f"%{q.strip().lower()}%"))
+        total = int(self._session.scalar(select(func.count()).select_from(stmt.subquery())) or 0)
+        rows = self._session.scalars(
+            stmt.order_by(DirectoryCompanyRow.domain).limit(limit).offset(offset)
+        )
+        return [_company(c) for c in rows], total
+
+    def save_company(
+        self,
+        domain: str,
+        *,
+        name: str | None,
+        country_code: str | None,
+        email_pattern: str | None,
+        now: datetime,
+    ) -> CompanyView:
+        """Add a company, or change what the directory knows about it."""
+        key = domain.strip().lower()
+        if "." not in key:
+            raise InvalidInput("give the company's domain, for example acme.com")
+        row = self._session.scalars(
+            select(DirectoryCompanyRow).where(DirectoryCompanyRow.domain == key)
+        ).first()
+        if row is None:
+            row = DirectoryCompanyRow(domain=key, last_confirmed_at=now, pattern_confidence=0)
+            self._session.add(row)
+        row.name = name or None
+        row.country_code = (country_code or "").upper() or None
+        if (email_pattern or None) != row.email_pattern:
+            row.email_pattern = email_pattern or None
+            row.pattern_confidence = 3 if email_pattern else 0  # a staff pattern is trusted
+        row.last_confirmed_at = now
+        self._session.flush()
+        return _company(row)
+
+    def delete_company(self, domain: str) -> None:
+        key = domain.strip().lower()
+        self._session.execute(delete(DirectoryCompanyRow).where(DirectoryCompanyRow.domain == key))
+        self._session.flush()
+
     # ------------------------------------------------------------------ figures
 
     def figures(
@@ -499,3 +717,18 @@ class DirectoryAdminRepository:
             select(DirectoryEmailRow).where(DirectoryEmailRow.email == email.lower())
         ).first()
         return month(row.verified_at) if row else None
+
+
+def _entry(e: DirectoryEmailRow, p: DirectoryPersonRow) -> EntryView:
+    return EntryView(
+        e.id, e.email, e.status.value, e.provenance, e.source, e.verified_at, p.id,
+        p.full_name, p.first_name, p.last_name, p.title, p.linkedin_url, p.company_domain,
+        p.employment_status.value,
+    )  # fmt: skip
+
+
+def _company(c: DirectoryCompanyRow) -> CompanyView:
+    return CompanyView(
+        c.id, c.domain, c.name, c.country_code, c.email_pattern, c.pattern_confidence,
+        c.status.value,
+    )  # fmt: skip

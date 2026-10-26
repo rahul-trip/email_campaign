@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -35,6 +36,23 @@ SENDER_FIELDS = frozenset(
     }
 )  # fmt: skip
 REVIEWED_KEY = "reviewed_at"
+# The fixed format of the downloadable profile file: every key, in the order the screen asks them,
+# with what an empty one looks like. A file with other keys is refused when it is uploaded.
+TEMPLATE_FIELDS: dict[str, Any] = {
+    "legal_name": "", "company_name": "", "domain": "", "postal_address": "",
+    "registration_details": "", "contact_info": "", "signature_name": "", "signature_title": "",
+    "greeting": "Hi", "industry": "", "mission": "", "narrative": "", "geographic_focus": "",
+    "value_propositions": [], "technologies": [], "target_verticals": [], "case_studies": [],
+    "outreach_goal": "", "style_examples": [],
+}  # fmt: skip
+
+
+def profile_template(current: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """The profile file: all the keys, empty (or filled from ``current``)."""
+    have = current or {}
+    return {key: have.get(key, empty) for key, empty in TEMPLATE_FIELDS.items()}
+
+
 SETTING_FIELDS = frozenset(
     {
         "safe_to_send_only",

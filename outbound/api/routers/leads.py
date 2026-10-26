@@ -17,6 +17,7 @@ from outbound.api.schemas import (
     EmailOut,
     JourneyOut,
     LeadOut,
+    LinkedInOut,
     MessageOut,
     NoteOut,
     PersonIn,
@@ -24,6 +25,7 @@ from outbound.api.schemas import (
     PolicySkipIn,
     RecipientIn,
     ReleaseIn,
+    RetryEmailOut,
     SkipCheckIn,
     TimelineOut,
     WaterfallOut,
@@ -31,6 +33,7 @@ from outbound.api.schemas import (
 from outbound.domain.enums import CompanyStatus, HoldReason
 from outbound.domain.permissions import Permission as P
 from outbound.services.leads import LeadDetail
+from outbound.services.runs import RunRequest
 
 router = APIRouter(prefix="/api", tags=["leads"])
 
@@ -323,3 +326,25 @@ def directory_skip(
 ) -> DirectoryBadgeOut:
     svc.directory.skip(company_id, body.skip)
     return directory_badge(company_id, svc)
+
+
+@router.post(
+    "/contacts/{contact_id}/find-linkedin",
+    response_model=LinkedInOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def find_linkedin(contact_id: str, svc: Annotated[Services, Depends(services)]) -> LinkedInOut:
+    """One search for this person's LinkedIn profile; saved only when it clearly fits."""
+    return LinkedInOut(url=svc.leads.find_linkedin(contact_id))
+
+
+@router.post(
+    "/contacts/{contact_id}/retry-email",
+    response_model=RetryEmailOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def retry_email(contact_id: str, svc: Annotated[Services, Depends(services)]) -> RetryEmailOut:
+    """Look for this person's email again, with fresh vendor answers, in a run queued now."""
+    svc.leads.retry_email(contact_id)
+    run = svc.runs.queue(RunRequest())
+    return RetryEmailOut(queued_run_id=run.id)

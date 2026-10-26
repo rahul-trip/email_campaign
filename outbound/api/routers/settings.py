@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
@@ -17,6 +18,7 @@ from outbound.api.schemas import (
     WorkspaceSettingsIn,
 )
 from outbound.domain.permissions import Permission as P
+from outbound.services.settings import profile_template
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -24,6 +26,17 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 @router.get("/sender-profile", dependencies=[Depends(require(P.SETTINGS_READ))])
 def sender_profile(svc: Annotated[Services, Depends(services)]) -> dict[str, Any]:
     return svc.settings.sender_profile()
+
+
+@router.get("/sender-profile/template", dependencies=[Depends(require(P.SETTINGS_READ))])
+def sender_profile_template(
+    svc: Annotated[Services, Depends(services)], current: bool = False
+) -> JSONResponse:
+    """A file with every key of the sender profile: empty, or with today's values to edit.
+    Upload it back with PUT /sender-profile."""
+    body = profile_template(svc.settings.sender_profile() if current else None)
+    name = "sender-profile.json" if current else "sender-profile-template.json"
+    return JSONResponse(body, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @router.put("/sender-profile", dependencies=[Depends(require(P.PROFILE_WRITE))])

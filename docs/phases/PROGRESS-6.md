@@ -56,6 +56,10 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 - Hashed removals by LinkedIn URL or by name and domain (only addresses are hashed).
 - The legal checklist before the public launch (6f).
 
+## Follow-up changes after the PR (2026-10-27)
+
+Small changes asked for while testing, on branch `phase-6/lead-page-and-profile-upload`: LinkedIn lookup for every person (automatic for ten per lead in research, plus a button), **Find email again** per person (migration 0016), research no longer limited or cut short and shown in sections, the whole sender profile from a downloadable JSON file, timestamps and an email history on Review and across the lead pages, the intake webhook's request body and an example, and staff browsing, adding, editing and removing directory entries and company patterns. The manual and tour are updated.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

@@ -113,7 +113,7 @@ export const SECTIONS: Section[] = [
       {
         target: "review-editor",
         title: "Read, edit, approve",
-        body: "The email exactly as it will be drafted, footer included. Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Write it again throws this one away and the next run writes a fresh one; Reject needs a reason.",
+        body: "The email exactly as it will be drafted, footer included, with when it was written. Beside it, History lists every step of its life (written, edited, approved, drafted, sent). Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Write it again throws this one away and the next run writes a fresh one; Reject needs a reason.",
       },
       {
         target: "review-opening",
@@ -196,7 +196,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-people",
         title: "People and consent",
-        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Edit a name or give a new address, record consent, write to someone else instead, remove a wrong match, or suppress a person for good.",
+        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone.",
       },
       {
         target: "lead-directory",
@@ -211,7 +211,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-research",
         title: "What research found",
-        body: "What the company does, how well it fits, your research questions' answers, and recent dated news about the company and its market, each a link to its source. The email opens with one of them when there is one.",
+        body: "Everything research found, in sections: what the company does, how well it fits, products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
       },
       {
         target: "lead-policy",
@@ -250,12 +250,12 @@ export const SECTIONS: Section[] = [
       {
         target: "settings-tabs",
         title: "Setup, profile, mailboxes, limits, team",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Integrations holds the signed address other systems use to add targets. Plan and usage shows your allowances, what is used, when they renew, and lets you ask for more credits. Your account changes your password.",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Integrations holds the signed address other systems use to add targets, the request body to send, and a complete example. Plan and usage shows your allowances, what is used, when they renew, and lets you ask for more credits. Your account changes your password.",
       },
       {
         target: "setup-check",
         title: "Confirm your sender profile",
-        body: "Every statement in the profile ends up in emails under your name. Read it, keep only what is true, and press Confirm and save: no email is written until you do.",
+        body: "Every statement in the profile ends up in emails under your name. Read it, keep only what is true, and press Confirm and save: no email is written until you do. You can also fill it from a file: download the empty file at the top, fill it in, and upload it back.",
       },
     ],
   },

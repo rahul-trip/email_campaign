@@ -104,6 +104,8 @@ class Contact:
     seniority: str | None = None
     linkedin_url: str | None = None
     manual_fields: tuple[str, ...] = field(default=())
+    created_at: datetime | None = None  # when the person was found or added
+    refresh_email: bool = False  # "Find email again" was pressed and the step has not run yet
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "manual_fields", tuple(self.manual_fields))
@@ -151,6 +153,7 @@ class Message:
     updated_at: datetime | None = (
         None  # when it last changed; for a drafted message, the draft time
     )
+    created_at: datetime | None = None  # when the engine wrote it
 
 
 @dataclass(frozen=True)

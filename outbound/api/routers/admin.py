@@ -27,6 +27,13 @@ from outbound.api.schemas import (
     CustomerOut,
     CustomerRowOut,
     DefaultPlanIn,
+    DirectoryCompaniesOut,
+    DirectoryCompanyIn,
+    DirectoryCompanyOut,
+    DirectoryEntriesOut,
+    DirectoryEntryIn,
+    DirectoryEntryOut,
+    DirectoryEntryPatch,
     DirectoryFiguresOut,
     DirectoryFlagOut,
     DirectoryHistoryOut,
@@ -637,3 +644,59 @@ def remove_member(
 @router.post("/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect", status_code=204)
 def force_reconnect(workspace_id: str, mailbox_id: str, staff: Writer, service: Admin) -> None:
     service.force_reconnect(workspace_id, mailbox_id, by=staff.user.id)
+
+
+@router.get("/directory/entries", response_model=DirectoryEntriesOut)
+def directory_entries(
+    _: Reader, service: Directory, q: str = "", page: int = Query(0, ge=0)
+) -> DirectoryEntriesOut:
+    found, total = service.entries(q, page)
+    return DirectoryEntriesOut(
+        entries=[DirectoryEntryOut(**e.__dict__) for e in found], total=total
+    )
+
+
+@router.post("/directory/entries", response_model=DirectoryEntryOut, status_code=201)
+def add_directory_entry(
+    body: DirectoryEntryIn, staff: Writer, service: Directory
+) -> DirectoryEntryOut:
+    made = service.add_entry(by=staff.user.id, **body.model_dump())
+    return DirectoryEntryOut(**made.__dict__)
+
+
+@router.patch("/directory/entries/{entry_id}", response_model=DirectoryEntryOut)
+def change_directory_entry(
+    entry_id: str, body: DirectoryEntryPatch, staff: Writer, service: Directory
+) -> DirectoryEntryOut:
+    made = service.update_entry(entry_id, body.model_dump(exclude_unset=True), by=staff.user.id)
+    return DirectoryEntryOut(**made.__dict__)
+
+
+@router.delete("/directory/entries/{entry_id}", status_code=204)
+def remove_directory_entry(
+    entry_id: str, staff: Writer, service: Directory, block: bool = False
+) -> None:
+    service.delete_entry(entry_id, block=block, by=staff.user.id)
+
+
+@router.get("/directory/companies", response_model=DirectoryCompaniesOut)
+def directory_companies(
+    _: Reader, service: Directory, q: str = "", page: int = Query(0, ge=0)
+) -> DirectoryCompaniesOut:
+    found, total = service.companies(q, page)
+    return DirectoryCompaniesOut(
+        companies=[DirectoryCompanyOut(**c.__dict__) for c in found], total=total
+    )
+
+
+@router.put("/directory/companies/{domain}", response_model=DirectoryCompanyOut)
+def save_directory_company(
+    domain: str, body: DirectoryCompanyIn, staff: Writer, service: Directory
+) -> DirectoryCompanyOut:
+    made = service.save_company(domain, by=staff.user.id, **body.model_dump())
+    return DirectoryCompanyOut(**made.__dict__)
+
+
+@router.delete("/directory/companies/{domain}", status_code=204)
+def remove_directory_company(domain: str, staff: Writer, service: Directory) -> None:
+    service.delete_company(domain, by=staff.user.id)

@@ -89,7 +89,7 @@ def build_services(
         workspace_id=workspace_id,
         intake=intake,
         review=ReviewService(uow, workspace_id, writer, actor=actor),
-        leads=LeadService(uow, workspace_id, actor=actor),
+        leads=LeadService(uow, workspace_id, actor=actor, search=search),
         runs=RunService(uow, workspace_id),
         settings=settings_service or SettingsService(uow, workspace_id, actor=actor),
         reports=ReportService(uow, workspace_id),

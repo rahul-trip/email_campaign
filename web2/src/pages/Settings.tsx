@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowRight, Lock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight, Download, Lock, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { client, ok } from "../api/client";
-import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, QueryState, SaveNote, Segmented, Select, Skeleton, Tabs, Textarea, buttonClass } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, Problem, QueryState, SaveNote, Segmented, Select, Skeleton, Tabs, Textarea, buttonClass } from "../components/ui";
 import { lines, when } from "../lib/format";
 import { useOpen, useSetup, SetupList } from "../lib/setup";
 import { Mailboxes } from "./Mailboxes";
@@ -157,6 +157,7 @@ export function SenderProfile() {
                   Emails are not written until you have read this profile and saved it. Every statement here ends up in emails under your name, so keep only what is true and can be shown.
                 </Callout>
               )}
+              <ProfileFile onUploaded={() => { for (const key of ["sender", "status"]) void queryClient.invalidateQueries({ queryKey: [key] }); }} />
               <Card title="1. Legal identity" subtitle="Printed in the footer the law of each country requires.">
                 <div className="grid gap-3 sm:grid-cols-2">
                   {LEGAL.map(([key, label, hint]) => (
@@ -247,6 +248,70 @@ const PLACEHOLDERS: Record<string, string> = {
   registration_details: "registration_details",
   contact_info: "contact_info",
 };
+
+/** Fill the whole profile from a file: download the empty file, fill it in, upload it back. */
+function ProfileFile({ onUploaded }: { onUploaded: () => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [done, setDone] = useState<string | null>(null);
+  const download = useMutation({
+    mutationFn: async (current: boolean) => {
+      const body = await ok(client.GET("/api/settings/sender-profile/template", { params: { query: { current } } }));
+      const blob = new Blob([JSON.stringify(body, null, 2) + "\n"], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = current ? "sender-profile.json" : "sender-profile-template.json";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    },
+  });
+  const upload = useMutation({
+    mutationFn: async (file: File) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        throw new Error("That file is not valid JSON. Start from the downloaded template and keep its quotes and commas.");
+      }
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) throw new Error("The file must be one JSON object, like the template.");
+      return ok(client.PUT("/api/settings/sender-profile", { body: parsed as never }));
+    },
+    onSuccess: () => {
+      setDone("Your profile was filled in from the file and confirmed. Check each part below.");
+      onUploaded();
+    },
+  });
+  return (
+    <Card tour="profile-file" title="Fill it in from a file" subtitle="Download the file, fill in every value in any editor, and upload it back.">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button busy={download.isPending && download.variables === false} onClick={() => download.mutate(false)}>
+          <Download className="size-3.5" aria-hidden /> Download empty file
+        </Button>
+        <Button variant="secondary" busy={download.isPending && download.variables === true} onClick={() => download.mutate(true)}>
+          Download my current profile
+        </Button>
+        <Button variant="secondary" busy={upload.isPending} onClick={() => input.current?.click()}>
+          <Upload className="size-3.5" aria-hidden /> Upload a file
+        </Button>
+        <input
+          ref={input}
+          type="file"
+          accept="application/json,.json"
+          aria-label="Profile file"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            setDone(null);
+            if (file) upload.mutate(file);
+          }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-muted">Keep the keys exactly as they are; a file with other keys is refused. Lists (value propositions, technologies, target verticals, case studies, style examples) are lists of text. The greeting is Hi, Hello or Dear. Uploading replaces what is saved and counts as confirming the profile.</p>
+      {done && <Callout tone="good" className="mt-3">{done}</Callout>}
+      <Problem error={download.error ?? upload.error} className="mt-3" />
+    </Card>
+  );
+}
 
 function FooterPreview({ profile, policies }: { profile: Profile; policies: { country_code: string; rule: string; footer_template?: string | null }[] }) {
   const withFooter = policies.filter((p) => p.footer_template);

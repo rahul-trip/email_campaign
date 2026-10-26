@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { Button, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Table, Td, Th } from "../components/ui";
+import { DirectoryBrowser } from "./DirectoryBrowser";
 import { When } from "./bits";
 
 const usd = (micro: number) => `$${(micro / 1e6).toFixed(2)}`;
@@ -70,6 +71,7 @@ export function DirectoryPage() {
                   </Table>
                 )}
               </Card>
+              <DirectoryBrowser />
               <Card title="Look up one fact" subtitle="An address or a domain: when each source last confirmed it.">
                 <Field label="Address or domain">
                   <Input value={key} onChange={(e) => setKey(e.target.value)} className="w-72" />

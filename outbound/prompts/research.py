@@ -23,7 +23,8 @@ or 'LTIMindtree'; never a page title, headline or slogan; empty if the pages do 
 "products": ["<product or service>", ...],
 "news": ["<recent, specific, dated if the text dates it>", ...],
 "hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...]}}
-At most 5 products, 3 news items and 3 hooks. A hook must be something only this company
+List every product or service, every recent news item and every hook the text supports; do
+not leave a point out to keep the lists short. A hook must be something only this company
 would have said or done. {_JSON_ONLY}"""
 
 SIGNALS_SYSTEM_PROMPT = f"""\
@@ -42,7 +43,7 @@ authors of quoted articles and anyone the text does not place at the company.
 
 Return: {{"people": [{{"name": "<full name>", "title": "<job title>",
 "linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}
-At most 10 people, most senior first. {_JSON_ONLY}"""
+Every person the text lists, most senior first. {_JSON_ONLY}"""
 
 NEWS_SYSTEM_PROMPT = f"""\
 You pick the news worth opening a first email to one company with. You are given numbered
@@ -55,9 +56,9 @@ text only>"}}, ...],
 "matters": "<one sentence: why it matters to this company>"}}, ...]}}
 - "company": only results that are about THIS company (it is named, or clearly the subject).
   Leave out results that merely mention it in a list, and anything that is a press-release
-  boilerplate, a job ad, a stock price or a directory listing. At most 3, best first.
+  boilerplate, a job ad, a stock price or a directory listing. Every one that qualifies, best first.
 - "market": only results about regulation, tenders, funding, acquisitions or market moves that a
-  company like this one would care about. At most 2, best first.
+  company like this one would care about. Every one that qualifies, best first.
 - Use only the numbers you were given. Empty lists are a good answer. {_JSON_ONLY}"""
 
 FIT_SYSTEM_PROMPT = f"""\
