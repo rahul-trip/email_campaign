@@ -213,3 +213,17 @@ def test_staff_manage_the_directorys_company_patterns(staff: Api, lead: str) -> 
     assert staff.put("/api/admin/directory/companies/nodots", json={}).status_code == 422
     assert staff.delete("/api/admin/directory/companies/acme.com").status_code == 204
     assert staff.get("/api/admin/directory/companies").json()["total"] == 0
+
+
+def test_a_run_may_skip_the_directory_only_with_the_ability(
+    api: Api, lead: str, services: Services
+) -> None:
+    with services.container.platform() as p:
+        p.plans.set_plan(
+            services.workspace_id, "free", started_at=datetime.now(UTC) - timedelta(days=1),
+            access_until=datetime.now(UTC) + timedelta(days=29),
+        )  # fmt: skip
+        p.commit()
+    refused = api.post("/api/runs", json={"skip_directory": True})
+    assert refused.status_code == 422 and "plan" in refused.text
+    assert api.post("/api/runs", json={}).status_code == 202

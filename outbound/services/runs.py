@@ -27,6 +27,8 @@ class RunRequest:
     mode: RunMode = RunMode.MANUAL
     discover: int = 10
     campaign: str = defaults.DEFAULT_CAMPAIGN_NAME
+    # Find emails with the vendors, not the shared directory, for the leads this run works on.
+    skip_directory: bool = False
 
     def to_params(self) -> dict[str, Any]:
         return {
@@ -35,6 +37,7 @@ class RunRequest:
             "mode": self.mode.value,
             "discover": self.discover,
             "campaign": self.campaign,
+            "skip_directory": self.skip_directory,
         }
 
     @classmethod

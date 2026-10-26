@@ -4,9 +4,10 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Stat, Table, Td, Th, buttonClass } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Stat, Table, Td, Th, buttonClass } from "../components/ui";
 import { ago, duration, usd, when } from "../lib/format";
 import { describe, runStatus } from "../lib/status";
+import { useUsage } from "../lib/usage";
 import { STAGES, STAGE_LABEL, countsOf, discoveryLine, stagesDone, totalsOf } from "../lib/runs";
 
 type Mode = "manual" | "discovery" | "mixed";
@@ -23,6 +24,9 @@ export function RunsPage() {
   const [limit, setLimit] = useState(50);
   const [discover, setDiscover] = useState(10);
   const [campaign, setCampaign] = useState("");
+  const [skipDirectory, setSkipDirectory] = useState(false);
+  const usage = useUsage();
+  const canSkip = usage.data?.features.includes("directory_bypass") ?? false;
 
   const runs = useQuery({
     queryKey: ["runs"],
@@ -36,7 +40,7 @@ export function RunsPage() {
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const start = useMutation({
-    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, limit, discover, ...(mode !== "manual" && campaign ? { campaign } : {}) } })),
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, limit, discover, ...(mode !== "manual" && campaign ? { campaign } : {}), ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
     onSuccess: refresh,
   });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
@@ -84,6 +88,16 @@ export function RunsPage() {
             <div className="hidden md:col-span-2 md:block" />
           )}
         </div>
+        {canSkip && (
+          <div className="mt-3">
+            <Checkbox
+              label="Find emails with the vendors, not the shared directory"
+              hint="For the leads this run works on. Costs credits at the vendors; what they find still updates the directory."
+              checked={skipDirectory}
+              onChange={setSkipDirectory}
+            />
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-3">
           <Button busy={start.isPending} onClick={() => start.mutate()}>
             <Play className="size-3.5 fill-current" aria-hidden /> Start run

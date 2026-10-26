@@ -91,7 +91,7 @@ export const SECTIONS: Section[] = [
       {
         target: "start-run",
         title: "Start the engine",
-        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies, from a new angle each run, so it keeps finding ones you do not have yet. The worker process does the work, so you can leave the page.",
+        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies, from a new angle each run, so it keeps finding ones you do not have yet. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
       },
       {
         target: "recent-runs",

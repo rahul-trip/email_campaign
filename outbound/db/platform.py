@@ -33,7 +33,13 @@ from outbound.db.repositories.plans import PlanAdminRepository, PlatformSettings
 from outbound.db.repositories.vendors import VendorKeyRepository
 from outbound.db.repositories.workspaces import WorkspaceRepository
 from outbound.db.types import utcnow
-from outbound.domain.enums import MailboxStatus, RunStatus, UsageStep, WorkspaceStatus
+from outbound.domain.enums import (
+    CallOutcome,
+    MailboxStatus,
+    RunStatus,
+    UsageStep,
+    WorkspaceStatus,
+)
 
 
 class SchedulerQueries:
@@ -122,6 +128,19 @@ class AdminQueries:
             .group_by(ProviderCallRow.provider)
         )
         return {name: int(total) for name, total in self._session.execute(stmt)}
+
+    def key_failures(self, since: datetime) -> dict[str, int]:
+        """How many calls each provider refused our key for since ``since`` (all workspaces)."""
+        stmt = (
+            select(ProviderCallRow.provider, func.count())
+            .where(
+                ProviderCallRow.created_at >= since,
+                ProviderCallRow.outcome == CallOutcome.ERROR,
+                ProviderCallRow.response["error"].as_string() == "ProviderAuthError",
+            )
+            .group_by(ProviderCallRow.provider)
+        )
+        return {name: int(n) for name, n in self._session.execute(stmt)}
 
     def leads_added(self, start: datetime, end: datetime) -> int:
         """New leads (manual and discovered) charged in ``[start, end)``, all workspaces."""

@@ -2902,6 +2902,31 @@
         "title": "JourneyOut",
         "type": "object"
       },
+      "KeyCheckOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "KeyCheckOut",
+        "type": "object"
+      },
       "LeadOut": {
         "properties": {
           "company": {
@@ -5122,6 +5147,11 @@
             },
             "title": "Only",
             "type": "array"
+          },
+          "skip_directory": {
+            "default": false,
+            "title": "Skip Directory",
+            "type": "boolean"
           }
         },
         "title": "RunIn",
@@ -6445,6 +6475,10 @@
             "title": "Can Roll Back",
             "type": "boolean"
           },
+          "can_test": {
+            "title": "Can Test",
+            "type": "boolean"
+          },
           "cap_micro_usd": {
             "anyOf": [
               {
@@ -6463,6 +6497,10 @@
           "key": {
             "title": "Key",
             "type": "string"
+          },
+          "key_refusals": {
+            "title": "Key Refusals",
+            "type": "integer"
           },
           "name": {
             "title": "Name",
@@ -6524,7 +6562,9 @@
           "paused",
           "can_roll_back",
           "spend_micro_usd",
-          "cap_micro_usd"
+          "cap_micro_usd",
+          "key_refusals",
+          "can_test"
         ],
         "title": "VendorOut",
         "type": "object"
@@ -9020,6 +9060,49 @@
           }
         },
         "summary": "Roll Back Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/test": {
+      "post": {
+        "description": "One small real call with the stored key, to show whether it works.",
+        "operationId": "test_vendor_key_api_admin_vendors__vendor__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Vendor Key",
         "tags": [
           "admin"
         ]

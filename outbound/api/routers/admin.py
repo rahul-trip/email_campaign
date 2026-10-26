@@ -43,6 +43,7 @@ from outbound.api.schemas import (
     GrantedOut,
     GrantIn,
     GrantOut,
+    KeyCheckOut,
     LlmSettingsIn,
     MemberOut,
     OverrideIn,
@@ -700,3 +701,10 @@ def save_directory_company(
 @router.delete("/directory/companies/{domain}", status_code=204)
 def remove_directory_company(domain: str, staff: Writer, service: Directory) -> None:
     service.delete_company(domain, by=staff.user.id)
+
+
+@router.post("/vendors/{vendor}/test", response_model=KeyCheckOut)
+def test_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> KeyCheckOut:
+    """One small real call with the stored key, to show whether it works."""
+    result = service.test_key(vendor, by=staff.user.id)
+    return KeyCheckOut(ok=result.ok, message=result.message)

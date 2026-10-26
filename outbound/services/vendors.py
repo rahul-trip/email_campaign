@@ -13,6 +13,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
 from pydantic import SecretStr
 
 from outbound.config import Settings
@@ -21,6 +22,7 @@ from outbound.db.types import utcnow
 from outbound.domain.errors import InvalidInput
 from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
 from outbound.logging import get_logger
+from outbound.providers.keycheck import KeyCheck, can_test, check_key
 
 log = get_logger(__name__)
 
@@ -41,6 +43,8 @@ class VendorStatus:
     can_roll_back: bool
     spend_micro_usd: int  # this calendar month
     cap_micro_usd: int | None
+    key_refusals: int  # calls the vendor refused our key for in the last day
+    can_test: bool
 
 
 class VendorService:
@@ -85,6 +89,7 @@ class VendorService:
             settings, _ = p.settings.get()
             stored = p.vendor_keys.summaries()
             spent = self._spend(p)
+            refused = self._refusals(p)
         out: list[VendorStatus] = []
         for vendor in VENDORS:
             found = stored.get(vendor.code)
@@ -102,6 +107,7 @@ class VendorService:
                     vendor.code in settings.paused_vendors,
                     bool(found and found.can_roll_back),
                     spent.get(vendor.code, 0), settings.vendor_caps.get(vendor.code),
+                    refused.get(vendor.code, 0), can_test(vendor.code),
                 )
             )  # fmt: skip
         return out
@@ -150,6 +156,34 @@ class VendorService:
             p.commit()
         log.warning("vendors_paused_by_cap", vendors=paused)
         return paused
+
+    def _refusals(self, p: PlatformUnitOfWork) -> dict[str, int]:
+        """Calls refused for a bad key in the last day, per vendor (the model's ledger name is
+        its provider preset, so it is whatever no other vendor claims)."""
+        found = p.figures.key_failures(self._now() - timedelta(days=1))
+        out = {code: n for code, n in found.items() if code in BY_CODE}
+        out["llm"] = sum(n for name, n in found.items() if name not in BY_CODE)
+        return out
+
+    def test_key(
+        self, vendor: str, *, by: str | None, client: httpx.Client | None = None
+    ) -> KeyCheck:
+        """One small real call with the key as stored (even if the vendor is paused)."""
+        _known(vendor)
+        with self._platform() as p:
+            platform_settings, _ = p.settings.get()
+            stored = p.vendor_keys.current().get(vendor)
+        update: dict[str, Any] = dict(platform_settings.llm)
+        if stored is not None:
+            update[BY_CODE[vendor].setting] = SecretStr(stored)
+        result = check_key(vendor, self._base.model_copy(update=update), client)
+        with self._platform() as p:
+            p.audit.record(
+                "vendor_key_tested", actor_user_id=by, target_type="vendor", target_id=vendor,
+                data={"ok": result.ok},
+            )  # fmt: skip
+            p.commit()
+        return result
 
     def _spend(self, p: PlatformUnitOfWork) -> dict[str, int]:
         """This month's cost per vendor. The language model's ledger name is its provider

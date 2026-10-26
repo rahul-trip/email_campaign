@@ -679,6 +679,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/vendors/{vendor}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Vendor Key
+         * @description One small real call with the stored key, to show whether it works.
+         */
+        post: operations["test_vendor_key_api_admin_vendors__vendor__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/invitations/{token}": {
         parameters: {
             query?: never;
@@ -3223,6 +3243,13 @@ export interface components {
             /** Total Cost Micro Usd */
             total_cost_micro_usd: number;
         };
+        /** KeyCheckOut */
+        KeyCheckOut: {
+            /** Message */
+            message: string;
+            /** Ok */
+            ok: boolean | null;
+        };
         /** LeadOut */
         LeadOut: {
             company: components["schemas"]["CompanyOut"];
@@ -3908,6 +3935,11 @@ export interface components {
             mode?: components["schemas"]["RunMode"];
             /** Only */
             only?: string[];
+            /**
+             * Skip Directory
+             * @default false
+             */
+            skip_directory?: boolean;
         };
         /** RunLeadOut */
         RunLeadOut: {
@@ -4309,12 +4341,16 @@ export interface components {
         VendorOut: {
             /** Can Roll Back */
             can_roll_back: boolean;
+            /** Can Test */
+            can_test: boolean;
             /** Cap Micro Usd */
             cap_micro_usd: number | null;
             /** Code */
             code: string;
             /** Key */
             key: string;
+            /** Key Refusals */
+            key_refusals: number;
             /** Name */
             name: string;
             /** Paused */
@@ -5830,6 +5866,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_vendor_key_api_admin_vendors__vendor__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyCheckOut"];
                 };
             };
             /** @description Validation Error */

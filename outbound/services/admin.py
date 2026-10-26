@@ -540,6 +540,18 @@ class AdminService:
             p.commit()
         return updated, saved
 
+    def key_refusals(self, since: datetime) -> dict[str, int]:
+        """Calls each vendor refused our key for since ``since``; the model under its own name."""
+        from outbound.domain.vendors import BY_CODE
+
+        with self._platform() as p:
+            found = p.figures.key_failures(since)
+        out = {code: n for code, n in found.items() if code in BY_CODE}
+        refused_llm = sum(n for name, n in found.items() if name not in BY_CODE)
+        if refused_llm:
+            out["llm"] = refused_llm
+        return out
+
     def force_reconnect(self, workspace_id: str, mailbox_id: str, *, by: str) -> None:
         """Make a customer connect a mailbox again (a leaked or suspect token): its credentials
         stay, but nothing is drafted through it until the customer signs in to it again."""

@@ -23,6 +23,7 @@ log = get_logger(__name__)
 SOON = timedelta(days=7)
 LOOKBACK = timedelta(days=3)  # grants and requests older than this are not announced late
 WARN_AT = 0.8
+FAILING_AT = 3  # refused calls in a day before staff are told
 
 
 class NoticeService:
@@ -79,7 +80,7 @@ class NoticeService:
                         ws.id, f"{ws.name}: {text.split('.')[0].lower()}", self._ask(text)
                     )
             sent["workspace"] += self._grants(ws.id, ws.name, now)
-        sent["staff"] += self._requests(now)
+        sent["staff"] += self._requests(now) + self._failing_keys(now)
         if any(sent.values()):
             log.info("notices_sent", **sent)
         return sent
@@ -112,6 +113,18 @@ class NoticeService:
                 count += self.to_staff(
                     "A customer asked for more credits",
                     f"{ask['note'] or 'No note.'}\n\nOpen the admin console: {self._base}/admin",
+                )
+        return count
+
+    def _failing_keys(self, now: datetime) -> int:
+        """A vendor that keeps refusing our key: staff hear once a day until it is fixed."""
+        count = 0
+        for vendor, refused in self._admin.key_refusals(now - timedelta(days=1)).items():
+            if refused >= FAILING_AT and self._once(None, f"keyfail:{vendor}:{now:%Y-%m-%d}"):
+                count += self.to_staff(
+                    f"The {vendor} key is being refused",
+                    f"{refused} calls in the last day were rejected for a bad key. Replace it in "
+                    f"the admin console, under Vendors and keys: {self._base}/admin/vendors",
                 )
         return count
 

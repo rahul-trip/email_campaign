@@ -18,8 +18,7 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 - 6d.8 notices: 80% and 100% of a step, access ending and ended, credits granted (to workspace admins); credit requests and vendors paused by their cap (to platform staff). Sent once each, by the worker's periodic pass.
 
 **Left**
-- *Test a key* in the console (a real call to each vendor). Needs live keys.
-- A notice when a vendor key is *failing* (only "paused by cap" exists).
+- *Test a key* has no cheap check for Scrubby and Enrichley (the catch-all resolvers); they are tested by first use. The tests use fakes, so the real calls still need a live check.
 - A browser test of "extending access reopens a read-only workspace" (the API test exists; the e2e server cannot start a workspace past its access date).
 - An admin tour section (the console has no tour yet; the `data-tour` targets are in place).
 - Resending a customer's pending invitation from the console (the customer's own admins can do it in Team).
@@ -46,8 +45,6 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 - The gate test: a person verified for one customer costs the next no finder call (`tests/db/test_pipeline_e2e.py`).
 
 **Left:**
-- A run-level "search vendors instead" option (only the per-lead option exists).
-- A **Reconfirm** button on the lead page (needs a metered verifier in the API's services).
 - Reconfirmation by a verifier or search, on a button and on a schedule, metered to an internal `directory` workspace. Today staff accept or reject a report by hand and nothing is re-verified on a timer.
 - Contributions of people and companies beyond addresses and patterns: titles are kept, but LinkedIn profiles, legal entity and registry numbers are not contributed.
 - The opt-in setting for operator-typed contacts has no screen (the key `directory_share_operator_contacts` is read, default off).
@@ -55,6 +52,10 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 - Accuracy per source and reporters' track record on the admin screen; down-weighting repeat false reporters.
 - Hashed removals by LinkedIn URL or by name and domain (only addresses are hashed).
 - The legal checklist before the public launch (6f).
+
+## Left points worked on (2026-10-28)
+
+Built: the console's **Test** button per vendor (one small real call with the stored key), a *key refused* flag and a once-a-day staff email when a vendor rejects our key three times in a day, and the run-level "find emails with the vendors" option. **Decided not to build** the lead page's *Reconfirm* button: every address the directory serves is already checked by the verifier before it is used, so a second button would repeat that check.
 
 ## Follow-up changes after the PR (2026-10-27)
 

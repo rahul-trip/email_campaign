@@ -17,6 +17,7 @@ from outbound.api.schemas import (
     StatusOut,
 )
 from outbound.db.types import utcnow
+from outbound.domain.errors import InvalidInput
 from outbound.domain.permissions import Permission as P
 from outbound.services.runs import RunRequest
 
@@ -28,12 +29,15 @@ router = APIRouter(prefix="/api", tags=["runs"])
 )
 def start_run(body: RunIn, svc: Annotated[Services, Depends(services)]) -> RunOut:
     """Queue a run; the worker process picks it up. The API never runs the pipeline itself."""
+    if body.skip_directory and not svc.quota.quota().entitlements.has("directory_bypass"):
+        raise InvalidInput("your plan does not include skipping the shared directory")
     request = RunRequest(
         limit=body.limit,
         only=tuple(body.only),
         mode=body.mode,
         discover=body.discover,
         campaign=body.campaign,
+        skip_directory=body.skip_directory,
     )
     return RunOut.model_validate(svc.runs.queue(request))
 
