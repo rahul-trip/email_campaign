@@ -14,8 +14,10 @@ It is built for 5–50 new prospects a week at no more than $0.50 each.
 ## Documentation
 
 - [docs/USER_MANUAL.md](docs/USER_MANUAL.md) — how to operate the application day to day (through Phase 3).
-- [docs/PLAN.md](docs/PLAN.md) — the approved end-to-end plan: decisions, architecture, stages, compliance, providers.
-- [docs/SCHEMA.md](docs/SCHEMA.md) — schema v1: every table, constraint, relationship and value convention.
+- [docs/PLAN.md](docs/PLAN.md) — the approved end-to-end plan: scope, decisions, lifecycles, compliance, providers.
+- [docs/technical/](docs/technical/README.md) — the engineering documentation: architecture, design, ADRs, data model, API, integrations, security, operations, runbooks, and the risk register. New contributors start with the [onboarding guide](docs/technical/guides/developer-onboarding.md).
+- [docs/technical/data/schema.md](docs/technical/data/schema.md) — schema v1: every table, constraint, relationship and value convention.
+- [docs/technical/operations/deployment.md](docs/technical/operations/deployment.md) — deploying to the VM.
 - [docs/phases/](docs/phases/README.md) — the delivery phases, each with its tasks, gate, and what was built.
 - [CLAUDE.md](CLAUDE.md) — the rules every code change follows.
 
@@ -28,7 +30,7 @@ It is built for 5–50 new prospects a week at no more than $0.50 each.
 | `scripts/` | The Phase 0 vendor bake-off, the OpenAPI export, a throwaway Postgres for tests, and the browser-test server |
 | `tests/` | Tests for `outbound/` and `scripts/`, all without network |
 | `agent/` | The legacy pipeline. It is deleted after the first live run; see [agent/README.md](agent/README.md) |
-| `docs/` | Plan, schema, phases, and the archive of superseded notes |
+| `docs/` | Plan, user manual, phases, the technical documentation (`docs/technical/`), and the archive of superseded notes |
 | `Quantra_Energy_Outbound_Campaign_Matrix.xlsx` | The 10 hand-written leads, imported once and kept read-only |
 
 ## First run

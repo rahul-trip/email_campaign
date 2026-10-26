@@ -6,7 +6,7 @@ The next phase starts only after the gate passes, with two exceptions:
 - Phases 0 and 1 can run at the same time.
 - 6g and the rest of Phase 4 run in parallel once the alpha has started.
 
-The order follows the plan: **schema, then relationships, then backend engine, then frontend**. The design behind each phase is in [../PLAN.md](../PLAN.md); the data model is in [../SCHEMA.md](../SCHEMA.md).
+The order follows the plan: **schema, then relationships, then backend engine, then frontend**. The design behind each phase is in [../PLAN.md](../PLAN.md); the data model is in [../technical/data/schema.md](../technical/data/schema.md), and the engineering documentation in [../technical/](../technical/README.md).
 
 | Phase | Document | Delivers | Gate | Depends on |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 
 1. Create a branch named `phase-N/<short-task>` for each task. Keep PRs small: one task, or one coherent group of tasks.
 2. Every task lists the files it touches and a **done when** line. A task is done when its tests are green in CI and the done-when line is true.
-3. If a task changes behaviour, the same PR updates [../PLAN.md](../PLAN.md). If it changes data, the same PR adds an Alembic migration and updates [../SCHEMA.md](../SCHEMA.md).
+3. If a task changes behaviour, the same PR updates [../PLAN.md](../PLAN.md). If it changes data, the same PR adds an Alembic migration and updates [../technical/data/schema.md](../technical/data/schema.md). The other technical pages it touches are listed in the [doc-update matrix](../technical/README.md#keeping-the-pages-true).
 4. To close a phase:
    - Run the gate, then write the result (date, numbers, who checked) in that phase's **Gate record** section.
    - Tick the phase in the status table below.
@@ -46,12 +46,12 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 | 3b | **Planned, next.** [Hardening before live use](phase-3b-hardening.md): 36 gaps from the audit (9 P0) | |
 | 4 | 4a built (2026-10-26): opt-outs and hard bounces from the inbox; the rest not started | |
 | 5 | Not started | |
-| 6 | Planned (2026-10-23): SaaS alpha track 6a–6g approved | |
-| 6a | **Code complete** (2026-10-23, branch `phase-6/tenancy-foundation`); the Postgres suite passes as `outbound_app`; the gate waits on the database roles in Supabase, a rehearsal on a production copy and a deploy | |
-| 6b | **Code complete** (2026-10-23, branch `phase-6/identity-and-access`); every route is tested against every role, and the invite, reset and superadmin flows pass in the browser. The gate waits on a transactional email provider and a deploy | |
-| 6c | **Code complete** (2026-10-24, branch `phase-6/onboarding-and-mailboxes`); the suite passes on SQLite and on Postgres as `outbound_app`. The gate waits on live checks with real Microsoft 365, Google and IMAP mailboxes | |
-| 6d | **Mostly built** (2026-10-26, branch `phase-6/plans-limits-admin`); the build state is in [PROGRESS-6.md](PROGRESS-6.md). The gate waits on two pilot customers | |
-| 6g | **Mostly built** (2026-10-26); the build state and what is left are in [PROGRESS-6.md](PROGRESS-6.md) | |
+| 6 | SaaS alpha track 6a–6g: code complete and merged to `main` (2026-10-27); open gates are live-key/live-mailbox checks and a production deploy rehearsal | |
+| 6a | **Code complete**, merged to `main` (2026-10-23); the Postgres suite passes as `outbound_app`; the gate waits on the database roles in Supabase, a rehearsal on a production copy and a deploy | |
+| 6b | **Code complete**, merged to `main` (2026-10-23); every route is tested against every role, and the invite, reset and superadmin flows pass in the browser. The gate waits on a transactional email provider and a deploy | |
+| 6c | **Code complete**, merged to `main` (2026-10-24); the suite passes on SQLite and on Postgres as `outbound_app`. The gate waits on live checks with real Microsoft 365, Google and IMAP mailboxes | |
+| 6d | **Mostly built**, merged to `main` (2026-10-26); the build state is in [PROGRESS-6.md](PROGRESS-6.md). The gate waits on two pilot customers | |
+| 6g | **Mostly built**, merged to `main` (2026-10-26); the build state and what is left are in [PROGRESS-6.md](PROGRESS-6.md) | |
 | 6e, 6f | After the alpha | |
 | 7 | Backlog, unscheduled | |
 
@@ -70,7 +70,7 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 
 Everything else that was left out waits in [Phase 7](phase-7-later.md) until a measured need appears.
 
-**Test suite (2026-10-18):** 1,236 Python tests pass on SQLite and on PostgreSQL 16.2; the Playwright browser test passes. CI has not run yet because there is no remote repository.
+**Test suite (2026-10-27):** 1,982 tests collected (`uv run pytest --collect-only -q`), up from 1,236 at Phase 1's own close — that earlier figure is this document's dated snapshot at the time, not a claim about today. The Playwright browser tests pass. CI has not run yet because there is no remote repository.
 
 ## Engineering rules for every phase
 

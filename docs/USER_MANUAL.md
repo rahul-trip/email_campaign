@@ -74,7 +74,7 @@ uv run outbound worker     # does the work you start from the browser
 - **Forgot your password?** Ask for a reset link on the sign-in page. It works once, for 30 minutes, and signs you out everywhere else.
 - The database is the local file `outbound.db` unless `.env` says `DATABASE_BACKEND=postgres`, which uses `POSTGRES_URL` (the Supabase database) instead. Change that one line to switch.
 - First time only: `uv run outbound db upgrade` and `uv run outbound seed` create the database, a default workspace, a default campaign and the country rules.
-- **On the server** the app and worker run all the time, at the address your team set up (always https). A deploy sets up the database itself and restarts both processes for a few seconds, so avoid deploying while a run is going. Logs, restarts and CLI commands on the server are in [DEPLOY.md](DEPLOY.md), section 3.
+- **On the server** the app and worker run all the time, at the address your team set up (always https). A deploy sets up the database itself and restarts both processes for a few seconds, so avoid deploying while a run is going. Logs, restarts and CLI commands on the server are in the [deployment guide](technical/operations/deployment.md), section 3; when something goes wrong there, see the [runbooks](technical/operations/runbooks/README.md).
 
 ### 3.1 Accounts, invitations and workspaces
 
