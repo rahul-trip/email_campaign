@@ -420,3 +420,37 @@ def test_a_skipped_check_never_overrides_the_do_not_contact_list() -> None:
     target = Target(domain="acme.com", name="Acme", is_blocked=lambda a: a == "romain@acme.com")
     out = run([], FakeVerifier({}), emails=[skipped("romain@acme.com", E.VALID)], target=target)
     assert out.verdict is not Verdict.READY
+
+
+def test_the_directory_answers_first_and_a_paying_finder_is_never_called() -> None:
+    directory = FakeFinder("directory", "jane.doe@acme.com")
+    paid = FakeFinder("hunter", "other@acme.com")
+    verifier = FakeVerifier({"jane.doe@acme.com": V.VALID})
+    outcome = Waterfall([directory, paid], verifier).run(
+        JANE, [], Target(domain="acme.com", name="Acme")
+    )
+    assert outcome.verdict is Verdict.READY and outcome.chosen is not None
+    assert outcome.chosen.email == "jane.doe@acme.com" and outcome.chosen.found_by == "directory"
+    assert paid.calls == 0
+    assert verifier.checked == ["jane.doe@acme.com"]  # still checked once before use
+
+
+def test_a_directory_address_that_no_longer_verifies_falls_through_to_the_finders() -> None:
+    directory = FakeFinder("directory", "old@acme.com")
+    paid = FakeFinder("hunter", "jane.doe@acme.com")
+    verifier = FakeVerifier({"jane.doe@acme.com": V.VALID})
+    outcome = Waterfall([directory, paid], verifier).run(
+        JANE, [], Target(domain="acme.com", name="Acme")
+    )
+    assert outcome.chosen is not None and outcome.chosen.found_by == "hunter"
+
+
+def test_skipping_the_directory_goes_straight_to_the_vendors() -> None:
+    directory = FakeFinder("directory", "jane.doe@acme.com")
+    paid = FakeFinder("hunter", "jane.doe@acme.com")
+    verifier = FakeVerifier({"jane.doe@acme.com": V.VALID})
+    outcome = Waterfall([directory, paid], verifier).run(
+        JANE, [], Target(domain="acme.com", name="Acme", skip_finders=frozenset({"directory"}))
+    )
+    assert directory.calls == 0 and paid.calls == 1
+    assert outcome.chosen is not None and outcome.chosen.found_by == "hunter"

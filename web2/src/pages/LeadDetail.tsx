@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-ro
 import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlock, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
+import { DirectoryCard } from "../components/DirectoryCard";
 import { PolicySkip } from "../components/PolicySkip";
 import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
@@ -212,6 +213,8 @@ export function LeadDetailPage() {
               </ul>
             )}
           </Card>
+
+          <DirectoryCard companyId={company.id} />
 
           <AddPerson company={company} onAdded={refresh} />
 

@@ -199,6 +199,11 @@ export const SECTIONS: Section[] = [
         body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Edit a name or give a new address, record consent, write to someone else instead, remove a wrong match, or suppress a person for good.",
       },
       {
+        target: "lead-directory",
+        title: "Shared directory",
+        body: "An address another customer's run already verified is used first, at no cost, and still checked once before it is used. Report a wrong detail and the directory stops using that address until the team has checked it. If your plan allows it, tick the box to find this lead's email with the vendors instead.",
+      },
+      {
         target: "lead-add-person",
         title: "Add a person",
         body: "Someone you know at the company, with a first and last name or their work email. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on.",

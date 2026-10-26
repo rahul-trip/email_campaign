@@ -17,6 +17,8 @@
 - **Erasure:** forgetting a person removes them from the directory and blocks re-adding.
 - **Reporting:** the admin Directory screen shows the hit rate and the money saved.
 
+> **As built (2026-10-26)** is listed in [PROGRESS-6.md](PROGRESS-6.md): the schema (migration **0014**, not 0013), the rules, repositories, `DirectoryFinder` as the first waterfall link, contributions from the email stage, the directory's pattern, skip per lead, reports, staff review, forgetting, expiry, the admin screen and the lead card. What is not built is listed there.
+
 ## Decisions
 
 - **Everything verified is shareable:** companies, people and emails, including addresses Hunter found.

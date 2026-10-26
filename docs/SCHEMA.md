@@ -448,6 +448,49 @@ CREATE TABLE platform_credentials (
   created_at TIMESTAMP NOT NULL,
   retired_at TIMESTAMP
 );
+
+-- The verified lead directory (migration 0014, Phase 6g). Platform tables: no workspace, no
+-- row-level security; grants decide. outbound_app may SELECT the first three and INSERT into the
+-- last three; it may read only (target_type, target_key, status) of directory_flags, only
+-- (target_type, target_key) of directory_observations and only value_hash of directory_suppressions,
+-- and delete observations and reports (so forgetting a person clears them at once).
+-- outbound_platform may do everything.
+CREATE TABLE directory_companies (
+  id TEXT PRIMARY KEY, domain TEXT NOT NULL UNIQUE, name TEXT, country_code TEXT,
+  email_pattern TEXT, pattern_confidence INTEGER NOT NULL, -- how many observations agree
+  status TEXT NOT NULL,        -- verified | disputed | invalid
+  last_confirmed_at TIMESTAMP NOT NULL
+);
+CREATE TABLE directory_people (
+  id TEXT PRIMARY KEY, company_domain TEXT NOT NULL, full_name TEXT NOT NULL,
+  first_name TEXT NOT NULL, last_name TEXT NOT NULL,   -- lower case, for matching
+  title TEXT, linkedin_url TEXT,
+  employment_status TEXT NOT NULL,   -- current | left | unknown
+  status TEXT NOT NULL, last_confirmed_at TIMESTAMP NOT NULL,
+  UNIQUE (company_domain, first_name, last_name)
+);
+CREATE TABLE directory_emails (
+  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, person_id TEXT NOT NULL REFERENCES directory_people(id),
+  status TEXT NOT NULL,        -- only 'verified' is served
+  provenance TEXT NOT NULL, source TEXT NOT NULL, verified_by TEXT, verified_at TIMESTAMP NOT NULL
+);
+CREATE TABLE directory_observations (   -- append-only; what each customer's run learned
+  id TEXT PRIMARY KEY, target_type TEXT NOT NULL,  -- email | person | company | pattern
+  target_key TEXT NOT NULL, data JSON NOT NULL, source TEXT NOT NULL, observed_at TIMESTAMP NOT NULL,
+  contributor_workspace_id TEXT NOT NULL,          -- platform-only
+  folded_at TIMESTAMP                              -- null until the platform job has applied it
+);
+CREATE TABLE directory_flags (          -- a customer reports a fact wrong
+  id TEXT PRIMARY KEY, target_type TEXT NOT NULL, target_key TEXT NOT NULL, field TEXT NOT NULL,
+  reason TEXT NOT NULL, status TEXT NOT NULL,      -- open | confirmed | rejected
+  resolution TEXT, created_at TIMESTAMP NOT NULL, resolved_at TIMESTAMP,
+  reporter_workspace_id TEXT NOT NULL              -- platform-only
+);
+CREATE TABLE directory_suppressions (   -- people removed for good: hashes only
+  id TEXT PRIMARY KEY, value_hash TEXT NOT NULL UNIQUE, created_at TIMESTAMP NOT NULL
+);
+ALTER TABLE companies ADD COLUMN skip_directory BOOLEAN NOT NULL DEFAULT false;
+  -- find this lead's emails with the vendors, not the directory (needs `directory_bypass`)
 ```
 
 **Not in v1, added only when needed:**

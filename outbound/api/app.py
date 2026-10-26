@@ -44,6 +44,7 @@ from outbound.api.routers import (
 from outbound.bootstrap import Container
 from outbound.providers.ports import TransactionalEmail
 from outbound.services.admin import AdminService
+from outbound.services.directory import DirectoryService, finder_price
 from outbound.services.identity import IdentityService
 from outbound.services.vendors import VendorService
 
@@ -88,6 +89,9 @@ def create_app(
     app.state.container = container
     app.state.admin = AdminService(container.platform, container.identity, container.uow)
     app.state.vendors = VendorService(container.platform, container.settings)
+    app.state.directory = DirectoryService(
+        container.platform, finder_price_micro_usd=finder_price(container.settings)
+    )
     app.state.identity = IdentityService(
         container.identity,
         container.platform,

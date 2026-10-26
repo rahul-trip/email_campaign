@@ -28,6 +28,7 @@ from outbound.domain.permissions import READ, Permission, Principal, can
 from outbound.logging import bind, get_logger
 from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.providers.registry import build_oauth_apps
+from outbound.services.directory import LeadDirectory
 from outbound.services.identity import CurrentUser, IdentityService
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
@@ -65,6 +66,7 @@ class Services:
     quota: QuotaService
     resume: ResumeService
     usage: UsageService
+    directory: LeadDirectory
 
 
 def build_services(
@@ -97,6 +99,7 @@ def build_services(
         quota=quota,
         resume=resume,
         usage=UsageService(uow, container.identity, workspace_id, quota, resume),
+        directory=LeadDirectory(uow, workspace_id),
         mailboxes=MailboxService(
             uow, container.identity, workspace_id,
             apps=build_oauth_apps(container.settings), base_url=container.settings.app_base_url,

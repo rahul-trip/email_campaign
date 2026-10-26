@@ -11,6 +11,9 @@ from outbound.api.schemas import (
     ConsentIn,
     ConsentOut,
     ContactOut,
+    DirectoryBadgeOut,
+    DirectoryReportIn,
+    DirectorySkipIn,
     EmailOut,
     JourneyOut,
     LeadOut,
@@ -280,3 +283,43 @@ def restore_email_verification(
     return ContactOut.model_validate(
         {**person.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in person.emails]}
     )
+
+
+@router.get(
+    "/companies/{company_id}/directory",
+    response_model=DirectoryBadgeOut,
+    dependencies=[Depends(require(P.LEADS_READ))],
+)
+def directory_badge(
+    company_id: str, svc: Annotated[Services, Depends(services)]
+) -> DirectoryBadgeOut:
+    badge = svc.directory.badge(company_id)
+    return DirectoryBadgeOut(
+        in_directory=badge.in_directory,
+        verified_month=badge.verified_month,
+        can_skip=badge.can_skip,
+        skipping=badge.skipping,
+    )
+
+
+@router.post(
+    "/companies/{company_id}/directory/report",
+    status_code=204,
+    dependencies=[Depends(require(P.DIRECTORY_REPORT))],
+)
+def directory_report(
+    company_id: str, body: DirectoryReportIn, svc: Annotated[Services, Depends(services)]
+) -> None:
+    svc.directory.report(company_id, body.field, body.reason)
+
+
+@router.put(
+    "/companies/{company_id}/directory/skip",
+    response_model=DirectoryBadgeOut,
+    dependencies=[Depends(require(P.DIRECTORY_SKIP))],
+)
+def directory_skip(
+    company_id: str, body: DirectorySkipIn, svc: Annotated[Services, Depends(services)]
+) -> DirectoryBadgeOut:
+    svc.directory.skip(company_id, body.skip)
+    return directory_badge(company_id, svc)

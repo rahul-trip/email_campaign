@@ -80,6 +80,7 @@ class Company:
     research_answers: dict[str, Any] | None = None
     policy_decision: dict[str, Any] | None = None
     policy_skip_from: PolicyStage | None = None  # the operator skipped the country rule from here
+    skip_directory: bool = False  # find emails with the vendors, not the shared directory
     manual_fields: tuple[str, ...] = field(default=())
     created_at: datetime | None = None
     updated_at: datetime | None = None

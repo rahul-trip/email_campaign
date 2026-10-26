@@ -1004,3 +1004,55 @@ class RevealedKeyOut(Out):
 
 class VendorCapIn(In):
     cap_micro_usd: int | None
+
+
+class DirectoryBadgeOut(Out):
+    in_directory: bool
+    verified_month: str | None  # YYYY-MM; never a day
+    can_skip: bool
+    skipping: bool
+
+
+class DirectoryReportIn(In):
+    field: str
+    reason: str = ""
+
+
+class DirectorySkipIn(In):
+    skip: bool
+
+
+class DirectoryFlagOut(Out):
+    id: str
+    target_type: str
+    target_key: str
+    field: str
+    reason: str
+    created_at: datetime
+
+
+class DirectoryFiguresOut(Out):
+    companies: int
+    people: int
+    emails: int
+    open_reports: int
+    unfolded: int
+    lookups: int
+    hits: int
+    saved_micro_usd: int
+
+
+class DirectoryOverviewOut(Out):
+    figures: DirectoryFiguresOut
+    flags: list[DirectoryFlagOut]
+
+
+class DirectoryResolveIn(In):
+    accept: bool
+    note: str = ""
+
+
+class DirectoryHistoryOut(Out):
+    at: datetime
+    target: str
+    source: str

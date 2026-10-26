@@ -286,6 +286,14 @@ class CompanyRepository(ScopedRepository):
         self._events.append(EntityType.COMPANY, row.id, "resumed", actor, {"step": step.value})
         return step
 
+    def set_skip_directory(self, company_id: str, skip: bool, *, actor: str) -> None:
+        """Find this lead's emails with the vendors (True) or the shared directory (False)."""
+        row = self._row(CompanyRow, company_id)
+        if row.skip_directory != skip:
+            row.skip_directory = skip
+            self._flush()
+            self._events.append(EntityType.COMPANY, row.id, "skip_directory", actor, {"skip": skip})
+
     def update_fields(
         self,
         company_id: str,

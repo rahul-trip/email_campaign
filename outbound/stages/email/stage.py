@@ -10,16 +10,18 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from outbound.db.uow import UnitOfWork
-from outbound.domain.entities import Contact, ContactEmail
+from outbound.domain.directory import CONTRIBUTABLE, DIRECTORY
+from outbound.domain.entities import Company, Contact, ContactEmail
 from outbound.domain.enums import (
     WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     EmailStatus,
     HoldReason,
+    Provenance,
 )
 from outbound.domain.names import display_name
 from outbound.domain.policies import PolicyOutcome
@@ -52,6 +54,13 @@ class EmailStage:
         self._waterfall = Waterfall(deps.finders, deps.verifier, deps.resolver)
         self._poll_delay = deps.poll_delay
 
+    @staticmethod
+    def _directory_pattern(ctx: StageContext, company: Company) -> str | None:
+        """The directory's verified pattern, when this company has none of its own."""
+        if company.skip_directory:
+            return None
+        return ctx.read(lambda uow: uow.directory.pattern(company.domain))
+
     def handle(self, ctx: StageContext) -> StageResult:
         company = ctx.company
         people = ctx.read(
@@ -64,7 +73,8 @@ class EmailStage:
         target = Target(
             domain=company.domain,
             name=display_name(company.name, company.domain),
-            pattern=company.email_pattern,
+            pattern=company.email_pattern or self._directory_pattern(ctx, company),
+            skip_finders=frozenset({DIRECTORY}) if company.skip_directory else frozenset(),
             site_emails=tuple((company.research or {}).get("site_emails", ())),
             safe_to_send_only=bool(ctx.workspace.settings.get("safe_to_send_only", True)),
             is_blocked=lambda address: ctx.read(lambda uow: uow.suppressions.blocks(address)),
@@ -93,6 +103,11 @@ class EmailStage:
 
         def write(uow: UnitOfWork) -> None:
             _save(uow, records, chosen)
+            if chosen is not None and chosen_contact is not None:
+                _contribute(uow, company, chosen_contact, chosen, ctx.now)
+                learned_here = _learn_pattern(company.email_pattern, chosen, chosen_contact)
+                if learned_here:
+                    uow.directory.observe_pattern(company.domain, learned_here, DIRECTORY, ctx.now)
 
         if chosen is not None and chosen_contact is not None:
             decision = ctx.read(
@@ -141,6 +156,31 @@ class EmailStage:
             )
         detail = f" ({'; '.join(problems[:3])})" if problems else ""
         raise StageFailure(f"no valid email found for {len(people)} contact(s){detail}")
+
+
+def _contribute(
+    uow: UnitOfWork, company: Company, contact: Contact, chosen: Record, now: datetime
+) -> None:
+    """Share a verified address with the directory. An address the operator typed in is not
+    shared unless the workspace has opted in."""
+    if chosen.status not in CONTRIBUTABLE or not (contact.first_name and contact.last_name):
+        return
+    if chosen.provenance is Provenance.OPERATOR_GIVEN and not bool(
+        uow.workspace_settings().get("directory_share_operator_contacts", False)
+    ):
+        return
+    uow.directory.observe_email(
+        email=chosen.email,
+        domain=company.domain,
+        first_name=contact.first_name,
+        last_name=contact.last_name,
+        full_name=contact.full_name or f"{contact.first_name} {contact.last_name}",
+        title=contact.title,
+        provenance=chosen.provenance.value,
+        source=chosen.found_by or chosen.provenance.value,
+        verified_by=chosen.verified_by,
+        observed_at=now,
+    )
 
 
 def _learn_pattern(known: str | None, chosen: Record, contact: Contact) -> str | None:

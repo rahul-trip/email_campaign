@@ -32,7 +32,28 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 
 ## 6g — verified lead directory
 
-Not started. See `phase-6g-lead-directory.md`.
+**Done** (migration 0014, tests on SQLite and Postgres):
+- Platform tables for companies, people, addresses, observations, reports and removals; the app role can read served facts only, insert observations, reports and removals, and cannot read who contributed or reported (a Postgres privilege test).
+- Rules (`domain/directory.py`), repositories (`db/repositories/directory.py`), `DirectoryFinder` first in the waterfall at price 0 with a ledger row per lookup, contributions from the email stage, the directory's email pattern when a company has none.
+- Skip the directory per lead, only with the `directory_bypass` ability (refused on the server otherwise).
+- Reports stop an address being served at once; staff accept or reject them; an accepted one is never learned again.
+- Forgetting a person clears their observations and reports, removes them from the directory and blocks adding them again; facts expire after 24 months.
+- A periodic pass folds observations (`DirectoryService.run`, in the worker).
+- Admin "Lead directory" screen (size, hits and savings this month, reports to decide, history of one fact) and the lead page card (badge by month, report, skip).
+- The gate test: a person verified for one customer costs the next no finder call (`tests/db/test_pipeline_e2e.py`).
+
+**Left:**
+- A run-level "search vendors instead" option (only the per-lead option exists).
+- Reconfirmation by a verifier or search, on a button and on a schedule, metered to an internal `directory` workspace. Today staff accept or reject a report by hand and nothing is re-verified on a timer.
+- Correcting the customer's own record when they report a detail (the report only stops the directory serving it).
+- Contributions of people and companies beyond addresses and patterns: titles are kept, but LinkedIn profiles, legal entity and registry numbers are not contributed.
+- The opt-in setting for operator-typed contacts has no screen (the key `directory_share_operator_contacts` is read, default off).
+- Hard bounces and "no longer works here" replies disputing facts automatically (4a suppresses the address in the workspace only).
+- Accuracy per source and reporters' track record on the admin screen; down-weighting repeat false reporters.
+- Hashed removals by LinkedIn URL or by name and domain (only addresses are hashed).
+- The public "Remove my data" page and its emailed confirmation.
+- The backfill command.
+- The legal checklist before the public launch (6f).
 
 ## After the alpha
 

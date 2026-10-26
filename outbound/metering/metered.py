@@ -291,7 +291,9 @@ def _elapsed_ms(started: float) -> int:
 
 
 class MeteredFinder:
-    def __init__(self, inner: EmailFinder, meter: Meter, *, ttl: timedelta = FINDER_TTL) -> None:
+    def __init__(
+        self, inner: EmailFinder, meter: Meter, *, ttl: timedelta | None = FINDER_TTL
+    ) -> None:
         self._inner = inner
         self._meter = meter
         self._ttl = ttl

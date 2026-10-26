@@ -59,6 +59,7 @@ from outbound.stages.base import Stage
 from outbound.stages.contacts import ContactsStage
 from outbound.stages.copy.stage import CopyStage
 from outbound.stages.deliver import DeliverStage
+from outbound.stages.email.directory import DirectoryFinder
 from outbound.stages.email.poller import CatchAllPoller
 from outbound.stages.email.stage import EmailDeps, EmailStage
 from outbound.stages.gate import GateStage
@@ -159,7 +160,11 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     llm = MeteredLlm(providers.llm, meter, prices=llm_prices)
     writer = MeteredLlm(providers.copy_llm, meter, prices=llm_prices) if providers.copy_llm else llm
     registry = MeteredRegistry(providers.registry, meter) if providers.registry else None
-    finders = [MeteredFinder(f, meter) for f in providers.finders]
+    # The shared directory goes first and is never cached: every lookup is a ledger row, so the
+    # hit rate and what it saved can be read back.
+    finders = [MeteredFinder(DirectoryFinder(uow, workspace_id), meter, ttl=None)] + [
+        MeteredFinder(f, meter) for f in providers.finders
+    ]
     verifier = MeteredVerifier(providers.verifier, meter)
     resolver = MeteredResolver(providers.resolver, meter) if providers.resolver else None
 

@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -39,8 +40,12 @@ from outbound.domain.enums import (
     ContactSource,
     ContactStatus,
     CredentialPurpose,
+    DirectoryStatus,
+    DirectoryTarget,
     EmailStatus,
+    EmploymentStatus,
     EntityType,
+    FlagStatus,
     HoldReason,
     ImportAnchor,
     ImportRowStatus,
@@ -184,6 +189,101 @@ class PlatformCredentialRow(Identified, Base):
     retired_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
 
 
+class DirectoryCompanyRow(Identified, Base):
+    """A company the directory knows, by domain. Platform table: the app role may only read it."""
+
+    __tablename__ = "directory_companies"
+
+    domain: Mapped[str] = mapped_column(String(253), unique=True)
+    name: Mapped[str | None] = mapped_column(String(300))
+    country_code: Mapped[str | None] = mapped_column(String(2))
+    email_pattern: Mapped[str | None] = mapped_column(String(100))
+    pattern_confidence: Mapped[int] = mapped_column(Integer, default=0)  # agreeing observations
+    status: Mapped[DirectoryStatus] = mapped_column(
+        enum_type(DirectoryStatus, "directory_status"), default=DirectoryStatus.VERIFIED
+    )
+    last_confirmed_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class DirectoryPersonRow(Identified, Base):
+    __tablename__ = "directory_people"
+    __table_args__ = (UniqueConstraint("company_domain", "first_name", "last_name"),)
+
+    company_domain: Mapped[str] = mapped_column(String(253), index=True)
+    full_name: Mapped[str] = mapped_column(String(300))
+    first_name: Mapped[str] = mapped_column(String(150))  # lower case, for matching
+    last_name: Mapped[str] = mapped_column(String(150))
+    title: Mapped[str | None] = mapped_column(String(300))
+    linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    employment_status: Mapped[EmploymentStatus] = mapped_column(
+        enum_type(EmploymentStatus, "employment_status"), default=EmploymentStatus.UNKNOWN
+    )
+    status: Mapped[DirectoryStatus] = mapped_column(
+        enum_type(DirectoryStatus, "directory_status"), default=DirectoryStatus.VERIFIED
+    )
+    last_confirmed_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class DirectoryEmailRow(Identified, Base):
+    __tablename__ = "directory_emails"
+
+    email: Mapped[str] = mapped_column(String(320), unique=True)
+    person_id: Mapped[str] = mapped_column(ForeignKey("directory_people.id"), index=True)
+    status: Mapped[DirectoryStatus] = mapped_column(
+        enum_type(DirectoryStatus, "directory_status"), default=DirectoryStatus.VERIFIED
+    )
+    provenance: Mapped[str] = mapped_column(String(40))
+    source: Mapped[str] = mapped_column(String(60))  # the finder that found it
+    verified_by: Mapped[str | None] = mapped_column(String(60))
+    verified_at: Mapped[datetime] = mapped_column(UtcDateTime)
+
+
+class DirectoryObservationRow(Identified, Base):
+    """What a customer's run learned, append-only. The contributor is readable by the platform
+    role only: the app role may insert here and nothing else."""
+
+    __tablename__ = "directory_observations"
+
+    target_type: Mapped[DirectoryTarget] = mapped_column(
+        enum_type(DirectoryTarget, "directory_target")
+    )
+    target_key: Mapped[str] = mapped_column(String(320))
+    data: Mapped[dict[str, Any]] = mapped_column(Json)
+    source: Mapped[str] = mapped_column(String(60))
+    observed_at: Mapped[datetime] = mapped_column(UtcDateTime)
+    contributor_workspace_id: Mapped[str] = mapped_column(String(36))
+    folded_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+
+
+class DirectoryFlagRow(Identified, Base):
+    """A customer's report that a fact is wrong. The reporter is platform-only."""
+
+    __tablename__ = "directory_flags"
+
+    target_type: Mapped[DirectoryTarget] = mapped_column(
+        enum_type(DirectoryTarget, "directory_target")
+    )
+    target_key: Mapped[str] = mapped_column(String(320))
+    field: Mapped[str] = mapped_column(String(40))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[FlagStatus] = mapped_column(
+        enum_type(FlagStatus, "flag_status"), default=FlagStatus.OPEN
+    )
+    resolution: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    reporter_workspace_id: Mapped[str] = mapped_column(String(36))
+
+
+class DirectorySuppressionRow(Identified, Base):
+    """A person who asked to be forgotten: only a hash, so they are never added again."""
+
+    __tablename__ = "directory_suppressions"
+
+    value_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
 class CredentialRow(Mutable, Base):
     """A workspace's secret, encrypted (AES-256-GCM, ``outbound.db.crypto``). The database only
     ever holds ciphertext; the key is in the environment (``SECRETS_KEYS``)."""
@@ -324,6 +424,8 @@ class CompanyRow(Mutable, Base):
     policy_skip_from: Mapped[PolicyStage | None] = mapped_column(
         enum_type(PolicyStage, "policy_stage")
     )
+    # Find emails with the vendors, not the shared directory (6g; needs `directory_bypass`).
+    skip_directory: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     manual_fields: Mapped[list[str]] = mapped_column(Json, default=list)
     row_version: Mapped[int] = mapped_column(Integer, default=1)
 

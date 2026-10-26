@@ -44,14 +44,14 @@ The order follows the plan: **schema, then relationships, then backend engine, t
 | 2 | Code complete; verified with fake vendors on SQLite and Postgres 16.2; gate waiting on live keys and a real run of 10 emails; `agent/` not yet deleted | |
 | 3 | Code complete; API tested, browser test passes against fake vendors; gate waiting on a live run with real keys | |
 | 3b | **Planned, next.** [Hardening before live use](phase-3b-hardening.md): 36 gaps from the audit (9 P0) | |
-| 4 | Not started (4a planned before the SaaS alpha) | |
+| 4 | 4a built (2026-10-26): opt-outs and hard bounces from the inbox; the rest not started | |
 | 5 | Not started | |
 | 6 | Planned (2026-10-23): SaaS alpha track 6a–6g approved | |
 | 6a | **Code complete** (2026-10-23, branch `phase-6/tenancy-foundation`); the Postgres suite passes as `outbound_app`; the gate waits on the database roles in Supabase, a rehearsal on a production copy and a deploy | |
 | 6b | **Code complete** (2026-10-23, branch `phase-6/identity-and-access`); every route is tested against every role, and the invite, reset and superadmin flows pass in the browser. The gate waits on a transactional email provider and a deploy | |
 | 6c | **Code complete** (2026-10-24, branch `phase-6/onboarding-and-mailboxes`); the suite passes on SQLite and on Postgres as `outbound_app`. The gate waits on live checks with real Microsoft 365, Google and IMAP mailboxes | |
 | 6d | **Mostly built** (2026-10-26, branch `phase-6/plans-limits-admin`); the build state is in [PROGRESS-6.md](PROGRESS-6.md). The gate waits on two pilot customers | |
-| 6g | Not started | |
+| 6g | **Mostly built** (2026-10-26); the build state and what is left are in [PROGRESS-6.md](PROGRESS-6.md) | |
 | 6e, 6f | After the alpha | |
 | 7 | Backlog, unscheduled | |
 
