@@ -234,6 +234,12 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `outbound/config.py::Settings._pick_database`, `outbound/bootstrap.py::build_container`.
 - **Links:** [tenancy and isolation](lld/tenancy-and-isolation.md#known-limitations).
 
+### R-28 · P2 · Documentation: the API reference has not caught up with the new routers
+
+- **What:** [api-reference.md](api/api-reference.md) documents the pre-Phase-6 routers (auth, targets, review, leads, runs, settings, privacy, webhook) to full request/response/error depth, but the six routers Phase 6 added (`admin`, `mailboxes`, `team`, `usage`, `setup`, `integrations` — about 70 of the ~147 total operations) are listed by path and permission only, not with each operation's full request and response shape.
+- **Read:** `outbound/api/routers/admin.py`, `mailboxes.py`, `team.py`, `usage.py`, `setup.py`, `integrations.py`; `web2/openapi.json` has the authoritative shapes today.
+- **Links:** [API reference](api/api-reference.md).
+
 ### R-27 · Note · The superadmin cross-workspace view is alpha-only and unaudited beyond the first access
 
 - **What:** `SUPERADMIN_ENABLED` lets any platform-role-`SUPERADMIN` user read any workspace, read-only, with only the *first* access per browser session per workspace written to `audit_log` — a long session's repeat views are not individually logged. This is a deliberate, documented trade-off for the alpha (per-click audit logging of every read was judged excessive for a read-only internal tool), not an oversight, but is worth tightening before a wider launch.
