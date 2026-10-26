@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6d
 ---
 
 # State machines
@@ -247,7 +247,38 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
-This table is consulted but not enforced, and no events are written ([R-15](../tech-debt-and-risks.md#r-15--p2--correctness-runs-and-three-tables-bypass-the-usual-guards)). A run whose worker dies stays `running` ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3)).
+This table is consulted but not enforced, and no events are written ([R-15](../tech-debt-and-risks.md#r-15--p2--correctness-runs-and-three-tables-bypass-the-usual-guards)). **`running` → `failed` on a stale heartbeat is fixed as of Phase 6a** (previously [R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3), now closed): `runs.heartbeat_at` is touched between leads, and `Worker.recover_stale` fails any `running` run whose heartbeat is older than `--stale-after` (30 minutes), freeing the workspace to be scheduled again. A partial unique index also keeps at most one `running` pipeline run per workspace (`ux_runs_one_running_pipeline`), so runs within a workspace no longer overlap. See [runner and worker](../lld/runner-and-worker.md) and [tenancy and isolation](../lld/tenancy-and-isolation.md).
+
+## Workspace
+
+`WORKSPACE`; values in `WorkspaceStatus` (Phase 6a). Governs whether a workspace may be used at all; a plan's access date is a separate, finer-grained check (read-only, not a status) in [plans, credits and admin](../lld/plans-credits-and-admin.md).
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> active: seeded or created (6c)
+    active --> paused: a platform admin stops its engine
+    active --> suspended: a platform admin closes it
+    active --> pending_deletion: deletion requested
+    paused --> active
+    paused --> suspended
+    paused --> pending_deletion
+    suspended --> active
+    suspended --> pending_deletion
+    pending_deletion --> active: restored before the date is due
+    pending_deletion --> deleted: purged when due
+    deleted --> [*]
+```
+
+| Status | Meaning | Engine runs? | Sign-in and reading? |
+|---|---|---|---|
+| `active` | Normal | Yes | Yes |
+| `paused` | A platform admin stopped the engine for this workspace | No new work is picked up; leads already due stay queued | Yes |
+| `suspended` | A platform admin closed it | No | No (API refuses, `403 workspace_closed`) |
+| `pending_deletion` | Deletion asked for; `deletion_due_at` set | No | Yes, until purged |
+| `deleted` | Purged; the row stays as a tombstone so cost history keeps its key | No | No |
+
+`outbound/api/deps.py::tenant` checks this status on every request (except for a superadmin's read-only view, which is still allowed into a suspended workspace). `Worker.plan`'s `active_workspaces` query is how the scheduler decides which workspaces are even worth asking for due work.
 
 ## Other events
 
@@ -255,7 +286,8 @@ Status changes are not the only events. The full list of event types, and which 
 
 ## Planned
 
-- Phase 4 uses `replied`, `completed`, `bounced`, `referred_away` and `in_sequence → contacts_found`: [phase-4-close-the-loop.md](../../phases/phase-4-close-the-loop.md).
+- **Built (4a, 2026-10-26):** an opt-out reply suppresses the contact (`contacts.status → opted_out`); a hard bounce invalidates the address (`contact_emails.status → invalid`) and marks the sent message `bounced`, and the lead continues to its next contact (`in_sequence → contacts_found`). See [inbox and opt-outs](../lld/inbox-and-opt-outs.md).
+- **Still planned (the rest of Phase 4):** `replied`, `completed`, just-in-time follow-ups, and automatic referral handling: [phase-4-close-the-loop.md](../../phases/phase-4-close-the-loop.md).
 - Phase 5 uses `approved → sent` for direct sending: [phase-5-automated-sending.md](../../phases/phase-5-automated-sending.md).
 
 ## How to refresh this page
