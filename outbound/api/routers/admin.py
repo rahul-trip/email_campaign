@@ -17,6 +17,7 @@ from outbound.api.deps import identity, require_platform
 from outbound.api.errors import ApiError
 from outbound.api.schemas import (
     AdminMailboxOut,
+    AdminRoleIn,
     AdminStepOut,
     AdminUserOut,
     AttentionOut,
@@ -56,10 +57,17 @@ from outbound.api.schemas import (
     VendorsOut,
 )
 from outbound.domain.entitlements import Plan
-from outbound.domain.enums import PlatformRole, UsageStep, UserStatus, WorkspaceStatus
+from outbound.domain.enums import (
+    MembershipRole,
+    PlatformRole,
+    UsageStep,
+    UserStatus,
+    WorkspaceStatus,
+)
 from outbound.domain.permissions import Permission as P
 from outbound.domain.platform_settings import PlatformSettings
 from outbound.services.admin import (
+    AdminError,
     AdminService,
     CustomerDetail,
     CustomerRow,
@@ -594,3 +602,38 @@ def directory_history(
     key: Annotated[str, Query(min_length=3)], _: Reader, service: Directory
 ) -> list[DirectoryHistoryOut]:
     return [DirectoryHistoryOut(**row) for row in service.history(key)]
+
+
+# ---- a customer's people and mailboxes
+
+
+@router.patch("/customers/{workspace_id}/members/{user_id}", status_code=204)
+def set_member_role(
+    workspace_id: str,
+    user_id: str,
+    body: AdminRoleIn,
+    staff: Writer,
+    ids: Annotated[IdentityService, Depends(identity)],
+) -> None:
+    try:
+        ids.set_role(workspace_id, user_id, MembershipRole(body.role), by=staff.user.id)
+    except IdentityError as error:
+        raise AdminError(error.status, error.code, error.detail) from None
+
+
+@router.delete("/customers/{workspace_id}/members/{user_id}", status_code=204)
+def remove_member(
+    workspace_id: str,
+    user_id: str,
+    staff: Writer,
+    ids: Annotated[IdentityService, Depends(identity)],
+) -> None:
+    try:
+        ids.remove(workspace_id, user_id, by=staff.user.id)
+    except IdentityError as error:
+        raise AdminError(error.status, error.code, error.detail) from None
+
+
+@router.post("/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect", status_code=204)
+def force_reconnect(workspace_id: str, mailbox_id: str, staff: Writer, service: Admin) -> None:
+    service.force_reconnect(workspace_id, mailbox_id, by=staff.user.id)

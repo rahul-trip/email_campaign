@@ -18,8 +18,9 @@ from outbound.db.repositories.directory import DirectoryFigures, FlagView
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
-from outbound.domain.enums import DirectoryTarget
+from outbound.domain.enums import DirectoryTarget, EmailStatus
 from outbound.domain.errors import InvalidInput
+from outbound.domain.state_machines import EMAIL
 from outbound.logging import get_logger
 from outbound.metering.quota import quota_in
 
@@ -74,7 +75,8 @@ class LeadDirectory:
 
     def report(self, company_id: str, field: str, reason: str) -> None:
         """Say a detail about this lead's person is wrong. The directory stops serving the
-        address until staff decide; this lead's own record is not changed."""
+        address until staff decide, and this workspace stops using it too (an address you
+        called wrong is marked invalid here)."""
         if field not in REPORT_FIELDS:
             raise InvalidInput(f"choose one of: {', '.join(REPORT_FIELDS)}")
         with self._uow(self._workspace_id) as uow:
@@ -87,6 +89,11 @@ class LeadDirectory:
                 else DirectoryTarget.PERSON
             )
             uow.directory.report(target, address, field, reason)
+            # This workspace stops using the address at once; the engine looks for another.
+            if field in ("email", "still_works"):
+                held = uow.emails.by_address(address)
+                if held is not None and EMAIL.allows(held.status, EmailStatus.INVALID):
+                    uow.emails.transition(held.id, EmailStatus.INVALID, actor=OPERATOR)
             uow.commit()
         log.info("directory_reported", company_id=company_id, field=field)
 

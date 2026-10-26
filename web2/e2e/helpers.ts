@@ -43,8 +43,8 @@ export async function signIn(page: Page, email = EMAIL, landed = true) {
 }
 
 /** The token in the newest emailed link of this kind (the test server keeps every email). */
-export async function emailedToken(page: Page, kind: "invite" | "reset", to: string): Promise<string> {
-  const pattern = kind === "invite" ? /\/invite\/([\w-]+)/ : /reset-password\?token=([\w-]+)/;
+export async function emailedToken(page: Page, kind: "invite" | "reset" | "remove", to: string): Promise<string> {
+  const pattern = kind === "invite" ? /\/invite\/([\w-]+)/ : kind === "remove" ? /remove-my-data\?token=([\w-]+)/ : /reset-password\?token=([\w-]+)/;
   const sent: { to: string; text: string }[] = await (await page.request.get("/e2e/outbox")).json();
   const found = sent.filter((m) => m.to === to).map((m) => m.text.match(pattern)?.[1]).filter(Boolean);
   expect(found.length, `an emailed ${kind} link to ${to}`).toBeGreaterThan(0);

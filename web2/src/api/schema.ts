@@ -144,6 +144,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Force Reconnect */
+        post: operations["force_reconnect_api_admin_customers__workspace_id__mailboxes__mailbox_id__reconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/customers/{workspace_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Member */
+        delete: operations["remove_member_api_admin_customers__workspace_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Set Member Role */
+        patch: operations["set_member_role_api_admin_customers__workspace_id__members__user_id__patch"];
+        trace?: never;
+    };
     "/api/admin/customers/{workspace_id}/overrides": {
         parameters: {
             query?: never;
@@ -720,6 +755,43 @@ export interface paths {
         put?: never;
         /** Reset */
         post: operations["reset_api_auth_password_reset_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/remove-my-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Request Removal
+         * @description Public. Sends a confirmation link to the address; never says whether we held it.
+         */
+        post: operations["request_removal_api_auth_remove_my_data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/remove-my-data/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Removal */
+        post: operations["confirm_removal_api_auth_remove_my_data_confirm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2094,6 +2166,14 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** AdminRoleIn */
+        AdminRoleIn: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "admin" | "member";
+        };
         /** AdminStepOut */
         AdminStepOut: {
             /** Granted */
@@ -3360,6 +3440,16 @@ export interface components {
         ReleaseIn: {
             resume_to?: components["schemas"]["CompanyStatus"] | null;
         };
+        /** RemovalConfirmIn */
+        RemovalConfirmIn: {
+            /** Token */
+            token: string;
+        };
+        /** RemovalIn */
+        RemovalIn: {
+            /** Email */
+            email: string;
+        };
         /** RequestCreditsIn */
         RequestCreditsIn: {
             /**
@@ -4278,6 +4368,100 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CustomerDetailOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    force_reconnect_api_admin_customers__workspace_id__mailboxes__mailbox_id__reconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                mailbox_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_member_api_admin_customers__workspace_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_member_role_api_admin_customers__workspace_id__members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminRoleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -5325,6 +5509,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_removal_api_auth_remove_my_data_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemovalIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_removal_api_auth_remove_my_data_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RemovalConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

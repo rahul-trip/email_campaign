@@ -22,6 +22,7 @@ export function PublicApp() {
   const params = new URLSearchParams(search);
   if (pathname === "/sign-in") return <SignIn next={safeNext(params.get("next"))} email={params.get("email") ?? ""} />;
   if (pathname === "/forgot-password") return <ForgotPassword />;
+  if (pathname === "/remove-my-data") return <RemoveMyData token={params.get("token") ?? ""} />;
   if (pathname === "/reset-password") return <ResetPassword token={params.get("token") ?? ""} />;
   if (pathname === "/oauth/callback") return <OAuthReturn params={params} />;
   const invite = pathname.match(/^\/invite\/([^/]+)\/?$/);
@@ -149,6 +150,56 @@ function ForgotPassword() {
       <a href="/sign-in" className="block text-center text-[12px] font-semibold text-primary hover:underline">
         Back to sign in
       </a>
+    </Frame>
+  );
+}
+
+/** For anyone, signed in or not: ask to be taken out of the shared lead directory, then confirm from the emailed link. */
+function RemoveMyData({ token }: { token: string }) {
+  const [email, setEmail] = useState("");
+  const ask = useMutation({ mutationFn: () => ok(client.POST("/api/auth/remove-my-data", { body: { email: email.trim() } })) });
+  const confirm = useMutation({ mutationFn: () => ok(client.POST("/api/auth/remove-my-data/confirm", { body: { token } })) });
+  if (token)
+    return (
+      <Frame title="Remove my data" subtitle="Confirm that your details should leave the lead directory.">
+        {confirm.isSuccess ? (
+          <Callout tone="good" title="Done">
+            Your details were removed from the directory and will not be added again.
+          </Callout>
+        ) : (
+          <>
+            <p className="text-[13px] text-muted">This removes the address this link was sent to, and any report or note about it, and blocks it from being added again.</p>
+            <Problem error={confirm.error} />
+            <Button busy={confirm.isPending} onClick={() => confirm.mutate()} className="h-9 w-full">
+              Remove my details
+            </Button>
+          </>
+        )}
+      </Frame>
+    );
+  return (
+    <Frame title="Remove my data" subtitle="Companies using Outbound share work email addresses they have checked. Ask here to be removed; we email a link to confirm it is you.">
+      {ask.isSuccess ? (
+        <Callout tone="good" title="Check your email">
+          If that address is valid, a confirmation link is on its way. It works once, for a day.
+        </Callout>
+      ) : (
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            ask.mutate();
+          }}
+        >
+          <Field label="Your work email">
+            <Input id="email" type="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 w-full" />
+          </Field>
+          <Problem error={ask.error} />
+          <Button type="submit" busy={ask.isPending} disabled={!email.includes("@")} className="h-9 w-full">
+            Email me a link
+          </Button>
+        </form>
+      )}
     </Frame>
   );
 }

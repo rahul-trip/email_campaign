@@ -253,7 +253,7 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
   - **Remove:** for someone who does not work here, such as a wrong match from a search. It is refused once anything has been written to them;
   - **Skip the check** (next to an address the check could not prove: *unknown*, *invalid*, a catch-all, or not checked yet): if you know the address works, write why and confirm. It becomes the address written to, no more checks are paid for it, and a lead stopped at the email step goes on. An *invalid* address will probably bounce, so use it only when you are sure. **Check it again** undoes it until the email is approved. The same button is in the journey's *Email address* stage when the lead is stuck there;
   - **Suppress:** never contact them again; their unsent emails are cancelled;
-- **Shared directory:** when another customer's run already verified this person's address, it is used first, at no cost, and still checked once before it is used. The card shows the month it was last verified. **Report wrong detail** (the address, that they have left, their title, LinkedIn, the company name or country) stops the directory using that address until the platform team has checked it. If your plan allows it, tick *Find this lead's email with the vendors instead* to skip the directory for this lead; what the vendors find still updates the directory. Forgetting a person removes them from the directory too, and they are never added again;
+- **Shared directory:** when another customer's run already verified this person's address, it is used first, at no cost, and still checked once before it is used. The card shows the month it was last verified. **Report wrong detail** (the address, that they have left, their title, LinkedIn, the company name or country) stops the directory using that address until the platform team has checked it. **Report wrong detail** also marks that address invalid in your own workspace, so the engine looks for another. If your plan allows it, tick *Find this lead's email with the vendors instead* to skip the directory for this lead; what the vendors find still updates the directory. Forgetting a person removes them from the directory too, and they are never added again;
 - **Add a person:** someone you know at the company (a first **and** last name, or their work email; optional title). Tick *has given consent*, choose the basis and write the evidence, and the consent is recorded with them; on a lead held for consent the hold is released as well. If the person is already on the lead (the same name, ignoring case and accents, or a first name you added earlier), their card is updated instead of a second one being made;
 - **Emails:** each email written, its state, how much you edited it and when it was sent. One waiting for review has **Open in Review**, which opens Review on that email;
 - **Research:** the summary, the fit reason, **recent news about the company** and **market news that may matter to it** (each a dated link to its source), the findings, your research questions' answers and the country rule;
@@ -550,6 +550,12 @@ Every line has `timestamp` (UTC), `level`, `logger`, `event`, `service`, `versio
 
 ---
 
+## 14c. Asking to be removed from the lead directory
+
+Anyone, with or without an account, can open `/remove-my-data` on the app's address, enter their work email and follow the link that is sent to it. Confirming removes that address and anything noted about it from the shared directory and stops it being added again. The link works once, for a day. No customer is told who asked.
+
+---
+
 ## 14b. Opt-outs and bounces
 
 Each tick the engine reads the inbox of every connected mailbox for replies to your emails. A reply that asks to be left alone ("unsubscribe", "remove me", "do not contact me") puts the person on the do-not-contact list, cancels their other emails and deletes their drafts. An email that bounces for good marks the address invalid, adds it to the list, and moves the lead on to the next person. Other replies are kept for you; the engine does not act on them yet. Mail that is not about one of your emails is never kept.
@@ -562,6 +568,7 @@ Platform admins and superadmins open **Admin console** from the user menu (or th
 
 - **Overview:** customers, leads added, drafts made, spend, what waits for credits, and what needs a decision (credit requests, expiring access, mailbox problems).
 - **Customers:** search and filter; **Invite customer** creates the workspace and emails its first admin. A customer's page has **Grant credits** (optionally resuming waiting work at once), **Extend access**, a plan change, a status change (active, paused, suspended), per-step limit overrides, members, mailboxes and activity. A customer past its access date is read-only until you extend it.
+- **Members and mailboxes of a customer:** on its page, the Members tab changes a person's role or removes them (a workspace always keeps one admin), and the Mailboxes tab can **Force reconnect** a mailbox, so nothing is saved through it until the customer signs in to it again. Both are recorded in the audit log.
 - **Users:** disable or enable an account, sign it out everywhere, and (superadmin) set a platform role.
 - **Plans:** edit the catalog and choose the default for new customers. A saved change applies to every customer on the plan.
 - **Vendors and keys:** the key of each paid service, always shown as `••••` and its last four characters. **Add key** or **Replace** takes effect on the worker's next run, and the old key is kept 30 days (**Roll back**). **Reveal** shows a key once and is recorded in the audit log. **Pause** makes the engine ignore a vendor. Each vendor can have a monthly cap: when its spend reaches it the vendor is paused and staff are emailed. The language-model settings (model, address, temperature) are here too.

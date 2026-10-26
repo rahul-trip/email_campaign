@@ -11,6 +11,7 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 ## 6d — plans, limits and the admin console
 
 **Done**
+- Browser tests (`web2/e2e/credits.spec.ts`): a customer over its allowance waits and the admin's grant in the console adds the lead; a superadmin opens a workspace read-only. Members tab (role, remove) and Force reconnect on a mailbox, both audited.
 - 6d.1 schema (0012), 6d.2 entitlements and once-per-lead charging, 6d.3 waiting and resuming, 6d.5 admin API, 6d.7 customer screens.
 - 6d.4 vendor keys in the database (0013): encrypted, versioned, masked, audited reveal, rollback, pause, hot reload in the worker, `vendors import-env`, and monthly spend caps that pause a vendor.
 - 6d.6 admin console: Overview, Customers, Customer detail, Users, Plans, Vendors and keys, Settings, Audit log.
@@ -19,9 +20,9 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 **Left**
 - *Test a key* in the console (a real call to each vendor). Needs live keys.
 - A notice when a vendor key is *failing* (only "paused by cap" exists).
-- Members tab actions on the customer page (role, remove, resend invite, force reconnect). Workspace admins already do these in Team.
-- Browser tests of: a free customer's 6th manual lead waits and the admin's grant resumes it; extending access reopens a read-only workspace; the superadmin opens a workspace read-only. The same flows are tested on the API.
-- Admin tour section in `web2/src/tour/steps.ts` (the targets `admin-*` are placed).
+- A browser test of "extending access reopens a read-only workspace" (the API test exists; the e2e server cannot start a workspace past its access date).
+- An admin tour section (the console has no tour yet; the `data-tour` targets are in place).
+- Resending a customer's pending invitation from the console (the customer's own admins can do it in Team).
 - Gate record: two pilot customers, and recorded spend against vendor invoices within ±5%.
 
 ## 4a — opt-outs and hard bounces
@@ -40,19 +41,19 @@ Gates still open, none of them code: database roles in Supabase and a rehearsal 
 - Forgetting a person clears their observations and reports, removes them from the directory and blocks adding them again; facts expire after 24 months.
 - A periodic pass folds observations (`DirectoryService.run`, in the worker).
 - Admin "Lead directory" screen (size, hits and savings this month, reports to decide, history of one fact) and the lead page card (badge by month, report, skip).
+- A report on an address or "no longer works there" also marks the address invalid in the reporting workspace.
+- The public "Remove my data" page with an emailed confirmation (migration 0015), and `outbound directory backfill --since DATE [--apply]`.
 - The gate test: a person verified for one customer costs the next no finder call (`tests/db/test_pipeline_e2e.py`).
 
 **Left:**
 - A run-level "search vendors instead" option (only the per-lead option exists).
+- A **Reconfirm** button on the lead page (needs a metered verifier in the API's services).
 - Reconfirmation by a verifier or search, on a button and on a schedule, metered to an internal `directory` workspace. Today staff accept or reject a report by hand and nothing is re-verified on a timer.
-- Correcting the customer's own record when they report a detail (the report only stops the directory serving it).
 - Contributions of people and companies beyond addresses and patterns: titles are kept, but LinkedIn profiles, legal entity and registry numbers are not contributed.
 - The opt-in setting for operator-typed contacts has no screen (the key `directory_share_operator_contacts` is read, default off).
 - Hard bounces and "no longer works here" replies disputing facts automatically (4a suppresses the address in the workspace only).
 - Accuracy per source and reporters' track record on the admin screen; down-weighting repeat false reporters.
 - Hashed removals by LinkedIn URL or by name and domain (only addresses are hashed).
-- The public "Remove my data" page and its emailed confirmation.
-- The backfill command.
 - The legal checklist before the public launch (6f).
 
 ## After the alpha
