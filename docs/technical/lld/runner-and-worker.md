@@ -2,23 +2,23 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6a
 ---
 
 # Runner and worker
 
-**Code:** `outbound/runner/` (`runner.py`, `guards.py`, `tick.py`), `outbound/worker.py`, `outbound/cli/serve.py::worker`, `outbound/db/repositories/audit.py::RunRepository` · **Layer:** runner (and the worker entry point) · **Tests:** `tests/db/test_runner.py`, `tests/db/test_pipeline_e2e.py`, `tests/db/test_robustness.py`
+**Code:** `outbound/runner/` (`runner.py`, `guards.py`, `tick.py`), `outbound/worker.py`, `outbound/cli/serve.py::worker`, `outbound/db/repositories/audit.py::RunRepository`, `outbound/db/platform.py::SchedulerQueries` · **Layer:** runner (and the worker entry point) · **Tests:** `tests/db/test_runner.py`, `tests/db/test_pipeline_e2e.py`, `tests/db/test_robustness.py`, `tests/db/test_scheduler.py`, `tests/test_worker.py`
 
 ## Purpose
 
-The runner is the plain-Python loop that moves leads through the stages. For each due lead it:
+The runner is the plain-Python loop that moves leads through the stages, for one workspace, one run at a time. For each due lead it:
 
 1. checks the guards;
 2. calls the stage with no transaction open;
 3. writes the stage's answer in one short transaction.
 
-A lead that fails is recorded as failed, and the run carries on. The worker is the process that executes runs queued by the API. The tick is the scheduled pass for retries and periodic jobs. Together they replace a queue broker ([ADR 0002](../adr/0002-the-table-is-the-queue.md)).
+A lead that fails is recorded as failed, and the run carries on. As of Phase 6a the **worker** is no longer a single-workspace poller: it is one process that serves *every* workspace, deciding fairly which workspace gets attention next, assembling a fresh pipeline per piece of work, and recovering a run abandoned by a worker that died — replacing the earlier cron-triggered `outbound tick`. Together with the runner, it replaces a queue broker ([ADR 0002](../adr/0002-the-table-is-the-queue.md)) and now a cron schedule too ([ADR 0025](../adr/0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md)).
 
 ## Responsibilities
 
@@ -29,8 +29,8 @@ A lead that fails is recorded as failed, and the run carries on. The worker is t
 - Turn failures into `failed` (with back-off) or a deferral.
 - Honour cancellation between leads and between stages.
 - Record the run's counts and cost.
-- **Worker:** claim queued runs and execute them; survive errors.
-- **Tick:** retry due failures, run the jobs, then a pipeline pass.
+- **Worker:** plan which workspace gets attention next (queued runs before ticks, least-recently-served first, never a workspace already busy), claim and execute queued runs, give every active workspace a periodic tick, and recover any run whose worker went silent.
+- **Tick:** retry due failures, run the jobs, then a pipeline pass — skipping the pipeline pass entirely when nothing is waiting and the caller says so (the worker's own timer does).
 
 **Not its job:**
 
@@ -47,9 +47,10 @@ A lead that fails is recorded as failed, and the run carries on. The worker is t
 | `outbound/runner/runner.py::RunReport` | dataclass | `run_id`, `status`, `counts` (stage → outcome → n), `cost_micro_usd` |
 | `outbound/runner/guards.py::Guards` | class | `check(uow, company, stage) → Refusal \| None` |
 | `outbound/runner/guards.py::Refusal`, `RefusalKind` | — | `suppressed`, `hold`, `budget` |
-| `outbound/runner/tick.py::Tick` | class | `run(limit=50) → TickReport` |
-| `outbound/runner/tick.py::Job` | protocol | `name`, `run() → dict[str, int]` (`CatchAllPoller`, `SentSync`) |
-| `outbound/worker.py::Worker` | class | `run_once() → bool`; `run_forever(poll_seconds=2.0, stop=…)` |
+| `outbound/runner/tick.py::Tick` | class | `run(limit=50, skip_idle=False) → TickReport` |
+| `outbound/runner/tick.py::Job` | protocol | `name`, `run() → dict[str, int]` (`CatchAllPoller`, `SentSync`, `InboxSync`) |
+| `outbound/worker.py::Worker` | class | `plan() → list[Job]`; `recover_stale() → list[str]`; `execute(job) → bool`; `run_periodic()`; `run_once() → bool`; `run_forever(poll_seconds=2.0, stop=…)` |
+| `outbound/worker.py::Task`, `Job` | enum, dataclass | `Task.RUN`/`Task.TICK`; `Job(workspace_id, task)` — the unit the worker plans and executes |
 | `outbound/stages/base.py::Stage`, `StageResult`, `StageContext`, `StageFailure`, `Reader` | — | The contract between the runner and a stage |
 
 **The stage contract.** A `Stage` declares:
@@ -133,34 +134,45 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 
 ### Retries
 
-`retry_failed(limit)` moves due `failed` leads with fewer than 3 attempts back to their failed stage's input status (`retry_status_for`). Only `outbound tick` and `outbound retry` call it ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7)). The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
+`retry_failed(limit)` moves due `failed` leads with fewer than 3 attempts back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
 
 ### The tick
 
-`Tick.run(limit)`:
+`Tick.run(limit, skip_idle=False)`:
 
 1. `retry_failed`.
 2. If there are jobs, start a `sync` run and run each job inside `call_scope(run_id)`. One failing job is logged as `job_failed` and does not stop the others. Finish the sync run.
-3. `run_pipeline(limit)`.
+3. `run_pipeline(limit)` — unless `skip_idle` is set and no lead is waiting, in which case no pipeline run starts at all, so a quiet workspace's Runs screen does not fill up with empty runs. The worker's own timer always passes `skip_idle=True`; a direct `tick` from the CLI does not.
 
 Everything is driven by status and `next_action_at`, so a tick that fires early repeats nothing.
 
-### The worker
+### The worker: one process, every workspace
 
 ```mermaid
-flowchart LR
-    A[run_forever] --> B["run_once: tx claim_next<br/>(FOR UPDATE SKIP LOCKED),<br/>status running, commit"]
-    B -->|none queued| S[sleep poll_seconds] --> A
-    B -->|claimed| E["execute_run: discovery unless manual,<br/>then run_pipeline(run_id)"]
-    E -->|exception| F["log run_failed;<br/>finish run failed with the error"]
-    E --> A
-    F --> A
+flowchart TB
+    subgraph plan["plan(): once per poll"]
+        direction LR
+        K{"platform kill switch?"} -->|on| Z["no jobs"]
+        K -->|off| Q["queued runs (platform read)"] --> J1["Job(ws, RUN)"]
+        K --> A["active workspaces due a tick"] --> J2["Job(ws, TICK): skip any<br/>workspace already planned or busy"]
+        J1 --> Sort["sort: least-recently-served first"]
+        J2 --> Sort
+    end
+    Sort --> Pool["ThreadPoolExecutor<br/>(threads, default 4)"]
+    Pool -->|RUN| Claim["claim_next (FOR UPDATE SKIP LOCKED),<br/>then execute_run"]
+    Pool -->|TICK| TickRun["Tick.run(limit, skip_idle=True)"]
+    Claim -->|exception| Fail["runs.finish(FAILED, counts)"]
+    Loop["every ~60s"] --> Stale["recover_stale(): fail runs idle<br/>past stale_after (30 min)"]
 ```
 
-- `outbound worker` builds the container and the pipeline over the real providers. A missing provider key makes it print `not configured: …` and exit 1. Under compose's `restart: unless-stopped` that becomes a restart loop.
-- **Errors are contained.** An exception in `run_once` itself (for example, the database is unreachable) is logged as `worker_error`, and the loop goes on.
-- **No graceful shutdown.** There is no SIGTERM handler, and PID 1 in the container is `doppler run`. A stop or deploy kills the process after Docker's 10-second grace: the lead in hand is lost (it is retried next run, with no repeated vendor lookups), and **the run stays `running`** ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3)).
-- **The workspace** comes from `--workspace`, default `default`. The API uses `WORKSPACE_NAME`; they must match ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces)).
+- **Planning (`Worker.plan`)** reads two cheap, cross-workspace facts through the **platform** unit of work ([tenancy and isolation](tenancy-and-isolation.md)) — which workspaces have a queued run, and which active workspaces are due a tick (`tick_every`, default 15 minutes) — and nothing else; it never reads a workspace's own rows. A platform-wide kill switch (`PlatformSettingsRow.kill_runs`) short-circuits planning to nothing for anyone. At most one job per workspace is planned per pass, a run always outranks a tick for the same workspace, and a workspace already executing a job is skipped (`self._busy`). Jobs are sorted so the workspace that has waited longest is served first — simple least-recently-served fairness, not a priority queue.
+- **Executing a job** (`Worker.execute` → `_execute`) runs in a fresh `contextvars.Context`, so one job's logging/request-scoped state cannot leak into the next. A `RUN` job claims the next queued run in that workspace's own unit of work (`uow.runs.claim_next`, `FOR UPDATE SKIP LOCKED` — safe with several workers on Postgres, a no-op on SQLite, which ignores `SKIP LOCKED`) and, if one was claimed, assembles a fresh `Pipeline` for that workspace and calls `execute_run`. A `TICK` job calls that workspace's `Tick.run(limit=tick_limit, skip_idle=True)` directly, with no run claimed first — a tick running into a `RunInProgress` for that workspace is logged as `tick_skipped`, not an error.
+- **Stale-run recovery (`Worker.recover_stale`)**, run about every 60 seconds in `run_forever`, asks the platform unit of work which workspaces have a run whose heartbeat has gone quiet past `stale_after` (30 minutes), then fails each such run (`uow.runs.fail_stale`) in that workspace's own unit of work — closing what was once an open gap for a worker killed mid-run ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3), now closed by this mechanism).
+- **A fresh pipeline per job**, not one built once at process start, because the runner keeps per-run state and a long-lived worker now serves many workspaces, each needing its own metered providers scoped to its own workspace id.
+- **Periodic (platform-wide) jobs** (`run_periodic`, e.g. usage notices) run once per `tick_every` interval, independent of any one workspace's own tick; one failing job is logged (`periodic_failed`) and does not stop the others.
+- **Errors are contained** at every level: one job's exception is logged (`run_failed`/`tick_failed`) and finishes that run as `FAILED` without affecting any other workspace's jobs; a database hiccup inside the loop itself is logged as `worker_error` and the loop continues.
+- **Still no SIGTERM handler.** A stop or deploy kills the process after Docker's grace period; any run in flight is picked up by the *next* worker's `recover_stale` once its heartbeat goes stale, rather than being lost forever — this is the mechanism that replaced the earlier "no stale-run recovery" gap, not a graceful-shutdown path, so the run still briefly shows as `running` until the next recovery pass.
+- **`outbound worker`** takes `--threads` (default 4), `--tick-minutes` (default 15), `--stale-minutes` (default 30), `--tick-limit` (default 50); there is no `--workspace` flag any more — the worker always serves every active workspace, which also makes the earlier risk of the API and worker binding to different single workspaces moot ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces), now closed).
 
 ### Run statuses
 
@@ -169,6 +181,7 @@ flowchart LR
 | API (`RunService.queue`) | `queued` | `running` (worker), `cancelled` (operator) |
 | CLI `run`, `tick` | `running` | `succeeded`, `failed`, `cancelled` |
 | Tick jobs | `running` (kind `sync`) | `succeeded`, or `failed` if any job failed |
+| Worker, stale (no heartbeat past `stale_after`) | `running` | `failed` (`Worker.recover_stale`), with a `run_stale_failed` log line |
 
 `finish` keeps a status that is already final, so a run cancelled while running stays `cancelled`. Run transitions use `RUN.allows`, not `check`, and write no events ([R-15](../tech-debt-and-risks.md#r-15--p2--correctness-runs-and-three-tables-bypass-the-usual-guards)).
 
@@ -184,20 +197,20 @@ flowchart LR
 
 Per lead: a read and guard transaction, an admin read, then one write transaction.
 
-**Two runs at once** (the worker, a CLI `run`, a `tick`) are not prevented ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3)):
+**Two runs at once for the same workspace** (a CLI `run`, a worker-claimed run, a tick) are still not structurally prevented, though the worker's own planning (at most one job per workspace per pass, and a busy workspace skipped) makes it rare in production:
 
 - Optimistic locking stops a double write: the second run's write conflicts and is skipped.
 - Both runs may still pay for the same vendor call before either has cached it.
 
-`claim_next` is safe with several workers on Postgres, but not on SQLite, which ignores `SKIP LOCKED`.
+`claim_next` is safe with several workers on Postgres, but not on SQLite, which ignores `SKIP LOCKED`. Two *different* workspaces' jobs run concurrently on separate threads with no shared locking at all, by design — their rows are isolated by row-level security ([tenancy and isolation](tenancy-and-isolation.md)), so nothing about one workspace's run can affect another's.
 
 ## Configuration
 
-`--poll-seconds` (2.0) and `--workspace` on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The delays (15 min, 1 h, 3 attempts) are constructor defaults, not settings.
+`--threads` (4), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 3 attempts) are constructor defaults, not settings.
 
 ## Observability
 
-`run_started`, `run_finished`, `stage_done`, `guard_refused`, `stage_failed`, `lead_gone_during_run`, `lead_unreadable`, `undo_failed`, `job_failed`, `run_claimed`, `run_failed`, `worker_error`, `service_started`. Context (`run_id`, `workspace_id`, `company_id`, `stage`) is bound once and rides on every line. See [observability](../operations/observability.md).
+`run_started`, `run_finished`, `stage_done`, `guard_refused`, `stage_failed`, `lead_gone_during_run`, `lead_unreadable`, `undo_failed`, `job_failed`, `tick_skipped`, `run_claimed`, `run_failed`, `tick_failed`, `run_stale_failed`, `periodic_failed`, `worker_error`. Context (`run_id`, `workspace_id`, `company_id`, `stage`) is bound once and rides on every line. See [observability](../operations/observability.md).
 
 ## Tests
 
@@ -206,18 +219,18 @@ Per lead: a read and guard transaction, an admin read, then one write transactio
 | `tests/db/test_runner.py` | Every stage in one run; events for every move; priority and limit; `only`; child rows written with the move; holds with a wake time; scheduled leads left alone; failures and illegal results; deferral recorded once; operator edits win; back-off growth and attempt limit; suppression, policy and budget guards; withdrawal on hold; undo of a saved draft; an unreadable lead |
 | `tests/db/test_pipeline_e2e.py` | Targets to drafts with fake vendors, and a rerun at zero vendor cost |
 | `tests/db/test_robustness.py` | Every paid path metered; misconfiguration errors |
+| `tests/db/test_scheduler.py` | `SchedulerQueries` returns correctly filtered ids, scoped and unaffected by any one workspace's own data |
+| `tests/test_worker.py` | `plan()` fairness and busy/kill-switch exclusion; `recover_stale`; a job's exception does not affect another workspace's job; `tick_skipped` on `RunInProgress` |
 
 ## Known limitations
 
-- `tick` is not scheduled in production ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7)).
-- Runs can overlap, and a killed run stays `running` ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3)).
-- The budget is read once per process ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)).
-- The worker's health is not checked ([R-06](../tech-debt-and-risks.md#r-06--p1--operations-health-checks-do-not-see-a-broken-worker-or-database)).
+- Two runs for the *same* workspace can still race if started from different entry points (CLI and worker, say) at the same moment; optimistic locking stops a double write, but the duplicate vendor spend before either write is not prevented.
+- The budget is read once per process ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)) — now once per *worker process*, which serves every workspace, raising the cost of restarting the worker to pick up a budget change.
+- The worker's health is not checked ([R-06](../tech-debt-and-risks.md#r-06--p1--operations-health-checks-do-not-see-a-broken-worker-or-database)) — a process alive but stuck in a loop (e.g. `recover_stale` itself failing) would not be caught by a liveness probe alone.
 
 ## Planned
 
-- Phase 3b B2, B3, B7: one run per workspace, stale-run recovery, the worker ticks when idle: [phase-3b-hardening.md](../../phases/phase-3b-hardening.md).
-- Phase 4 adds follow-up and reply jobs to the tick: [phase-4-close-the-loop.md](../../phases/phase-4-close-the-loop.md).
+- Phase 4 adds follow-up and reply jobs to the tick: [phase-4-close-the-loop.md](../../phases/phase-4-close-the-loop.md) (the opt-out/bounce half of this, [inbox and opt-outs](inbox-and-opt-outs.md), landed in Phase 4a).
 
 ## How to refresh this page
 
