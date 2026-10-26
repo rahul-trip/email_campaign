@@ -33,6 +33,9 @@ OPEN = {
     "/api/auth/password/forgot",
     "/api/auth/password/reset",
     "/api/auth/password/change",
+    # Public on purpose: a person who is not a user asks to leave the directory, by email link.
+    "/api/auth/remove-my-data",
+    "/api/auth/remove-my-data/confirm",
     "/api/auth/invitations/{token}",
     "/api/auth/invitations/{token}/accept",
     # The provider's return page knows no workspace: the route finds it in the session's pending

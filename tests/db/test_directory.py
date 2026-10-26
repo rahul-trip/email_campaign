@@ -226,3 +226,39 @@ def test_the_app_role_cannot_read_who_contributed_or_reported(engine: Engine) ->
         )
         assert connection.execute(text("SELECT value_hash FROM directory_suppressions")).all() == []
     assert hash_value("x")  # hashes only are ever stored
+
+
+def test_backfill_counts_first_then_shares_only_proven_addresses_not_typed_ones(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    from outbound.domain.enums import ContactSource, EmailStatus
+
+    long_ago = datetime(2020, 1, 1, tzinfo=UTC)
+    with factory(ws) as uow:
+        company = uow.companies.create(domain="acme.com", source=CompanySource.MANUAL)
+        jane = uow.contacts.add(
+            company.id, rank=1, source=ContactSource.SITE, full_name="Jane Doe",
+            first_name="Jane", last_name="Doe",
+        )  # fmt: skip
+        uow.emails.add(
+            jane.id, "jane.doe@acme.com", Provenance.API_DATABASE,
+            status=EmailStatus.VALID, verified_by="zerobounce",
+        )  # fmt: skip
+        sam = uow.contacts.add(
+            company.id, rank=2, source=ContactSource.SITE, full_name="Sam Lee",
+            first_name="Sam", last_name="Lee",
+        )  # fmt: skip
+        uow.emails.add(  # typed in by the operator: not shared
+            sam.id, "sam@acme.com", Provenance.OPERATOR_GIVEN,
+            status=EmailStatus.VALID, verified_by="zerobounce",
+        )  # fmt: skip
+        uow.commit()
+    with factory(ws) as uow:
+        assert uow.directory.backfill(long_ago, dry_run=True) == 1
+        uow.commit()
+    assert service(platform).run()["emails"] == 0  # a dry run wrote nothing
+    with factory(ws) as uow:
+        assert uow.directory.backfill(long_ago, dry_run=False) == 1
+        uow.commit()
+    assert service(platform).run()["emails"] == 1
+    assert find(factory, other_ws) == "jane.doe@acme.com"

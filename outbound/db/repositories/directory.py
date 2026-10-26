@@ -16,6 +16,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from outbound.db.models import (
+    CompanyRow,
+    ContactEmailRow,
+    ContactRow,
     DirectoryCompanyRow,
     DirectoryEmailRow,
     DirectoryFlagRow,
@@ -25,13 +28,21 @@ from outbound.db.models import (
     ProviderCallRow,
 )
 from outbound.db.types import utcnow
-from outbound.domain.directory import DIRECTORY, RETENTION, DirectoryHit, month, person_key
+from outbound.domain.directory import (
+    CONTRIBUTABLE,
+    DIRECTORY,
+    RETENTION,
+    DirectoryHit,
+    month,
+    person_key,
+)
 from outbound.domain.enums import (
     CallOutcome,
     DirectoryStatus,
     DirectoryTarget,
     EmploymentStatus,
     FlagStatus,
+    Provenance,
 )
 from outbound.domain.errors import InvalidInput
 from outbound.domain.hashing import hash_value
@@ -174,6 +185,42 @@ class DirectoryRepository:
             )
         )
         self._session.flush()
+
+    def backfill(self, since: datetime, *, dry_run: bool) -> int:
+        """Share this workspace's verified addresses found since ``since`` (the alpha's start):
+        the proven ones that are not the operator's own typing. Returns how many were (or
+        would be) shared; observations already folded just refresh the same fact."""
+        stmt = (
+            select(ContactEmailRow, ContactRow, CompanyRow)
+            .join(ContactRow, ContactRow.id == ContactEmailRow.contact_id)
+            .join(CompanyRow, CompanyRow.id == ContactRow.company_id)
+            .where(
+                ContactEmailRow.workspace_id == self._workspace_id,
+                ContactEmailRow.status.in_(CONTRIBUTABLE),
+                ContactEmailRow.provenance != Provenance.OPERATOR_GIVEN,
+                ContactEmailRow.email.is_not(None),
+                ContactEmailRow.verified_at >= since,
+                ContactRow.first_name.is_not(None),
+                ContactRow.last_name.is_not(None),
+            )
+        )
+        shared = 0
+        for address, contact, company in self._session.execute(stmt):
+            shared += 1
+            if not dry_run:
+                self.observe_email(
+                    email=address.email or "",
+                    domain=company.domain,
+                    first_name=contact.first_name or "",
+                    last_name=contact.last_name or "",
+                    full_name=contact.full_name or "",
+                    title=contact.title,
+                    provenance=address.provenance.value,
+                    source=address.found_by or address.provenance.value,
+                    verified_by=address.verified_by,
+                    observed_at=address.verified_at or since,
+                )
+        return shared
 
     def remove_person(self, email: str) -> None:
         """Forget: keep only a hash, so the person is never added again. Staff's next pass
@@ -318,6 +365,31 @@ class DirectoryAdminRepository:
             company.last_confirmed_at = obs.observed_at
 
     # ------------------------------------------------------------------ removal and expiry
+
+    def remove_address(self, email: str) -> int:
+        """Delete everything held about an address and never add it again (a person's own
+        request). Returns how many addresses were deleted."""
+        key = email.strip().lower()
+        gone = self._session.execute(
+            delete(DirectoryEmailRow).where(DirectoryEmailRow.email == key)
+        )
+        self._session.execute(
+            delete(DirectoryObservationRow).where(DirectoryObservationRow.target_key == key)
+        )
+        self._session.execute(delete(DirectoryFlagRow).where(DirectoryFlagRow.target_key == key))
+        digest = hash_value(key)
+        if (
+            self._session.scalars(
+                select(DirectorySuppressionRow.value_hash).where(
+                    DirectorySuppressionRow.value_hash == digest
+                )
+            ).first()
+            is None
+        ):
+            self._session.add(DirectorySuppressionRow(value_hash=digest, created_at=utcnow()))
+        self._session.flush()
+        self._drop_orphans()
+        return int(gone.rowcount or 0)  # type: ignore[attr-defined]
 
     def remove_suppressed(self) -> int:
         """Delete every held address (and a person with none left) that was asked to go."""

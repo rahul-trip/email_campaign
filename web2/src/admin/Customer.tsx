@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { useMe } from "../app/session";
-import { Button, Callout, Card, Checkbox, Dialog, Field, Input, Menu, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Confirm, Dialog, Field, Input, Menu, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../components/ui";
 import { usd } from "../lib/format";
 import { AccessPill, Pill, UseBar, When, stepName } from "./bits";
 import { A, useId } from "./nav";
@@ -45,8 +45,8 @@ export function CustomerPage() {
               {tab === "overview" && <Overview d={d} onChange={refresh} />}
               {tab === "limits" && <Limits d={d} onChange={refresh} />}
               {tab === "access" && <Access d={d} onChange={refresh} />}
-              {tab === "members" && <Members d={d} />}
-              {tab === "mailboxes" && <Mailboxes d={d} />}
+              {tab === "members" && <Members d={d} onChange={refresh} />}
+              {tab === "mailboxes" && <Mailboxes d={d} onChange={refresh} />}
               {tab === "activity" && <Activity d={d} />}
             </Tabs>
           </>
@@ -608,15 +608,36 @@ function Access({ d, onChange }: { d: Detail; onChange: () => void }) {
   );
 }
 
-function Members({ d }: { d: Detail }) {
+function Members({ d, onChange }: { d: Detail; onChange: () => void }) {
+  const base = { workspace_id: d.row.id };
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
+  const role = useMutation({
+    mutationFn: async (v: { id: string; role: "admin" | "member" }) => {
+      const r = await client.PATCH("/api/admin/customers/{workspace_id}/members/{user_id}", { params: { path: { ...base, user_id: v.id } }, body: { role: v.role } });
+      if (!r.response.ok) throw new Error("That change was refused: a workspace keeps at least one admin.");
+    },
+    onSuccess: onChange,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await client.DELETE("/api/admin/customers/{workspace_id}/members/{user_id}", { params: { path: { ...base, user_id: id } } });
+      if (!r.response.ok) throw new Error("That change was refused: a workspace keeps at least one admin.");
+    },
+    onSuccess: () => {
+      setRemoving(null);
+      onChange();
+    },
+  });
   return (
-    <Card title="Members" subtitle="Who can sign in to this workspace. The customer's own admins manage the team.">
+    <Card title="Members" subtitle="Who can sign in to this workspace. Changes here are recorded in the audit log.">
+      <Problem error={role.error} className="mb-2" />
       <Table>
         <thead>
           <tr>
             <Th>Person</Th>
             <Th>Role</Th>
             <Th>Last signed in</Th>
+            <Th />
           </tr>
         </thead>
         <tbody>
@@ -626,17 +647,43 @@ function Members({ d }: { d: Detail }) {
                 <span className="font-medium">{m.name || m.email}</span>
                 {m.name && <span className="block text-[11px] text-muted">{m.email}</span>}
               </Td>
-              <Td className="capitalize">{m.role}</Td>
+              <Td>
+                <Select aria-label={`Role of ${m.email}`} value={m.role} onChange={(e) => role.mutate({ id: m.user_id, role: e.target.value as "admin" | "member" })}>
+                  <option value="admin">Admin</option>
+                  <option value="member">Member</option>
+                </Select>
+              </Td>
               <Td className="text-muted">{m.last_login_at ? new Date(m.last_login_at).toLocaleString() : "Never"}</Td>
+              <Td className="text-right">
+                <Button size="sm" variant="danger-ghost" onClick={() => setRemoving({ id: m.user_id, label: m.email })}>
+                  Remove
+                </Button>
+              </Td>
             </tr>
           ))}
         </tbody>
       </Table>
+      {removing && (
+        <Confirm title={`Remove ${removing.label}?`} confirmLabel="Remove" busy={remove.isPending} error={remove.error} onClose={() => setRemoving(null)} onConfirm={() => remove.mutate(removing.id)}>
+          They lose access to this workspace at once. Their leads and work stay.
+        </Confirm>
+      )}
     </Card>
   );
 }
 
-function Mailboxes({ d }: { d: Detail }) {
+function Mailboxes({ d, onChange }: { d: Detail; onChange: () => void }) {
+  const [asking, setAsking] = useState<{ id: string; address: string } | null>(null);
+  const reconnect = useMutation({
+    mutationFn: async (id: string) => {
+      const r = await client.POST("/api/admin/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect", { params: { path: { workspace_id: d.row.id, mailbox_id: id } } });
+      if (!r.response.ok) throw new Error("That did not work.");
+    },
+    onSuccess: () => {
+      setAsking(null);
+      onChange();
+    },
+  });
   return (
     <Card title="Mailboxes" subtitle="Addresses and health only; the customer connects and manages them.">
       {d.mailboxes.length === 0 ? (
@@ -650,6 +697,7 @@ function Mailboxes({ d }: { d: Detail }) {
               <Th>Status</Th>
               <Th>DNS</Th>
               <Th>Last checked</Th>
+              <Th />
             </tr>
           </thead>
           <tbody>
@@ -660,10 +708,22 @@ function Mailboxes({ d }: { d: Detail }) {
                 <Td>{m.status === "active" ? <Pill tone="good">working</Pill> : <Pill tone="error">{m.status.replace("_", " ")}</Pill>}</Td>
                 <Td>{m.dns_ok === null ? "not checked" : m.dns_ok ? "ok" : "problems"}</Td>
                 <Td className="text-muted">{m.last_checked_at ? new Date(m.last_checked_at).toLocaleString() : "—"}</Td>
+                <Td className="text-right">
+                  {m.status !== "needs_reconnect" && (
+                    <Button size="sm" variant="ghost" onClick={() => setAsking({ id: m.id, address: m.address })}>
+                      Force reconnect
+                    </Button>
+                  )}
+                </Td>
               </tr>
             ))}
           </tbody>
         </Table>
+      )}
+      {asking && (
+        <Confirm title={`Make ${asking.address} reconnect?`} confirmLabel="Force reconnect" busy={reconnect.isPending} error={reconnect.error} onClose={() => setAsking(null)} onConfirm={() => reconnect.mutate(asking.id)}>
+          Nothing is saved through this mailbox until the customer signs in to it again. Use it when a token may have leaked.
+        </Confirm>
       )}
     </Card>
   );

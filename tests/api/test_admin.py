@@ -450,3 +450,38 @@ def test_the_audit_log_filters_and_exports_without_formula_injection(
     csv_text = staff.get("/api/admin/audit.csv")
     assert csv_text.headers["content-type"].startswith("text/csv")
     assert "'=HYPERLINK" in csv_text.text and ",=HYPERLINK" not in csv_text.text
+
+
+# ---- a customer's people and mailboxes
+
+
+def test_staff_change_a_members_role_remove_them_and_keep_the_last_admin(
+    api: Api, staff: Api, services: Services, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    app, _ = app_and_services
+    add_user(app, "second@customer.example", services.workspace_id, MembershipRole.MEMBER)
+    team = {m["email"]: m["user_id"] for m in api.get("/api/team").json()["members"]}
+    other, me = team["second@customer.example"], team[ADMIN]
+    base = f"/api/admin/customers/{services.workspace_id}/members"
+    assert api.patch(f"{base}/{other}", json={"role": "admin"}).status_code == 403  # not staff
+    assert staff.patch(f"{base}/{other}", json={"role": "admin"}).status_code == 204
+    assert staff.delete(f"{base}/{other}").status_code == 204
+    # Only one admin is left: the workspace keeps them.
+    assert staff.delete(f"{base}/{me}").status_code == 409
+    assert audited(services, "role_changed", services.workspace_id)
+    assert audited(services, "member_removed", services.workspace_id)
+
+
+def test_staff_can_make_a_customer_connect_a_mailbox_again(
+    api: Api, staff: Api, services: Services
+) -> None:
+    with services.container.uow(services.workspace_id) as uow:
+        box = uow.mailboxes.create("sam@customer.example", "customer.example")
+        uow.commit()
+    url = f"/api/admin/customers/{services.workspace_id}/mailboxes/{box.id}/reconnect"
+    assert api.post(url).status_code == 403
+    assert staff.post(url).status_code == 204
+    with services.container.uow(services.workspace_id) as uow:
+        assert [m.status.value for m in uow.mailboxes.all()] == ["needs_reconnect"]
+    assert audited(services, "mailbox_reconnect_forced", services.workspace_id)
+    assert staff.post(url.replace(box.id, "missing")).status_code == 404

@@ -60,6 +60,14 @@ class Me(Out):
     workspaces: list[MyWorkspace]
 
 
+class RemovalIn(In):
+    email: str
+
+
+class RemovalConfirmIn(In):
+    token: str
+
+
 class ForgotIn(In):
     email: str = Field(max_length=320)
 
@@ -1056,3 +1064,7 @@ class DirectoryHistoryOut(Out):
     at: datetime
     target: str
     source: str
+
+
+class AdminRoleIn(In):
+    role: Literal["admin", "member"]

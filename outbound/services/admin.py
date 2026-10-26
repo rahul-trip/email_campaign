@@ -540,6 +540,23 @@ class AdminService:
             p.commit()
         return updated, saved
 
+    def force_reconnect(self, workspace_id: str, mailbox_id: str, *, by: str) -> None:
+        """Make a customer connect a mailbox again (a leaked or suspect token): its credentials
+        stay, but nothing is drafted through it until the customer signs in to it again."""
+        from outbound.domain.enums import MailboxStatus
+        from outbound.stages.mailboxes import mark
+
+        with self._uow(workspace_id) as uow:
+            if not any(m.id == mailbox_id for m in uow.mailboxes.all()):
+                raise NotFound(f"mailbox {mailbox_id}")
+        mark(self._uow, workspace_id, mailbox_id, MailboxStatus.NEEDS_RECONNECT)
+        with self._platform() as p:
+            p.audit.record(
+                "mailbox_reconnect_forced", actor_user_id=by, workspace_id=workspace_id,
+                target_type="mailbox", target_id=mailbox_id,
+            )  # fmt: skip
+            p.commit()
+
     # ------------------------------------------------------------------ audit
 
     def audit(

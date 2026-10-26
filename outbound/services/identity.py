@@ -21,6 +21,7 @@ from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import AuthToken, Membership, User, Workspace
 from outbound.domain.enums import AuthTokenPurpose, MembershipRole, PlatformRole, UserStatus
+from outbound.domain.hashing import hash_value
 from outbound.domain.passwords import (
     hash_password,
     hash_token,
@@ -36,6 +37,7 @@ log = get_logger(__name__)
 
 INVITE_TTL = timedelta(days=7)
 RESET_TTL = timedelta(minutes=30)
+REMOVAL_TTL = timedelta(days=1)
 USER_IDLE, USER_ABSOLUTE = timedelta(hours=24), timedelta(days=14)
 STAFF_IDLE, STAFF_ABSOLUTE = timedelta(hours=8), timedelta(days=3)
 SEEN_EVERY = timedelta(minutes=5)  # how often last_seen_at is written
@@ -226,6 +228,38 @@ class IdentityService:
             ids.commit()
         link = f"{self._base_url}/reset-password?token={token}"
         self._send(user.email, "Reset your Outbound password", _RESET.format(link=link))
+
+    def request_data_removal(self, email: str) -> None:
+        """A person asks to be removed from the lead directory. A link is sent to the address
+        itself, so only its owner can confirm. The caller always says the same thing."""
+        address = normalise_email(email)
+        if "@" not in address:
+            return
+        with self._identity() as ids:
+            token, token_hash = new_token()
+            ids.tokens.revoke_open(AuthTokenPurpose.REMOVE_DATA, address)
+            ids.tokens.create(
+                AuthTokenPurpose.REMOVE_DATA, address, token_hash, utcnow() + REMOVAL_TTL
+            )
+            ids.commit()
+        link = f"{self._base_url}/remove-my-data?token={token}"
+        self._send(
+            address, "Confirm: remove your details from Outbound", _REMOVAL.format(link=link)
+        )
+
+    def confirm_data_removal(self, token: str) -> None:
+        with self._identity() as ids:
+            found = self._usable(ids, token, AuthTokenPurpose.REMOVE_DATA)
+            ids.tokens.use(found.id)
+            ids.commit()
+        with self._platform() as directory:
+            directory.directory.remove_address(found.email)
+            # The address itself is not recorded; the hash identifies the request.
+            directory.audit.record(
+                "directory_removal_confirmed", actor_user_id=None,
+                data={"hash": hash_value(found.email)},
+            )  # fmt: skip
+            directory.commit()
 
     def reset(self, token: str, new: str) -> SignedIn:
         with self._identity() as ids:
@@ -508,6 +542,15 @@ Open this link to join (it works for {days} days, once):
 {link}
 
 If you were not expecting this, you can ignore this email."""
+
+_REMOVAL = """Someone (we hope you) asked for your details to be removed from the lead directory
+that Outbound's customers share, and for your address never to be added again.
+
+To confirm, open this link within a day:
+{link}
+
+If you did not ask for this, ignore this message and nothing changes.
+"""
 
 _RESET = """Someone asked to reset the password for your Outbound account.
 

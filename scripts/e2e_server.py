@@ -44,7 +44,7 @@ from tests.stages.world import PROFILE, World
 E2E_EMAIL = "operator@e2e.example"
 E2E_STAFF = "staff@e2e.example"
 E2E_PASSWORD = "e2e-password-1234567"
-PORT = 8765
+PORT = int(os.environ.get("E2E_PORT", "8765"))
 
 
 def platform_default_id(platform: PlatformUnitOfWorkFactory) -> str:

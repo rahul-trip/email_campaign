@@ -18,6 +18,8 @@ from outbound.api.schemas import (
     LoginIn,
     Me,
     MyWorkspace,
+    RemovalConfirmIn,
+    RemovalIn,
     ResetIn,
     UserOut,
 )
@@ -153,3 +155,19 @@ def accept(token: str, body: AcceptIn, request: Request, response: Response, ids
     if isinstance(result, SignedIn):
         return _signed_in(request, response, ids, result)
     return _me(ids, result)
+
+
+@router.post("/remove-my-data", status_code=202)
+async def request_removal(body: RemovalIn, ids: Ids) -> dict[str, str]:
+    """Public. Sends a confirmation link to the address; never says whether we held it."""
+    await run_in_threadpool(ids.request_data_removal, body.email)
+    return {"detail": "If that address is a valid one, a confirmation link is on its way."}
+
+
+@router.post("/remove-my-data/confirm", status_code=200)
+def confirm_removal(body: RemovalConfirmIn, ids: Ids) -> dict[str, str]:
+    try:
+        ids.confirm_data_removal(body.token)
+    except IdentityError as error:
+        raise _refuse(error) from None
+    return {"detail": "Done. Your details were removed and will not be added again."}

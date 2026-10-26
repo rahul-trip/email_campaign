@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from outbound.api.deps import Services
 from outbound.domain.enums import (
@@ -15,6 +17,7 @@ from outbound.domain.enums import (
     PlatformRole,
     Provenance,
 )
+from outbound.providers.adapters.transactional_email import LogEmail
 from outbound.services.directory import DirectoryService
 from tests.api.conftest import Api, add_user, sign_in
 
@@ -72,6 +75,9 @@ def test_a_report_stops_the_address_being_served_and_reaches_the_admin_screen(
     assert done.status_code == 204
     with services.container.uow(services.workspace_id) as uow:
         assert uow.directory.find_email("acme.com", "Jane", "Doe", datetime.now(UTC)) is None
+        # and this workspace no longer uses the address it called wrong
+        held = uow.emails.by_address("jane.doe@acme.com")
+        assert held is not None and held.status is EmailStatus.INVALID
     overview = staff.get("/api/admin/directory").json()
     assert overview["figures"]["open_reports"] == 1
     [flag] = overview["flags"]
@@ -109,3 +115,34 @@ def test_only_staff_see_the_admin_directory(api: Api, staff: Api, lead: str) -> 
     assert staff.get("/api/admin/directory").status_code == 200
     history = staff.get("/api/admin/directory/history", params={"key": "jane.doe@acme.com"}).json()
     assert history and set(history[0]) == {"at", "target", "source"}  # no contributor
+
+
+def test_a_person_removes_themselves_from_the_directory_by_confirming_by_email(
+    anonymous: TestClient, lead: str, services: Services, outbox: LogEmail, staff: Api
+) -> None:
+    headers = {"X-Requested-With": "outbound"}
+    asked = anonymous.post(
+        "/api/auth/remove-my-data", json={"email": "Jane.Doe@acme.com"}, headers=headers
+    )
+    assert asked.status_code == 202
+    [mail] = [m for m in outbox.sent if m.to == "jane.doe@acme.com"]
+    token = re.search(r"remove-my-data\?token=([\w-]+)", mail.text).group(1)  # type: ignore[union-attr]
+    still = anonymous.post(
+        "/api/auth/remove-my-data/confirm", json={"token": "wrong"}, headers=headers
+    )
+    assert still.status_code == 400
+    with services.container.uow(services.workspace_id) as uow:
+        assert uow.directory.holds("jane.doe@acme.com")  # nothing changes until it is confirmed
+    done = anonymous.post(
+        "/api/auth/remove-my-data/confirm", json={"token": token}, headers=headers
+    )
+    assert done.status_code == 200
+    with services.container.uow(services.workspace_id) as uow:
+        assert not uow.directory.holds("jane.doe@acme.com")
+    DirectoryService(services.container.platform, finder_price_micro_usd=0).run()
+    again = anonymous.post(
+        "/api/auth/remove-my-data/confirm", json={"token": token}, headers=headers
+    )
+    assert again.status_code == 400  # a link works once
+    audit = staff.get("/api/admin/audit", params={"action": "directory_removal_confirmed"}).json()
+    assert len(audit) == 1 and "jane" not in str(audit)  # the address is not written down

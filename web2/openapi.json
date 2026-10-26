@@ -84,6 +84,24 @@
         "title": "AdminMailboxOut",
         "type": "object"
       },
+      "AdminRoleIn": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "title": "AdminRoleIn",
+        "type": "object"
+      },
       "AdminStepOut": {
         "properties": {
           "granted": {
@@ -4161,6 +4179,36 @@
         "title": "ReleaseIn",
         "type": "object"
       },
+      "RemovalConfirmIn": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "maxLength": 10000,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "RemovalConfirmIn",
+        "type": "object"
+      },
+      "RemovalIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 10000,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "RemovalIn",
+        "type": "object"
+      },
       "RequestCreditsIn": {
         "additionalProperties": false,
         "properties": {
@@ -6820,6 +6868,146 @@
         ]
       }
     },
+    "/api/admin/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect": {
+      "post": {
+        "operationId": "force_reconnect_api_admin_customers__workspace_id__mailboxes__mailbox_id__reconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "mailbox_id",
+            "required": true,
+            "schema": {
+              "title": "Mailbox Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Force Reconnect",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/customers/{workspace_id}/members/{user_id}": {
+      "delete": {
+        "operationId": "remove_member_api_admin_customers__workspace_id__members__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Member",
+        "tags": [
+          "admin"
+        ]
+      },
+      "patch": {
+        "operationId": "set_member_role_api_admin_customers__workspace_id__members__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminRoleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Member Role",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/customers/{workspace_id}/overrides": {
       "put": {
         "operationId": "set_override_api_admin_customers__workspace_id__overrides_put",
@@ -8205,6 +8393,97 @@
           }
         },
         "summary": "Reset",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/remove-my-data": {
+      "post": {
+        "description": "Public. Sends a confirmation link to the address; never says whether we held it.",
+        "operationId": "request_removal_api_auth_remove_my_data_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemovalIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Request Removal Api Auth Remove My Data Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Removal",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/remove-my-data/confirm": {
+      "post": {
+        "operationId": "confirm_removal_api_auth_remove_my_data_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemovalConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Confirm Removal Api Auth Remove My Data Confirm Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Confirm Removal",
         "tags": [
           "auth"
         ]

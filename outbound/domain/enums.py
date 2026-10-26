@@ -292,6 +292,7 @@ class UserStatus(StrEnum):
 class AuthTokenPurpose(StrEnum):
     INVITE = "invite"
     RESET = "reset"
+    REMOVE_DATA = "remove_data"  # confirms a request to be removed from the lead directory
 
 
 class DirectoryStatus(StrEnum):
