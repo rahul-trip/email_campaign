@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-10-27 (5f6dee4)
+applies_to: Phase 6
 ---
 
 # Technical documentation
@@ -66,6 +66,12 @@ One page per module, all from the same [template](_templates/lld.md).
 | [lld/web-frontend.md](lld/web-frontend.md) | `web2/` |
 | [lld/configuration-and-bootstrap.md](lld/configuration-and-bootstrap.md) | `outbound/config.py`, `bootstrap.py`, `pipeline.py` |
 | [lld/logging.md](lld/logging.md) | `outbound/logging.py`, `outbound/api/request_log.py` |
+| [lld/tenancy-and-isolation.md](lld/tenancy-and-isolation.md) | `outbound/db/session.py`, `isolation.py`, `uow.py`, `platform.py`, migrations 0007–0009 |
+| [lld/identity-and-access.md](lld/identity-and-access.md) | `outbound/db/identity.py`, `outbound/api/auth.py`, `outbound/domain/permissions.py` |
+| [lld/plans-credits-and-admin.md](lld/plans-credits-and-admin.md) | `outbound/domain/entitlements.py`, `outbound/api/routers/admin.py` |
+| [lld/mailboxes-and-oauth.md](lld/mailboxes-and-oauth.md) | `outbound/providers/oauth.py`, `adapters/ms_graph.py`, `gmail_api.py`, `netguard.py` |
+| [lld/lead-directory.md](lld/lead-directory.md) | `outbound/domain/directory.py`, `outbound/services/directory.py` |
+| [lld/inbox-and-opt-outs.md](lld/inbox-and-opt-outs.md) | `outbound/domain/inbox.py`, `outbound/services/inbox.py` |
 
 ### Data, API and integrations
 
