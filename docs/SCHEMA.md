@@ -492,6 +492,31 @@ CREATE TABLE directory_suppressions (   -- people removed for good: hashes only
 -- Migration 0015: auth_tokens.purpose also allows 'remove_data' (the public "Remove my data" link).
 -- Migration 0016: contacts.refresh_email BOOLEAN NOT NULL DEFAULT false -- set by "Find email again";
 -- the email step tries that person alone with fresh vendor answers, then clears it.
+-- Migration 0017 (6h: join requests). Platform tables like `memberships`: no row-level security,
+-- reached only through outbound/db/identity.py.
+ALTER TABLE workspaces ADD COLUMN join_code TEXT UNIQUE;
+  -- what a signed-in person types to ask to join; random, 8 characters, never the slug.
+  -- Made when the workspace is, backfilled for existing ones, replaceable by an admin.
+CREATE TABLE join_requests (           -- a signed-in person asks to join a workspace
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL,                  -- pending | approved | rejected
+  role TEXT,                             -- granted_role: admin | member, set when approved
+  decided_by TEXT, decided_at TIMESTAMP,
+  created_at TIMESTAMP NOT NULL
+);
+CREATE UNIQUE INDEX uq_join_requests_open ON join_requests (workspace_id, user_id)
+  WHERE status = 'pending';              -- one open request per person and workspace
+CREATE TABLE notifications (           -- what a person sees under the bell until they read it
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL,                    -- join_requested | join_approved | join_rejected
+  workspace_id TEXT REFERENCES workspaces(id),
+  data JSON NOT NULL,                    -- what the line needs (names, slug), never a secret
+  read_at TIMESTAMP, created_at TIMESTAMP NOT NULL
+);
+CREATE INDEX ix_notifications_user ON notifications (user_id, created_at);
 ALTER TABLE companies ADD COLUMN skip_directory BOOLEAN NOT NULL DEFAULT false;
   -- find this lead's emails with the vendors, not the directory (needs `directory_bypass`)
 ```
@@ -500,6 +525,7 @@ ALTER TABLE companies ADD COLUMN skip_directory BOOLEAN NOT NULL DEFAULT false;
 
 - The SaaS tables, each specified in its phase document and added here with its migration:
   - `users`, `memberships`, `auth_tokens`, `sessions`, `audit_log` (6b);
+  - `join_requests`, `notifications` (6h);
   - `platform_credentials` (6d, vendor keys in the database);
   - the `directory_*` tables (6g).
 - A jobs table. The runner's status and `next_action_at` queries cover scheduling at this volume.

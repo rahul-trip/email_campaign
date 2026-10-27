@@ -15,11 +15,33 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from outbound.db.errors import NotFound
-from outbound.db.models import AuditRow, AuthTokenRow, MembershipRow, SessionRow, UserRow
+from outbound.db.models import (
+    AuditRow,
+    AuthTokenRow,
+    JoinRequestRow,
+    MembershipRow,
+    NotificationRow,
+    SessionRow,
+    UserRow,
+)
 from outbound.db.repositories.base import snapshot
 from outbound.db.types import utcnow
-from outbound.domain.entities import AuthToken, LoginSession, Membership, User
-from outbound.domain.enums import AuthTokenPurpose, MembershipRole, PlatformRole, UserStatus
+from outbound.domain.entities import (
+    AuthToken,
+    JoinRequest,
+    LoginSession,
+    Membership,
+    Notification,
+    User,
+)
+from outbound.domain.enums import (
+    AuthTokenPurpose,
+    JoinRequestStatus,
+    MembershipRole,
+    NotificationKind,
+    PlatformRole,
+    UserStatus,
+)
 
 
 def normalise_email(email: str) -> str:
@@ -230,6 +252,21 @@ class AuthTokenRepository:
         )
         return [snapshot(row, AuthToken) for row in self._session.scalars(stmt)]
 
+    def pending_platform_invites(self, now: datetime) -> list[AuthToken]:
+        """Open invitations from platform staff: to the platform, not to one workspace."""
+        stmt = (
+            select(AuthTokenRow)
+            .where(
+                AuthTokenRow.purpose == AuthTokenPurpose.INVITE,
+                AuthTokenRow.workspace_id.is_(None),
+                AuthTokenRow.used_at.is_(None),
+                AuthTokenRow.revoked_at.is_(None),
+                AuthTokenRow.expires_at > now,
+            )
+            .order_by(AuthTokenRow.created_at)
+        )
+        return [snapshot(row, AuthToken) for row in self._session.scalars(stmt)]
+
     def _set(self, token_id: str, **values: Any) -> None:
         row = self._session.get(AuthTokenRow, token_id)
         if row is None:
@@ -365,6 +402,125 @@ class AuditRepository:
         ]
 
 
+class JoinRequestRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def open(self, workspace_id: str, user_id: str) -> JoinRequest:
+        """Ask to join. One open request per person and workspace."""
+        row = JoinRequestRow(workspace_id=workspace_id, user_id=user_id)
+        self._session.add(row)
+        self._session.flush()
+        return snapshot(row, JoinRequest)
+
+    def pending_for(self, workspace_id: str, user_id: str) -> JoinRequest | None:
+        stmt = select(JoinRequestRow).where(
+            JoinRequestRow.workspace_id == workspace_id,
+            JoinRequestRow.user_id == user_id,
+            JoinRequestRow.status == JoinRequestStatus.PENDING,
+        )
+        row = self._session.scalars(stmt).one_or_none()
+        return snapshot(row, JoinRequest) if row else None
+
+    def get(self, request_id: str) -> JoinRequest:
+        row = self._session.get(JoinRequestRow, request_id)
+        if row is None:
+            raise NotFound(f"join request {request_id}")
+        return snapshot(row, JoinRequest)
+
+    def pending(self, workspace_id: str) -> list[tuple[JoinRequest, User]]:
+        stmt = (
+            select(JoinRequestRow, UserRow)
+            .join(UserRow, UserRow.id == JoinRequestRow.user_id)
+            .where(
+                JoinRequestRow.workspace_id == workspace_id,
+                JoinRequestRow.status == JoinRequestStatus.PENDING,
+            )
+            .order_by(JoinRequestRow.created_at)
+        )
+        return [
+            (snapshot(r, JoinRequest), snapshot(u, User)) for r, u in self._session.execute(stmt)
+        ]
+
+    def of_user(self, user_id: str) -> list[JoinRequest]:
+        """Everything this person asked for, newest first (what they see while they wait)."""
+        stmt = (
+            select(JoinRequestRow)
+            .where(JoinRequestRow.user_id == user_id)
+            .order_by(JoinRequestRow.created_at.desc())
+        )
+        return [snapshot(r, JoinRequest) for r in self._session.scalars(stmt)]
+
+    def decide(
+        self, request_id: str, status: JoinRequestStatus, *, by: str, role: MembershipRole | None
+    ) -> JoinRequest:
+        row = self._session.get(JoinRequestRow, request_id)
+        if row is None:
+            raise NotFound(f"join request {request_id}")
+        row.status, row.role, row.decided_by, row.decided_at = status, role, by, utcnow()
+        self._session.flush()
+        return snapshot(row, JoinRequest)
+
+
+class NotificationRepository:
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def add(
+        self,
+        user_id: str,
+        kind: NotificationKind,
+        *,
+        workspace_id: str | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> Notification:
+        row = NotificationRow(
+            user_id=user_id, kind=kind, workspace_id=workspace_id, data=data or {}
+        )
+        self._session.add(row)
+        self._session.flush()
+        return snapshot(row, Notification)
+
+    def for_user(self, user_id: str, *, limit: int = 50) -> list[Notification]:
+        stmt = (
+            select(NotificationRow)
+            .where(NotificationRow.user_id == user_id)
+            .order_by(NotificationRow.created_at.desc(), NotificationRow.id.desc())
+            .limit(limit)
+        )
+        return [snapshot(r, Notification) for r in self._session.scalars(stmt)]
+
+    def unread_count(self, user_id: str) -> int:
+        stmt = (
+            select(func.count())
+            .select_from(NotificationRow)
+            .where(NotificationRow.user_id == user_id, NotificationRow.read_at.is_(None))
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def mark_read(self, user_id: str, notification_id: str | None = None) -> None:
+        """One notification, or all of this person's when no id is given."""
+        stmt = update(NotificationRow).where(
+            NotificationRow.user_id == user_id, NotificationRow.read_at.is_(None)
+        )
+        if notification_id is not None:
+            stmt = stmt.where(NotificationRow.id == notification_id)
+        self._session.execute(stmt.values(read_at=utcnow()))
+
+    def clear_join_request(self, workspace_id: str, user_id: str) -> None:
+        """Read the "asks to join" notices about one person, once their request is decided."""
+        for row in self._session.scalars(
+            select(NotificationRow).where(
+                NotificationRow.kind == NotificationKind.JOIN_REQUESTED,
+                NotificationRow.workspace_id == workspace_id,
+                NotificationRow.read_at.is_(None),
+            )
+        ):
+            if row.data.get("user_id") == user_id:
+                row.read_at = utcnow()
+        self._session.flush()
+
+
 class IdentityUnitOfWork:
     session: Session
 
@@ -378,6 +534,8 @@ class IdentityUnitOfWork:
         self.tokens = AuthTokenRepository(self.session)
         self.sessions = SessionRepository(self.session)
         self.audit = AuditRepository(self.session)
+        self.join_requests = JoinRequestRepository(self.session)
+        self.notifications = NotificationRepository(self.session)
         return self
 
     def __exit__(

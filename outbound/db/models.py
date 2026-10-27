@@ -51,12 +51,14 @@ from outbound.domain.enums import (
     ImportRowStatus,
     ImportSource,
     InboundCategory,
+    JoinRequestStatus,
     LegalEntityType,
     MailboxGateway,
     MailboxStatus,
     MembershipRole,
     MessageState,
     NoteSource,
+    NotificationKind,
     PlatformRole,
     PolicyRule,
     PolicyStage,
@@ -99,10 +101,13 @@ def _tenant_fk(table: str, column: str, parent: str, *, ondelete: str | None = N
 class WorkspaceRow(Identified, Base):
     __tablename__ = "workspaces"
     # Reached by slug (``/w/<slug>``); two customers may share a name (migration 0008).
-    __table_args__ = (UniqueConstraint("slug"),)
+    __table_args__ = (UniqueConstraint("slug"), UniqueConstraint("join_code"))
 
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(48))
+    # What a signed-in person types to ask to join (migration 0017). Not the slug: that is
+    # guessable from the company's name, and this is only ever shared by the team.
+    join_code: Mapped[str | None] = mapped_column(String(16))
     status: Mapped[WorkspaceStatus] = mapped_column(
         enum_type(WorkspaceStatus, "workspace_status"), default=WorkspaceStatus.ACTIVE
     )
@@ -709,6 +714,42 @@ class MembershipRow(Identified, Base):
     role: Mapped[MembershipRole] = mapped_column(enum_type(MembershipRole, "membership_role"))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow, onupdate=utcnow)
+
+
+class JoinRequestRow(Identified, Base):
+    """A signed-in person asking to join a workspace; its owner approves or rejects (0017)."""
+
+    __tablename__ = "join_requests"
+    __table_args__ = (
+        Index(
+            "uq_join_requests_open", "workspace_id", "user_id", unique=True,
+            sqlite_where=text("status = 'pending'"), postgresql_where=text("status = 'pending'"),
+        ),
+    )  # fmt: skip
+
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[JoinRequestStatus] = mapped_column(
+        enum_type(JoinRequestStatus, "join_request_status"), default=JoinRequestStatus.PENDING
+    )
+    role: Mapped[MembershipRole | None] = mapped_column(enum_type(MembershipRole, "granted_role"))
+    decided_by: Mapped[str | None] = mapped_column(String(36))  # a user id
+    decided_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class NotificationRow(Identified, Base):
+    """Something a person should see in the app, until they read it (0017)."""
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_user", "user_id", "created_at"),)
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    kind: Mapped[NotificationKind] = mapped_column(enum_type(NotificationKind, "notification_kind"))
+    workspace_id: Mapped[str | None] = mapped_column(ForeignKey("workspaces.id"))
+    data: Mapped[dict[str, Any]] = mapped_column(Json, default=dict)
+    read_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
 
 class AuthTokenRow(Identified, Base):

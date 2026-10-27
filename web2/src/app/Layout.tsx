@@ -3,6 +3,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Shield, Sun, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
+import { NotificationBell } from "../components/Notifications";
 import { Avatar, Menu, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
@@ -78,6 +79,7 @@ function Shell({ children }: { children: ReactNode }) {
             </Link>
           )}
           <TourButton />
+          <NotificationBell />
           <ThemeSwitch />
           <UserMenu />
         </div>

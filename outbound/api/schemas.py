@@ -84,8 +84,8 @@ class ChangePasswordIn(In):
 
 class InvitationOut(Out):
     email: str
-    workspace_name: str
-    role: Literal["admin", "member"]
+    workspace_name: str | None  # None: an invitation to Outbound itself, not to a workspace
+    role: Literal["admin", "member"] | None
     has_account: bool
 
 
@@ -110,9 +110,71 @@ class PendingInviteOut(Out):
     expires_at: datetime
 
 
+class JoinRequestOut(Out):
+    id: str
+    user_id: str
+    email: str
+    name: str
+    requested_at: datetime
+
+
 class TeamOut(Out):
     members: list[MemberOut]
     invitations: list[PendingInviteOut]
+    requests: list[JoinRequestOut]
+    join_code: str | None
+
+
+class JoinCodeOut(Out):
+    join_code: str
+
+
+class DecideJoinIn(In):
+    role: Literal["admin", "member"] = "member"
+
+
+class CreateWorkspaceIn(In):
+    name: str = Field(min_length=1, max_length=200)
+    website: str = Field(default="", max_length=255)
+
+
+class JoinIn(In):
+    code: str = Field(min_length=1, max_length=40)
+
+
+class MyJoinRequestOut(Out):
+    id: str
+    workspace_name: str
+    status: Literal["pending", "approved", "rejected"]
+    created_at: datetime
+
+
+class NotificationOut(Out):
+    id: str
+    kind: Literal["join_requested", "join_approved", "join_rejected"]
+    workspace_id: str | None
+    data: dict[str, Any]
+    read: bool
+    created_at: datetime
+
+
+class NotificationsOut(Out):
+    items: list[NotificationOut]
+    unread: int
+
+
+class ReadIn(In):
+    id: str | None = None  # one notification; none means all of them
+
+
+class PlatformInviteIn(In):
+    email: str = Field(max_length=320)
+
+
+class PlatformInvitationOut(Out):
+    id: str
+    email: str
+    expires_at: datetime
 
 
 class InviteIn(In):

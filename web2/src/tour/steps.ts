@@ -50,6 +50,11 @@ export const SECTIONS: Section[] = [
         body: "Change your password, sign out other devices, or sign out.",
       },
       {
+        target: "notifications",
+        title: "Notifications",
+        body: "The bell shows what needs a look, such as someone asking to join your workspace. An admin opens it to find the request, then approves or rejects it under Settings, Team.",
+      },
+      {
         target: "search",
         title: "Find any lead",
         body: "Type a company or domain and press Enter. Ctrl+K (Cmd+K on a Mac) jumps here from anywhere.",
@@ -250,7 +255,7 @@ export const SECTIONS: Section[] = [
       {
         target: "settings-tabs",
         title: "Setup, profile, mailboxes, limits, team",
-        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people and set their roles. Integrations holds the signed address other systems use to add targets, the request body to send, and a complete example. Plan and usage shows your allowances, what is used, when they renew, and lets you ask for more credits. Your account changes your password.",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people, set their roles, share the workspace's join code and approve or reject requests to join. Integrations holds the signed address other systems use to add targets, the request body to send, and a complete example. Plan and usage shows your allowances, what is used, when they renew, and lets you ask for more credits. Your account changes your password.",
       },
       {
         target: "setup-check",

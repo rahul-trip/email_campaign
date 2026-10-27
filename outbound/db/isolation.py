@@ -17,7 +17,9 @@ PUBLIC_API_ROLES = ("anon", "authenticated")
 
 # Platform tables that name a workspace but are not one workspace's data: they are reached only
 # through outbound.db.identity, with explicit predicates, and have no row-level security.
-PLATFORM_TABLES = frozenset({"memberships", "auth_tokens", "audit_log"})
+PLATFORM_TABLES = frozenset(
+    {"memberships", "auth_tokens", "audit_log", "join_requests", "notifications"}
+)
 
 
 def tenant_tables() -> tuple[str, ...]:

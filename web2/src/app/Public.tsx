@@ -253,8 +253,11 @@ function Invitation({ token }: { token: string }) {
       </Frame>
     );
   const found = invitation.data;
-  const title = `Join ${found.workspace_name}`;
-  const subtitle = `You are invited as ${found.role === "admin" ? "an admin" : "a member"}.`;
+  // No workspace named: an invitation to Outbound itself. They make a workspace or ask to join one next.
+  const title = found.workspace_name ? `Join ${found.workspace_name}` : "Welcome to Outbound";
+  const subtitle = found.workspace_name
+    ? `You are invited as ${found.role === "admin" ? "an admin" : "a member"}.`
+    : "Set up your account. Next you can start your own workspace or ask to join your team's.";
   if (!found.has_account) return <NewAccount token={token} email={found.email} title={title} subtitle={subtitle} workspace={found.workspace_name} />;
   const signedInAs = me.data?.user.email;
   return (
@@ -269,14 +272,15 @@ function Invitation({ token }: { token: string }) {
 }
 
 /** The workspace someone just joined, by its name among their memberships. */
-function joined(me: Me, name: string): string {
+function joined(me: Me, name: string | null): string {
+  if (!name) return "/"; // no workspace yet: `/` offers to make one or ask to join
   const found = me.workspaces.find((w) => w.name === name && w.role);
   if (found) rememberWorkspace(found.slug);
   // A new workspace's admin starts with the guided setup; everyone else on the dashboard.
   return found ? inWorkspace(found.slug, found.role === "admin" ? "/onboarding" : "/") : "/";
 }
 
-function NewAccount({ token, email, title, subtitle, workspace }: { token: string; email: string; title: string; subtitle: string; workspace: string }) {
+function NewAccount({ token, email, title, subtitle, workspace }: { token: string; email: string; title: string; subtitle: string; workspace: string | null }) {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [terms, setTerms] = useState(false);
@@ -311,7 +315,7 @@ function NewAccount({ token, email, title, subtitle, workspace }: { token: strin
   );
 }
 
-function JoinAsYou({ token, workspace }: { token: string; workspace: string }) {
+function JoinAsYou({ token, workspace }: { token: string; workspace: string | null }) {
   const accept = useMutation({
     mutationFn: () => ok(client.POST("/api/auth/invitations/{token}/accept", { params: { path: { token } }, body: {} })),
     onSuccess: (me) => go(joined(me, workspace)),
@@ -320,7 +324,7 @@ function JoinAsYou({ token, workspace }: { token: string; workspace: string }) {
     <div className="space-y-4">
       <Problem error={accept.error} />
       <Button busy={accept.isPending} onClick={() => accept.mutate()} className="h-9 w-full">
-        Join {workspace}
+        {workspace ? `Join ${workspace}` : "Continue"}
       </Button>
     </div>
   );
@@ -403,11 +407,10 @@ function Home({ path }: { path: string | null }) {
 function Workspaces({ me }: { me: Me }) {
   const signOut = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => go("/sign-in") });
   const staff = me.user.platform_role === "superadmin";
+  const none = me.workspaces.length === 0;
   return (
-    <Frame title="Choose a workspace" subtitle={`Signed in as ${me.user.email}.`}>
-      {me.workspaces.length === 0 ? (
-        <Callout tone="attention">You are not in any workspace yet. Ask an admin for an invitation.</Callout>
-      ) : (
+    <Frame title={none ? "Get started" : "Choose a workspace"} subtitle={`Signed in as ${me.user.email}.`}>
+      {!none && (
         <ul className="divide-y divide-line rounded-lg border border-line">
           {me.workspaces.map((w) => (
             <li key={w.id}>
@@ -422,6 +425,7 @@ function Workspaces({ me }: { me: Me }) {
           ))}
         </ul>
       )}
+      <GetStarted none={none} />
       {me.user.platform_role && (
         <a href="/admin" className="flex h-9 w-full items-center justify-center rounded-lg border border-outline text-[13px] font-semibold hover:bg-surface-low">
           Admin console
@@ -431,5 +435,88 @@ function Workspaces({ me }: { me: Me }) {
         Sign out
       </Button>
     </Frame>
+  );
+}
+
+/** Make a workspace (and be its admin), or ask to join one with the code its team shares. */
+function GetStarted({ none }: { none: boolean }) {
+  const [name, setName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [code, setCode] = useState("");
+  const requests = useQuery({
+    queryKey: ["join-requests"],
+    queryFn: () => ok(client.GET("/api/me/join-requests")),
+    refetchInterval: 15000, // an admin may approve while this page is open
+  });
+  const create = useMutation({
+    mutationFn: () => ok(client.POST("/api/me/workspaces", { body: { name: name.trim(), website: website.trim() } })),
+    onSuccess: (made) => {
+      rememberWorkspace(made.slug);
+      go(inWorkspace(made.slug, "/onboarding"));
+    },
+  });
+  const join = useMutation({
+    mutationFn: () => ok(client.POST("/api/me/join-requests", { body: { code: code.trim() } })),
+    onSuccess: () => {
+      setCode("");
+      void requests.refetch();
+    },
+  });
+  const waiting = (requests.data ?? []).filter((r) => r.status === "pending");
+  const refused = (requests.data ?? []).filter((r) => r.status === "rejected");
+  // Approved: the workspace now shows in the person's list, so `/` opens it.
+  useEffect(() => {
+    if ((requests.data ?? []).some((r) => r.status === "approved") && none) go("/");
+  }, [requests.data, none]);
+  return (
+    <div className="space-y-4" data-tour="get-started">
+      {none && <p className="text-[13px] text-muted">You are not in a workspace yet. Start your own, or ask to join your team's.</p>}
+      <form
+        className="space-y-2 rounded-lg border border-line p-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          create.mutate();
+        }}
+      >
+        <div className="text-[13px] font-semibold">Start a workspace</div>
+        <Field label="Company name">
+          <Input aria-label="Company name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full" />
+        </Field>
+        <Field label="Website (optional)">
+          <Input aria-label="Website" value={website} onChange={(e) => setWebsite(e.target.value)} className="h-9 w-full" />
+        </Field>
+        <Problem error={create.error} />
+        <Button type="submit" busy={create.isPending} disabled={!name.trim()} className="h-9 w-full">
+          Create workspace
+        </Button>
+        <p className="text-[11px] text-muted">You become its admin and can invite your team and approve requests to join.</p>
+      </form>
+      <form
+        className="space-y-2 rounded-lg border border-line p-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          join.mutate();
+        }}
+      >
+        <div className="text-[13px] font-semibold">Join a workspace</div>
+        <Field label="Join code">
+          <Input aria-label="Join code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ask a workspace admin for it" className="h-9 w-full" />
+        </Field>
+        <Problem error={join.error} />
+        <Button type="submit" variant="secondary" busy={join.isPending} disabled={!code.trim()} className="h-9 w-full">
+          Ask to join
+        </Button>
+      </form>
+      {waiting.map((r) => (
+        <Callout key={r.id} tone="info">
+          Waiting for an admin of {r.workspace_name} to approve you. You will see it here and in your notifications.
+        </Callout>
+      ))}
+      {refused.map((r) => (
+        <Callout key={r.id} tone="attention">
+          {r.workspace_name} did not accept your request.
+        </Callout>
+      ))}
+    </div>
   );
 }
