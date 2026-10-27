@@ -517,6 +517,7 @@ class RunIn(In):
     mode: RunMode = RunMode.MANUAL
     discover: int = Field(default=10, ge=1, le=50)
     campaign: str = "default"
+    skip_directory: bool = False  # needs the directory_bypass ability
 
 
 class RunOut(Out):
@@ -1014,6 +1015,8 @@ class VendorOut(Out):
     can_roll_back: bool
     spend_micro_usd: int
     cap_micro_usd: int | None
+    key_refusals: int
+    can_test: bool
 
 
 class VendorsOut(Out):
@@ -1170,3 +1173,8 @@ class DirectoryCompanyIn(In):
     name: str | None = Field(default=None, max_length=300)
     country_code: str | None = Field(default=None, max_length=2)
     email_pattern: str | None = Field(default=None, max_length=100)
+
+
+class KeyCheckOut(Out):
+    ok: bool | None  # None: this vendor cannot be tested from here
+    message: str

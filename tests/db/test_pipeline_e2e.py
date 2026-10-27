@@ -326,3 +326,32 @@ def test_a_person_verified_for_one_customer_costs_the_next_no_finder_call(
         uow.commit()
     pipeline.runner.run_pipeline()
     assert third_world.finder.calls == 1
+
+
+def test_a_run_can_find_every_lead_s_email_with_the_vendors_instead_of_the_directory(
+    engine: Engine,
+    factory: UnitOfWorkFactory,
+    ws: str,
+    other_ws: str,
+    platform: PlatformUnitOfWorkFactory,
+) -> None:
+    """The run-level choice: leads this run works on skip the directory, and it stays on them."""
+    from outbound.pipeline import execute_run
+    from outbound.services.runs import RunRequest
+
+    first, second = World(), World()
+    pipeline, _ = build(engine, factory, ws, first)
+    pipeline.intake.run([ROWS[0]])
+    pipeline.runner.run_pipeline()
+    with platform() as p:  # leave out the learned pattern, so the person's fact would answer
+        p.session.execute(text("DELETE FROM directory_observations WHERE target_type = 'pattern'"))
+        p.commit()
+    DirectoryService(platform, finder_price_micro_usd=1).run()
+
+    pipeline, container = build(engine, factory, other_ws, second)
+    pipeline.intake.run([ROWS[0]])
+    execute_run(pipeline, container, other_ws, RunRequest(skip_directory=True))
+    assert second.finder.calls == 1  # the vendors were asked; the directory was passed over
+    with factory(other_ws) as uow:
+        company = uow.companies.by_domain("acme.co.uk")
+        assert company is not None and company.skip_directory is True

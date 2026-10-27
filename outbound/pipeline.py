@@ -17,6 +17,7 @@ from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Workspace
 from outbound.domain.enums import (
     CompanySource,
+    CompanyStatus,
     EntityType,
     ImportRowStatus,
     ImportSource,
@@ -258,9 +259,27 @@ def execute_run(
                 "searches": found.searches,
             }
         )
+    if request.skip_directory:
+        _skip_directory(container, workspace_id, request.limit)
     return pipeline.runner.run_pipeline(
         limit=request.limit, only=set(request.only) or None, run_id=run_id, extra_counts=extra
     )
+
+
+def _skip_directory(container: Container, workspace_id: str, limit: int) -> None:
+    """The leads this run will work on before it finds their emails take their emails from the
+    vendors, not the shared directory. The choice stays on each lead (its page shows it)."""
+    before_email = (
+        CompanyStatus.NEW,
+        CompanyStatus.RESEARCHED,
+        CompanyStatus.QUALIFIED,
+        CompanyStatus.CONTACTS_FOUND,
+    )
+    with container.uow(workspace_id) as uow:
+        for status in before_email:
+            for company in uow.companies.due(status, limit):
+                uow.companies.set_skip_directory(company.id, True, actor=SYSTEM)
+        uow.commit()
 
 
 @dataclass(frozen=True)

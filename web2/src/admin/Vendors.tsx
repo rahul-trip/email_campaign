@@ -11,6 +11,11 @@ export function VendorsPage() {
   const queryClient = useQueryClient();
   const vendors = useQuery({ queryKey: ["admin", "vendors"], queryFn: () => ok(client.GET("/api/admin/vendors")) });
   const [replacing, setReplacing] = useState<Vendor | null>(null);
+  const [tested, setTested] = useState<Record<string, { ok: boolean | null; message: string }>>({});
+  const test = useMutation({
+    mutationFn: async (v: Vendor) => ({ code: v.code, result: await ok(client.POST("/api/admin/vendors/{vendor}/test", path(v.code))) }),
+    onSuccess: ({ code, result }) => setTested((all) => ({ ...all, [code]: result })),
+  });
   const [capping, setCapping] = useState<Vendor | null>(null);
   const [revealed, setRevealed] = useState<{ vendor: Vendor; key: string } | null>(null);
   const refresh = (data: unknown) => queryClient.setQueryData(["admin", "vendors"], data);
@@ -26,7 +31,7 @@ export function VendorsPage() {
   return (
     <>
       <PageHeader title="Vendors and keys" subtitle="The third-party services the platform pays for. A new key reaches the worker on its next run; no restart." />
-      <Problem error={rollback.error ?? pause.error ?? reveal.error} className="mb-3" />
+      <Problem error={rollback.error ?? pause.error ?? reveal.error ?? test.error} className="mb-3" />
       <QueryState query={vendors} rows={6}>
         {(data) => (
           <div className="space-y-4">
@@ -60,11 +65,24 @@ export function VendorsPage() {
                           {v.cap_micro_usd != null ? "Change cap" : "Set cap"}
                         </button>
                       </Td>
-                      <Td>{v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : <Pill tone="good">live</Pill>}</Td>
+                      <Td>
+                        {v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
+                        {v.key_refusals > 0 && <div className="mt-1 text-[11px] text-error">refused {v.key_refusals}× in the last day</div>}
+                        {tested[v.code] && (
+                          <div role="status" className={`mt-1 max-w-56 text-[11px] ${tested[v.code]!.ok === false ? "text-error" : tested[v.code]!.ok ? "text-good" : "text-muted"}`}>
+                            {tested[v.code]!.message}
+                          </div>
+                        )}
+                      </Td>
                       <Td className="space-x-1 text-right whitespace-nowrap">
                         <Button size="sm" variant="secondary" onClick={() => setReplacing(v)}>
                           {v.source === "database" ? "Replace" : "Add key"}
                         </Button>
+                        {v.source !== "none" && v.can_test && (
+                          <Button size="sm" variant="ghost" busy={test.isPending && test.variables?.code === v.code} onClick={() => test.mutate(v)} title="Makes one small real call (a fraction of a cent) to check the key works">
+                            Test
+                          </Button>
+                        )}
                         {v.source === "database" && (
                           <Button size="sm" variant="ghost" busy={reveal.isPending && reveal.variables?.code === v.code} onClick={() => reveal.mutate(v)}>
                             Reveal

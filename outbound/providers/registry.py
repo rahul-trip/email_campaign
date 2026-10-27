@@ -143,6 +143,13 @@ def build_verifier(settings: Settings, client: httpx.Client | None = None) -> Em
     return _build(_VERIFIERS, [settings.verifier], settings, client)[0]
 
 
+def build_verifier_named(
+    name: str, settings: Settings, client: httpx.Client | None = None
+) -> EmailVerifier:
+    """One particular verifier, whatever the chain is set to (a key test uses it)."""
+    return _build(_VERIFIERS, [name], settings, client)[0]
+
+
 def build_resolver(settings: Settings, client: httpx.Client | None = None) -> CatchAllResolver:
     return _build(_RESOLVERS, [settings.catch_all_resolver], settings, client)[0]
 
