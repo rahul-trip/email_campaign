@@ -7,6 +7,7 @@ name: deploy
 # Secrets (in the `production` environment):
 #   DEPLOY_SSH_KEY   private key whose public half is in the deploy user's authorized_keys
 #   DOPPLER_TOKEN    a read-only Doppler *service token* for the outbound/prd config
+#   CLOUDFLARE_TUNNEL_TOKEN  optional; turns on the cloudflared service (docs/DEPLOY.md §1.5)
 #   SSH_KNOWN_HOSTS  optional; the VM's host key line(s). Without it the key is trusted on first use.
 
 on:
@@ -136,6 +137,18 @@ jobs:
               | ssh target "umask 077 && cat > '$APP_DIR/doppler-migrate.env'"
           else
             ssh target "rm -f '$APP_DIR/doppler-migrate.env'"
+          fi
+
+      - name: Give the VM its Cloudflare Tunnel token, if there is one
+        env:
+          CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+        run: |
+          # Optional: publishes the app through a Cloudflare Tunnel when the VM's own 80/443 are taken.
+          if [[ -n "$CLOUDFLARE_TUNNEL_TOKEN" ]]; then
+            printf 'TUNNEL_TOKEN=%s\n' "$CLOUDFLARE_TUNNEL_TOKEN" \
+              | ssh target "umask 077 && cat > '$APP_DIR/tunnel.env'"
+          else
+            ssh target "rm -f '$APP_DIR/tunnel.env'"
           fi
 
       - name: Build, migrate and start on the VM
