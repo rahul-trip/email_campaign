@@ -165,6 +165,11 @@ Migrations are additive. A rollback to an older commit does not undo them, and t
 
 Add a site for Outbound to the proxy that already runs on the VM. Copy [`deploy/nginx.conf.example`](../deploy/nginx.conf.example) or [`deploy/Caddyfile.example`](../deploy/Caddyfile.example), replace the domain, point the domain's DNS at the VM, and reload the proxy. The proxy must send `X-Forwarded-For`: the login throttle and the logs read the client's address from it.
 
+**No proxy, or the ports are taken (a Cloudflare Tunnel).** When another application owns ports 80 and 443 on the VM and must stay untouched, publish Outbound through a Cloudflare Tunnel instead. The `cloudflared` container is part of this stack and makes only an outbound connection, so no port, certificate or proxy file is involved, and the stack moves to a new VM unchanged.
+1. In Cloudflare → Zero Trust → Networks → Tunnels, create a tunnel (type *Cloudflared*) and copy its token.
+2. Add a public hostname to it: your domain, service `http://api:8000`. Delete any existing A record for that name first; the tunnel creates its own CNAME.
+3. Save the token as the GitHub `production` secret `CLOUDFLARE_TUNNEL_TOKEN`. The deploy writes it to `$APP_DIR/tunnel.env`, and `remote-deploy.sh` then starts the `tunnel` service. Remove the secret to turn it off.
+
 ## 2. Deploying
 
 The checks run on the exact `ref` being deployed. They also run every Monday on `main`, so a new dependency advisory (pip-audit) shows up before deploy day instead of blocking it. After the api is healthy the deploy also checks that the worker container is still running, and rolls back if not.

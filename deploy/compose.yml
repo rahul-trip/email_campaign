@@ -5,6 +5,9 @@
 #   migrate  one-shot: `db upgrade` then `seed` (both safe to repeat), before anything else starts
 #   api      the web app and API on 127.0.0.1:${OUTBOUND_PORT}; the VM's proxy adds https
 #   worker   executes the runs queued from the web app
+#   tunnel   optional (profile `tunnel`, started when ${OUTBOUND_HOME}/tunnel.env exists): a Cloudflare
+#            Tunnel that publishes the api without opening any port, for a VM whose 80/443 belong to
+#            another application
 #
 # Secrets come from Doppler at start-up. Only DOPPLER_TOKEN is on disk, in ${OUTBOUND_HOME}/doppler.env.
 # The database is Supabase Postgres, through its session pooler (POSTGRES_URL in Doppler).
@@ -65,6 +68,23 @@ services:
     mem_limit: 1g
     depends_on:
       migrate: { condition: service_completed_successfully }
+
+  tunnel:
+    image: cloudflare/cloudflared:2026.10.5
+    profiles: ["tunnel"]
+    # TUNNEL_TOKEN only; written by the deploy workflow from the CLOUDFLARE_TUNNEL_TOKEN secret.
+    # In the Cloudflare dashboard the tunnel's public hostname points at http://api:8000.
+    env_file:
+      - path: ${OUTBOUND_HOME:-/opt/outbound}/tunnel.env
+        required: false
+    command: ["tunnel", "--no-autoupdate", "run"]
+    restart: unless-stopped
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    depends_on:
+      api: { condition: service_started }
 
 volumes:
   doppler:

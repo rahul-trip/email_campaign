@@ -65,6 +65,11 @@ if [[ -s "$OUTBOUND_HOME/doppler-migrate.env" ]]; then
   export MIGRATE_ENV_FILE=doppler-migrate.env
 fi
 
+# A Cloudflare Tunnel token on the VM turns on the `tunnel` service (no port needs to be opened).
+if [[ -s "$OUTBOUND_HOME/tunnel.env" ]]; then
+  export COMPOSE_PROFILES="${COMPOSE_PROFILES:+$COMPOSE_PROFILES,}tunnel"
+fi
+
 previous=""
 if [[ -L "$OUTBOUND_HOME/current" ]]; then
   previous="$(basename "$(readlink "$OUTBOUND_HOME/current")")"
