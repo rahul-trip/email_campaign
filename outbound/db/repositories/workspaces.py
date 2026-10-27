@@ -26,6 +26,7 @@ from outbound.domain.enums import (
     WorkspaceStatus,
 )
 from outbound.domain.ids import new_id
+from outbound.domain.join_codes import new_join_code, normalise_join_code
 from outbound.domain.slugs import unique_slug
 from outbound.domain.state_machines import WORKSPACE
 
@@ -48,9 +49,14 @@ class WorkspaceRepository:
         taken = set(self._session.scalars(select(WorkspaceRow.slug)))
         if slug is not None and slug in taken:
             raise ValueError(f"the address {slug!r} is taken")
+        codes = set(self._session.scalars(select(WorkspaceRow.join_code)))
+        code = new_join_code()
+        while code in codes:
+            code = new_join_code()
         row = WorkspaceRow(
             name=name,
             slug=slug or unique_slug(name, taken),
+            join_code=code,
             sender_profile=sender_profile,
             settings=settings,
         )
@@ -62,6 +68,24 @@ class WorkspaceRepository:
         stmt = select(WorkspaceRow).where(WorkspaceRow.slug == slug)
         row = self._session.scalars(stmt).one_or_none()
         return snapshot(row, Workspace) if row else None
+
+    def by_join_code(self, code: str) -> Workspace | None:
+        stmt = select(WorkspaceRow).where(WorkspaceRow.join_code == normalise_join_code(code))
+        row = self._session.scalars(stmt).one_or_none()
+        return snapshot(row, Workspace) if row else None
+
+    def new_join_code(self, workspace_id: str) -> Workspace:
+        """Replace the code (for example when it was shared too widely)."""
+        row = self._session.get(WorkspaceRow, workspace_id)
+        if row is None:
+            raise LookupError(workspace_id)
+        taken = set(self._session.scalars(select(WorkspaceRow.join_code)))
+        code = new_join_code()
+        while code in taken:
+            code = new_join_code()
+        row.join_code = code
+        self._session.flush()
+        return snapshot(row, Workspace)
 
     def by_name(self, name: str) -> Workspace | None:
         """The oldest workspace with this name. Names may repeat: prefer ``by_slug``."""

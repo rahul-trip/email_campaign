@@ -2,8 +2,58 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { useMe } from "../app/session";
-import { Button, Confirm, Empty, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../components/ui";
+import { Button, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../components/ui";
 import { Pill, When } from "./bits";
+
+/** Invite someone to Outbound itself. They make a workspace or ask to join one after signing up. */
+function InviteToOutbound() {
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
+  const pending = useQuery({ queryKey: ["admin", "invitations"], queryFn: () => ok(client.GET("/api/admin/invitations")) });
+  const set = (data: unknown) => queryClient.setQueryData(["admin", "invitations"], data);
+  const invite = useMutation({
+    mutationFn: () => ok(client.POST("/api/admin/invitations", { body: { email: email.trim() } })),
+    onSuccess: (data) => {
+      set(data);
+      setEmail("");
+    },
+  });
+  const revoke = useMutation({
+    mutationFn: (id: string) => ok(client.DELETE("/api/admin/invitations/{invitation_id}", { params: { path: { invitation_id: id } } })),
+    onSuccess: set,
+  });
+  return (
+    <Card tour="admin-invite" title="Invite someone to Outbound" subtitle="They get an email with a link that works once, for 7 days. After setting a password they start their own workspace or ask to join one with its code." className="mb-4">
+      <form
+        className="flex flex-wrap items-end gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          invite.mutate();
+        }}
+      >
+        <Field label="Email" className="min-w-[240px] flex-1">
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@theircompany.com" className="w-full" />
+        </Field>
+        <Button type="submit" busy={invite.isPending} disabled={!email.includes("@")}>
+          Send invitation
+        </Button>
+      </form>
+      <Problem error={invite.error ?? revoke.error} className="mt-2" />
+      {(pending.data ?? []).length > 0 && (
+        <ul className="mt-3 divide-y divide-line rounded-lg border border-line text-[13px]">
+          {pending.data!.map((i) => (
+            <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2">
+              <span>{i.email}</span>
+              <Button size="sm" variant="secondary" busy={revoke.isPending && revoke.variables === i.id} onClick={() => revoke.mutate(i.id)}>
+                Withdraw
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}
 
 export function UsersPage() {
   const me = useMe();
@@ -30,6 +80,7 @@ export function UsersPage() {
   return (
     <>
       <PageHeader title="Users" subtitle="Everyone with an account. Disabling signs them out everywhere at once." />
+      <InviteToOutbound />
       <div className="mb-4 w-72">
         <Input aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or email" className="w-full" />
       </div>

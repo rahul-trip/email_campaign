@@ -31,6 +31,7 @@ from outbound.api.routers import (
     integrations,
     leads,
     mailboxes,
+    me,
     privacy,
     review,
     runs,
@@ -125,6 +126,7 @@ def create_app(
     app.include_router(webhook.router)  # signed, so no sign-in
     for router in (
         auth,
+        me,
         team,
         admin,
         mailboxes,

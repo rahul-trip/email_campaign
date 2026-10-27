@@ -61,6 +61,17 @@ Built: the console's **Test** button per vendor (one small real call with the st
 
 Small changes asked for while testing, on branch `phase-6/lead-page-and-profile-upload`: LinkedIn lookup for every person (automatic for ten per lead in research, plus a button), **Find email again** per person (migration 0016), research no longer limited or cut short and shown in sections, the whole sender profile from a downloadable JSON file, timestamps and an email history on Review and across the lead pages, the intake webhook's request body and an example, and staff browsing, adding, editing and removing directory entries and company patterns. The manual and tour are updated.
 
+## Owners, platform invitations and join requests (2026-10-28, 6h)
+
+Branch `phase-6/owners-and-join-requests`, migration 0017. There is no separate owner role: a workspace's creator is an admin, and any admin decides requests.
+
+Built:
+- Platform admins invite someone to Outbound with no workspace (`/api/admin/invitations`, a card on the console's Users page; the token has no workspace).
+- After accepting, the person makes a workspace (`POST /api/me/workspaces`, they become its admin) or asks to join one with its **join code** (`POST /api/me/join-requests`, a random 8-character code on `workspaces`, not the slug; 10 wrong codes an hour; an admin can replace it).
+- Admins are notified in the app (the bell, `notifications` table) and decide under Settings → Team (`/api/team/join-requests/{id}/approve|reject`, choosing member or admin). The requester is notified and, once approved, the workspace opens.
+
+**Left:** an email to admins about a new request (only the bell today); transferring or sharing the creator's role is just making another admin; a person cannot cancel their own request; no limit on how many workspaces one person may create.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

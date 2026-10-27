@@ -38,6 +38,12 @@ OPEN = {
     "/api/auth/remove-my-data/confirm",
     "/api/auth/invitations/{token}",
     "/api/auth/invitations/{token}/accept",
+    # A signed-in person's own account, before or beside any workspace: make one, ask to join
+    # one, read their notifications. Each call acts only on the caller.
+    "/api/me/workspaces",
+    "/api/me/join-requests",
+    "/api/me/notifications",
+    "/api/me/notifications/read",
     # The provider's return page knows no workspace: the route finds it in the session's pending
     # sign-in and checks mailboxes.own there itself.
     "/api/mailboxes/oauth/finish",

@@ -53,6 +53,8 @@ from outbound.api.schemas import (
     PlanDefinition,
     PlanSaveIn,
     PlansOut,
+    PlatformInvitationOut,
+    PlatformInviteIn,
     PlatformRoleIn,
     PlatformSettingsIn,
     PlatformSettingsOut,
@@ -708,3 +710,35 @@ def test_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> KeyCheck
     """One small real call with the stored key, to show whether it works."""
     result = service.test_key(vendor, by=staff.user.id)
     return KeyCheckOut(ok=result.ok, message=result.message)
+
+
+# ---- invitations to Outbound itself (no workspace): the person makes or asks to join one
+
+
+@router.get("/invitations", response_model=list[PlatformInvitationOut])
+def platform_invitations(
+    _: Reader, ids: Annotated[IdentityService, Depends(identity)]
+) -> list[PlatformInvitationOut]:
+    return [
+        PlatformInvitationOut(id=i.id, email=i.email, expires_at=i.expires_at)
+        for i in ids.platform_invitations()
+    ]
+
+
+@router.post("/invitations", response_model=list[PlatformInvitationOut], status_code=201)
+def invite_to_platform(
+    body: PlatformInviteIn, staff: Writer, ids: Annotated[IdentityService, Depends(identity)]
+) -> list[PlatformInvitationOut]:
+    try:
+        ids.invite_to_platform(body.email, by=staff.user.id)
+    except IdentityError as error:
+        raise AdminError(error.status, error.code, error.detail) from None
+    return platform_invitations(staff, ids)
+
+
+@router.delete("/invitations/{invitation_id}", response_model=list[PlatformInvitationOut])
+def revoke_platform_invitation(
+    invitation_id: str, staff: Writer, ids: Annotated[IdentityService, Depends(identity)]
+) -> list[PlatformInvitationOut]:
+    ids.revoke_platform_invite(invitation_id, by=staff.user.id)
+    return platform_invitations(staff, ids)

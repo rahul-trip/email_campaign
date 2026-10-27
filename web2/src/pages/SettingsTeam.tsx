@@ -1,5 +1,6 @@
 /** Settings → Team (who works in this workspace) and Your account (password, sessions). */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Copy } from "lucide-react";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { useCurrent, useIsAdmin } from "../app/session";
@@ -21,8 +22,82 @@ export function Team() {
   return (
     <div className="space-y-4">
       {admin ? <Invite onDone={update} /> : <Callout>Only admins invite people and change roles. Ask one of the admins below.</Callout>}
+      {admin && <QueryState query={team}>{(data) => <JoinRequests team={data} onChange={update} />}</QueryState>}
       <QueryState query={team}>{(data) => <Members team={data} admin={admin} onChange={update} />}</QueryState>
     </div>
+  );
+}
+
+/** The code people type to ask to join, and the requests waiting for an admin's answer. */
+function JoinRequests({ team, onChange }: { team: TeamOut; onChange: (team: TeamOut) => void }) {
+  const queryClient = useQueryClient();
+  const [roles, setRoles] = useState<Record<string, Role>>({});
+  const [renewing, setRenewing] = useState(false);
+  const done = (data: TeamOut) => {
+    onChange(data);
+    void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  };
+  const approve = useMutation({
+    mutationFn: (id: string) => ok(client.POST("/api/team/join-requests/{request_id}/approve", { params: { path: { request_id: id } }, body: { role: roles[id] ?? "member" } })),
+    onSuccess: done,
+  });
+  const reject = useMutation({
+    mutationFn: (id: string) => ok(client.POST("/api/team/join-requests/{request_id}/reject", { params: { path: { request_id: id } } })),
+    onSuccess: done,
+  });
+  const renew = useMutation({
+    mutationFn: () => ok(client.POST("/api/team/join-code")),
+    onSuccess: ({ join_code }) => {
+      onChange({ ...team, join_code });
+      setRenewing(false);
+    },
+  });
+  return (
+    <Card tour="team-requests" title="Join requests" subtitle="Someone with an account asks to join with your workspace's code. You decide, and choose the role they get.">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
+        <span className="text-muted">Join code</span>
+        <code className="rounded bg-surface-low px-2 py-1 text-[14px] font-semibold tracking-widest">{team.join_code ?? "—"}</code>
+        <Button variant="secondary" size="sm" onClick={() => void navigator.clipboard?.writeText(team.join_code ?? "")} aria-label="Copy the join code">
+          <Copy className="size-3.5" aria-hidden />
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setRenewing(true)}>
+          New code
+        </Button>
+      </div>
+      <Problem error={approve.error ?? reject.error} className="mb-2" />
+      {team.requests.length === 0 ? (
+        <p className="text-[13px] text-muted">No one is waiting.</p>
+      ) : (
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {team.requests.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-[13px]">
+              <span>
+                <span className="font-semibold">{r.name || r.email}</span>
+                {r.name && <span className="ml-2 text-muted">{r.email}</span>}
+                <span className="ml-2 text-[11px] text-muted">asked {ago(r.requested_at)}</span>
+              </span>
+              <span className="flex items-center gap-2">
+                <Select aria-label={`Role for ${r.email}`} value={roles[r.id] ?? "member"} onChange={(e) => setRoles({ ...roles, [r.id]: e.target.value as Role })}>
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </Select>
+                <Button size="sm" busy={approve.isPending && approve.variables === r.id} onClick={() => approve.mutate(r.id)}>
+                  Approve
+                </Button>
+                <Button size="sm" variant="secondary" busy={reject.isPending && reject.variables === r.id} onClick={() => reject.mutate(r.id)}>
+                  Reject
+                </Button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {renewing && (
+        <Confirm title="Make a new join code?" confirmLabel="New code" busy={renew.isPending} error={renew.error} onClose={() => setRenewing(false)} onConfirm={() => renew.mutate()}>
+          The old code stops working at once. Requests already waiting stay.
+        </Confirm>
+      )}
+    </Card>
   );
 }
 

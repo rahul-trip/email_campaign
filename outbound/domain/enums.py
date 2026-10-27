@@ -289,6 +289,22 @@ class UserStatus(StrEnum):
     DISABLED = "disabled"
 
 
+class JoinRequestStatus(StrEnum):
+    """A signed-in person's request to join a workspace, decided by its admins."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class NotificationKind(StrEnum):
+    """What an in-app notification is about."""
+
+    JOIN_REQUESTED = "join_requested"  # to the admins: someone asks to join
+    JOIN_APPROVED = "join_approved"  # to the person who asked
+    JOIN_REJECTED = "join_rejected"  # to the person who asked
+
+
 class AuthTokenPurpose(StrEnum):
     INVITE = "invite"
     RESET = "reset"

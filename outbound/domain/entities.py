@@ -21,10 +21,12 @@ from outbound.domain.enums import (
     EmailStatus,
     EntityType,
     HoldReason,
+    JoinRequestStatus,
     LegalEntityType,
     MembershipRole,
     MessageState,
     NoteSource,
+    NotificationKind,
     PlatformRole,
     PolicyRule,
     PolicyStage,
@@ -193,6 +195,7 @@ class Workspace:
     settings: dict[str, Any]
     deletion_due_at: datetime | None = None
     created_at: datetime | None = None
+    join_code: str | None = None  # what a person types to ask to join; shared by the team
 
 
 @dataclass(frozen=True)
@@ -272,6 +275,29 @@ class Membership:
     workspace_id: str
     user_id: str
     role: MembershipRole
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class JoinRequest:
+    id: str
+    workspace_id: str
+    user_id: str
+    status: JoinRequestStatus
+    role: MembershipRole | None  # the role granted, once approved
+    decided_by: str | None
+    decided_at: datetime | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class Notification:
+    id: str
+    user_id: str
+    kind: NotificationKind
+    workspace_id: str | None
+    data: dict[str, Any]
+    read_at: datetime | None
     created_at: datetime
 
 

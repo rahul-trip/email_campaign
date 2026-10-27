@@ -132,7 +132,7 @@ def invitation(token: str, ids: Ids) -> InvitationOut:
     return InvitationOut(
         email=found.email,
         workspace_name=found.workspace_name,
-        role=found.role.value,
+        role=found.role.value if found.role else None,
         has_account=found.has_account,
     )
 

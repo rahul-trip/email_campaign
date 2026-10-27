@@ -386,6 +386,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform Invitations */
+        get: operations["platform_invitations_api_admin_invitations_get"];
+        put?: never;
+        /** Invite To Platform */
+        post: operations["invite_to_platform_api_admin_invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Platform Invitation */
+        delete: operations["revoke_platform_invitation_api_admin_invitations__invitation_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/overview": {
         parameters: {
             query?: never;
@@ -1637,6 +1672,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/join-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Join Requests */
+        get: operations["join_requests_api_me_join_requests_get"];
+        put?: never;
+        /**
+         * Request To Join
+         * @description Ask to join the workspace with this code; its admins are told and decide.
+         */
+        post: operations["request_to_join_api_me_join_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Notifications */
+        get: operations["notifications_api_me_notifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/notifications/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark Read */
+        post: operations["mark_read_api_me_notifications_read_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Workspace
+         * @description Make a workspace; the caller becomes its admin.
+         */
+        post: operations["create_workspace_api_me_workspaces_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/privacy/forget": {
         parameters: {
             query?: never;
@@ -2272,6 +2382,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/team/join-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * New Join Code
+         * @description A new code; the old one stops working at once.
+         */
+        post: operations["new_join_code_api_team_join_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/team/join-requests/{request_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_team_join_requests__request_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/team/join-requests/{request_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject */
+        post: operations["reject_api_team_join_requests__request_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/team/members/{user_id}": {
         parameters: {
             query?: never;
@@ -2695,6 +2859,16 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** CreateWorkspaceIn */
+        CreateWorkspaceIn: {
+            /** Name */
+            name: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
         /** CustomerDetailOut */
         CustomerDetailOut: {
             /** Activity */
@@ -2799,6 +2973,15 @@ export interface components {
             steps: components["schemas"]["AdminStepOut"][];
             /** Waiting */
             waiting: number;
+        };
+        /** DecideJoinIn */
+        DecideJoinIn: {
+            /**
+             * Role
+             * @default member
+             * @enum {string}
+             */
+            role?: "admin" | "member";
         };
         /** DefaultPlanIn */
         DefaultPlanIn: {
@@ -3210,13 +3393,10 @@ export interface components {
             email: string;
             /** Has Account */
             has_account: boolean;
-            /**
-             * Role
-             * @enum {string}
-             */
-            role: "admin" | "member";
+            /** Role */
+            role: ("admin" | "member") | null;
             /** Workspace Name */
-            workspace_name: string;
+            workspace_name: string | null;
         };
         /** InviteIn */
         InviteIn: {
@@ -3228,6 +3408,32 @@ export interface components {
              * @enum {string}
              */
             role?: "admin" | "member";
+        };
+        /** JoinCodeOut */
+        JoinCodeOut: {
+            /** Join Code */
+            join_code: string;
+        };
+        /** JoinIn */
+        JoinIn: {
+            /** Code */
+            code: string;
+        };
+        /** JoinRequestOut */
+        JoinRequestOut: {
+            /** Email */
+            email: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** User Id */
+            user_id: string;
         };
         /** JourneyOut */
         JourneyOut: {
@@ -3402,6 +3608,23 @@ export interface components {
             /** Updated At */
             updated_at?: string | null;
         };
+        /** MyJoinRequestOut */
+        MyJoinRequestOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+            /** Workspace Name */
+            workspace_name: string;
+        };
         /** MyWorkspace */
         MyWorkspace: {
             /** Id */
@@ -3427,6 +3650,36 @@ export interface components {
             id: string;
             /** Source */
             source: string;
+        };
+        /** NotificationOut */
+        NotificationOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "join_requested" | "join_approved" | "join_rejected";
+            /** Read */
+            read: boolean;
+            /** Workspace Id */
+            workspace_id: string | null;
+        };
+        /** NotificationsOut */
+        NotificationsOut: {
+            /** Items */
+            items: components["schemas"]["NotificationOut"][];
+            /** Unread */
+            unread: number;
         };
         /** OAuthFinishIn */
         OAuthFinishIn: {
@@ -3650,6 +3903,23 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** PlatformInvitationOut */
+        PlatformInvitationOut: {
+            /** Email */
+            email: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Id */
+            id: string;
+        };
+        /** PlatformInviteIn */
+        PlatformInviteIn: {
+            /** Email */
+            email: string;
+        };
         /** PlatformRoleIn */
         PlatformRoleIn: {
             /** Role */
@@ -3771,6 +4041,11 @@ export interface components {
             unedited_share: number | null;
             /** Written */
             written: number;
+        };
+        /** ReadIn */
+        ReadIn: {
+            /** Id */
+            id?: string | null;
         };
         /** RecipientIn */
         RecipientIn: {
@@ -4234,8 +4509,12 @@ export interface components {
         TeamOut: {
             /** Invitations */
             invitations: components["schemas"]["PendingInviteOut"][];
+            /** Join Code */
+            join_code: string | null;
             /** Members */
             members: components["schemas"]["MemberOut"][];
+            /** Requests */
+            requests: components["schemas"]["JoinRequestOut"][];
         };
         /** TimelineOut */
         TimelineOut: {
@@ -5330,6 +5609,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectoryHistoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    platform_invitations_api_admin_invitations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformInvitationOut"][];
+                };
+            };
+        };
+    };
+    invite_to_platform_api_admin_invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformInviteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformInvitationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_platform_invitation_api_admin_invitations__invitation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformInvitationOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7647,6 +8010,143 @@ export interface operations {
             };
         };
     };
+    join_requests_api_me_join_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyJoinRequestOut"][];
+                };
+            };
+        };
+    };
+    request_to_join_api_me_join_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyJoinRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    notifications_api_me_notifications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationsOut"];
+                };
+            };
+        };
+    };
+    mark_read_api_me_notifications_read_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_workspace_api_me_workspaces_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkspaceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyWorkspace"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     forget_api_privacy_forget_post: {
         parameters: {
             query?: never;
@@ -8802,6 +9302,92 @@ export interface operations {
             header?: never;
             path: {
                 invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    new_join_code_api_team_join_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JoinCodeOut"];
+                };
+            };
+        };
+    };
+    approve_api_team_join_requests__request_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideJoinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_api_team_join_requests__request_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
             };
             cookie?: never;
         };

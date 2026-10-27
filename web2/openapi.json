@@ -1264,6 +1264,28 @@
         "title": "CostOut",
         "type": "object"
       },
+      "CreateWorkspaceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "website": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateWorkspaceIn",
+        "type": "object"
+      },
       "CustomerDetailOut": {
         "properties": {
           "activity": {
@@ -1593,6 +1615,22 @@
           "max_prospect_budget_micro_usd"
         ],
         "title": "CustomerRowOut",
+        "type": "object"
+      },
+      "DecideJoinIn": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "default": "member",
+            "enum": [
+              "admin",
+              "member"
+            ],
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "title": "DecideJoinIn",
         "type": "object"
       },
       "DefaultPlanIn": {
@@ -2817,16 +2855,30 @@
             "type": "boolean"
           },
           "role": {
-            "enum": [
-              "admin",
-              "member"
+            "anyOf": [
+              {
+                "enum": [
+                  "admin",
+                  "member"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Role",
-            "type": "string"
+            "title": "Role"
           },
           "workspace_name": {
-            "title": "Workspace Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Name"
           }
         },
         "required": [
@@ -2860,6 +2912,69 @@
           "email"
         ],
         "title": "InviteIn",
+        "type": "object"
+      },
+      "JoinCodeOut": {
+        "properties": {
+          "join_code": {
+            "title": "Join Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "join_code"
+        ],
+        "title": "JoinCodeOut",
+        "type": "object"
+      },
+      "JoinIn": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "JoinIn",
+        "type": "object"
+      },
+      "JoinRequestOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "user_id",
+          "email",
+          "name",
+          "requested_at"
+        ],
+        "title": "JoinRequestOut",
         "type": "object"
       },
       "JourneyOut": {
@@ -3448,6 +3563,40 @@
         "title": "MessageOut",
         "type": "object"
       },
+      "MyJoinRequestOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "workspace_name": {
+            "title": "Workspace Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_name",
+          "status",
+          "created_at"
+        ],
+        "title": "MyJoinRequestOut",
+        "type": "object"
+      },
       "MyWorkspace": {
         "properties": {
           "id": {
@@ -3538,6 +3687,79 @@
           "created_at"
         ],
         "title": "NoteOut",
+        "type": "object"
+      },
+      "NotificationOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "join_requested",
+              "join_approved",
+              "join_rejected"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "read": {
+            "title": "Read",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "workspace_id",
+          "data",
+          "read",
+          "created_at"
+        ],
+        "title": "NotificationOut",
+        "type": "object"
+      },
+      "NotificationsOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "unread": {
+            "title": "Unread",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "unread"
+        ],
+        "title": "NotificationsOut",
         "type": "object"
       },
       "OAuthFinishIn": {
@@ -4286,6 +4508,45 @@
         "title": "PlansOut",
         "type": "object"
       },
+      "PlatformInvitationOut": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "expires_at"
+        ],
+        "title": "PlatformInvitationOut",
+        "type": "object"
+      },
+      "PlatformInviteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "maxLength": 320,
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "PlatformInviteIn",
+        "type": "object"
+      },
       "PlatformRoleIn": {
         "additionalProperties": false,
         "properties": {
@@ -4684,6 +4945,25 @@
           "catch_all_share"
         ],
         "title": "QualityOut",
+        "type": "object"
+      },
+      "ReadIn": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          }
+        },
+        "title": "ReadIn",
         "type": "object"
       },
       "RecipientIn": {
@@ -6164,17 +6444,37 @@
             "title": "Invitations",
             "type": "array"
           },
+          "join_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Join Code"
+          },
           "members": {
             "items": {
               "$ref": "#/components/schemas/MemberOut"
             },
             "title": "Members",
             "type": "array"
+          },
+          "requests": {
+            "items": {
+              "$ref": "#/components/schemas/JoinRequestOut"
+            },
+            "title": "Requests",
+            "type": "array"
           }
         },
         "required": [
           "members",
-          "invitations"
+          "invitations",
+          "requests",
+          "join_code"
         ],
         "title": "TeamOut",
         "type": "object"
@@ -8354,6 +8654,120 @@
           }
         },
         "summary": "Directory History",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/invitations": {
+      "get": {
+        "operationId": "platform_invitations_api_admin_invitations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformInvitationOut"
+                  },
+                  "title": "Response Platform Invitations Api Admin Invitations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Platform Invitations",
+        "tags": [
+          "admin"
+        ]
+      },
+      "post": {
+        "operationId": "invite_to_platform_api_admin_invitations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformInviteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformInvitationOut"
+                  },
+                  "title": "Response Invite To Platform Api Admin Invitations Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Invite To Platform",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/invitations/{invitation_id}": {
+      "delete": {
+        "operationId": "revoke_platform_invitation_api_admin_invitations__invitation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformInvitationOut"
+                  },
+                  "title": "Response Revoke Platform Invitation Api Admin Invitations  Invitation Id  Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Platform Invitation",
         "tags": [
           "admin"
         ]
@@ -11509,6 +11923,168 @@
         ]
       }
     },
+    "/api/me/join-requests": {
+      "get": {
+        "operationId": "join_requests_api_me_join_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyJoinRequestOut"
+                  },
+                  "title": "Response Join Requests Api Me Join Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Join Requests",
+        "tags": [
+          "me"
+        ]
+      },
+      "post": {
+        "description": "Ask to join the workspace with this code; its admins are told and decide.",
+        "operationId": "request_to_join_api_me_join_requests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyJoinRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request To Join",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/me/notifications": {
+      "get": {
+        "operationId": "notifications_api_me_notifications_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Notifications",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/me/notifications/read": {
+      "post": {
+        "operationId": "mark_read_api_me_notifications_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Read",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/me/workspaces": {
+      "post": {
+        "description": "Make a workspace; the caller becomes its admin.",
+        "operationId": "create_workspace_api_me_workspaces_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkspaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyWorkspace"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Workspace",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/api/privacy/forget": {
       "post": {
         "description": "Erase a person: suppress the address for good and remove what identifies them.",
@@ -13047,6 +13623,122 @@
           }
         },
         "summary": "Resend",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/join-code": {
+      "post": {
+        "description": "A new code; the old one stops working at once.",
+        "operationId": "new_join_code_api_team_join_code_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "New Join Code",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/join-requests/{request_id}/approve": {
+      "post": {
+        "operationId": "approve_api_team_join_requests__request_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideJoinIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve",
+        "tags": [
+          "team"
+        ]
+      }
+    },
+    "/api/team/join-requests/{request_id}/reject": {
+      "post": {
+        "operationId": "reject_api_team_join_requests__request_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject",
         "tags": [
           "team"
         ]

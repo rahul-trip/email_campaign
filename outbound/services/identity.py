@@ -19,9 +19,25 @@ from outbound.db.identity import IdentityUnitOfWork, IdentityUnitOfWorkFactory, 
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.entities import AuthToken, Membership, User, Workspace
-from outbound.domain.enums import AuthTokenPurpose, MembershipRole, PlatformRole, UserStatus
+from outbound.domain.entities import (
+    AuthToken,
+    JoinRequest,
+    Membership,
+    Notification,
+    User,
+    Workspace,
+)
+from outbound.domain.enums import (
+    AuthTokenPurpose,
+    JoinRequestStatus,
+    MembershipRole,
+    NotificationKind,
+    PlatformRole,
+    UserStatus,
+    WorkspaceStatus,
+)
 from outbound.domain.hashing import hash_value
+from outbound.domain.join_codes import normalise_join_code
 from outbound.domain.passwords import (
     hash_password,
     hash_token,
@@ -41,6 +57,8 @@ REMOVAL_TTL = timedelta(days=1)
 USER_IDLE, USER_ABSOLUTE = timedelta(hours=24), timedelta(days=14)
 STAFF_IDLE, STAFF_ABSOLUTE = timedelta(hours=8), timedelta(days=3)
 SEEN_EVERY = timedelta(minutes=5)  # how often last_seen_at is written
+JOIN_CODE_TRIES = 10  # wrong join codes one person may try in JOIN_CODE_WINDOW
+JOIN_CODE_WINDOW = timedelta(hours=1)
 
 
 class IdentityError(Exception):
@@ -71,8 +89,8 @@ class SignedIn:
 @dataclass(frozen=True)
 class InvitationView:
     email: str
-    workspace_name: str
-    role: MembershipRole
+    workspace_name: str | None  # None: an invitation to the platform; they pick a workspace after
+    role: MembershipRole | None
     has_account: bool
 
 
@@ -80,6 +98,14 @@ class InvitationView:
 class TeamView:
     members: list[tuple[Membership, User]]
     invitations: list[AuthToken]
+    requests: list[tuple[JoinRequest, User]]
+    join_code: str | None
+
+
+@dataclass(frozen=True)
+class MyJoinRequest:
+    request: JoinRequest
+    workspace_name: str
 
 
 @dataclass
@@ -365,6 +391,8 @@ class IdentityService:
         with self._identity() as ids:
             found = self._usable(ids, token, AuthTokenPurpose.INVITE)
             has_account = ids.users.by_email(found.email) is not None
+        if found.workspace_id is None:
+            return InvitationView(found.email, None, None, has_account)
         workspace_id, role = _invited(found)
         return InvitationView(found.email, self._workspace(workspace_id).name, role, has_account)
 
@@ -383,7 +411,8 @@ class IdentityService:
         an account must already be signed in as the invited address."""
         with self._identity() as ids:
             found = self._usable(ids, token, AuthTokenPurpose.INVITE)
-            workspace_id, role = _invited(found)
+            # A platform invitation names no workspace: the person picks or makes one after.
+            workspace_id, role = (None, None) if found.workspace_id is None else _invited(found)
             user = ids.users.by_email(found.email)
             if user is not None:
                 if current is None or current.user.id != user.id:
@@ -399,13 +428,19 @@ class IdentityService:
                 self._check_password(password, found.email)
                 user = ids.users.create(found.email, hash_password(password), name=name)
                 ids.users.accept_terms(user.id, self._terms_version)
-            if ids.memberships.get(workspace_id, user.id) is None:
-                ids.memberships.add(workspace_id, user.id, role)
+            if workspace_id is not None and role is not None:
+                if ids.memberships.get(workspace_id, user.id) is None:
+                    ids.memberships.add(workspace_id, user.id, role)
+                ids.audit.record(
+                    "member_joined", actor_user_id=user.id, workspace_id=workspace_id,
+                    target_type="user", target_id=user.id, data={"role": role.value},
+                )  # fmt: skip
+            else:
+                ids.audit.record(
+                    "platform_invitation_accepted", actor_user_id=user.id,
+                    target_type="user", target_id=user.id,
+                )  # fmt: skip
             ids.tokens.use(found.id)
-            ids.audit.record(
-                "member_joined", actor_user_id=user.id, workspace_id=workspace_id,
-                target_type="user", target_id=user.id, data={"role": role.value},
-            )  # fmt: skip
             ids.commit()
         if current is not None:
             return self.authenticate_session(current)
@@ -438,10 +473,10 @@ class IdentityService:
 
     def team(self, workspace_id: str) -> TeamView:
         with self._identity() as ids:
-            return TeamView(
-                ids.memberships.members(workspace_id),
-                ids.tokens.pending_invites(workspace_id, utcnow()),
-            )
+            members = ids.memberships.members(workspace_id)
+            invitations = ids.tokens.pending_invites(workspace_id, utcnow())
+            requests = ids.join_requests.pending(workspace_id)
+        return TeamView(members, invitations, requests, self._workspace(workspace_id).join_code)
 
     def set_role(
         self, workspace_id: str, user_id: str, role: MembershipRole, *, by: str | None
@@ -482,6 +517,178 @@ class IdentityService:
                 "last_admin",
                 "A workspace needs at least one admin. Make someone else admin first.",
             )
+
+    # ------------------------------------------------------------------ platform invitations
+
+    def invite_to_platform(self, email: str, *, by: str | None) -> AuthToken:
+        """Platform staff invite someone to Outbound itself, with no workspace. After accepting,
+        the person makes a workspace or asks to join one."""
+        address = normalise_email(email)
+        if "@" not in address or len(address) > 320:
+            raise IdentityError(422, "bad_email", "Enter a valid email address.")
+        with self._identity() as ids:
+            if ids.users.by_email(address) is not None:
+                raise IdentityError(409, "already_member", "That person already has an account.")
+            for open_invite in ids.tokens.pending_platform_invites(utcnow()):
+                if open_invite.email == address:
+                    ids.tokens.revoke(open_invite.id)  # the new invitation replaces it
+            token, token_hash = new_token()
+            invitation = ids.tokens.create(
+                AuthTokenPurpose.INVITE, address, token_hash, utcnow() + INVITE_TTL, created_by=by
+            )
+            ids.audit.record("platform_invited", actor_user_id=by, target_type="email")
+            ids.commit()
+        self._send(
+            address,
+            "You're invited to Outbound",
+            _PLATFORM_INVITE.format(link=f"{self._base_url}/invite/{token}", days=INVITE_TTL.days),
+        )
+        return invitation
+
+    def platform_invitations(self) -> list[AuthToken]:
+        with self._identity() as ids:
+            return ids.tokens.pending_platform_invites(utcnow())
+
+    def revoke_platform_invite(self, invitation_id: str, *, by: str | None) -> None:
+        with self._identity() as ids:
+            invitation = ids.tokens.get(invitation_id)
+            if invitation.workspace_id is not None:
+                raise NotFound(f"invitation {invitation_id}")
+            ids.tokens.revoke(invitation.id)
+            ids.audit.record("invitation_revoked", actor_user_id=by)
+            ids.commit()
+
+    # ------------------------------------------------------------------ making or joining one
+
+    def create_my_workspace(
+        self, current: CurrentUser, name: str, *, website: str = ""
+    ) -> Workspace:
+        """Someone with an account makes a workspace and becomes its admin."""
+        if not name.strip():
+            raise IdentityError(422, "name_required", "Give the company's name.")
+        created = create_workspace(self._uow, self._platform, name, website=website)
+        with self._identity() as ids:
+            ids.memberships.add(created.id, current.user.id, MembershipRole.ADMIN)
+            ids.audit.record(
+                "workspace_created", actor_user_id=current.user.id, workspace_id=created.id,
+                target_type="workspace", target_id=created.id, data={"name": name},
+            )  # fmt: skip
+            ids.commit()
+        return created
+
+    def request_to_join(self, current: CurrentUser, code: str) -> MyJoinRequest:
+        """Ask to join the workspace with this code; its admins decide."""
+        typed = normalise_join_code(code)
+        user_id = current.user.id
+        with self._identity() as ids:
+            tries = ids.audit.recent(
+                actor_user_id=user_id, action="join_code_failed",
+                since=utcnow() - JOIN_CODE_WINDOW, limit=JOIN_CODE_TRIES,
+            )  # fmt: skip
+        if len(tries) >= JOIN_CODE_TRIES:
+            raise IdentityError(429, "too_many_attempts", "Too many wrong codes. Try again later.")
+        with self._platform() as directory:
+            found = directory.workspaces.by_join_code(typed) if typed else None
+        if found is None or found.status is not WorkspaceStatus.ACTIVE:
+            with self._identity() as ids:
+                ids.audit.record("join_code_failed", actor_user_id=user_id)
+                ids.commit()
+            raise IdentityError(404, "no_such_code", "No workspace has that code. Check it.")
+        with self._identity() as ids:
+            if ids.memberships.get(found.id, user_id) is not None:
+                raise IdentityError(409, "already_member", "You are already in that workspace.")
+            if ids.join_requests.pending_for(found.id, user_id) is not None:
+                raise IdentityError(409, "already_requested", "You already asked to join it.")
+            request = ids.join_requests.open(found.id, user_id)
+            for member, admin in ids.memberships.members(found.id):
+                if member.role is MembershipRole.ADMIN and admin.status is UserStatus.ACTIVE:
+                    ids.notifications.add(
+                        admin.id, NotificationKind.JOIN_REQUESTED, workspace_id=found.id,
+                        data={
+                            "request_id": request.id, "user_id": user_id,
+                            "email": current.user.email, "name": current.user.name,
+                            "workspace_name": found.name, "slug": found.slug,
+                        },
+                    )  # fmt: skip
+            ids.audit.record(
+                "join_requested", actor_user_id=user_id, workspace_id=found.id,
+                target_type="join_request", target_id=request.id,
+            )  # fmt: skip
+            ids.commit()
+        return MyJoinRequest(request, found.name)
+
+    def decide_join(
+        self,
+        workspace_id: str,
+        request_id: str,
+        *,
+        approve: bool,
+        role: MembershipRole = MembershipRole.MEMBER,
+        by: str,
+    ) -> JoinRequest:
+        """An admin approves (with the role to give) or rejects a request to join."""
+        workspace = self._workspace(workspace_id)
+        with self._identity() as ids:
+            request = ids.join_requests.get(request_id)
+            if request.workspace_id != workspace_id:
+                raise NotFound(f"join request {request_id}")
+            if request.status is not JoinRequestStatus.PENDING:
+                raise IdentityError(409, "already_decided", "That request was already decided.")
+            if approve and ids.memberships.get(workspace_id, request.user_id) is None:
+                ids.memberships.add(workspace_id, request.user_id, role)
+            status = JoinRequestStatus.APPROVED if approve else JoinRequestStatus.REJECTED
+            decided = ids.join_requests.decide(
+                request_id, status, by=by, role=role if approve else None
+            )
+            ids.notifications.add(
+                request.user_id,
+                NotificationKind.JOIN_APPROVED if approve else NotificationKind.JOIN_REJECTED,
+                workspace_id=workspace_id,
+                data={"workspace_name": workspace.name, "slug": workspace.slug},
+            )
+            ids.notifications.clear_join_request(workspace_id, request.user_id)
+            ids.audit.record(
+                "join_approved" if approve else "join_rejected", actor_user_id=by,
+                workspace_id=workspace_id, target_type="user", target_id=request.user_id,
+                data={"role": role.value} if approve else {},
+            )  # fmt: skip
+            ids.commit()
+        return decided
+
+    def new_join_code(self, workspace_id: str, *, by: str | None) -> str:
+        """Replace the workspace's join code; the old one stops working at once."""
+        with self._platform() as directory:
+            code = directory.workspaces.new_join_code(workspace_id).join_code
+            directory.commit()
+        with self._identity() as ids:
+            ids.audit.record("join_code_changed", actor_user_id=by, workspace_id=workspace_id)
+            ids.commit()
+        return code or ""
+
+    def my_join_requests(self, current: CurrentUser) -> list[MyJoinRequest]:
+        with self._identity() as ids:
+            requests = ids.join_requests.of_user(current.user.id)
+        with self._platform() as directory:
+            names = {
+                r.workspace_id: w.name
+                for r in requests
+                if (w := directory.workspaces.get(r.workspace_id))
+            }
+        return [MyJoinRequest(r, names.get(r.workspace_id, "")) for r in requests]
+
+    # ------------------------------------------------------------------ notifications
+
+    def notifications(self, current: CurrentUser) -> tuple[list[Notification], int]:
+        with self._identity() as ids:
+            return (
+                ids.notifications.for_user(current.user.id),
+                ids.notifications.unread_count(current.user.id),
+            )
+
+    def mark_notifications_read(self, current: CurrentUser, notification_id: str | None) -> None:
+        with self._identity() as ids:
+            ids.notifications.mark_read(current.user.id, notification_id)
+            ids.commit()
 
     # ------------------------------------------------------------------ directory
 
@@ -535,6 +742,14 @@ def _invited(token: AuthToken) -> tuple[str, MembershipRole]:
 
 # Verified against on unknown accounts, so a wrong email costs as much time as a wrong password.
 _DUMMY_HASH = hash_password("not-a-real-password-just-for-timing")
+
+_PLATFORM_INVITE = """You have been invited to Outbound.
+
+Open this link to set your password (it works for {days} days, once). Then you can start your own
+workspace, or ask to join your team's with the code they share.
+{link}
+
+If you were not expecting this, you can ignore this email."""
 
 _INVITE = """You have been invited to {workspace} on Outbound.
 
