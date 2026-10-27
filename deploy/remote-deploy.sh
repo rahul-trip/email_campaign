@@ -100,6 +100,9 @@ say "starting $RELEASE (migrate, then api and worker)"
 ln -sfn "$RELEASES/$RELEASE" "$OUTBOUND_HOME/current"
 compose "$RELEASE" up -d --remove-orphans || rollback
 healthy || rollback
+# The worker has no HTTP port, so check that it is still running a few seconds after start.
+sleep 5
+[[ -n "$(compose "$RELEASE" ps --status running --quiet worker)" ]] || rollback
 say "healthy on 127.0.0.1:$OUTBOUND_PORT"
 
 # ---- tidy up: old release folders and their images, never anything else -----------------------
