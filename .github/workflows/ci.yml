@@ -4,7 +4,14 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"  # weekly, so a new advisory shows up before deploy day
   workflow_call:  # the deploy workflow runs these checks first
+    inputs:
+      ref:
+        description: Commit to check (the deploy workflow passes the one it ships)
+        type: string
+        default: ""
 
 jobs:
   checks:
@@ -12,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -27,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -54,6 +65,8 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://outbound:outbound@localhost:5432/outbound_test
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -65,6 +78,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -94,6 +109,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
       - name: Build the image the VM builds (deploy/compose.yml)
         run: docker build --pull -t outbound:ci .
       - name: The CLI starts inside it
@@ -105,6 +122,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.ref }}
           fetch-depth: 0  # gitleaks reads the whole history
       - name: Secrets in the history
         uses: gitleaks/gitleaks-action@v2

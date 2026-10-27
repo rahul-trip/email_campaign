@@ -167,6 +167,8 @@ Add a site for Outbound to the proxy that already runs on the VM. Copy [`deploy/
 
 ## 2. Deploying
 
+The checks run on the exact `ref` being deployed. They also run every Monday on `main`, so a new dependency advisory (pip-audit) shows up before deploy day instead of blocking it. After the api is healthy the deploy also checks that the worker container is still running, and rolls back if not.
+
 **Actions → deploy → Run workflow**, then fill in:
 
 | Input | Example | Notes |

@@ -52,6 +52,8 @@ jobs:
   checks:
     if: ${{ inputs.run_checks }}
     uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ inputs.ref }}
     secrets: inherit
 
   deploy:
