@@ -1,27 +1,34 @@
 # Agent Reference & Tooling
 
 ## Purpose
-This document provides instructions and context for AI coding assistants working on the Outbound email campaign codebase.
+This document gives instructions and context for AI coding assistants working on the Outbound email campaign codebase. The source of truth is `CLAUDE.md` and the docs it names. This file is a quick map.
 
-## Design & UI System (`web2`)
-- **Stitch Project**: `projects/7399113199558765054` ("Design System Generator")
-- **Design Tokens**: `docs/design.md` defines colors, typography (Inter + JetBrains Mono), spacing (4px unit rhythm), and elevation tiers.
-- **Screens Implemented in `web2/src/pages/`**:
-  - `Dashboard.tsx`: Variant 2 (`b82c0f5861154818bfab6fc0ea6a9c98`) with 8-stage interactive funnel centerpiece, bottleneck action callouts, drop-out status strip, and dual spend/quality telemetry cards.
-  - `Review.tsx`: Dual-pane review matching Stitch screen `7fc684982cf04eb5aa794b19102079f2`, word count targets, lint alerts, diff preview, compliance lock, approve/reject mutations.
-  - `Attention.tsx`: Needs Attention triage matching Stitch screen `e76d9620c9de4adebf7e85f95a860052`, filterable held/failed leads, instant release and retry.
-  - `Leads.tsx`: Leads data table matching Stitch screen `df01f6be973a49f69df1f062bbf22c75`, search, status filter, hold reason filter, pagination.
-  - `LeadDetail.tsx`: Matching Stitch screen `639e16bf31e743c9b98ea714433f1c5d` ("Halden Power Ltd"), contacts list, add-person form, messages history, research profile, vendor waterfall ledger, safeguarded delete modal (`POST /api/companies/{company_id}/delete`), and link to Pipeline Journey.
-  - `LeadJourney.tsx`: Interactive 8-stage execution stepper with status nodes, "What happens next" banner, stage facts, vendor calls & latency telemetry, and intake origin metadata (`GET /api/companies/{company_id}/journey`).
-  - `Targets.tsx`: Add Leads matching Stitch screen `80739578575147c19f28442a738b5f6e`, manual input, drag-and-drop CSV/XLSX uploader (`/api/targets/upload`), dry-run validation, and intake results table.
-  - `Runs.tsx`: Pipeline Runs matching Stitch screen `0faacf7d709347f68e0d06dd45836a99`, run trigger form (mode, limit, discovery count), live polling, execution history table with cancellation support.
-  - `Reports.tsx`: Analytics matching Stitch screen `0fba433f9aa348948e0642f15fbf750d`, 30-day spend burn, per-prospect budget efficiency bar against $0.50 cap, provider consumption, 80% unedited copy compliance tracker.
-  - `Campaigns.tsx`: Dedicated outreach campaigns dashboard with ICP narrative editor, minimum fit score slider, custom research questions, target persona titles, and follow-up cadence scheduling.
-  - `Mailboxes.tsx`: Sending mailbox connectivity, aggregate daily capacity metrics, and live DNS diagnostics (SPF, DKIM, DMARC) with `POST /api/settings/mailboxes/{mailbox_id}/dns-check`.
-  - `Compliance.tsx`: Country cold-email rules (`GET`/`PUT /api/settings/policies/{country_code}`), corporate subscriber requirements, statutory footer editor, live suppression registry, and GDPR Article 17 Right to be Forgotten erasure (`POST /api/privacy/forget`).
-  - `Settings.tsx`: Tabbed configuration suite covering Workspace budget ceiling (`PUT /api/settings/workspace`), Sender Identity profile narrative & legal disclosures (`PUT /api/settings/sender-profile`), connected Mailboxes, Suppression registry, and Campaigns.
+## Web app (`web2`)
+- React + Vite + TanStack Router, served by `outbound serve` from `web2/dist`. Design tokens are in `docs/design.md`.
+- Routes under `/w/{slug}` are a workspace's pages, built in `web2/src/main.tsx`. Pages outside a workspace (sign-in, invitations, the workspace chooser, "Get started") are in `web2/src/app/Public.tsx`.
+- Workspace pages in `web2/src/pages/`:
+  - `Dashboard.tsx`: funnel, bottleneck callouts, spend and quality cards.
+  - `Review.tsx`: approve or reject a drafted email.
+  - `Attention.tsx`: held and failed leads, with release and retry.
+  - `Leads.tsx`, `LeadDetail.tsx`, `LeadJourney.tsx`: lead list, lead page with contacts and vendor ledger, and the stage-by-stage journey.
+  - `Targets.tsx`: add leads by hand or by CSV/XLSX upload.
+  - `Runs.tsx`, `RunDetail.tsx`: run trigger, history and detail.
+  - `Reports.tsx`: spend and copy statistics.
+  - `Campaigns.tsx`, `Mailboxes.tsx`, `Compliance.tsx`, `Onboarding.tsx`.
+  - `Settings.tsx` with tabs in `settingsTabs.ts`: setup, profile, mailboxes, limits, plan, team (`SettingsTeam.tsx`: invitations, roles, join code and join requests), integrations (`SettingsIntegrations.tsx`), account.
+- The platform admin console is `web2/src/admin/` (`/admin`): Overview, Customers, Users (includes inviting someone to Outbound), Plans, Vendors, Directory, Audit, Settings.
+- The header has a notifications bell (`web2/src/components/Notifications.tsx`) for join requests and their answers.
+- The product tour is `web2/src/tour/steps.ts`. Every new screen or element needs a step, a `data-tour` attribute and the "Guided tour" part of `docs/USER_MANUAL.md`.
+- Stitch project for the design: `projects/7399113199558765054` ("Design System Generator"). Dashboard Variant 2 is `b82c0f5861154818bfab6fc0ea6a9c98`.
 
-## Key Architecture Rules
-- Strictly follow layer boundaries: `domain` -> `db`/`providers` -> `metering` -> `stages` -> `runner` -> `services` -> `pipeline` -> `cli`/`api`/`worker`.
-- Pay-as-you-go waterfall for contact finding/verification with strict meter guards.
-- Keep `CLAUDE.md`, `agent.md`, and `memory.md` updated across tasks.
+## Key architecture rules
+- Layers: `domain` -> `db`/`providers` -> `metering` -> `stages` -> `runner` -> `services` -> `pipeline` -> `cli`/`api`/`worker`. `uv run lint-imports` checks this.
+- Every API route declares its permission with `require(Permission.X)`. The route-walk test fails otherwise. Routes outside any workspace (`/api/me/*`) are listed as open in `tests/api/test_permissions.py`.
+- Platform tables (`users`, `memberships`, `auth_tokens`, `join_requests`, `notifications`, ...) have no row-level security and are reached only through `outbound/db/identity.py`.
+- Every paid vendor call goes through the meter in `outbound/metering/`.
+- The schema changes only through Alembic, and `docs/technical/data/schema.md` is updated in the same PR. The latest migration is `0017` (join codes, join requests, notifications).
+
+## Working conventions
+- One branch per task, named `phase-N/<task>`, and a PR into `main`.
+- Never commit `.env` files or private data.
+- Run `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run lint-imports && uv run pytest` before a PR. For web changes also `cd web2 && npm run typecheck && npm run build && npx playwright test`.
