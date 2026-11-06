@@ -6244,6 +6244,44 @@
         "title": "SkipOut",
         "type": "object"
       },
+      "SourceYieldOut": {
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "leads": {
+            "title": "Leads",
+            "type": "integer"
+          },
+          "qualified": {
+            "title": "Qualified",
+            "type": "integer"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "found",
+          "leads",
+          "qualified",
+          "rate",
+          "days"
+        ],
+        "title": "SourceYieldOut",
+        "type": "object"
+      },
       "StageOut": {
         "properties": {
           "calls": {
@@ -12435,6 +12473,32 @@
           }
         },
         "summary": "Quality",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/reports/sources": {
+      "get": {
+        "description": "Where discovery's companies came from, and how many of each source's leads qualified.",
+        "operationId": "sources_api_reports_sources_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SourceYieldOut"
+                  },
+                  "title": "Response Sources Api Reports Sources Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Sources",
         "tags": [
           "runs"
         ]
