@@ -141,7 +141,7 @@ def build_fit_user_prompt(
         + _block("Company", company)
         + untrusted("What they do", summary)
         + untrusted("Products", "\n".join(f"- {p}" for p in products))
-        + _block("Operator notes", notes)
+        + untrusted("Notes, including where the company was found", notes)
         + untrusted("Answers to research questions", answers)
     )
 

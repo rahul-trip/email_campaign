@@ -5,8 +5,12 @@ The brief's must-haves, buying signals and disqualifiers become numbered checks 
 it found it. ``qualify`` turns those answers into the fit score and a reason a person can check:
 
 - a disqualifier that is met rules the company out (score 0), whatever else is true;
-- must-haves give up to 70, counted by weight, an unknown one counting half (50 when none is set);
-- each buying signal that is met adds 10, up to 30.
+- must-haves give up to 80, counted by weight, an unknown one counting half (60 when none is
+  set, so a brief of rule-outs only passes the default fit minimum of 60 when none is met);
+- each buying signal that is met adds 10, up to 20.
+
+The scale meets the gate's default minimum of 60: every must-have met passes, and a company
+nothing is known about fails.
 """
 
 from __future__ import annotations
@@ -18,10 +22,10 @@ from typing import Any
 
 from outbound.domain.brief import Brief
 
-MUST_HAVE_POINTS = 70
-NO_MUST_HAVES = 50
+MUST_HAVE_POINTS = 80
+NO_MUST_HAVES = 60
 SIGNAL_POINTS = 10
-MAX_SIGNAL_POINTS = 30
+MAX_SIGNAL_POINTS = 20
 MAX_TEXT = 300
 
 

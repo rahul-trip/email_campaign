@@ -46,3 +46,40 @@ def test_no_keyword_match_means_nothing_found_and_the_list_is_fetched_once() -> 
     yc.find(SourceQuery(keywords=("energy",)), limit=5)
     assert len(seen) == 1  # the whole directory is one download, kept for a day
     assert yc.find(SourceQuery(), limit=5) == []  # no keywords: no basis to choose
+
+
+def _company(name: str, text: str, places: str, regions: list[str]) -> dict[str, object]:
+    return {
+        "name": name, "status": "Active", "one_liner": text, "all_locations": places,
+        "regions": regions, "website": f"https://{name.lower()}.com", "batch": "Winter 2023",
+    }  # fmt: skip
+
+
+def custom(*companies: dict[str, object]) -> YcDirectory:
+    return YcDirectory(client=mock_client(lambda _: httpx.Response(200, json=list(companies))))
+
+
+def test_keywords_match_whole_words_not_parts_of_words() -> None:
+    found = custom(
+        _company("Mailco", "We maintain email lists", "Austin, TX, USA", ["United States"]),
+        _company("Gridai", "AI for grid operators", "Austin, TX, USA", ["United States"]),
+    ).find(SourceQuery(keywords=("ai",)), limit=5)
+    assert [m.name for m in found] == ["Gridai"]
+
+
+def test_regions_match_whole_places_and_their_common_names() -> None:
+    directory = custom(
+        _company("Londonco", "grid", "London, ENG, United Kingdom", ["United Kingdom", "Europe"]),
+        _company("Moscowco", "grid", "Moscow, Russia", ["Russia"]),
+        _company("Ohioco", "grid", "Columbus, OH, USA", ["United States of America"]),
+    )
+
+    def where(region: str) -> list[str]:
+        return [
+            m.name
+            for m in directory.find(SourceQuery(keywords=("grid",), regions=(region,)), limit=5)
+        ]
+
+    assert where("UK") == ["Londonco"]
+    assert where("US") == ["Ohioco"]
+    assert where("Europe") == ["Londonco"]

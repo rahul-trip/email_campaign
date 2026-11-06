@@ -51,7 +51,7 @@ class YcDirectory:
         for order, company in enumerate(self._directory()):
             if company.get("status") not in _LIVE:
                 continue
-            if regions and not any(r in _places(company) for r in regions):
+            if regions and not any(_in_place(r, _places(company)) for r in regions):
                 continue
             founded = _founded(company)
             if query.founded_after and (founded is None or founded < query.founded_after):
@@ -72,11 +72,32 @@ class YcDirectory:
         return self._companies
 
 
+def _word(phrase: str, text: str) -> bool:
+    """The phrase as whole words: "ai" is in "ai for grids", not in "maintain"."""
+    return re.search(rf"\b{re.escape(phrase)}\b", text) is not None
+
+
 def _matches(phrase: str, text: str) -> int:
     """2 when the whole phrase appears, 1 when every word of it does, else 0."""
-    if phrase in text:
+    if _word(phrase, text):
         return 2
     return 1 if all(re.search(rf"\b{re.escape(w)}", text) for w in phrase.split()) else 0
+
+
+# What a brief may call a place, and what the directory calls it.
+_PLACE_NAMES = {
+    "uk": ("united kingdom",), "gb": ("united kingdom",), "great britain": ("united kingdom",),
+    "britain": ("united kingdom",), "england": ("united kingdom",),
+    "us": ("united states",), "usa": ("united states",), "u.s.": ("united states",),
+    "america": ("united states",), "eu": ("europe",),
+}  # fmt: skip
+
+
+def _in_place(region: str, places: str) -> bool:
+    """A brief's region among a company's places, as whole words or by a common name
+    ("UK" is "United Kingdom"; "US" is not in "Russia" or "Columbus")."""
+    name = re.sub(r"^the ", "", region.strip().lower())
+    return any(_word(n, places) for n in (name, *_PLACE_NAMES.get(name, ())))
 
 
 def _text(company: dict[str, Any]) -> str:

@@ -138,7 +138,9 @@ def build_actor_user_prompt(
         "## Research notes (from the web)\n" + research_notes(research),
         "## Answers to research questions (from the web)\n"
         + untrusted_text(_list([f"{q}: {a}" for q, a in answers.items() if a])),
-        f"## Operator notes about this lead\n{notes or '(none)'}",
+        # Notes may carry what discovery read on the web about the company, so they are fenced.
+        "## Notes about this lead (the operator's, or where discovery found it)\n"
+        + (untrusted_text(notes) if notes.strip() else "(none)"),
     ]
     styles = [str(s).strip() for s in sender.get("style_examples") or [] if str(s).strip()]
     if styles:

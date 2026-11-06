@@ -33,19 +33,19 @@ def test_every_criterion_has_a_short_id_the_model_answers_by() -> None:
 
 def test_every_must_have_met_with_a_signal_scores_high() -> None:
     result = qualify(BRIEF, {"M1": said("met"), "M2": said("met"), "S1": said("met")})
-    assert result.score == 80 and not result.ruled_out
+    assert result.score == 90 and not result.ruled_out
     assert result.reason == "Meets 2 of 2 must-haves; signs they may buy now: recent funding"
 
 
 def test_must_haves_count_by_weight_and_an_unknown_counts_half() -> None:
     result = qualify(BRIEF, {"M1": said("met"), "M2": said("unknown")})
-    assert result.score == 61  # 70 x (3 + 0.5) / 4
+    assert result.score == 70  # 80 x (3 + 0.5) / 4
     assert "not known: has a data team" in result.reason
 
 
 def test_a_missing_must_have_says_which() -> None:
     result = qualify(BRIEF, {"M1": said("not_met"), "M2": said("met")})
-    assert result.score == 18  # 70 x 1 / 4
+    assert result.score == 20  # 80 x 1 / 4
     assert result.reason.startswith("Meets 1 of 2 must-haves; missing: operates on the power grid")
 
 
@@ -64,10 +64,17 @@ def test_an_unanswered_or_garbled_criterion_is_unknown() -> None:
     assert [i.check.id for i in result.items] == ["M1", "M2", "S1", "S2", "D1"]
 
 
-def test_signals_add_at_most_thirty() -> None:
+def test_signals_add_at_most_twenty() -> None:
     many = Brief.from_json({"buying_signals": ["a", "b", "c", "d"]})
     result = qualify(many, {f"S{n}": said("met") for n in range(1, 5)})
-    assert result.score == 80  # 50 with no must-haves set, plus 30
+    assert result.score == 80  # 60 with no must-haves set, plus 20
+
+
+def test_the_scale_meets_the_default_fit_minimum_of_60() -> None:
+    rules_only = Brief.from_json({"disqualifiers": ["sells forecasting software"]})
+    assert qualify(rules_only, {"D1": said("not_met")}).score == 60  # nothing against it
+    assert qualify(BRIEF, {"M1": said("met"), "M2": said("met")}).score >= 60
+    assert qualify(BRIEF, {}).score < 60  # nothing known about any must-have
 
 
 def test_the_breakdown_is_stored_as_plain_json() -> None:

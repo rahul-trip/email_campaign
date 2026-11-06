@@ -17,6 +17,7 @@ from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CandidateVerdict, CompanySource, CompanyStatus
 from outbound.pipeline import Pipeline, discover_companies
+from outbound.providers.errors import ProviderError
 from outbound.providers.ports import CompanyMention, SearchHit, SourceQuery
 from outbound.services.discovery import PER_SOURCE
 from tests.db.test_credits import started, used
@@ -218,3 +219,20 @@ def test_the_campaigns_qualified_leads_are_examples_to_find_more_like(
         uow.commit()
     run(pipeline, container, ws, 5, "run-1")
     assert "best.io" in world.directory.queries[0].seed_domains
+
+
+def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+
+    def down(query: str, **_: object) -> list[SearchHit]:
+        raise ProviderError("tavily", "503 after retries")
+
+    world.search.search = down
+    world.directory.mentions = [yc("Gridcast", "gridcast.io"), yc("Mystery", "")]
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert found.added == 1  # the directory's company still became a lead
+    with factory(ws) as uow:
+        verdicts = {c.name: c.verdict for c in uow.candidates.for_run("run-1")}
+    assert verdicts["Mystery"] is CandidateVerdict.UNRESOLVED  # its website search failed

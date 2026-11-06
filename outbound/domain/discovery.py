@@ -12,6 +12,7 @@ company is recognised across sources by its name without its legal suffix (``nam
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -153,9 +154,11 @@ _SUFFIXES = re.compile(
 
 
 def name_key(name: str) -> str:
-    """A company's name as compared: lower case, "&" as "and", no punctuation and no legal
-    suffix, so "Acme Energy Ltd." and "ACME energy" are the same company."""
-    text = " ".join(re.findall(r"[a-z0-9]+", name.lower().replace("&", " and ")))
+    """A company's name as compared: lower case, accents folded, "&" as "and", no punctuation
+    and no legal suffix, so "Acme Energy Ltd." and "ACME energy" are the same company. A name
+    in a script without Latin letters gives ""."""
+    folded = unicodedata.normalize("NFKD", name.lower()).encode("ascii", "ignore").decode()
+    text = " ".join(re.findall(r"[a-z0-9]+", folded.replace("&", " and ")))
     while True:
         shorter = _SUFFIXES.sub("", text).strip()
         if shorter == text or not shorter:

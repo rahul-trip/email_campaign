@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from outbound.db.models import CompanyRow, DiscoveryCandidateRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
-from outbound.domain.discovery import QUALIFIED, SourceYield
+from outbound.domain.discovery import QUALIFIED, SourceYield, name_key
 from outbound.domain.entities import DiscoveryCandidate
 from outbound.domain.enums import CandidateVerdict
 
@@ -92,12 +92,17 @@ class CandidateRepository(ScopedRepository):
         return [snapshot(row, DiscoveryCandidate) for row in self._session.scalars(stmt)]
 
     def known_keys(self, campaign_id: str) -> set[str]:
-        """The companies already screened for this campaign, by name key."""
-        stmt = select(DiscoveryCandidateRow.name_key).where(
+        """The companies already screened for this campaign: each one's key (its website, or
+        its name key without one) and its name key, so a later mention of it without a
+        website is recognised too."""
+        stmt = select(DiscoveryCandidateRow.name_key, DiscoveryCandidateRow.name).where(
             DiscoveryCandidateRow.workspace_id == self._workspace_id,
             DiscoveryCandidateRow.campaign_id == campaign_id,
         )
-        return set(self._session.scalars(stmt))
+        keys: set[str] = set()
+        for key, name in self._session.execute(stmt):
+            keys |= {key, name_key(name)} - {""}
+        return keys
 
     def read_urls(self, campaign_id: str) -> set[str]:
         """Every page a candidate of this campaign was found on, so it is not read again."""

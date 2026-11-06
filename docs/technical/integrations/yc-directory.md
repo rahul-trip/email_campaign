@@ -29,8 +29,8 @@ applies_to: Phase 6 follow-up (discovery)
 
 Each company with `status` *Active* or *Public* is a candidate. It is kept when:
 
-- every word of a brief keyword appears in its `one_liner`, `long_description`, `subindustry`, `tags` or `industries` (a match of the whole phrase counts double);
-- a brief region appears in `all_locations` or `regions`;
+- every word of a brief keyword appears (as a word, not inside another: *ai* is not in *maintain*) in its `one_liner`, `long_description`, `subindustry`, `tags` or `industries` (a match of the whole phrase counts double);
+- a brief region appears as whole words in `all_locations` or `regions`, or by a common name (*UK* → *United Kingdom*, *US* → *United States*, *EU* → *Europe*), so *US* never matches *Russia*;
 - its batch year (`Winter 2022` or `W22`) is not before the brief's *founded after*.
 
 The best matches come first. A match becomes `CompanyMention(name, domain=registrable_domain(website), description=one_liner + long_description, tags, country=regions[0], founded=batch year, size=team_size, stage, source="yc_directory", source_url=url, evidence="Y Combinator <batch>: <one_liner>")`.

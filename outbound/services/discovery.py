@@ -260,20 +260,36 @@ def _usable_domain(value: str) -> str | None:
 
 
 def merge(mentions: Iterable[CompanyMention]) -> list[Found]:
-    """One entry per company: the same website, or failing that the same name, is the same
-    company. The longest description is kept; every source, page and piece of evidence too."""
-    by_key: dict[str, Found] = {}
-    by_domain: dict[str, str] = {}
+    """One entry per company. The same website is the same company, and two websites are two
+    companies even with the same name ("Home", "Nova"). A mention without a website joins the
+    company of that name when there is just one, else it stands alone under its name. The key
+    is the website when known (it has a dot, which a name key never has), else the name key.
+    The longest description is kept; every source, page and piece of evidence too."""
+    found_all: list[Found] = []
+    by_domain: dict[str, Found] = {}
+    by_name: dict[str, list[Found]] = {}
     for m in mentions:
-        key = name_key(m.name)
-        if not key:
-            continue
+        name = name_key(m.name)
         domain = _usable_domain(m.domain or "")
-        key = by_domain.get(domain, key) if domain else key
-        found = by_key.setdefault(key, Found(key=key, name=m.name))
-        if domain and not found.domain:
-            found.domain = domain
-            by_domain[domain] = key
+        named = by_name.get(name, []) if name else []
+        if domain:
+            found = by_domain.get(domain) or next((f for f in named if not f.domain), None)
+            if found is None:
+                found = Found(key=domain, name=m.name)
+                found_all.append(found)
+            if not found.domain:  # a name found earlier without a website: now it has one
+                found.domain, found.key = domain, domain
+            by_domain[domain] = found
+        elif not name:
+            continue  # no name to compare and no website
+        elif len(named) == 1:
+            found = named[0]
+        else:
+            found = next((f for f in named if not f.domain), None) or Found(key=name, name=m.name)
+            if found not in found_all:
+                found_all.append(found)
+        if name and found not in by_name.setdefault(name, []):
+            by_name[name].append(found)
         if len(m.description) > len(found.description):
             found.description = m.description
         if m.evidence and m.evidence not in found.evidence:
@@ -282,7 +298,7 @@ def merge(mentions: Iterable[CompanyMention]) -> list[Found]:
             found.sources.append(m.source)
         if m.source_url and m.source_url not in found.source_urls:
             found.source_urls.append(m.source_url)
-    return list(by_key.values())
+    return found_all
 
 
 def screen(llm: LlmClient | None, brief: Brief, found: Sequence[Found]) -> dict[str, Screening]:
@@ -467,7 +483,13 @@ class Discoverer:
             fresh = {name_key(m.name) for m in mentions} - known_keys
             if len(fresh) >= count * ENOUGH:
                 break
-            got = source.find(SourceQuery(text=planned.q), limit=PER_SOURCE * 2)
+            try:
+                got = source.find(SourceQuery(text=planned.q), limit=PER_SOURCE * 2)
+            except ProviderError as error:
+                # A failed or capped web search costs this search only, not the run: the other
+                # sources' companies are still screened and the run goes on to existing leads.
+                log.warning("discovery_search_failed", source=ARTICLES, reason=str(error)[:200])
+                got = []
             made += 1
             mentions = [*mentions, *got]
             self._record(campaign, run_id, source=ARTICLES, query=planned.q,
@@ -519,7 +541,11 @@ class Discoverer:
     def _website(self, name: str) -> str | None:
         if self.resolve is None:
             return None
-        domain, confidence = self.resolve(name)
+        try:
+            domain, confidence = self.resolve(name)
+        except ProviderError as error:
+            log.warning("discovery_website_failed", reason=str(error)[:200])
+            return None
         if not domain or (confidence or 0) < MIN_CONFIDENCE:
             return None
         return domain

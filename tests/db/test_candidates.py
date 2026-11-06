@@ -130,3 +130,17 @@ def test_each_source_is_credited_with_what_it_found_and_how_much_of_it_qualified
         assert uow.companies.qualified_domains(cid, 5) == ["good.io"]
     with factory(other_ws) as uow:
         assert uow.candidates.source_yield(since=utcnow() - timedelta(days=90)) == {}
+
+
+def test_a_company_kept_by_its_website_is_also_known_by_its_name(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = _campaign(factory, ws)
+    with factory(ws) as uow:
+        uow.candidates.add(
+            campaign_id=cid, run_id=None, name="Gridcast Ltd", name_key="gridcast.io",
+            domain="gridcast.io", verdict=CandidateVerdict.REJECTED,
+        )  # fmt: skip
+        uow.commit()
+    with factory(ws) as uow:
+        assert uow.candidates.known_keys(cid) == {"gridcast.io", "gridcast"}
