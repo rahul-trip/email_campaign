@@ -169,6 +169,9 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/runs` | login | — | 200 `list[RunOut]` (the 20 most recent) | — | `RunService.recent` |
 | `GET /api/runs/{run_id}` | login | — | 200 `RunOut` (live cost while running) | — | `RunService.get` |
 | `POST /api/runs/{run_id}/cancel` | login + CSRF | — | 200 `RunOut` | — | `RunService.cancel` |
+| `GET /api/runs/{run_id}/searches` | login (`runs.read`) | — | 200 `list[DiscoverySearchOut {query, new_leads, already_leads, source, angle, found, pages[]}]` | 404 | `RunService.searches` |
+| `GET /api/runs/{run_id}/candidates` | login (`runs.read`) | — | 200 `list[CandidateOut {id, run_id, name, domain, sources[], source_urls[], description, evidence, screen_score, rank_score, verdict, reason, company_id}]`, best ranked first | 404 | `CandidateService.for_run` |
+| `POST /api/candidates/{candidate_id}/promote` | login + CSRF (`leads.write`) | `PromoteIn {domain?}` | 200 `CandidateOut` (`accepted`, with `company_id`) | 404; 422 already a lead, no website known and none given, or intake refused it | `CandidateService.promote` |
 | `GET /api/status` | login | — | 200 `StatusOut` (counts by status, review queue, holds) | — | `ReportService.status` |
 | `GET /api/reports/quality` | login | — | 200 `QualityOut` | — | `ReportService.quality` |
 | `GET /api/reports/cost` | login | query `days` 1–365 (30) | 200 `CostOut` | — | `ReportService.cost` |

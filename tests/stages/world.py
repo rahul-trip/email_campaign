@@ -10,7 +10,7 @@ from outbound.providers.ports import (
     VerificationResult,
     VerificationStatus,
 )
-from tests.stages.fakes import FakeLlm, FakeMailbox, FakeRegistry, FakeSearch
+from tests.stages.fakes import FakeDirectory, FakeLlm, FakeMailbox, FakeRegistry, FakeSearch
 
 PROFILE = {
     "reviewed_at": "2026-10-18T00:00:00+00:00",
@@ -79,6 +79,7 @@ class World:
         self.verifier = AllValid()
         self.mailbox = FakeMailbox()
         self.registry = FakeRegistry([])
+        self.directory = FakeDirectory()  # a company source, standing in for the YC directory
 
     def providers(self) -> Providers:
         return Providers(
@@ -88,4 +89,5 @@ class World:
             verifier=self.verifier,
             registry=self.registry,
             mailbox=self.mailbox,
+            company_sources=[self.directory],
         )

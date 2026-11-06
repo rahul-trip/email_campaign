@@ -86,9 +86,15 @@ class RunStep:
 
 @dataclass(frozen=True)
 class DiscoverySearch:
+    """One place a discovery run looked: a directory, or a web search for list pages."""
+
     query: str
     new_leads: int
     already_leads: int
+    source: str = "articles"
+    angle: str = ""
+    found: int = 0  # companies it named
+    pages: tuple[str, ...] = ()  # the list pages read
 
 
 class RunService:
@@ -167,7 +173,7 @@ class RunService:
             return uow.calls.summary_for_run(run_id)
 
     def searches(self, run_id: str) -> list[DiscoverySearch]:
-        """The web searches a run made to find new companies, with what each one found."""
+        """Where a run looked for new companies, with what each place found."""
         with self._uow(self._workspace_id) as uow:
             uow.runs.get(run_id)  # NotFound for an unknown run or another workspace's
             return [
@@ -175,6 +181,10 @@ class RunService:
                     str(e.data.get("query", "")),
                     int(e.data.get("new", 0)),
                     int(e.data.get("already_leads", 0)),
+                    source=str(e.data.get("source", "articles")),
+                    angle=str(e.data.get("angle", "")),
+                    found=int(e.data.get("found", 0)),
+                    pages=tuple(str(u) for u in e.data.get("pages") or []),
                 )
                 for e in uow.events.for_run(run_id, ("discovery_query",))
             ]

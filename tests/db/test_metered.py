@@ -12,6 +12,7 @@ from outbound.metering.budget import BudgetPolicy
 from outbound.metering.metered import (
     Meter,
     MeteredFinder,
+    MeteredLeadSource,
     MeteredLlm,
     MeteredResolver,
     MeteredSearch,
@@ -21,6 +22,7 @@ from outbound.metering.metered import (
 )
 from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.ports import (
+    CompanyMention,
     FinderResult,
     LlmResult,
     PageText,
@@ -29,6 +31,7 @@ from outbound.providers.ports import (
     ResolutionStatus,
     ResolutionTicket,
     SearchHit,
+    SourceQuery,
     VerificationResult,
     VerificationStatus,
 )
@@ -444,3 +447,32 @@ def test_a_deterministic_task_can_opt_into_caching(factory: UnitOfWorkFactory, w
 def test_the_llm_cost_helper_rounds_up() -> None:
     assert llm_cost({"m": (1, 1)}, "m", 1, 0) == 1
     assert llm_cost({"m": (1_000_000, 0)}, "m", 3, 0) == 3
+
+
+class FakeSource:
+    name = "yc_directory"
+
+    def __init__(self) -> None:
+        self.asked = 0
+
+    def find(self, query: SourceQuery, *, limit: int) -> list[CompanyMention]:
+        self.asked += 1
+        return [CompanyMention(name="Gridcast", domain="gridcast.io", source=self.name)][:limit]
+
+
+def test_a_company_source_is_cached_by_its_query_and_logged(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    inner = FakeSource()
+    source = MeteredLeadSource(inner, meter(factory, ws))
+    query = SourceQuery(keywords=("grid",), regions=("Europe",))
+    assert source.find(query, limit=5)[0].domain == "gridcast.io"
+    assert source.find(SourceQuery(keywords=("grid",), regions=("Europe",)), limit=5)
+    assert inner.asked == 1
+    source.find(query, limit=10)  # asking for more is a different request
+    assert inner.asked == 2
+    assert [(op, outcome) for op, outcome, _ in ledger(factory, ws)] == [
+        ("find", CallOutcome.HIT),
+        ("find", CallOutcome.CACHE_HIT),
+        ("find", CallOutcome.HIT),
+    ]

@@ -509,6 +509,30 @@ CREATE TABLE credit_grants (              -- extra credits for one step
   revoked_at TIMESTAMP, note TEXT NOT NULL DEFAULT '', granted_by TEXT
 );
 
+-- Every company discovery found for a campaign, and what it decided (migration 0019). One row
+-- per company per campaign, so nothing is screened twice. outbound_app may SELECT, INSERT and
+-- UPDATE (a later run or a person promotes one). company_id and run_id are plain ids, not foreign
+-- keys: deleting a lead leaves the record of finding it.
+CREATE TABLE discovery_candidates (
+  campaign_id   TEXT NOT NULL,
+  run_id        TEXT,                    -- the run that last decided it
+  name          TEXT NOT NULL,
+  name_key      TEXT NOT NULL,           -- domain.discovery.name_key: no case, punctuation or legal suffix
+  domain        TEXT,                    -- NULL until known
+  sources       JSON NOT NULL,           -- e.g. ["yc_directory","articles"]
+  source_urls   JSON NOT NULL,           -- the directory page or list pages it was named on
+  description   TEXT NOT NULL,
+  evidence      TEXT NOT NULL,           -- what the sources said about it
+  screen_score  INTEGER,                 -- 0-100 from screening; NULL when screened by words or not at all
+  rank_score    INTEGER,
+  verdict       TEXT NOT NULL CHECK (verdict IN ('accepted','rejected','unresolved','already_lead','over_limit')),
+  reason        TEXT NOT NULL,
+  company_id    TEXT,                    -- the lead it became
+  UNIQUE (workspace_id, campaign_id, name_key),
+  FOREIGN KEY (workspace_id, campaign_id) REFERENCES campaigns (workspace_id, id)
+);
+CREATE INDEX ix_discovery_candidates_run ON discovery_candidates (workspace_id, run_id);
+
 -- One row per charge. outbound_app may SELECT and INSERT only. company_id is deliberately not a
 -- foreign key: deleting a lead must not give its credits back.
 CREATE TABLE usage_events (

@@ -43,6 +43,7 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | `SearchProvider` | `search(query, max_results=5)`, `extract(urls)` | `list[SearchHit]`, `list[PageText]` |
 | `LlmClient` | `complete(system, user, json_mode, temperature, max_tokens)`; attributes `name`, `model` | `LlmResult` (text, token counts) |
 | `CompanyRegistry` | `search(company_name, max_results=5)` | `list[RegistryEntry]` |
+| `LeadSource` | `find(SourceQuery, limit)` | `list[CompanyMention]` (name, domain if known, description, source, source page, evidence) |
 | `Mailbox` | `append_draft(OutgoingDraft)`, `draft_exists(id)`, `delete_draft(id)`, `list_sent(since)`, `list_inbox(since)`; attribute `address` | Remote draft id, bool, count, `list[SentMessage]`, `list[InboundMessage]` |
 
 ### Adapters
@@ -57,6 +58,7 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | Enrichley | `outbound/providers/adapters/enrichley.py::EnrichleyResolver` | `CatchAllResolver` (answers at once) | [enrichley](../integrations/enrichley.md) |
 | Scrubby | `outbound/providers/adapters/scrubby.py::ScrubbyResolver` | `CatchAllResolver` (asynchronous) | [scrubby](../integrations/scrubby.md) |
 | Companies House | `outbound/providers/adapters/companies_house.py::CompaniesHouse` | `CompanyRegistry` | [companies-house](../integrations/companies-house.md) |
+| Y Combinator directory | `outbound/providers/adapters/yc_directory.py::YcDirectory` | `LeadSource` | [yc-directory](../integrations/yc-directory.md) |
 | Any OpenAI-compatible chat API | `outbound/providers/adapters/llm.py::OpenAiCompatibleLlm` | `LlmClient` | [llm](../integrations/llm.md) |
 | IMAP | `outbound/providers/adapters/imap_mailbox.py::ImapMailbox` | `Mailbox` | [imap-mailbox](../integrations/imap-mailbox.md) |
 

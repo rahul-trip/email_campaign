@@ -194,6 +194,16 @@ class MailboxStatus(StrEnum):
     NEEDS_RECONNECT = "needs_reconnect"  # access expired or was revoked: sign in again
 
 
+class CandidateVerdict(StrEnum):
+    """What discovery decided about a company it found (``discovery_candidates.verdict``)."""
+
+    ACCEPTED = "accepted"  # added as a lead
+    REJECTED = "rejected"  # screened out: it does not fit the brief
+    UNRESOLVED = "unresolved"  # it fits, but its website could not be found with confidence
+    ALREADY_LEAD = "already_lead"  # the workspace has it already
+    OVER_LIMIT = "over_limit"  # it fits, but the run had found enough (or credits ran out)
+
+
 class UsageStep(StrEnum):
     """What a plan limits and a customer is charged for, once per lead (Phase 6d)."""
 

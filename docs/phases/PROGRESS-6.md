@@ -72,6 +72,21 @@ Built:
 
 **Left:** an email to admins about a new request (only the bell today); transferring or sharing the creator's role is just making another admin; a person cannot cancel their own request; no limit on how many workspaces one person may create.
 
+## Discovery and qualification (2026-11-06)
+
+Branches `phase-6/discovery-brief` (migration 0018), `phase-6/discovery-sources` (migration 0019) and the later ones in the plan. Discovery used to make one web search and add every new domain as a lead, scoring fit only after full research. It now works from a brief and screens before adding ([ADR 0031](../technical/adr/0031-multi-source-discovery-screened-before-intake.md)).
+
+Built:
+- **The brief.** Each campaign has an editable ideal-customer brief (`campaigns.icp_brief`). A model drafts it from the campaign and the sender profile, and the operator edits it on the Campaigns page under **Who we look for**.
+- **Sources.** Discovery looks in the Y Combinator directory (a public mirror, free) when the brief is after start-ups. It also searches for pages that list many companies like the wanted ones and reads them with a model.
+- **Screening.** Everything found is merged, screened against the brief in batches, and only fits become leads. Every company is kept with its verdict (`discovery_candidates`) and shown on the run's page, and **Make a lead** promotes one.
+
+**Left:**
+- Detailed, criterion-by-criterion qualification in research (next).
+- Companies House advanced search and a lookalike source.
+- Weighting sources by how many of their leads qualify.
+- A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

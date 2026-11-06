@@ -15,6 +15,7 @@ Every outside system Outbound depends on: what it is for, how it is reached, wha
 | Vendor | Role | Port | Registry name | Settings | Cache (TTL) | Live check (2026-10-19) | Page |
 |---|---|---|---|---|---|---|---|
 | Tavily | Search, page extraction, discovery, LinkedIn-title search | `SearchProvider` | — (always Tavily) | `TAVILY_API_KEY` | `search`, `extract` (30 days) | Works, including `site:` search and extract | [tavily](tavily.md) |
+| Y Combinator directory | Start-up directory for discovery (public yc-oss mirror) | `LeadSource` | — (always on) | none | the directory in memory for a day; `find` (30 days) | Not yet | [yc-directory](yc-directory.md) |
 | Hunter | Finder and verifier | `EmailFinder`, `EmailVerifier` | `hunter` | `HUNTER_API_KEY` | `find`, `verify` (90 days) | Verifier works | [hunter](hunter.md) |
 | ZeroBounce | Finder and verifier | `EmailFinder`, `EmailVerifier` | `zerobounce` | `ZEROBOUNCE_API_KEY` | `find`, `verify` (90 days) | Verifier works | [zerobounce](zerobounce.md) |
 | MyEmailVerifier | Verifier (the default) | `EmailVerifier` | `myemailverifier` | `MYEMAILVERIFIER_API_KEY` | `verify` (90 days) | Works | [myemailverifier](myemailverifier.md) |

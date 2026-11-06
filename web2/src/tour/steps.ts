@@ -108,12 +108,12 @@ export const SECTIONS: Section[] = [
       {
         target: "start-run",
         title: "Start the engine",
-        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies, from a new angle each run, so it keeps finding ones you do not have yet. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
+        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also looks for new companies: in start-up directories such as Y Combinator when your campaign is after start-ups, and in pages that list many companies like the ones in its brief. It screens every company it finds against the brief and adds only those that fit, taking new angles each run. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
       },
       {
         target: "recent-runs",
         title: "Watch it work",
-        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, the searches it made, what each vendor cost, and every lead it touched; click a lead to go to it.",
+        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, where it looked, every company it found with why it was or was not added (Make a lead adds one the screening left out), what each vendor cost, and every lead it touched; click a lead to go to it.",
       },
     ],
   },

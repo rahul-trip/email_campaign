@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
+    CandidateOut,
     CostOut,
     DiscoverySearchOut,
+    PromoteIn,
     QualityOut,
     RunCallOut,
     RunIn,
@@ -82,6 +84,28 @@ def run_searches(
 ) -> list[DiscoverySearchOut]:
     """The searches a run made to find new companies, and what each found."""
     return [DiscoverySearchOut.model_validate(x) for x in svc.runs.searches(run_id)]
+
+
+@router.get(
+    "/runs/{run_id}/candidates",
+    response_model=list[CandidateOut],
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
+def run_candidates(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[CandidateOut]:
+    """Every company the run found, best ranked first, with what it decided about each."""
+    return [CandidateOut.model_validate(c) for c in svc.candidates.for_run(run_id)]
+
+
+@router.post(
+    "/candidates/{candidate_id}/promote",
+    response_model=CandidateOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def promote_candidate(
+    candidate_id: str, body: PromoteIn, svc: Annotated[Services, Depends(services)]
+) -> CandidateOut:
+    """Add a company the run found, but did not add, as a lead."""
+    return CandidateOut.model_validate(svc.candidates.promote(candidate_id, body.domain))
 
 
 @router.post(

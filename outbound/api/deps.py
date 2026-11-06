@@ -28,6 +28,7 @@ from outbound.domain.permissions import READ, Permission, Principal, can
 from outbound.logging import bind, get_logger
 from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.providers.registry import build_oauth_apps
+from outbound.services.candidates import CandidateService
 from outbound.services.directory import LeadDirectory
 from outbound.services.identity import CurrentUser, IdentityService
 from outbound.services.intake import IntakeService
@@ -57,6 +58,7 @@ class Services:
     review: ReviewService
     leads: LeadService
     runs: RunService
+    candidates: CandidateService
     settings: SettingsService
     reports: ReportService
     webhook: WebhookService
@@ -91,6 +93,7 @@ def build_services(
         review=ReviewService(uow, workspace_id, writer, actor=actor),
         leads=LeadService(uow, workspace_id, actor=actor, search=search),
         runs=RunService(uow, workspace_id),
+        candidates=CandidateService(uow, workspace_id, intake, actor=actor),
         settings=settings_service or SettingsService(uow, workspace_id, actor=actor, llm=writer),
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),

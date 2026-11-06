@@ -27,10 +27,12 @@ from outbound.metering.budget import BudgetPolicy, check_budget
 from outbound.providers.errors import BudgetExceeded
 from outbound.providers.ports import (
     CatchAllResolver,
+    CompanyMention,
     CompanyRegistry,
     EmailFinder,
     EmailVerifier,
     FinderResult,
+    LeadSource,
     LlmClient,
     LlmResult,
     PageText,
@@ -40,6 +42,7 @@ from outbound.providers.ports import (
     ResolutionTicket,
     SearchHit,
     SearchProvider,
+    SourceQuery,
     VerificationResult,
 )
 from outbound.providers.pricing import DEFAULT_LLM_PRICES, DEFAULT_PRICES, llm_cost, price_of
@@ -438,6 +441,29 @@ class MeteredSearch:
             run=lambda: self._inner.extract(urls),
             encode=lambda pages: {"items": [p.model_dump(mode="json") for p in pages]},
             decode=lambda stored: [PageText.model_validate(i) for i in stored["items"]],
+            found=bool,
+            ttl=self._ttl,
+        )
+
+
+class MeteredLeadSource:
+    """A company directory or index, cached per query like a search (a directory changes
+    slowly; a new run with the same brief asks the same question)."""
+
+    def __init__(self, inner: LeadSource, meter: Meter, *, ttl: timedelta = SEARCH_TTL) -> None:
+        self._inner = inner
+        self._meter = meter
+        self._ttl = ttl
+        self.name = inner.name
+
+    def find(self, query: SourceQuery, *, limit: int) -> list[CompanyMention]:
+        return self._meter.call(
+            provider=self.name,
+            operation="find",
+            request={**query.model_dump(mode="json"), "limit": limit},
+            run=lambda: self._inner.find(query, limit=limit),
+            encode=lambda found: {"items": [m.model_dump(mode="json") for m in found]},
+            decode=lambda stored: [CompanyMention.model_validate(i) for i in stored["items"]],
             found=bool,
             ttl=self._ttl,
         )

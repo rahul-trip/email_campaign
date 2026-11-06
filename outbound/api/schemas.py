@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from outbound.domain.enums import (
+    CandidateVerdict,
     CompanyStatus,
     ConsentBasis,
     HoldReason,
@@ -615,6 +616,30 @@ class DiscoverySearchOut(Out):
     query: str
     new_leads: int
     already_leads: int
+    source: str
+    angle: str
+    found: int
+    pages: list[str]
+
+
+class CandidateOut(Out):
+    id: str
+    run_id: str | None
+    name: str
+    domain: str | None
+    sources: list[str]
+    source_urls: list[str]
+    description: str
+    evidence: str
+    screen_score: int | None
+    rank_score: int | None
+    verdict: CandidateVerdict
+    reason: str
+    company_id: str | None
+
+
+class PromoteIn(In):
+    domain: str | None = Field(default=None, max_length=255)
 
 
 class RunCallOut(Out):

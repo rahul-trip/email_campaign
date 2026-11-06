@@ -1,15 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Callout, Card, Empty, PageHeader, Problem, QueryState, Skeleton, Stat, Table, Td, Th, buttonClass } from "../components/ui";
+import { Button, Callout, Card, Empty, Input, PageHeader, Problem, QueryState, Skeleton, Stat, Table, Td, Th, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, duration, usd, when, words } from "../lib/format";
 import { OUTCOME_LABEL, STAGES, STAGE_LABEL, countsOf, discoveryLine, totalsOf } from "../lib/runs";
-import { describe, leadStatus, runStatus } from "../lib/status";
+import { candidateVerdict, describe, discoverySource, leadStatus, runStatus } from "../lib/status";
 
 type Lead = Schemas["RunLeadOut"];
+type Candidate = Schemas["CandidateOut"];
 
 const OUTCOME: Record<string, { label: string; tone: string }> = {
   moved: { label: "Moved on", tone: "bg-good-container text-on-good-container" },
@@ -43,6 +45,11 @@ export function RunDetailPage() {
   const searches = useQuery({
     queryKey: ["run-searches", runId],
     queryFn: () => ok(client.GET("/api/runs/{run_id}/searches", path)),
+    refetchInterval: live ? 3000 : false,
+  });
+  const candidates = useQuery({
+    queryKey: ["run-candidates", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}/candidates", path)),
     refetchInterval: live ? 3000 : false,
   });
 
@@ -131,18 +138,55 @@ export function RunDetailPage() {
       </Card>
 
       {(searches.data?.length ?? 0) > 0 && (
-        <Card tour="run-searches" title="What it searched for" subtitle="Each run looks from a new angle, so it finds companies the earlier ones did not." className="mb-5">
+        <Card tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
           <ul className="divide-y divide-line text-[13px]">
             {searches.data!.map((q, i) => (
-              <li key={i} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5">
-                <span className="min-w-0 flex-1">{q.query}</span>
-                <span className="whitespace-nowrap text-xs text-muted">
-                  <strong className={cx("font-semibold", q.new_leads > 0 ? "text-good" : "text-muted")}>{q.new_leads} new</strong>
-                  {q.already_leads > 0 && ` · ${q.already_leads} already yours`}
-                </span>
+              <li key={i} className="py-1.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="mr-2 text-xs font-medium text-muted">{discoverySource[q.source] ?? words(q.source)}</span>
+                    {q.query}
+                    {q.angle && <span className="ml-2 text-xs text-muted">({q.angle})</span>}
+                  </span>
+                  <span className="whitespace-nowrap text-xs text-muted">
+                    <strong className={cx("font-semibold", q.found > 0 ? "text-ink" : "text-muted")}>{q.found} found</strong>
+                  </span>
+                </div>
+                {q.pages.length > 0 && (
+                  <ul className="mt-0.5 space-y-0.5 pl-4 text-xs text-muted">
+                    {q.pages.map((url) => (
+                      <li key={url} className="truncate">
+                        <a href={url} target="_blank" rel="noreferrer" className="hover:underline">
+                          {url}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {(candidates.data?.length ?? 0) > 0 && (
+        <Card tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Company</Th>
+                <Th>Found in</Th>
+                <Th className="text-right">Fit</Th>
+                <Th>Decision</Th>
+                <Th />
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.data!.map((c) => (
+                <CandidateRow key={c.id} candidate={c} runId={runId} />
+              ))}
+            </tbody>
+          </Table>
         </Card>
       )}
 
@@ -261,6 +305,51 @@ function LeadRow({ lead }: { lead: Lead }) {
             Journey
           </Link>
         </div>
+      </Td>
+    </tr>
+  );
+}
+
+function CandidateRow({ candidate: c, runId }: { candidate: Candidate; runId: string }) {
+  const queryClient = useQueryClient();
+  const [domain, setDomain] = useState("");
+  const promote = useMutation({
+    mutationFn: () =>
+      ok(client.POST("/api/candidates/{candidate_id}/promote", { params: { path: { candidate_id: c.id } }, body: { domain: domain.trim() || null } })),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["run-candidates", runId] }),
+  });
+  const canPromote = c.verdict !== "accepted" && c.verdict !== "already_lead";
+  return (
+    <tr>
+      <Td>
+        <div className="font-medium">
+          {c.company_id ? (
+            <Link to="/leads/$companyId" params={{ companyId: c.company_id }} className="hover:underline">
+              {c.name}
+            </Link>
+          ) : (
+            c.name
+          )}
+          {c.domain && <span className="ml-2 font-mono text-xs text-muted">{c.domain}</span>}
+        </div>
+        {(c.evidence || c.description) && <p className="mt-0.5 line-clamp-2 max-w-xl text-xs text-muted">{c.evidence || c.description}</p>}
+      </Td>
+      <Td className="text-xs text-muted">{c.sources.map((src) => discoverySource[src] ?? words(src)).join(", ")}</Td>
+      <Td className="text-right font-mono text-xs">{c.screen_score ?? "–"}</Td>
+      <Td>
+        <StatusBadge status={describe(candidateVerdict, c.verdict)} title={c.reason} />
+        {c.reason && <p className="mt-0.5 max-w-xs text-xs text-muted">{c.reason}</p>}
+      </Td>
+      <Td className="text-right">
+        {canPromote && (
+          <div className="flex items-center justify-end gap-2">
+            {!c.domain && <Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="website.com" aria-label={`${c.name}'s website`} className="w-36" />}
+            <Button size="sm" variant="secondary" busy={promote.isPending} disabled={!c.domain && !domain.trim()} onClick={() => promote.mutate()}>
+              Make a lead
+            </Button>
+          </div>
+        )}
+        {promote.error && <Problem error={promote.error} className="mt-1" />}
       </Td>
     </tr>
   );

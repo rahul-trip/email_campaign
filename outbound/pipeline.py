@@ -16,11 +16,7 @@ from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Workspace
 from outbound.domain.enums import (
-    CompanySource,
     CompanyStatus,
-    EntityType,
-    ImportRowStatus,
-    ImportSource,
     UsageStep,
 )
 from outbound.domain.errors import ConfigurationError
@@ -29,6 +25,7 @@ from outbound.metering.budget import BudgetPolicy
 from outbound.metering.metered import (
     Meter,
     MeteredFinder,
+    MeteredLeadSource,
     MeteredLlm,
     MeteredRegistry,
     MeteredResolver,
@@ -41,6 +38,7 @@ from outbound.providers.ports import (
     CompanyRegistry,
     EmailFinder,
     EmailVerifier,
+    LeadSource,
     LlmClient,
     Mailbox,
     SearchProvider,
@@ -48,6 +46,7 @@ from outbound.providers.ports import (
 from outbound.providers.pricing import DEFAULT_LLM_PRICES, DEFAULT_PRICES
 from outbound.providers.registry import (
     build_company_registry,
+    build_company_sources,
     build_finder_chain,
     build_llm,
     build_oauth_apps,
@@ -58,9 +57,9 @@ from outbound.providers.registry import (
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
-from outbound.services.discovery import HISTORY, plan_queries
+from outbound.services.discovery import Discoverer, Discovery, domain_resolver
 from outbound.services.inbox import InboxSync
-from outbound.services.intake import IntakeService, discover_candidates, discovery_query
+from outbound.services.intake import IntakeService
 from outbound.services.privacy import PrivacyService
 from outbound.services.resume import ResumeService
 from outbound.services.review import ReviewService
@@ -95,6 +94,8 @@ class Providers:
     # uses the mailboxes it connected (``StoredMailboxes``).
     mailbox: Mailbox | None = None
     copy_llm: LlmClient | None = None  # the writer's model; None means ``llm``
+    # Where discovery looks besides web search: directories such as Y Combinator's.
+    company_sources: list[LeadSource] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -106,7 +107,8 @@ class Pipeline:
     intake: IntakeService
     meter: Meter
     search: SearchProvider
-    llm: LlmClient | None = None  # plans discovery searches; behind the meter
+    llm: LlmClient | None = None  # plans and screens discovery; behind the meter
+    company_sources: list[LeadSource] = field(default_factory=list)  # behind the meter
     stage_names: list[str] = field(default_factory=list)
     has_mailbox: bool = False
 
@@ -134,6 +136,7 @@ def real_providers(settings: Settings) -> Providers:
             copy_llm=build_llm(settings, model=settings.llm_copy_model)
             if settings.llm_copy_model
             else None,
+            company_sources=build_company_sources(settings),
         )
     except ProviderError as error:
         raise NotConfigured(str(error)) from None
@@ -214,6 +217,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         meter=meter,
         search=search,
         llm=llm,
+        company_sources=[MeteredLeadSource(s, meter) for s in providers.company_sources],
         stage_names=[stage.name for stage in stages],
         has_mailbox=has_mailbox,
     )
@@ -282,16 +286,6 @@ def _skip_directory(container: Container, workspace_id: str, limit: int) -> None
         uow.commit()
 
 
-@dataclass(frozen=True)
-class Discovery:
-    added: int = 0
-    already_leads: int = 0
-    searches: int = 0
-
-
-MAX_SEARCHES = 4  # per run: enough angles to find new companies, not a runaway bill
-
-
 def discover_companies(
     pipeline: Pipeline,
     container: Container,
@@ -301,16 +295,14 @@ def discover_companies(
     *,
     run_id: str | None = None,
 ) -> Discovery:
-    """Search the web for companies that fit the campaign and add them as discovered targets.
-
-    Every run looks from new angles (see ``services.discovery``), skipping companies the
-    workspace already has, until ``count`` new ones are found or the searches are used up."""
+    """Find companies that fit the campaign in every source that suits its brief, screen
+    them, and add up to ``count`` of the best as discovered targets (``services.discovery``)."""
     with container.uow(workspace_id) as uow:
         campaign = uow.campaigns.by_name(campaign_name)
         workspace = uow.workspace()
     if campaign is None:
         raise LookupError(f"no campaign named {campaign_name!r}")
-    if not (campaign.icp_description or "").strip():
+    if not (campaign.icp_description or "").strip() and not campaign.icp_brief:
         raise ValueError(
             f"describe the ideal customer on the {campaign_name!r} campaign first: "
             "discovery searches for companies that fit it"
@@ -326,48 +318,15 @@ def discover_companies(
     if count <= 0:
         log.info("discovery_skipped", reason="no discovery credit left")
         return Discovery()
-    with container.uow(workspace_id) as uow:
-        known = uow.companies.known_domains()
-        earlier = uow.events.latest(
-            EntityType.WORKSPACE, workspace_id, "discovery_query", HISTORY * 2
-        )
-    used = [
-        str(e.data.get("query", "")) for e in earlier if e.data.get("campaign") == campaign.name
-    ]
-    queries = plan_queries(
+    return Discoverer(
+        uow=container.uow,
+        workspace_id=workspace_id,
+        intake=pipeline.intake,
+        search=pipeline.search,
         llm=pipeline.llm,
-        base=discovery_query(campaign.icp_description or ""),
-        profile=profile,
-        icp=campaign.icp_description or "",
-        used=used[-HISTORY:],
-        count=MAX_SEARCHES,
-    )
-    added = already = searches = 0
-    for query in queries:
-        if added >= count:
-            break
-        found = discover_candidates(pipeline.search, [query], per_query=count - added, skip=known)
-        searches += 1
-        report = pipeline.intake.run(
-            found.rows,
-            source=ImportSource.CLI,
-            company_source=CompanySource.DISCOVERY,
-            campaign_id=campaign.id,
-        )
-        new = report.count(ImportRowStatus.ACCEPTED)
-        added += new
-        already += found.already_leads
-        known |= {str(row["website"]).lower() for row in found.rows}
-        # Remembered, so the next run takes a different angle; shown on the run's page.
-        with container.uow(workspace_id) as uow:
-            uow.events.append(
-                EntityType.WORKSPACE, workspace_id, "discovery_query", SYSTEM,
-                {"query": query, "campaign": campaign.name, "run_id": run_id,
-                 "new": new, "already_leads": found.already_leads},
-            )  # fmt: skip
-            uow.commit()
-    log.info("discovery_done", asked=count, searches=searches, added=added, already_leads=already)
-    return Discovery(added, already, searches)
+        sources=pipeline.company_sources,
+        resolve=domain_resolver(pipeline.search),
+    ).run(campaign, profile, count, run_id)
 
 
 def writer_or_none(settings: Settings) -> LlmClient | None:

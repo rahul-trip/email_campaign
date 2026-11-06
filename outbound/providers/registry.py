@@ -25,6 +25,7 @@ from outbound.providers.adapters.myemailverifier import MyEmailVerifierVerifier
 from outbound.providers.adapters.orbisearch import OrbiSearchVerifier
 from outbound.providers.adapters.scrubby import ScrubbyResolver
 from outbound.providers.adapters.tavily import TavilySearch
+from outbound.providers.adapters.yc_directory import YcDirectory
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder, ZeroBounceVerifier
 from outbound.providers.errors import ProviderAuthError
 from outbound.providers.oauth import OAuthApp
@@ -33,6 +34,7 @@ from outbound.providers.ports import (
     CompanyRegistry,
     EmailFinder,
     EmailVerifier,
+    LeadSource,
     LlmClient,
     SearchProvider,
     TransactionalEmail,
@@ -184,6 +186,13 @@ def build_company_registry(
     """Companies House, or ``None`` with no key (a UK lead then stays "legal entity unknown")."""
     key = _key(settings.companies_house_api_key)
     return CompaniesHouse(key, client=client) if key else None
+
+
+def build_company_sources(
+    settings: Settings, client: httpx.Client | None = None
+) -> list[LeadSource]:
+    """Where discovery looks besides web search. The Y Combinator directory needs no key."""
+    return [YcDirectory(client=client)]
 
 
 def build_oauth_apps(settings: Settings) -> dict[MailboxGateway, OAuthApp]:

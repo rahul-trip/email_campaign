@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Callable
 from typing import Any, ClassVar
 
 from outbound.providers.ports import (
+    CompanyMention,
     LlmResult,
     PageText,
     RegistryEntry,
     SearchHit,
+    SourceQuery,
 )
 
 GOOD_BODY = (
@@ -49,6 +53,8 @@ class FakeLlm:
         "You check a cold email before it goes": "critic",
         "You plan web searches that find companies": "discovery",
         "You write the brief that says which companies": "brief",
+        "You read one web page that names companies": "extract",
+        "You decide which companies fit": "screen",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
@@ -87,6 +93,8 @@ class FakeLlm:
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
             "news": {"company": [], "market": []},
+            "extract": {"companies": []},
+            "screen": screen_all(80),
             "revise": {"body": REVISED_EMAIL},
             "actor": GOOD_DRAFT,
             "critic": {"grounded": True, "human": True, "problem": ""},
@@ -106,8 +114,46 @@ class FakeLlm:
         self.calls.append(role)
         self.users[role] = user
         reply = self.replies[role]
+        if callable(reply):  # a reply that depends on what was asked
+            reply = reply(user)
         text = reply if isinstance(reply, str) else json.dumps(reply)
         return LlmResult(text=text, provider=self.name, model=self.model)
+
+
+def screen_all(score: int, **by_name: int) -> Callable[[str], dict[str, Any]]:
+    """A screening reply giving every numbered company ``score``, or the score named for it
+    (``Rival=10``); a score under 50 comes with a disqualifier."""
+
+    def reply(user: str) -> dict[str, Any]:
+        out = []
+        for n, name in re.findall(r"^(\d+)\. ([^(\n]+?)(?: \(|\n|$)", user, re.MULTILINE):
+            given = next((v for k, v in by_name.items() if k.lower() in name.lower()), score)
+            out.append(
+                {
+                    "n": int(n),
+                    "score": given,
+                    "matched": ["fits"] if given >= 50 else [],
+                    "disqualified_by": [] if given >= 50 else ["competitor"],
+                    "reason": "fits the brief" if given >= 50 else "a competitor",
+                }
+            )
+        return {"companies": out}
+
+    return reply
+
+
+class FakeDirectory:
+    """A company source (like the YC directory) that names the companies it was given."""
+
+    name = "yc_directory"
+
+    def __init__(self, mentions: list[CompanyMention] | None = None) -> None:
+        self.mentions = mentions or []
+        self.queries: list[SourceQuery] = []
+
+    def find(self, query: SourceQuery, *, limit: int) -> list[CompanyMention]:
+        self.queries.append(query)
+        return self.mentions[:limit]
 
 
 class FakeSearch:

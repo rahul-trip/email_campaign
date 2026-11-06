@@ -20,6 +20,7 @@ from outbound.db.crypto import Keyring
 from outbound.db.errors import ConcurrencyConflict
 from outbound.db.repositories.audit import ProviderCallRepository, RunRepository
 from outbound.db.repositories.base import EventRepository
+from outbound.db.repositories.candidates import CandidateRepository
 from outbound.db.repositories.companies import CompanyRepository
 from outbound.db.repositories.contacts import (
     ConsentRepository,
@@ -79,6 +80,7 @@ class UnitOfWork:
         self.suppressions = SuppressionRepository(*args)
         self.policies = CountryPolicyRepository(*args)
         self.campaigns = CampaignRepository(*args)
+        self.candidates = CandidateRepository(*args)
         self.mailboxes = MailboxRepository(*args)
         self.credentials = CredentialRepository(*args, self._keyring)
         self.usage = UsageRepository(*args)

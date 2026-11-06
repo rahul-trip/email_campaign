@@ -13,6 +13,7 @@ from typing import Any
 from outbound.domain.enums import (
     AuthTokenPurpose,
     CallOutcome,
+    CandidateVerdict,
     CompanySource,
     CompanyStatus,
     ConsentBasis,
@@ -326,3 +327,30 @@ class LoginSession:
     revoked_at: datetime | None
     ip: str | None
     user_agent: str | None
+
+
+@dataclass(frozen=True)
+class DiscoveryCandidate:
+    """A company discovery found for a campaign, and what it decided about it."""
+
+    id: str
+    workspace_id: str
+    campaign_id: str
+    run_id: str | None
+    name: str
+    name_key: str
+    domain: str | None
+    sources: tuple[str, ...]
+    source_urls: tuple[str, ...]
+    description: str
+    evidence: str
+    screen_score: int | None
+    rank_score: int | None
+    verdict: CandidateVerdict
+    reason: str
+    company_id: str | None
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+        object.__setattr__(self, "source_urls", tuple(self.source_urls))

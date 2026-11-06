@@ -924,6 +924,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/candidates/{candidate_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Candidate
+         * @description Add a company the run found, but did not add, as a lead.
+         */
+        post: operations["promote_candidate_api_candidates__candidate_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies": {
         parameters: {
             query?: never;
@@ -1987,6 +2007,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Candidates
+         * @description Every company the run found, best ranked first, with what it decided about each.
+         */
+        get: operations["run_candidates_api_runs__run_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/leads": {
         parameters: {
             query?: never;
@@ -2722,6 +2762,40 @@ export interface components {
             /** Target Titles */
             target_titles?: string[] | null;
         };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Company Id */
+            company_id: string | null;
+            /** Description */
+            description: string;
+            /** Domain */
+            domain: string | null;
+            /** Evidence */
+            evidence: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Rank Score */
+            rank_score: number | null;
+            /** Reason */
+            reason: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Screen Score */
+            screen_score: number | null;
+            /** Source Urls */
+            source_urls: string[];
+            /** Sources */
+            sources: string[];
+            verdict: components["schemas"]["CandidateVerdict"];
+        };
+        /**
+         * CandidateVerdict
+         * @description What discovery decided about a company it found (``discovery_candidates.verdict``).
+         * @enum {string}
+         */
+        CandidateVerdict: "accepted" | "rejected" | "unresolved" | "already_lead" | "over_limit";
         /** ChangePasswordIn */
         ChangePasswordIn: {
             /** Current Password */
@@ -3241,10 +3315,18 @@ export interface components {
         DiscoverySearchOut: {
             /** Already Leads */
             already_leads: number;
+            /** Angle */
+            angle: string;
+            /** Found */
+            found: number;
             /** New Leads */
             new_leads: number;
+            /** Pages */
+            pages: string[];
             /** Query */
             query: string;
+            /** Source */
+            source: string;
         };
         /** EmailOut */
         EmailOut: {
@@ -4038,6 +4120,11 @@ export interface components {
             found: boolean;
             /** Messages Cancelled */
             messages_cancelled: number;
+        };
+        /** PromoteIn */
+        PromoteIn: {
+            /** Domain */
+            domain?: string | null;
         };
         /**
          * Provenance
@@ -6626,6 +6713,41 @@ export interface operations {
             };
         };
     };
+    promote_candidate_api_candidates__candidate_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     companies_api_companies_get: {
         parameters: {
             query?: {
@@ -8576,6 +8698,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_candidates_api_runs__run_id__candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"][];
                 };
             };
             /** @description Validation Error */

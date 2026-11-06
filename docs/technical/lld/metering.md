@@ -32,7 +32,7 @@ The meter stands between every stage and every paid vendor. Before a call it ans
 | Symbol | Kind | What it does |
 |---|---|---|
 | `outbound/metering/metered.py::Meter` | class | `call(...)` runs the cache, cap, call and record steps; `lookup`, `record`, `price` |
-| `outbound/metering/metered.py::MeteredFinder`, `MeteredVerifier`, `MeteredResolver`, `MeteredSearch`, `MeteredLlm`, `MeteredRegistry` | decorators | Each wraps one port and has the same interface, so a stage holds an ordinary `EmailFinder`, `SearchProvider` and so on |
+| `outbound/metering/metered.py::MeteredFinder`, `MeteredVerifier`, `MeteredResolver`, `MeteredSearch`, `MeteredLlm`, `MeteredRegistry`, `MeteredLeadSource` | decorators | Each wraps one port and has the same interface, so a stage holds an ordinary `EmailFinder`, `SearchProvider` and so on |
 | `outbound/metering/metered.py::call_scope` | context manager | Sets the run, company and contact for every call inside it; unnamed fields keep the outer value |
 | `outbound/metering/metered.py::request_hash` | function | SHA-256 of `[provider, operation, canonical(request)]` |
 | `outbound/metering/budget.py::BudgetPolicy` | dataclass | `monthly_caps` (provider → micro-USD) and `per_prospect` (micro-USD or `None`); `from_workspace_settings` |
@@ -72,6 +72,7 @@ flowchart TD
 | `MeteredResolver.poll` | — | — | — | Not metered. An answer is stored as a `resolve` hit (cost 0) so the next submit finds it |
 | `MeteredSearch.search` | `search` | `{query, max_results}` | 30 days | The price |
 | `MeteredSearch.extract` | `extract` | `{urls}` (sorted) | 30 days | The price |
+| `MeteredLeadSource.find` | `find` | the `SourceQuery` and `limit` | 30 days | The price (`yc_directory:find` is 0) |
 | `MeteredRegistry.search` | `lookup` | `{name, max_results}` | 30 days | The price (Companies House is free) |
 | `MeteredLlm.complete` | `complete` | Model, prompts and parameters | **None** (not cached) | `llm_cost(prices, model, input_tokens, output_tokens)` |
 

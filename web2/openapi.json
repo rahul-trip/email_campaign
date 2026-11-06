@@ -684,6 +684,131 @@
         "title": "CampaignPatch",
         "type": "object"
       },
+      "CandidateOut": {
+        "properties": {
+          "company_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Id"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rank_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank Score"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "screen_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen Score"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Urls",
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/CandidateVerdict"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "name",
+          "domain",
+          "sources",
+          "source_urls",
+          "description",
+          "evidence",
+          "screen_score",
+          "rank_score",
+          "verdict",
+          "reason",
+          "company_id"
+        ],
+        "title": "CandidateOut",
+        "type": "object"
+      },
+      "CandidateVerdict": {
+        "description": "What discovery decided about a company it found (``discovery_candidates.verdict``).",
+        "enum": [
+          "accepted",
+          "rejected",
+          "unresolved",
+          "already_lead",
+          "over_limit"
+        ],
+        "title": "CandidateVerdict",
+        "type": "string"
+      },
       "ChangePasswordIn": {
         "additionalProperties": false,
         "properties": {
@@ -2367,19 +2492,42 @@
             "title": "Already Leads",
             "type": "integer"
           },
+          "angle": {
+            "title": "Angle",
+            "type": "string"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
           "new_leads": {
             "title": "New Leads",
             "type": "integer"
           },
+          "pages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
           "query": {
             "title": "Query",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
             "type": "string"
           }
         },
         "required": [
           "query",
           "new_leads",
-          "already_leads"
+          "already_leads",
+          "source",
+          "angle",
+          "found",
+          "pages"
         ],
         "title": "DiscoverySearchOut",
         "type": "object"
@@ -4884,6 +5032,25 @@
           "drafts_left"
         ],
         "title": "PrivacyOut",
+        "type": "object"
+      },
+      "PromoteIn": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          }
+        },
+        "title": "PromoteIn",
         "type": "object"
       },
       "Provenance": {
@@ -9955,6 +10122,59 @@
         ]
       }
     },
+    "/api/candidates/{candidate_id}/promote": {
+      "post": {
+        "description": "Add a company the run found, but did not add, as a lead.",
+        "operationId": "promote_candidate_api_candidates__candidate_id__promote_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "candidate_id",
+            "required": true,
+            "schema": {
+              "title": "Candidate Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote Candidate",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/companies": {
       "get": {
         "operationId": "companies_api_companies_get",
@@ -12678,6 +12898,53 @@
           }
         },
         "summary": "Cancel",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/candidates": {
+      "get": {
+        "description": "Every company the run found, best ranked first, with what it decided about each.",
+        "operationId": "run_candidates_api_runs__run_id__candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CandidateOut"
+                  },
+                  "title": "Response Run Candidates Api Runs  Run Id  Candidates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Candidates",
         "tags": [
           "runs"
         ]

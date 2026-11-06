@@ -19,7 +19,7 @@ from outbound.domain.enums import (
     UsageStep,
 )
 from outbound.pipeline import Pipeline, assemble
-from outbound.providers.ports import SearchHit
+from outbound.providers.ports import CompanyMention
 from outbound.services.intake import WAITING_FOR_CREDITS
 from outbound.services.leads import LeadService
 from outbound.services.workspaces import create_workspace
@@ -254,8 +254,8 @@ def test_discovery_adds_no_more_leads_than_credits_and_does_not_search_without_a
 
     ws, pipeline, world = started(engine, factory, platform)
     container = container_for(Settings(_env_file=None), engine)
-    world.search.hits = [  # a search that has plenty to offer
-        SearchHit(url=f"https://company{n}.com/about", title="About us", snippet="")
+    world.directory.mentions = [  # a directory that has plenty to offer
+        CompanyMention(name=f"Grid {n}", domain=f"company{n}.com", source="yc_directory")
         for n in range(12)
     ]
     with platform() as p:
@@ -263,9 +263,9 @@ def test_discovery_adds_no_more_leads_than_credits_and_does_not_search_without_a
         p.commit()
     assert discover_companies(pipeline, container, ws, "default", 10).added == 2  # not ten
     assert used(factory, ws)["discovery"] == 2
-    searches = len(world.search.searches)
+    asked = len(world.directory.queries), len(world.search.searches)
     assert discover_companies(pipeline, container, ws, "default", 10).added == 0  # none left
-    assert len(world.search.searches) == searches  # and it did not even search
+    assert (len(world.directory.queries), len(world.search.searches)) == asked  # nor looked
 
 
 # ------------------------------------------------------------------ rewrites
@@ -326,19 +326,19 @@ def test_a_search_that_finds_only_known_companies_says_so_on_the_run(
 
     ws, pipeline, world = started(engine, factory, platform)
     container = container_for(Settings(_env_file=None), engine)
-    world.search.hits = [
-        SearchHit(url=f"https://company{n}.com/about", title="About us", snippet="")
-        for n in range(4)
+    # A lead added by hand that the directory also lists.
+    add(pipeline, "company0.com")
+    world.directory.mentions = [
+        CompanyMention(name=f"Grid {n}", domain=f"company{n}.com", source="yc_directory")
+        for n in range(3)
     ]
-    first = discover_companies(pipeline, container, ws, "default", 2)
-    assert (first.added, first.already_leads) == (2, 0)
-    # The same results come back: two are leads now, so the next two are taken instead.
-    second = discover_companies(pipeline, container, ws, "default", 2)
-    assert (second.added, second.already_leads) == (2, 2)
+    first = discover_companies(pipeline, container, ws, "default", 1)
+    assert (first.added, first.already_leads) == (1, 1)
+    # The rest come back next time: one more is added, nothing is screened twice.
+    second = discover_companies(pipeline, container, ws, "default", 5)
+    assert second.added == 1 and second.found == 0
     third = discover_companies(pipeline, container, ws, "default", 1)
-    # Nothing new: every search (the fake ignores the wording) returns the four known leads.
-    assert third.added == 0 and third.already_leads == 4 * third.searches
+    assert third.added == 0  # nothing new anywhere
 
     run = execute_run(pipeline, container, ws, RunRequest(mode=RunMode.DISCOVERY, discover=2))
-    discovery = run.counts["discovery"]
-    assert discovery["new leads"] == 0 and discovery["already leads"] == 4 * discovery["searches"]
+    assert run.counts["discovery"]["new leads"] == 0

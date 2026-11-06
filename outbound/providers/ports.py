@@ -152,6 +152,46 @@ class SearchProvider(Protocol):
         ...
 
 
+# --------------------------------------------------------------------------- company sources
+
+
+class SourceQuery(_Model):
+    """What discovery asks a company source for, taken from the campaign's brief."""
+
+    keywords: tuple[str, ...] = ()
+    segments: tuple[str, ...] = ()
+    regions: tuple[str, ...] = ()
+    founded_after: int | None = None
+    industry_codes: tuple[str, ...] = ()
+    text: str = ""  # a free-text search, for sources that take one
+    seed_domains: tuple[str, ...] = ()  # example customers, for lookalike sources
+
+
+class CompanyMention(_Model):
+    """One company a source names, with what it says about it. ``domain`` may be unknown (an
+    article that names a company without linking it)."""
+
+    name: str
+    domain: str | None = None
+    description: str = ""
+    tags: tuple[str, ...] = ()
+    country: str = ""
+    founded: int | None = None
+    size: str = ""
+    stage: str = ""
+    source: str  # the source's name, e.g. "yc_directory"
+    source_url: str = ""
+    evidence: str = ""  # what the source says about the company, in its words
+
+
+class LeadSource(Protocol):
+    name: str
+
+    def find(self, query: SourceQuery, *, limit: int) -> list[CompanyMention]:
+        """Companies matching the query, best first, at most ``limit``."""
+        ...
+
+
 # --------------------------------------------------------------------------- language model
 
 
