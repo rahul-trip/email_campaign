@@ -1,0 +1,40 @@
+{
+  "etag": "a1b2",
+  "hits": 3,
+  "kind": "search#advanced-search",
+  "top_hit": {"company_name": "NORTHGRID FORECASTING LTD", "company_number": "12345678"},
+  "items": [
+    {
+      "company_name": "NORTHGRID FORECASTING LTD",
+      "company_number": "12345678",
+      "company_status": "active",
+      "company_type": "ltd",
+      "date_of_creation": "2019-03-01",
+      "kind": "search-results#company",
+      "links": {"company_profile": "/company/12345678"},
+      "registered_office_address": {
+        "address_line_1": "1 Wellington Street",
+        "locality": "Leeds",
+        "postal_code": "LS1 4DL",
+        "country": "England"
+      },
+      "sic_codes": ["35110", "62012"]
+    },
+    {
+      "company_name": "Severn Power plc",
+      "company_number": "07654321",
+      "company_status": "active",
+      "company_type": "plc",
+      "date_of_creation": "2011-07-15",
+      "registered_office_address": {"locality": "Bristol", "postal_code": "BS1 5TR"},
+      "sic_codes": ["35110"]
+    },
+    {
+      "company_name": "",
+      "company_number": "",
+      "company_status": "active",
+      "company_type": "ltd",
+      "sic_codes": ["35110"]
+    }
+  ]
+}

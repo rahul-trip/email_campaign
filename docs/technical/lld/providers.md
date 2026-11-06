@@ -59,6 +59,8 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | Scrubby | `outbound/providers/adapters/scrubby.py::ScrubbyResolver` | `CatchAllResolver` (asynchronous) | [scrubby](../integrations/scrubby.md) |
 | Companies House | `outbound/providers/adapters/companies_house.py::CompaniesHouse` | `CompanyRegistry` | [companies-house](../integrations/companies-house.md) |
 | Y Combinator directory | `outbound/providers/adapters/yc_directory.py::YcDirectory` | `LeadSource` | [yc-directory](../integrations/yc-directory.md) |
+| Companies House (discovery) | `outbound/providers/adapters/companies_house.py::CompaniesHouse.find` | `LeadSource` | [companies-house](../integrations/companies-house.md) |
+| Exa | `outbound/providers/adapters/exa.py::ExaSearch` | `LeadSource` | [exa](../integrations/exa.md) |
 | Any OpenAI-compatible chat API | `outbound/providers/adapters/llm.py::OpenAiCompatibleLlm` | `LlmClient` | [llm](../integrations/llm.md) |
 | IMAP | `outbound/providers/adapters/imap_mailbox.py::ImapMailbox` | `Mailbox` | [imap-mailbox](../integrations/imap-mailbox.md) |
 

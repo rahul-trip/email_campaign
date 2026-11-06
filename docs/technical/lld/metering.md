@@ -72,7 +72,7 @@ flowchart TD
 | `MeteredResolver.poll` | — | — | — | Not metered. An answer is stored as a `resolve` hit (cost 0) so the next submit finds it |
 | `MeteredSearch.search` | `search` | `{query, max_results}` | 30 days | The price |
 | `MeteredSearch.extract` | `extract` | `{urls}` (sorted) | 30 days | The price |
-| `MeteredLeadSource.find` | `find` | the `SourceQuery` and `limit` | 30 days | The price (`yc_directory:find` is 0) |
+| `MeteredLeadSource.find` | `find` | the `SourceQuery` and `limit` | 30 days | The price (`yc_directory:find` and `companies_house:find` are 0, `exa:find` 90,000) |
 | `MeteredRegistry.search` | `lookup` | `{name, max_results}` | 30 days | The price (Companies House is free) |
 | `MeteredLlm.complete` | `complete` | Model, prompts and parameters | **None** (not cached) | `llm_cost(prices, model, input_tokens, output_tokens)` |
 

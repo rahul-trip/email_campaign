@@ -16,9 +16,11 @@ from outbound.api.schemas import (
     RunIn,
     RunLeadOut,
     RunOut,
+    SourceYieldOut,
     StatusOut,
 )
 from outbound.db.types import utcnow
+from outbound.domain.discovery import YIELD_DAYS
 from outbound.domain.errors import InvalidInput
 from outbound.domain.permissions import Permission as P
 from outbound.services.runs import RunRequest
@@ -141,6 +143,20 @@ def quality(svc: Annotated[Services, Depends(services)]) -> QualityOut:
         flag_rate=report.flag_rate,
         catch_all_share=report.catch_all_share,
     )
+
+
+@router.get(
+    "/reports/sources",
+    response_model=list[SourceYieldOut],
+    dependencies=[Depends(require(P.REPORTS_READ))],
+)
+def sources(svc: Annotated[Services, Depends(services)]) -> list[SourceYieldOut]:
+    """Where discovery's companies came from, and how many of each source's leads qualified."""
+    return [
+        SourceYieldOut(source=name, found=y.found, leads=y.leads, qualified=y.qualified,
+                       rate=round(y.rate, 3), days=YIELD_DAYS)
+        for name, y in svc.reports.sources()
+    ]  # fmt: skip
 
 
 @router.get(

@@ -52,3 +52,14 @@ def test_a_company_the_screening_left_out_can_be_made_a_lead(
     done = api.post(f"/api/candidates/{unresolved}/promote", json={"domain": "mystery.energy"})
     assert done.status_code == 200 and done.json()["domain"] == "mystery.energy"
     assert api.post("/api/candidates/nope/promote", json={}).status_code == 404
+
+
+def test_the_reports_say_where_good_leads_come_from(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    _found(factory, ws)
+    rows = api.get("/api/reports/sources").json()
+    assert rows == [
+        {"source": "yc_directory", "found": 1, "leads": 0, "qualified": 0, "rate": 0.0,
+         "days": 90},
+    ]  # fmt: skip

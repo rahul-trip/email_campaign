@@ -1,7 +1,9 @@
 """Where to look for new companies, and how to tell what was found before (no I/O).
 
 Discovery asks several sources (``plan_sources``): start-up directories when the brief is
-after start-ups, and pages that list many companies, found by web search. When no model plans
+after start-ups, the UK register for a UK brief with industry codes, lookalike search, and
+pages that list many companies, found by web search. Sources whose leads qualify more often
+are asked first and for more (``share``). When no model plans
 the searches for such pages, they come from the brief's own words (``article_queries``). They
 are compared by their words (``normal``, ``clean``) so no run repeats an earlier one, and a
 company is recognised across sources by its name without its legal suffix (``name_key``).
@@ -11,9 +13,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from outbound.domain.brief import Brief, CompanyType
+from outbound.domain.enums import CompanyStatus
 
 MAX_QUERY_WORDS = 30
 
@@ -51,17 +55,77 @@ def regions(profile: Mapping[str, Any]) -> list[str]:
 # --------------------------------------------------------------------------- sources
 
 YC = "yc_directory"  # the public Y Combinator company directory
+CH = "companies_house"  # the UK register, searched by industry (SIC) code
+EXA = "exa"  # neural company search and lookalikes of example customers
 ARTICLES = "articles"  # lists, rankings and round-ups found by web search, read by a model
-SOURCE_ORDER = (YC, ARTICLES)  # structured indexes first: cheaper, and their data is cleaner
+# Structured indexes first: cheaper, and their data is cleaner.
+SOURCE_ORDER = (YC, CH, EXA, ARTICLES)
 STARTUP_SOURCES = frozenset({YC})
+UK_PLACES = frozenset(
+    {"uk", "gb", "united kingdom", "great britain", "britain", "england", "scotland", "wales",
+     "northern ireland"}
+)  # fmt: skip
+# A lead past the fit gate, whatever became of it after.
+QUALIFIED = frozenset(
+    {CompanyStatus.QUALIFIED, CompanyStatus.CONTACTS_FOUND, CompanyStatus.EMAIL_READY,
+     CompanyStatus.COPY_READY, CompanyStatus.APPROVED, CompanyStatus.REJECTED,
+     CompanyStatus.IN_SEQUENCE, CompanyStatus.REPLIED, CompanyStatus.COMPLETED}
+)  # fmt: skip
+YIELD_DAYS = 90  # how far back a source's record counts
+MIN_HISTORY = 10  # candidates a source must have found before its yield counts
+MIN_SHARE, MAX_SHARE = 0.5, 2.0
 
 
-def plan_sources(brief: Brief, *, available: Iterable[str]) -> list[str]:
-    """Where to look this run: the sources that suit the brief, of those that are set up."""
+@dataclass(frozen=True)
+class SourceYield:
+    """What one source found for a workspace, and how many of those leads qualified."""
+
+    found: int  # companies it named (screened or not)
+    qualified: int  # of those, leads that passed the fit gate
+    leads: int = 0  # of those, how many became leads
+
+    @property
+    def rate(self) -> float:
+        return self.qualified / self.found if self.found else 0.0
+
+
+def is_uk(places: Iterable[str]) -> bool:
+    return any(re.sub(r"^the ", "", p.strip().lower()) in UK_PLACES for p in places)
+
+
+def _rates(yields: Mapping[str, SourceYield]) -> dict[str, float]:
+    return {name: y.rate for name, y in yields.items() if y.found >= MIN_HISTORY}
+
+
+def plan_sources(
+    brief: Brief, *, available: Iterable[str], yields: Mapping[str, SourceYield] | None = None
+) -> list[str]:
+    """Where to look this run: the sources that suit the brief, of those that are set up, the
+    ones whose leads have qualified most often first. A source with too little history counts
+    as average, so a new one is tried without jumping the queue."""
     usable = set(available)
     if brief.company_type not in {CompanyType.STARTUP, CompanyType.ANY}:
         usable -= STARTUP_SOURCES
-    return [source for source in SOURCE_ORDER if source in usable]
+    if not (brief.industry_codes and is_uk(brief.regions)):
+        usable.discard(CH)
+    order = [source for source in SOURCE_ORDER if source in usable]
+    rates = _rates(yields or {})
+    if not rates:
+        return order
+    average = sum(rates.values()) / len(rates)
+    return sorted(order, key=lambda s: -rates.get(s, average))  # stable: ties keep the order
+
+
+def share(source: str, yields: Mapping[str, SourceYield]) -> float:
+    """How much of the usual amount to ask of a source: its qualified rate against the
+    average, between half and double; 1 while too little is known."""
+    rates = _rates(yields)
+    if source not in rates:
+        return 1.0
+    average = sum(rates.values()) / len(rates)
+    if not average:
+        return 1.0
+    return max(MIN_SHARE, min(MAX_SHARE, rates[source] / average))
 
 
 def article_queries(brief: Brief, *, used: Iterable[str], limit: int) -> list[str]:

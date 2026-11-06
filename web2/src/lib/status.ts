@@ -82,6 +82,8 @@ export const candidateVerdict: Vocabulary = {
 /** Where discovery looked, as the run page names it. */
 export const discoverySource: Record<string, string> = {
   yc_directory: "Y Combinator directory",
+  companies_house: "Companies House",
+  exa: "Exa company search",
   articles: "Lists and articles",
 };
 

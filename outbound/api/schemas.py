@@ -673,6 +673,15 @@ class QualityOut(Out):
     catch_all_share: float | None
 
 
+class SourceYieldOut(Out):
+    source: str
+    found: int  # companies it named
+    leads: int  # of those, how many became leads
+    qualified: int  # of those, how many passed the fit gate
+    rate: float  # qualified / found
+    days: int  # the window counted
+
+
 class CostOut(Out):
     total: int
     per_prospect: int | None

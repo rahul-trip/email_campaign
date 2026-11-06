@@ -25,6 +25,7 @@ VENDORS: tuple[Vendor, ...] = (
     Vendor("scrubby", "Scrubby", "scrubby_api_key", "resolver"),
     Vendor("enrichley", "Enrichley", "enrichley_api_key", "resolver"),
     Vendor("companies_house", "Companies House", "companies_house_api_key", "registry"),
+    Vendor("exa", "Exa", "exa_api_key", "discovery"),
 )
 BY_CODE: dict[str, Vendor] = {v.code: v for v in VENDORS}
 

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
+from datetime import datetime
 
 from sqlalchemy import select
 
-from outbound.db.models import DiscoveryCandidateRow
+from outbound.db.models import CompanyRow, DiscoveryCandidateRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
+from outbound.domain.discovery import QUALIFIED, SourceYield
 from outbound.domain.entities import DiscoveryCandidate
 from outbound.domain.enums import CandidateVerdict
 
@@ -103,6 +106,35 @@ class CandidateRepository(ScopedRepository):
             DiscoveryCandidateRow.campaign_id == campaign_id,
         )
         return {url for urls in self._session.scalars(stmt) for url in urls or []}
+
+    def source_yield(self, *, since: datetime) -> dict[str, SourceYield]:
+        """For each source, the companies it named since ``since``, how many became leads and
+        how many of those passed the fit gate. A company two sources named counts for both."""
+        stmt = (
+            select(DiscoveryCandidateRow.sources, DiscoveryCandidateRow.company_id,
+                   CompanyRow.status)
+            .outerjoin(
+                CompanyRow,
+                (CompanyRow.id == DiscoveryCandidateRow.company_id)
+                & (CompanyRow.workspace_id == self._workspace_id),
+            )
+            .where(
+                DiscoveryCandidateRow.workspace_id == self._workspace_id,
+                DiscoveryCandidateRow.created_at >= since,
+            )
+        )  # fmt: skip
+        found: Counter[str] = Counter()
+        leads: Counter[str] = Counter()
+        qualified: Counter[str] = Counter()
+        for sources, company_id, status in self._session.execute(stmt):
+            for source in sources or []:
+                found[source] += 1
+                leads[source] += company_id is not None
+                qualified[source] += status in QUALIFIED
+        return {
+            s: SourceYield(found=n, qualified=qualified[s], leads=leads[s])
+            for s, n in found.items()
+        }
 
     def decide(
         self,

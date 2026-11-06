@@ -175,6 +175,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/status` | login | — | 200 `StatusOut` (counts by status, review queue, holds) | — | `ReportService.status` |
 | `GET /api/reports/quality` | login | — | 200 `QualityOut` | — | `ReportService.quality` |
 | `GET /api/reports/cost` | login | query `days` 1–365 (30) | 200 `CostOut` | — | `ReportService.cost` |
+| `GET /api/reports/sources` | `reports:read` | — | 200 `SourceYieldOut[]`: per discovery source over 90 days, companies named, leads, passed the fit gate, rate | — | `ReportService.sources` |
 
 ## Settings
 

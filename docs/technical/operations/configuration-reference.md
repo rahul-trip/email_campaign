@@ -63,7 +63,8 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `ENRICHLEY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=enrichley` |
 | `SCRUBBY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=scrubby` (default) |
 | `SCRUBBY_BASE_URL` | str | — | | D | Required with Scrubby; not documented publicly ([R-09](../tech-debt-and-risks.md#r-09--p1--vendors-the-provider-chain-is-unproven-e5-d5)) |
-| `COMPANIES_HOUSE_API_KEY` | str | — | yes | D | Optional: UK incorporation checks |
+| `COMPANIES_HOUSE_API_KEY` | str | — | yes | D | Optional: UK incorporation checks, and UK companies by industry code for discovery |
+| `EXA_API_KEY` | str | — | yes | D | Optional: Exa company search and lookalikes for discovery ([exa](../integrations/exa.md)) |
 | `FINDER_CHAIN` | comma list | `hunter,zerobounce` | | D | Finders, in order (provisional) |
 | `VERIFIER` | str | `myemailverifier` | | D | The verifier |
 | `CATCH_ALL_RESOLVER` | str | `scrubby` | | D | The resolver; with no key, catch-alls are held as unverified |

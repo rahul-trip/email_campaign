@@ -7,15 +7,18 @@ everything found against the campaign's brief.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sqlalchemy import Engine
 
 from outbound.bootstrap import container_for
 from outbound.config import Settings
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.enums import CandidateVerdict, CompanyStatus
+from outbound.domain.enums import CandidateVerdict, CompanySource, CompanyStatus
 from outbound.pipeline import Pipeline, discover_companies
-from outbound.providers.ports import CompanyMention, SearchHit
+from outbound.providers.ports import CompanyMention, SearchHit, SourceQuery
+from outbound.services.discovery import PER_SOURCE
 from tests.db.test_credits import started, used
 from tests.stages.fakes import screen_all
 from tests.stages.world import World
@@ -162,3 +165,56 @@ def test_without_a_model_the_directory_still_finds_companies(
     pipeline = replace(assemble(container, ws, world.providers()), llm=None)
     assert run(pipeline, container, ws, 5, "run-1").added == 1
     assert world.llm.calls == []
+
+
+def _history(factory: UnitOfWorkFactory, ws: str) -> None:
+    """An older campaign whose directory finds never qualified and whose articles always did."""
+    with factory(ws) as uow:
+        old = uow.campaigns.create("old", ["CTO"])
+        lead = uow.companies.create(
+            domain="winner.io", source=CompanySource.DISCOVERY, campaign_id=old.id
+        )
+        for status in (CompanyStatus.RESEARCHED, CompanyStatus.QUALIFIED):
+            lead = uow.companies.transition(lead.id, status, expected_version=lead.row_version)
+        for n in range(12):
+            for source, company_id in (("yc_directory", None), ("articles", lead.id)):
+                uow.candidates.add(
+                    campaign_id=old.id, run_id=None, name=f"{source}{n}",
+                    name_key=f"{source}{n}", sources=[source], company_id=company_id,
+                    verdict=CandidateVerdict.ACCEPTED,
+                )  # fmt: skip
+        uow.commit()
+
+
+def test_a_source_whose_leads_qualify_is_asked_first_and_a_poor_one_for_less(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    _history(factory, ws)
+    searched_before: list[int] = []
+    asked: Callable[..., list[CompanyMention]] = world.directory.find
+
+    def find(query: SourceQuery, *, limit: int) -> list[CompanyMention]:
+        searched_before.append(len(world.search.searches))
+        return asked(query, limit=limit)
+
+    world.directory.find = find
+    run(pipeline, container, ws, 5, "run-1")
+    assert searched_before[0] > 0  # the articles went first
+    assert world.directory.limits == [PER_SOURCE // 2]
+
+
+def test_the_campaigns_qualified_leads_are_examples_to_find_more_like(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+        lead = uow.companies.create(
+            domain="best.io", source=CompanySource.MANUAL, campaign_id=campaign.id
+        )
+        for status in (CompanyStatus.RESEARCHED, CompanyStatus.QUALIFIED):
+            lead = uow.companies.transition(lead.id, status, expected_version=lead.row_version)
+        uow.commit()
+    run(pipeline, container, ws, 5, "run-1")
+    assert "best.io" in world.directory.queries[0].seed_domains

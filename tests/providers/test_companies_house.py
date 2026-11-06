@@ -5,7 +5,7 @@ import base64
 import httpx
 
 from outbound.providers.adapters.companies_house import CompaniesHouse
-from outbound.providers.ports import RegistryEntry
+from outbound.providers.ports import RegistryEntry, SourceQuery
 from tests.contract._shared import SECRET, AdapterContract
 from tests.providers.helpers import Handler, always, mock_client, respond
 
@@ -49,3 +49,39 @@ class TestCompaniesHouse(AdapterContract):
     def test_no_match_is_an_empty_list(self) -> None:
         empty = httpx.Response(200, json={"items": [], "total_results": 0})
         assert self.call(self.build(always(empty))) == []
+
+
+# ------------------------------------------------------------------ finding companies by industry
+
+
+def finder(seen: list[httpx.Request]) -> CompaniesHouse:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return respond("companies_house/advanced_search.json")
+
+    return CompaniesHouse(SECRET, client=mock_client(handler))
+
+
+def test_active_uk_companies_are_found_by_industry_code_and_founding_year() -> None:
+    seen: list[httpx.Request] = []
+    query = SourceQuery(industry_codes=("35110", "35120"), founded_after=2010)
+    found = finder(seen).find(query, limit=30)
+    params = seen[0].url.params
+    assert seen[0].url.path == "/advanced-search/companies"
+    assert params["sic_codes"] == "35110,35120"
+    assert params["company_status"] == "active"
+    assert params["company_type"] == "ltd,plc,llp"  # companies PECR lets us email
+    assert params["incorporated_from"] == "2010-01-01"
+    assert params["size"] == "30"
+    assert [m.name for m in found] == ["Northgrid Forecasting Ltd", "Severn Power plc"]
+    first = found[0]
+    assert first.domain is None  # the register has no websites
+    assert (first.source, first.country, first.founded) == ("companies_house", "GB", 2019)
+    assert first.source_url.endswith("/company/12345678")
+    assert "SIC 35110, 62012" in first.evidence and "Leeds" in first.evidence
+
+
+def test_without_industry_codes_the_register_is_not_asked() -> None:
+    seen: list[httpx.Request] = []
+    assert finder(seen).find(SourceQuery(keywords=("grid",)), limit=10) == []
+    assert seen == []

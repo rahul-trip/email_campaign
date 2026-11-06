@@ -82,9 +82,11 @@ Built:
 - **Screening.** Everything found is merged, screened against the brief in batches, and only fits become leads. Every company is kept with its verdict (`discovery_candidates`) and shown on the run's page, and **Make a lead** promotes one.
 - **Qualification** (`phase-6/discovery-qualification`). Research judges each lead against the brief criterion by criterion, with evidence and source, why now and risks; the score is computed in code (`outbound/domain/qualification.py`) and the breakdown is shown on the lead page. A discovered lead whose own site meets a disqualifier stops after the site read.
 
+- **More sources and their record** (`phase-6/discovery-more-sources`). Companies House advanced search (UK briefs with SIC codes) and Exa (company search and lookalikes of example customers and qualified leads, behind `EXA_API_KEY`) are discovery sources. Each source's 90-day record (named, leads, passed the fit gate) orders the sources and sizes their share, and Reports shows it as *Where good leads come from*.
+
 **Left:**
-- Companies House advanced search and a lookalike source.
-- Weighting sources by how many of their leads qualify.
+- People Data Labs company search (optional in the plan; not built).
+- Live checks of Exa and Companies House advanced search ([R-30](../technical/tech-debt-and-risks.md)).
 - A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.
 
 ## After the alpha

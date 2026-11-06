@@ -21,12 +21,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
 from outbound.domain.brief import Brief
-from outbound.domain.discovery import ARTICLES, article_queries, clean, name_key, plan_sources
+from outbound.domain.discovery import (
+    ARTICLES,
+    YIELD_DAYS,
+    article_queries,
+    clean,
+    name_key,
+    plan_sources,
+    share,
+)
 from outbound.domain.domains import is_free_mail, is_platform, registrable_domain
 from outbound.domain.entities import Campaign
 from outbound.domain.enums import (
@@ -63,7 +73,8 @@ HISTORY = 30  # how many earlier searches a run remembers and avoids
 MAX_SEARCHES = 4  # article searches per run: enough angles, not a runaway bill
 PAGES_PER_SEARCH = 3  # the best list pages a search finds; one extract credit reads five
 PAGE_CHARS = 12_000  # of each page the model reads
-PER_SOURCE = 25  # companies asked of each directory
+PER_SOURCE = 25  # companies asked of each directory, before weighting by its record
+EXAMPLES = 3  # qualified leads given to lookalike sources as examples
 SCREEN_BATCH = 15  # companies screened per model call
 SCREEN_MIN = 50  # below this a company does not fit
 MIN_CONFIDENCE = 0.65  # a website found by search below this is not trusted
@@ -154,7 +165,9 @@ def _planned(raw: Iterable[object], *, used: Sequence[str], limit: int) -> list[
     return [PlannedQuery(q, angles.get(q, "")) for q in clean(texts, used=used, limit=limit)]
 
 
-def source_query(brief: Brief) -> SourceQuery:
+def source_query(brief: Brief, *, examples: Sequence[str] = ()) -> SourceQuery:
+    """What a directory is asked, from the brief; ``examples`` are the websites of leads that
+    qualified, which lookalike sources find more like, after the brief's own examples."""
     return SourceQuery(
         keywords=brief.keywords or brief.segments,
         segments=brief.segments,
@@ -162,7 +175,7 @@ def source_query(brief: Brief) -> SourceQuery:
         founded_after=brief.founded_after,
         industry_codes=brief.industry_codes,
         text=brief.summary,
-        seed_domains=brief.seed_companies,
+        seed_domains=tuple(dict.fromkeys([*brief.seed_companies, *examples])),
     )
 
 
@@ -350,6 +363,8 @@ class Discoverer:
             known_domains = uow.companies.known_domains()
             known_keys = uow.candidates.known_keys(campaign.id)
             read = uow.candidates.read_urls(campaign.id)
+            yields = uow.candidates.source_yield(since=utcnow() - timedelta(days=YIELD_DAYS))
+            examples = uow.companies.qualified_domains(campaign.id, EXAMPLES)
             earlier = uow.events.latest(
                 EntityType.WORKSPACE, self.workspace_id, "discovery_query", HISTORY * 4
             )
@@ -368,17 +383,19 @@ class Discoverer:
         available = {s.name for s in self.sources} | ({ARTICLES} if self.llm else set())
         mentions: list[CompanyMention] = []
         calls = 0
-        for name in plan_sources(brief, available=available):
+        # Sources whose leads qualified most often go first and are asked for more.
+        for name in plan_sources(brief, available=available, yields=yields):
+            weight = share(name, yields)
             if name == ARTICLES and self.llm is not None:
-                mentions, made = self._articles(
-                    self.llm, brief, campaign, mentions, used, read, known_keys, count, run_id
-                )
+                searches = max(1, round(MAX_SEARCHES * weight))
+                mentions, made = self._articles(self.llm, brief, campaign, mentions, used, read,
+                                                known_keys, count, run_id, searches)  # fmt: skip
                 calls += made
                 continue
             source = next(s for s in self.sources if s.name == name)
-            query = source_query(brief)
+            query = source_query(brief, examples=examples)
             try:
-                got = source.find(query, limit=PER_SOURCE)
+                got = source.find(query, limit=max(1, int(PER_SOURCE * weight)))
             except ProviderError as error:
                 log.warning("discovery_source_failed", source=name, reason=str(error)[:200])
                 got = []
@@ -442,10 +459,11 @@ class Discoverer:
         known_keys: set[str],
         count: int,
         run_id: str | None,
+        searches: int,
     ) -> tuple[list[CompanyMention], int]:
         source = ArticleSource(self.search, llm, skip=read)
         made = 0
-        for planned in plan_queries(llm=llm, brief=brief, used=used, count=MAX_SEARCHES):
+        for planned in plan_queries(llm=llm, brief=brief, used=used, count=searches):
             fresh = {name_key(m.name) for m in mentions} - known_keys
             if len(fresh) >= count * ENOUGH:
                 break

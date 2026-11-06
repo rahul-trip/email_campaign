@@ -19,6 +19,7 @@ from outbound.domain.errors import ConfigurationError
 from outbound.providers import oauth
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
+from outbound.providers.adapters.exa import ExaSearch
 from outbound.providers.adapters.hunter import HunterFinder, HunterVerifier
 from outbound.providers.adapters.llm import OpenAiCompatibleLlm
 from outbound.providers.adapters.myemailverifier import MyEmailVerifierVerifier
@@ -191,8 +192,14 @@ def build_company_registry(
 def build_company_sources(
     settings: Settings, client: httpx.Client | None = None
 ) -> list[LeadSource]:
-    """Where discovery looks besides web search. The Y Combinator directory needs no key."""
-    return [YcDirectory(client=client)]
+    """Where discovery looks besides web search: the Y Combinator directory (no key), then
+    the UK register and Exa when their keys are set."""
+    sources: list[LeadSource] = [YcDirectory(client=client)]
+    if key := _key(settings.companies_house_api_key):
+        sources.append(CompaniesHouse(key, client=client))
+    if key := _key(settings.exa_api_key):
+        sources.append(ExaSearch(key, client=client))
+    return sources
 
 
 def build_oauth_apps(settings: Settings) -> dict[MailboxGateway, OAuthApp]:

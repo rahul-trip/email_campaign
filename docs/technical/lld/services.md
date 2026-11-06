@@ -75,9 +75,9 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 
 1. **The brief.** The campaign's brief is read, or drafted (`brief.py::draft_brief`) and saved if it is empty.
 2. **Fits waiting from earlier runs go first** (`candidates.waiting`, verdict `over_limit`), with no new screening. If they fill the count, the run stops there.
-3. **Every source that suits the brief is asked** (`domain.discovery.plan_sources`):
-   - the `LeadSource`s, such as `yc_directory`, with `source_query(brief)`;
-   - `ArticleSource`, for up to `MAX_SEARCHES` list-page searches (planned by `plan_queries`, or by `article_queries` from the brief). It reads the best `PAGES_PER_SEARCH` pages of each, never one read before, and makes one model call per page.
+3. **Every source that suits the brief is asked** (`domain.discovery.plan_sources`), the ones whose leads passed the fit gate most often in the last `YIELD_DAYS` first (`candidates.source_yield`; a source with fewer than `MIN_HISTORY` companies counts as average). Each is asked for its usual amount times `share` (half to double, by its qualified rate against the average):
+   - the `LeadSource`s (`yc_directory`, `companies_house`, `exa`), for `PER_SOURCE × share` companies, with `source_query(brief, examples=…)`, where the examples are the campaign's best qualified leads (`companies.qualified_domains`, at most `EXAMPLES`) for lookalike search;
+   - `ArticleSource`, for up to `MAX_SEARCHES × share` list-page searches (planned by `plan_queries`, or by `article_queries` from the brief). It reads the best `PAGES_PER_SEARCH` pages of each, never one read before, and makes one model call per page.
 
    Article searches stop early once there are `ENOUGH` fresh companies per wanted lead. Every search is a `discovery_query` event, recording its source, angle, pages and how many companies it found.
 4. **Merge** (`merge`): one entry per company, matched by website, else by `name_key`.

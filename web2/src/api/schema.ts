@@ -1821,6 +1821,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sources
+         * @description Where discovery's companies came from, and how many of each source's leads qualified.
+         */
+        get: operations["sources_api_reports_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review": {
         parameters: {
             query?: never;
@@ -4494,6 +4514,21 @@ export interface components {
             kind: string;
             /** Text */
             text: string;
+        };
+        /** SourceYieldOut */
+        SourceYieldOut: {
+            /** Days */
+            days: number;
+            /** Found */
+            found: number;
+            /** Leads */
+            leads: number;
+            /** Qualified */
+            qualified: number;
+            /** Rate */
+            rate: number;
+            /** Source */
+            source: string;
         };
         /** StageOut */
         StageOut: {
@@ -8374,6 +8409,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["QualityOut"];
+                };
+            };
+        };
+    };
+    sources_api_reports_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceYieldOut"][];
                 };
             };
         };

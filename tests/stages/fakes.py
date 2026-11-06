@@ -152,9 +152,11 @@ class FakeDirectory:
     def __init__(self, mentions: list[CompanyMention] | None = None) -> None:
         self.mentions = mentions or []
         self.queries: list[SourceQuery] = []
+        self.limits: list[int] = []
 
     def find(self, query: SourceQuery, *, limit: int) -> list[CompanyMention]:
         self.queries.append(query)
+        self.limits.append(limit)
         return self.mentions[:limit]
 
 

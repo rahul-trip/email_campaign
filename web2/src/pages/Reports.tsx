@@ -4,13 +4,14 @@ import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card, Label, PageHeader, Problem, Segmented, Skeleton, Stat, Table, Td, Th } from "../components/ui";
 import { percent, usd } from "../lib/format";
-import { callOutcome, describe, describeHold } from "../lib/status";
+import { callOutcome, describe, describeHold, discoverySource } from "../lib/status";
 import { BudgetMeter, ProviderBars } from "./Dashboard";
 
 export function ReportsPage() {
   const [days, setDays] = useState(30);
   const cost = useQuery({ queryKey: ["cost", days], queryFn: () => ok(client.GET("/api/reports/cost", { params: { query: { days } } })) });
   const quality = useQuery({ queryKey: ["quality"], queryFn: () => ok(client.GET("/api/reports/quality")) });
+  const sources = useQuery({ queryKey: ["report-sources"], queryFn: () => ok(client.GET("/api/reports/sources")) });
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
   const c = cost.data;
@@ -140,6 +141,44 @@ export function ReportsPage() {
                 </span>
               ))}
             </div>
+          )}
+        </Card>
+
+        <Card
+          tour="reports-sources"
+          title="Where good leads come from"
+          subtitle={`Over the last ${sources.data?.[0]?.days ?? 90} days: the companies each discovery source named, how many became leads, and how many of those passed the fit check. Discovery asks the best sources first, and for more.`}
+          className="lg:col-span-2 p-0"
+        >
+          {sources.isPending ? (
+            <div className="p-4">
+              <Skeleton />
+            </div>
+          ) : !sources.data?.length ? (
+            <p className="p-4 text-sm text-muted">Nothing yet: this fills in once discovery has run.</p>
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Source</Th>
+                  <Th className="text-right">Companies named</Th>
+                  <Th className="text-right">Became leads</Th>
+                  <Th className="text-right">Passed the fit check</Th>
+                  <Th className="text-right">Of those named</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {sources.data.map((row) => (
+                  <tr key={row.source}>
+                    <Td className="font-medium">{discoverySource[row.source] ?? row.source}</Td>
+                    <Td className="text-right font-mono text-xs">{row.found}</Td>
+                    <Td className="text-right font-mono text-xs">{row.leads}</Td>
+                    <Td className="text-right font-mono text-xs">{row.qualified}</Td>
+                    <Td className="text-right font-mono text-xs">{percent(row.rate)}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
           )}
         </Card>
       </div>

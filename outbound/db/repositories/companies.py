@@ -12,6 +12,7 @@ from outbound.db.models import CompanyRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
+from outbound.domain.discovery import QUALIFIED
 from outbound.domain.entities import Company
 from outbound.domain.enums import (
     CompanySource,
@@ -93,6 +94,21 @@ class CompanyRepository(ScopedRepository):
         )
         row = self._session.scalars(stmt).one_or_none()
         return snapshot(row, Company) if row else None
+
+    def qualified_domains(self, campaign_id: str, limit: int) -> list[str]:
+        """The websites of this campaign's leads that passed the fit gate, best fit first:
+        examples to find more like."""
+        stmt = (
+            select(CompanyRow.domain)
+            .where(
+                CompanyRow.workspace_id == self._workspace_id,
+                CompanyRow.campaign_id == campaign_id,
+                CompanyRow.status.in_(sorted(QUALIFIED)),
+            )
+            .order_by(CompanyRow.fit_score.desc().nulls_last(), CompanyRow.created_at)
+            .limit(limit)
+        )
+        return list(self._session.scalars(stmt))
 
     def known_domains(self) -> set[str]:
         stmt = select(CompanyRow.domain).where(CompanyRow.workspace_id == self._workspace_id)
