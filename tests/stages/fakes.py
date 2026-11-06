@@ -55,6 +55,7 @@ class FakeLlm:
         "You write the brief that says which companies": "brief",
         "You read one web page that names companies": "extract",
         "You decide which companies fit": "screen",
+        "You check one company against each criterion": "qualify",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
@@ -92,6 +93,7 @@ class FakeLlm:
                 ]
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
+            "qualify": {"criteria": [], "why_now": "", "risks": []},
             "news": {"company": [], "market": []},
             "extract": {"companies": []},
             "screen": screen_all(80),

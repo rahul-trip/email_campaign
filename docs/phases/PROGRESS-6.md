@@ -80,9 +80,9 @@ Built:
 - **The brief.** Each campaign has an editable ideal-customer brief (`campaigns.icp_brief`). A model drafts it from the campaign and the sender profile, and the operator edits it on the Campaigns page under **Who we look for**.
 - **Sources.** Discovery looks in the Y Combinator directory (a public mirror, free) when the brief is after start-ups. It also searches for pages that list many companies like the wanted ones and reads them with a model.
 - **Screening.** Everything found is merged, screened against the brief in batches, and only fits become leads. Every company is kept with its verdict (`discovery_candidates`) and shown on the run's page, and **Make a lead** promotes one.
+- **Qualification** (`phase-6/discovery-qualification`). Research judges each lead against the brief criterion by criterion, with evidence and source, why now and risks; the score is computed in code (`outbound/domain/qualification.py`) and the breakdown is shown on the lead page. A discovered lead whose own site meets a disqualifier stops after the site read.
 
 **Left:**
-- Detailed, criterion-by-criterion qualification in research (next).
 - Companies House advanced search and a lookalike source.
 - Weighting sources by how many of their leads qualify.
 - A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.

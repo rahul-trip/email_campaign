@@ -228,7 +228,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-research",
         title: "What research found",
-        body: "Everything research found, in sections: what the company does, how well it fits, products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
+        body: "Everything research found, in sections: what the company does, how well it fits (with a campaign brief, each must-have, sign and rule-out with what research found for it and its source, why they might buy now, and the risks), products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
       },
       {
         target: "lead-policy",

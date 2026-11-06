@@ -5,8 +5,10 @@ from __future__ import annotations
 from typing import Any
 
 from outbound.db.uow import UnitOfWork
+from outbound.domain.brief import Brief
 from outbound.domain.enums import CompanyStatus, ContactSource, ContactStatus, LegalEntityType
 from outbound.domain.names import display_name, same_person
+from outbound.domain.policies import OPERATOR_CHOSEN
 from outbound.stages.base import StageContext, StageResult
 from outbound.stages.research.graph import (
     Person,
@@ -47,6 +49,10 @@ class ResearchStage:
                 questions=campaign.research_questions if campaign else (),
                 target_titles=campaign.target_titles if campaign else (),
                 has_operator_contact=any(c.source is ContactSource.OPERATOR for c in contacts),
+                brief=Brief.from_json(campaign.icp_brief)
+                if campaign and campaign.icp_brief
+                else None,
+                operator_chosen=company.source in OPERATOR_CHOSEN,
             ),
         )
 

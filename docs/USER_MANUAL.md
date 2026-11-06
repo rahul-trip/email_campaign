@@ -298,7 +298,9 @@ Quality since the start (sent without an edit against the 80% target, flagged sh
 
 ### 5.7a What the lead page shows from research
 
-The **Research** card lists everything research found, in sections: what the company does (with its sector), how well it fits, products and services, findings worth mentioning in an email, news from their own site, recent news about them and market news (each a link to its source, with its date), hiring, the technology they use, and the answers to your research questions. Nothing is cut short: research no longer limits how many products, findings, news items or people it keeps. The lead's header shows when it was added and last changed, and each email shows when it was written.
+The **Research** card lists everything research found, in sections: what the company does (with its sector), how well it fits, products and services, findings worth mentioning in an email, news from their own site, recent news about them and market news (each a link to its source, with its date), hiring, the technology they use, and the answers to your research questions. Nothing is cut short: research no longer limits how many products, findings, news items or people it keeps.
+
+When the lead's campaign has a brief (*Who we look for*), **How well they fit** lists every must-have, sign they may buy now and rule that rules a company out, each with *Yes*, *No* or *Not known*, the words research found for it and a link to its source, then **Why now** and **Risks**. The score is worked out from those answers, not guessed: must-haves give up to 70 (a must-have that counts 3 weighs three times as much, and one that is not known counts half), each sign adds 10 up to 30, and a rule that rules them out makes it 0. A company discovery found whose own site already shows it meets a rule-out is stopped there, at a fraction of the cost of full research (no news, people or company checks), with the rule and the words that showed it as the reason. A lead you added, imported or were referred to is always researched in full. The lead's header shows when it was added and last changed, and each email shows when it was written.
 
 ### 5.8 Campaigns
 
@@ -353,7 +355,7 @@ Automatic sending cannot be switched on in this version.
 | # | Step | What it does | Where it can stop |
 |---|---|---|---|
 | 1 | Intake | Works out the company's website and rejects unusable rows | needs confirmation |
-| 2 | Research | Reads the home, about, team, news and contact pages; searches the news for recent, dated stories about the company and its market (two searches, a few cents); finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit | failed |
+| 2 | Research | Reads the home, about, team, news and contact pages; searches the news for recent, dated stories about the company and its market (two searches, a few cents); finds people; works out the country; for UK companies looks for proof it is an incorporated company; scores the fit, criterion by criterion when the campaign has a brief. A discovered company its own site rules out stops after reading the site | failed |
 | 3 | Gate | Compares fit with the campaign minimum, then applies the country rule | **disqualified**, **held** |
 | 4 | Contacts | Ranks the people against your wanted titles, then by seniority | failed (nobody found) |
 | 5 | Email | For the best people in turn: tries an address you gave, one published on the company's site, the company's usual pattern, then each finder in order. **Every address is verified at once** | held, failed |

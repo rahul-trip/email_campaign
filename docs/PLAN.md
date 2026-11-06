@@ -88,7 +88,7 @@ Three research findings shaped the design:
 | # | Recommendation | Verdict | How we apply it |
 |---|---|---|---|
 | 1 | Plain status router outside; LangGraph inside Research and Copy | Adopt | The companies table is the resumable queue |
-| 2 | Research supervisor with four workers | Adopt | The supervisor dispatches only the workers a lead needs: site and trigger, compliance and legal entity, campaign signals, and persona discovery (skipped if the operator gave a contact). Workers run in parallel |
+| 2 | Research supervisor with four workers | Adopt | The supervisor dispatches only the workers a lead needs: site and trigger, compliance and legal entity, campaign signals, and persona discovery (skipped if the operator gave a contact). Workers run in parallel. With a campaign brief, a discovered lead whose site meets a disqualifier skips the other workers, and fit is judged criterion by criterion (met, not met or unknown, with evidence and source), then scored in code: weighted must-haves, an unknown counting half, signals adding up to 30, a met disqualifier giving 0 |
 | 3 | Copy actor-critic, at most 2 rewrites | Adopt | The critic runs the deterministic linter and the source check first (the opening news item must be one research found, and recent news must be used when there is some), then one model check: every fact grounded, and it reads like a person wrote it. A rewrite sees its last draft and the problems |
 | 4 | CLI and a read-only viewer before React | Adopt | Datasette during Phases 1–2 |
 | 5 | Persona-first discovery | Adopt | Tavily over the company's pages and public search. Apollo free tier is optional |

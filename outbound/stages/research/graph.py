@@ -7,6 +7,11 @@ costed like any other.
 
     pages -> site -> (supervisor picks) -> legal | signals | persona -> fit
 
+When the campaign has a brief, the site worker also checks its disqualifiers, and a discovered
+lead the pages clearly rule out goes straight to ``fit`` (``after_site``): no news, legal,
+signals or people searches are spent on it. ``fit`` then judges the company criterion by
+criterion and scores it in plain code (``outbound.domain.qualification``).
+
 The site worker runs first because it reads the company's own name, and the later workers
 search with it: a discovered lead arrives with no name, and a search made with a page title
 instead finds the wrong people.
@@ -26,6 +31,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from outbound.domain.brief import Brief
 from outbound.domain.enums import LegalEntityType
 from outbound.domain.names import (
     clean_person_name,
@@ -33,6 +39,7 @@ from outbound.domain.names import (
     mentions_company,
     read_profile_title,
 )
+from outbound.domain.qualification import Check, checks, qualify
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
 from outbound.providers.errors import BudgetExceeded, ProviderError
@@ -76,6 +83,8 @@ class ResearchInput:
     questions: tuple[str, ...] = ()
     target_titles: tuple[str, ...] = ()
     has_operator_contact: bool = False
+    brief: Brief | None = None
+    operator_chosen: bool = False  # typed, imported or referred: never ruled out early
 
 
 @dataclass(frozen=True)
@@ -107,6 +116,11 @@ class _Reply(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
+class _RuledOut(_Reply):
+    id: str = ""
+    evidence: str = ""
+
+
 class SiteFacts(_Reply):
     sector: str = ""
     company_name: str = ""
@@ -114,6 +128,7 @@ class SiteFacts(_Reply):
     products: list[str] = Field(default_factory=list)
     news: list[str] = Field(default_factory=list)
     hooks: list[str] = Field(default_factory=list)
+    ruled_out: list[_RuledOut] = Field(default_factory=list)
 
 
 class _NewsPick(_Reply):
@@ -155,6 +170,19 @@ class FitFacts(_Reply):
         return value
 
 
+class _Answer(_Reply):
+    id: str = ""
+    verdict: str = ""
+    evidence: str = ""
+    source: str = ""
+
+
+class QualifyFacts(_Reply):
+    criteria: list[_Answer] = Field(default_factory=list)
+    why_now: str = ""
+    risks: list[str] = Field(default_factory=list)
+
+
 # --------------------------------------------------------------------------- the supervisor
 
 SITE, LEGAL, SIGNALS, PERSONA, NEWS = "site", "legal", "signals", "persona", "news"
@@ -170,6 +198,33 @@ def plan_workers(inp: ResearchInput) -> list[str]:
     if not inp.has_operator_contact:
         workers.append(PERSONA)
     return workers
+
+
+def _criteria(inp: ResearchInput) -> list[Check]:
+    return checks(inp.brief) if inp.brief else []
+
+
+def _rules(inp: ResearchInput) -> list[Check]:
+    return [c for c in _criteria(inp) if c.kind == "disqualifier"]
+
+
+def site_rulings(inp: ResearchInput, site: SiteFacts) -> dict[str, dict[str, str]]:
+    """The brief's disqualifiers the site worker found met, as answers ``qualify`` reads;
+    an id the brief does not have is ignored."""
+    ids = {c.id for c in _rules(inp)}
+    return {
+        r.id: {"verdict": "met", "evidence": r.evidence.strip()}
+        for r in site.ruled_out
+        if r.id in ids
+    }
+
+
+def after_site(inp: ResearchInput, site: SiteFacts) -> list[str]:
+    """The workers after the site: none but ``fit`` for a discovered lead its own pages rule
+    out, else the planned ones. A lead the operator chose is always researched in full."""
+    if not inp.operator_chosen and site_rulings(inp, site):
+        return ["fit"]
+    return [w for w in plan_workers(inp) if w != SITE] or ["fit"]
 
 
 # --------------------------------------------------------------------------- state and helpers
@@ -188,6 +243,7 @@ class ResearchState(TypedDict, total=False):
     triggers: list[dict[str, str]]
     people_found: list[Person]
     fit_facts: FitFacts | None
+    qualification: dict[str, Any]
 
 
 def _joined(pages: dict[str, str], *, only: Sequence[str] = ()) -> str:
@@ -256,13 +312,15 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         return {"page_text": snippets, "thin": True}
 
     def supervisor(state: ResearchState) -> list[Hashable]:
-        later = [w for w in plan_workers(state["inp"]) if w != SITE]
-        return list[Hashable](later or ["fit"])
+        return list[Hashable](after_site(state["inp"], state.get("site_facts") or SiteFacts()))
 
     def site_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
         user = prompts.build_site_user_prompt(
-            inp.company_name, inp.domain, _joined(state["page_text"])
+            inp.company_name,
+            inp.domain,
+            _joined(state["page_text"]),
+            [f"{c.id}. {c.text}" for c in _rules(inp)],
         )
         return {
             "site_facts": ask(
@@ -427,8 +485,51 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
                 found[i] = replace(person, linkedin_url=link)
         return {"people_found": found}
 
+    def qualify_node(state: ResearchState, criteria: list[Check]) -> ResearchState:
+        inp = state["inp"]
+        brief = inp.brief or Brief()
+        site = state.get("site_facts") or SiteFacts()
+        early = site_rulings(inp, site)
+        if early and not inp.operator_chosen:
+            # The pages already rule it out: no model call is worth making.
+            result, why_now, risks = qualify(brief, early), "", []
+        else:
+            signals = state.get("signal_facts") or SignalFacts()
+            user = prompts.build_qualify_user_prompt(
+                brief=brief.summary or inp.icp,
+                criteria=[
+                    f"{c.id}. {c.text}" + (f" (counts {c.weight})" if c.weight > 1 else "")
+                    for c in criteria
+                ],
+                company=_company(state),
+                research=_findings(state),
+                notes=inp.notes,
+                answers="\n".join(f"{q}: {a}" for q, a in signals.answers.items() if a),
+                pages=_joined(state["page_text"]),
+            )
+            reply = ask(
+                deps.llm,
+                prompts.QUALIFY_SYSTEM_PROMPT,
+                user,
+                QualifyFacts,
+                temperature=EXTRACTION_TEMPERATURE,
+            )
+            answers = {a.id: a.model_dump() for a in reply.criteria}
+            # A disqualifier the site saw stands even if this reply forgot it.
+            answers.update({k: v for k, v in early.items() if k not in answers})
+            result = qualify(brief, answers)
+            why_now = " ".join(reply.why_now.split())
+            risks = [" ".join(r.split()) for r in reply.risks if r.strip()]
+        return {
+            "fit_facts": FitFacts(score=result.score, reason=result.reason),
+            "qualification": {**result.to_json(), "why_now": why_now, "risks": risks},
+        }
+
     def fit_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
+        criteria = _criteria(inp)
+        if criteria:
+            return qualify_node(state, criteria)
         if not inp.icp:
             return {"fit_facts": None}
         site = state.get("site_facts") or SiteFacts()
@@ -535,6 +636,23 @@ def _numbered(hits: Sequence[SearchHit], *, start: int = 1) -> str:
     )
 
 
+def _findings(state: ResearchState) -> str:
+    """What the workers found, as the qualifier reads it, with each news item's source."""
+    site = state.get("site_facts") or SiteFacts()
+    signals = state.get("signal_facts") or SignalFacts()
+    lines = [
+        f"Sector: {site.sector}",
+        f"Summary: {site.summary}",
+        "Products: " + "; ".join(site.products),
+        "Hiring: " + signals.hiring,
+        "Technology: " + "; ".join(signals.tech),
+    ]
+    for kind, key in (("News", "news_items"), ("Market news", "triggers")):
+        for item in state.get(key) or []:  # type: ignore[attr-defined]
+            lines.append(f"{kind} ({item['date']}, {item['url']}): {item['detail']}")
+    return "\n".join(line for line in lines if not line.endswith(": "))
+
+
 def _unique(people: Sequence[Person]) -> list[Person]:
     seen: set[str] = set()
     unique: list[Person] = []
@@ -574,7 +692,8 @@ def run_research(graph: Any, inp: ResearchInput) -> ResearchOutput:
                 {"code": suggestion[0], "evidence": suggestion[1]} if suggestion else None
             ),
             "legal_evidence": entity_evidence,
-            "workers": plan_workers(inp),
+            "workers": [SITE, *(w for w in after_site(inp, site) if w != "fit")],
+            **({"qualification": q} if (q := state.get("qualification")) else {}),
         },
         answers=signals.answers,
         country_code=country,
