@@ -87,6 +87,18 @@ Built:
 **Left:**
 - People Data Labs company search (optional in the plan; not built).
 - Live checks of Exa and Companies House advanced search ([R-30](../technical/tech-debt-and-risks.md)).
+- Minor findings from the final review, deferred:
+  - **Make a lead** with no manual credit says "not added" though the row is queued (a second click queues a duplicate).
+  - Intake races are stored as *Does not fit* instead of *A lead already* / *waiting for the next run*.
+  - Website searches per run are not capped.
+  - Screening's fallback to word matching when the model fails is not logged as a warning.
+  - Usable model values are dropped: a score of `72.0`, a founded year as text, and ids like `m1`.
+  - Exa `find` ignores `limit` and drops example sites given with `https://`.
+  - One malformed Exa or Companies House item can fail that source.
+  - Source records count not-yet-researched leads as misses.
+  - Search URLs are unfenced in the extract prompt, and the evidence link isn't checked to be `http(s)`.
+  - The run page's per-search new/already lead counts are always 0, and a candidate's lead link breaks after the lead is deleted.
+  - `Discovery` lacks `screened` and per-source counts.
 - A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.
 
 ## After the alpha
