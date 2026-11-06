@@ -81,6 +81,7 @@ Three research findings shaped the design:
 | 20 | Admin console | `/admin`, nine screens: customers, limits and credits, users, plans, vendors and keys, directory, settings, audit log |
 | 21 | Lead directory | Shared verified facts (companies, people, LinkedIn profiles, emails), all shareable in the alpha. It is the free first link of the email waterfall, and customers may skip it when an admin allows ([6g](phases/phase-6g-lead-directory.md)) |
 | 22 | Payments | None in the alpha. Staff assign plans. Billing is [6e](phases/phase-6e-billing.md), after the alpha |
+| 23 | Who a campaign looks for (2026-11-06) | Each campaign has an editable ideal-customer brief (`campaigns.icp_brief`, migration 0018): a summary, the kind of company, what they do, where, weighted must-haves, disqualifiers, buying signals, where such companies are listed, UK SIC codes and example customers. A model drafts it from the campaign and the sender profile's *What the writer may use*; the operator corrects it. Discovery searches from it, screening drops companies that do not fit it, and research qualifies each lead against it |
 
 ## 4. Research recommendations: verdicts
 

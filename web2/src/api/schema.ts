@@ -2062,6 +2062,23 @@ export interface paths {
         patch: operations["update_campaign_api_settings_campaigns__campaign_id__patch"];
         trace?: never;
     };
+    "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Campaign Brief */
+        post: operations["regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/mailboxes/{mailbox_id}/dns-check": {
         parameters: {
             query?: never;
@@ -2669,6 +2686,10 @@ export interface components {
         CampaignOut: {
             /** Cadence Days */
             cadence_days: number[];
+            /** Icp Brief */
+            icp_brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Icp Description */
             icp_description: string | null;
             /** Id */
@@ -2686,6 +2707,10 @@ export interface components {
         CampaignPatch: {
             /** Cadence Days */
             cadence_days?: number[] | null;
+            /** Icp Brief */
+            icp_brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Icp Description */
             icp_description?: string | null;
             /** Min Fit Score */
@@ -8693,6 +8718,37 @@ export interface operations {
                 "application/json": components["schemas"]["CampaignPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

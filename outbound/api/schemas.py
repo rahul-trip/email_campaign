@@ -669,6 +669,7 @@ class CampaignOut(Out):
     min_fit_score: int
     research_questions: list[str]
     cadence_days: list[int]
+    icp_brief: dict[str, Any] | None = None
 
 
 class CampaignIn(In):
@@ -687,6 +688,7 @@ class CampaignPatch(In):
     min_fit_score: int | None = Field(default=None, ge=0, le=100)
     research_questions: list[str] | None = Field(default=None, max_length=3)
     cadence_days: list[int] | None = None
+    icp_brief: dict[str, Any] | None = None  # cleaned by ``domain.brief.Brief``
 
 
 class PolicyOut(Out):

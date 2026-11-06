@@ -110,7 +110,7 @@ Waiting work continues **by itself** as soon as credits exist: when the month re
 
 ### 3.4 The guided tour
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
+The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Campaigns, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 
 Every step has these buttons:
 
@@ -297,6 +297,13 @@ The **Research** card lists everything research found, in sections: what the com
 ### 5.8 Campaigns
 
 Each campaign has its wanted job titles (one per line, best first), the ideal customer, the minimum fit score (0–100), up to 3 research questions and the follow-up days (stored for a later phase). **New campaign** adds one.
+
+Under each campaign, **Who we look for** is its brief: the ideal customer broken into parts the engine can use.
+
+- **What it holds:** a short summary; the kind of company (any, start-ups, small and mid-sized, enterprises, public sector); what must be true (add `(3)` after an essential line, `(2)` after one that matters); what they do; kinds of company; where; what rules a company out (a competitor, for example); signs they may buy now; where such companies are listed (accelerator cohorts, funding round-ups, association members); funding stages; UK SIC codes; and example customers.
+- **Draft from the campaign** (later **Draft again**) asks the model to write it from the ideal customer, job titles and research questions above and from section 3 of your sender profile, *What the writer may use*. Drafting again replaces the brief, so save your own changes somewhere first if you want to keep them. Without a model, a plainer brief is made from the ideal customer, where you sell and your target industries.
+- **Save brief** keeps your edits. Lists are cleaned the same way as a drafted brief: blank and repeated lines go, and each list keeps at most 12 lines.
+- Discovery searches from the brief and research checks every lead against it. The first discovery run for a campaign drafts the brief if nobody has.
 
 ### 5.9 Mailboxes
 

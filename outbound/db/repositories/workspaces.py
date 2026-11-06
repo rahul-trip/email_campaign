@@ -232,7 +232,7 @@ class CampaignRepository(ScopedRepository):
     def update(self, campaign_id: str, changes: dict[str, Any]) -> Campaign:
         allowed = {
             "name", "target_titles", "icp_description", "min_fit_score",
-            "research_questions", "cadence_days", "mailbox_id",
+            "research_questions", "cadence_days", "mailbox_id", "icp_brief",
         }  # fmt: skip
         unknown = set(changes) - allowed
         if unknown:

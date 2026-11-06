@@ -518,6 +518,18 @@
             "title": "Cadence Days",
             "type": "array"
           },
+          "icp_brief": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icp Brief"
+          },
           "icp_description": {
             "anyOf": [
               {
@@ -584,6 +596,21 @@
               }
             ],
             "title": "Cadence Days"
+          },
+          "icp_brief": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "propertyNames": {
+                  "maxLength": 10000
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Icp Brief"
           },
           "icp_description": {
             "anyOf": [
@@ -12861,6 +12888,48 @@
           }
         },
         "summary": "Update Campaign",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
+      "post": {
+        "operationId": "regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Regenerate Campaign Brief",
         "tags": [
           "settings"
         ]

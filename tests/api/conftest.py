@@ -111,7 +111,7 @@ def make_app(
     def build(dns_lookup: TxtLookup | None = None) -> tuple[FastAPI, Services]:
         # Never the real resolver: tests make no network calls.
         settings_service = SettingsService(
-            container.uow, ws, dns_lookup=dns_lookup or (lambda name: [])
+            container.uow, ws, dns_lookup=dns_lookup or (lambda name: []), llm=FakeLlm()
         )
         services = build_services(
             container, ws, settings_service=settings_service, writer=FakeLlm()

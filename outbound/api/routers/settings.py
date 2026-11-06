@@ -104,6 +104,17 @@ def update_campaign(
     return CampaignOut.model_validate(svc.settings.update_campaign(campaign_id, changes))
 
 
+@router.post(
+    "/campaigns/{campaign_id}/brief/regenerate",
+    response_model=CampaignOut,
+    dependencies=[Depends(require(P.CAMPAIGNS_WRITE))],
+)
+def regenerate_campaign_brief(
+    campaign_id: str, svc: Annotated[Services, Depends(services)]
+) -> CampaignOut:
+    return CampaignOut.model_validate(svc.settings.regenerate_brief(campaign_id))
+
+
 @router.get(
     "/policies", response_model=list[PolicyOut], dependencies=[Depends(require(P.SETTINGS_READ))]
 )

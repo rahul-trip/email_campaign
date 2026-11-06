@@ -128,6 +128,7 @@ CREATE TABLE campaigns (
   name               TEXT NOT NULL,
   target_titles      JSON NOT NULL,                   -- ordered, most wanted first
   icp_description    TEXT,
+  icp_brief          JSON,                            -- who it looks for, domain.brief.Brief; NULL until drafted (0018)
   min_fit_score      INTEGER NOT NULL DEFAULT 60 CHECK (min_fit_score BETWEEN 0 AND 100),
   research_questions JSON NOT NULL DEFAULT '[]',      -- up to 3
   cadence_days       JSON NOT NULL DEFAULT '[0,3,8]', -- business-day offsets from touch 1: days 1, 4, 9

@@ -48,6 +48,7 @@ class FakeLlm:
         "You write the first email from one person": "actor",
         "You check a cold email before it goes": "critic",
         "You plan web searches that find companies": "discovery",
+        "You write the brief that says which companies": "brief",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
@@ -55,6 +56,17 @@ class FakeLlm:
         self.users: dict[str, str] = {}
         self.replies: dict[str, Any] = {
             "discovery": {"queries": ["grid forecasting for wind farm operators in Germany"]},
+            "brief": {
+                "summary": "Utilities and grid operators that need better load forecasts.",
+                "company_type": "any",
+                "keywords": ["grid forecasting", "load forecasting"],
+                "segments": ["utilities", "grid operators"],
+                "regions": ["UK", "Germany"],
+                "must_haves": [{"text": "operates or trades on the power grid", "weight": 3}],
+                "disqualifiers": ["competitor: sells forecasting software"],
+                "buying_signals": ["new grid project"],
+                "source_hints": ["industry association member lists"],
+            },
             "site": {
                 "sector": "grid forecasting software",
                 "summary": "Acme builds grid forecasting software for utilities.",

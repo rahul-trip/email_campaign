@@ -91,7 +91,7 @@ def build_services(
         review=ReviewService(uow, workspace_id, writer, actor=actor),
         leads=LeadService(uow, workspace_id, actor=actor, search=search),
         runs=RunService(uow, workspace_id),
-        settings=settings_service or SettingsService(uow, workspace_id, actor=actor),
+        settings=settings_service or SettingsService(uow, workspace_id, actor=actor, llm=writer),
         reports=ReportService(uow, workspace_id),
         webhook=WebhookService(uow, workspace_id, intake),
         privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),

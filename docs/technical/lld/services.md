@@ -35,7 +35,8 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `leads.py` | `LeadService` (below), `LeadError` | API leads, targets and privacy routers; data-fix scripts |
 | `privacy.py` | `PrivacyService` (`forget`, `suppress_contact`, `suppress_company`, `suppress_value`, `delete_lead`) | CLI `forget`, `suppress`, `delete-lead`; API privacy router |
 | `forget.py` | `forget_email`, `stop_contact`, `suppress_if_nobody_left` | `PrivacyService` (runs inside the caller's unit of work) |
-| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
+| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns and `regenerate_brief`, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
+| `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
 | `runs.py` | `RunService` (`queue`, `get`, `recent`, `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
 | `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |

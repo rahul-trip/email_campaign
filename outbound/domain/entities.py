@@ -209,6 +209,7 @@ class Campaign:
     cadence_days: tuple[int, ...]
     icp_description: str | None = None
     mailbox_id: str | None = None  # the sender; None means the workspace's default mailbox
+    icp_brief: dict[str, Any] | None = None  # who it looks for (``domain.brief.Brief``)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "target_titles", tuple(self.target_titles))

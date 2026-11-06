@@ -130,6 +130,7 @@ class CampaignRow(Mutable, Base):
     name: Mapped[str] = mapped_column(String(200))
     target_titles: Mapped[list[str]] = mapped_column(Json)
     icp_description: Mapped[str | None] = mapped_column(Text)
+    icp_brief: Mapped[dict[str, Any] | None] = mapped_column(Json)  # domain.brief.Brief
     min_fit_score: Mapped[int] = mapped_column(Integer, default=60)
     research_questions: Mapped[list[str]] = mapped_column(Json, default=list)
     cadence_days: Mapped[list[int]] = mapped_column(Json, default=lambda: [0, 3, 8])

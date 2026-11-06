@@ -8,7 +8,7 @@
  */
 
 /** Where a section lives. The two lead pages need a real lead, so the tour opens the newest one. */
-export type Place = "/" | "/onboarding" | "/targets" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
+export type Place = "/" | "/onboarding" | "/targets" | "/campaigns" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
 
 export type Step = {
   /** The `data-tour` name of the element to point at; none means a centred message. */
@@ -85,6 +85,18 @@ export const SECTIONS: Section[] = [
         target: "target-tabs",
         title: "Upload a list, confirm websites",
         body: "Upload a CSV or Excel file: preview it first, nothing is saved until you import. When a company name could mean more than one website, it waits under Websites to confirm.",
+      },
+    ],
+  },
+  {
+    id: "campaigns",
+    title: "Campaigns",
+    place: "/campaigns",
+    steps: [
+      {
+        target: "campaign-brief",
+        title: "Who we look for",
+        body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save.",
       },
     ],
   },

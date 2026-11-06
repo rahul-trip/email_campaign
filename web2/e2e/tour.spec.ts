@@ -38,8 +38,8 @@ test("Next, Back and Skip section move through it; Escape ends it", async ({ pag
   await expect(tour(page)).toContainText("Add leads · section 2");
   await expect(page).toHaveURL(/\/targets$/);
   await page.getByRole("button", { name: "Skip section" }).click();
-  await expect(tour(page)).toContainText("Runs · section 3");
-  await expect(page).toHaveURL(/\/runs$/);
+  await expect(tour(page)).toContainText("Campaigns · section 3");
+  await expect(page).toHaveURL(/\/campaigns$/);
   await page.keyboard.press("Escape");
   await expect(tour(page)).toBeHidden();
 });
