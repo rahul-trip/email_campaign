@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     scrubby_base_url: str = ""  # the public docs do not state it; copy it from your Scrubby account
     tavily_api_key: SecretStr = SecretStr("")
     companies_house_api_key: SecretStr = SecretStr("")  # free key from Companies House
+    exa_api_key: SecretStr = SecretStr("")  # optional: company search and lookalikes
 
     # --- mailboxes (Phase 6c): each workspace connects its own in Settings. These are the
     # platform's OAuth apps that let customers sign in to Microsoft 365 and Google. ---

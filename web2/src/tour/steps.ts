@@ -8,7 +8,7 @@
  */
 
 /** Where a section lives. The two lead pages need a real lead, so the tour opens the newest one. */
-export type Place = "/" | "/onboarding" | "/targets" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
+export type Place = "/" | "/onboarding" | "/targets" | "/campaigns" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
 
 export type Step = {
   /** The `data-tour` name of the element to point at; none means a centred message. */
@@ -89,6 +89,18 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "campaigns",
+    title: "Campaigns",
+    place: "/campaigns",
+    steps: [
+      {
+        target: "campaign-brief",
+        title: "Who we look for",
+        body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save.",
+      },
+    ],
+  },
+  {
     id: "runs",
     title: "Runs",
     place: "/runs",
@@ -96,12 +108,12 @@ export const SECTIONS: Section[] = [
       {
         target: "start-run",
         title: "Start the engine",
-        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also searches for new companies, from a new angle each run, so it keeps finding ones you do not have yet. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
+        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also looks for new companies: in start-up directories such as Y Combinator when your campaign is after start-ups, and in pages that list many companies like the ones in its brief. It screens every company it finds against the brief and adds only those that fit, taking new angles each run. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
       },
       {
         target: "recent-runs",
         title: "Watch it work",
-        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, the searches it made, what each vendor cost, and every lead it touched; click a lead to go to it.",
+        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, where it looked, every company it found with why it was or was not added (Make a lead adds one the screening left out), what each vendor cost, and every lead it touched; click a lead to go to it.",
       },
     ],
   },
@@ -216,7 +228,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-research",
         title: "What research found",
-        body: "Everything research found, in sections: what the company does, how well it fits, products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
+        body: "Everything research found, in sections: what the company does, how well it fits (with a campaign brief, each must-have, sign and rule-out with what research found for it and its source, why they might buy now, and the risks), products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
       },
       {
         target: "lead-policy",
@@ -244,6 +256,11 @@ export const SECTIONS: Section[] = [
         target: "reports-quality",
         title: "Is it working?",
         body: "The share of first emails sent without an edit (the target is 8 of 10), how many were flagged, and spend per prospect against the budget.",
+      },
+      {
+        target: "reports-sources",
+        title: "Where good leads come from",
+        body: "For each place discovery looks (the Y Combinator directory, Companies House, Exa, lists and articles): how many companies it named, how many became leads and how many passed the fit check. Discovery asks the sources whose leads pass most often first, and for more of them.",
       },
     ],
   },

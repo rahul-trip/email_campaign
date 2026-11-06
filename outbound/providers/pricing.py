@@ -21,6 +21,11 @@ DEFAULT_PRICES: dict[str, int | None] = {
     "tavily:search": 8_000,  # $0.008 a credit, 1 credit for a basic search
     "tavily:extract": 8_000,  # 1 credit per 5 URLs; charged as one credit per call here
     "companies_house:lookup": 0,  # free, rate-limited
+    "yc_directory:find": 0,  # the public yc-oss mirror: free, filtered locally
+    "companies_house:find": 0,  # advanced search: free, rate-limited
+    # One search plus up to two lookalike requests, each $0.005 for up to 25 results plus
+    # $0.001 a page for its text: about $0.09 at most.
+    "exa:find": 90_000,
 }
 
 # LLM prices per million tokens as ``(input, output)`` in micro-dollars. Unknown models cost 0

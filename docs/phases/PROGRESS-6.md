@@ -72,6 +72,35 @@ Built:
 
 **Left:** an email to admins about a new request (only the bell today); transferring or sharing the creator's role is just making another admin; a person cannot cancel their own request; no limit on how many workspaces one person may create.
 
+## Discovery and qualification (2026-11-06)
+
+Branches `phase-6/discovery-brief` (migration 0018), `phase-6/discovery-sources` (migration 0019) and the later ones in the plan. Discovery used to make one web search and add every new domain as a lead, scoring fit only after full research. It now works from a brief and screens before adding ([ADR 0031](../technical/adr/0031-multi-source-discovery-screened-before-intake.md)).
+
+Built:
+- **The brief.** Each campaign has an editable ideal-customer brief (`campaigns.icp_brief`). A model drafts it from the campaign and the sender profile, and the operator edits it on the Campaigns page under **Who we look for**.
+- **Sources.** Discovery looks in the Y Combinator directory (a public mirror, free) when the brief is after start-ups. It also searches for pages that list many companies like the wanted ones and reads them with a model.
+- **Screening.** Everything found is merged, screened against the brief in batches, and only fits become leads. Every company is kept with its verdict (`discovery_candidates`) and shown on the run's page, and **Make a lead** promotes one.
+- **Qualification** (`phase-6/discovery-qualification`). Research judges each lead against the brief criterion by criterion, with evidence and source, why now and risks; the score is computed in code (`outbound/domain/qualification.py`) and the breakdown is shown on the lead page. A discovered lead whose own site meets a disqualifier stops after the site read.
+
+- **More sources and their record** (`phase-6/discovery-more-sources`). Companies House advanced search (UK briefs with SIC codes) and Exa (company search and lookalikes of example customers and qualified leads, behind `EXA_API_KEY`) are discovery sources. Each source's 90-day record (named, leads, passed the fit gate) orders the sources and sizes their share, and Reports shows it as *Where good leads come from*.
+
+**Left:**
+- People Data Labs company search (optional in the plan; not built).
+- Live checks of Exa and Companies House advanced search ([R-30](../technical/tech-debt-and-risks.md)).
+- Minor findings from the final review, deferred:
+  - **Make a lead** with no manual credit says "not added" though the row is queued (a second click queues a duplicate).
+  - Intake races are stored as *Does not fit* instead of *A lead already* / *waiting for the next run*.
+  - Website searches per run are not capped.
+  - Screening's fallback to word matching when the model fails is not logged as a warning.
+  - Usable model values are dropped: a score of `72.0`, a founded year as text, and ids like `m1`.
+  - Exa `find` ignores `limit` and drops example sites given with `https://`.
+  - One malformed Exa or Companies House item can fail that source.
+  - Source records count not-yet-researched leads as misses.
+  - Search URLs are unfenced in the extract prompt, and the evidence link isn't checked to be `http(s)`.
+  - The run page's per-search new/already lead counts are always 0, and a candidate's lead link breaks after the lead is deleted.
+  - `Discovery` lacks `screened` and per-source counts.
+- A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

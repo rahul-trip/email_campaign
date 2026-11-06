@@ -425,6 +425,23 @@ def test_campaigns_can_be_created_listed_and_changed(api: Api) -> None:
     )
 
 
+def test_a_campaigns_brief_is_drafted_by_the_model_and_editable(api: Api) -> None:
+    cid = api.post(
+        "/api/settings/campaigns", json={"name": "expo", "target_titles": ["CTO"]}
+    ).json()["id"]
+    assert api.get("/api/settings/campaigns").json()[0]["icp_brief"] is None
+    drafted = api.post(f"/api/settings/campaigns/{cid}/brief/regenerate")
+    assert drafted.status_code == 200
+    assert drafted.json()["icp_brief"]["keywords"] == ["grid forecasting", "load forecasting"]
+    edited = api.patch(
+        f"/api/settings/campaigns/{cid}",
+        json={"icp_brief": {"keywords": ["wind", "wind "], "company_type": "startup"}},
+    ).json()["icp_brief"]
+    assert edited["keywords"] == ["wind"]  # cleaned the same way as a model's brief
+    assert edited["company_type"] == "startup"
+    assert api.post("/api/settings/campaigns/nope/brief/regenerate").status_code == 404
+
+
 def test_a_country_policy_is_versioned_when_it_changes(api: Api) -> None:
     first = api.put("/api/settings/policies/gb", json={"rule": "allow_with_footer"}).json()
     assert (first["country_code"], first["version"]) == ("GB", 1)

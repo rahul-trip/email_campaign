@@ -1,0 +1,28 @@
+{
+  "requestId": "b5947044c4b78efa9552a7c89b306d95",
+  "resolvedSearchType": "neural",
+  "results": [
+    {
+      "id": "https://www.gridcast.io/",
+      "url": "https://www.gridcast.io/",
+      "title": "Gridcast | Load forecasting for grid operators",
+      "score": 0.41,
+      "publishedDate": null,
+      "author": null,
+      "text": "Gridcast helps European grid operators forecast load and congestion a day ahead."
+    },
+    {
+      "id": "https://voltwise.com/about",
+      "url": "https://voltwise.com/about",
+      "title": "Voltwise - Battery dispatch software",
+      "text": "Voltwise optimises battery dispatch for utilities."
+    },
+    {
+      "id": "no-url",
+      "url": "",
+      "title": "Broken",
+      "text": ""
+    }
+  ],
+  "costDollars": {"total": 0.005}
+}

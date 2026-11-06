@@ -1,0 +1,18 @@
+{
+  "requestId": "c6a1",
+  "results": [
+    {
+      "id": "https://amperon.co",
+      "url": "https://amperon.co",
+      "title": "Amperon: AI energy forecasting",
+      "text": "Amperon provides electricity demand forecasts to utilities and traders."
+    },
+    {
+      "id": "https://www.gridcast.io/",
+      "url": "https://www.gridcast.io/",
+      "title": "Gridcast | Load forecasting for grid operators",
+      "text": "Gridcast helps European grid operators forecast load."
+    }
+  ],
+  "costDollars": {"total": 0.005}
+}

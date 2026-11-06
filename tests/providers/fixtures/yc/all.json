@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1, "name": "Gridcast", "slug": "gridcast", "former_names": [],
+    "website": "https://www.gridcast.io", "all_locations": "Berlin, BE, Germany",
+    "long_description": "Gridcast forecasts electricity demand for European grid operators.",
+    "one_liner": "Load forecasting for grid operators", "team_size": 18,
+    "industry": "Industrials", "subindustry": "Industrials -> Energy",
+    "launched_at": 1640995200, "tags": ["Energy", "Machine Learning"],
+    "top_company": false, "isHiring": true, "nonprofit": false,
+    "batch": "Winter 2022", "status": "Active",
+    "industries": ["Industrials", "Energy"], "regions": ["Germany", "Europe"],
+    "stage": "Early", "url": "https://www.ycombinator.com/companies/gridcast"
+  },
+  {
+    "id": 2, "name": "Old Grid Co", "slug": "old-grid", "former_names": [],
+    "website": "https://oldgrid.com", "all_locations": "London, ENG, United Kingdom",
+    "long_description": "Grid forecasting software, wound down.",
+    "one_liner": "Grid forecasting", "team_size": 3,
+    "industry": "Industrials", "subindustry": "Industrials -> Energy",
+    "launched_at": 1388534400, "tags": ["Energy"],
+    "batch": "Summer 2014", "status": "Inactive",
+    "industries": ["Industrials"], "regions": ["United Kingdom", "Europe"],
+    "stage": "Early", "url": "https://www.ycombinator.com/companies/old-grid"
+  },
+  {
+    "id": 3, "name": "PetPal", "slug": "petpal", "former_names": [],
+    "website": "https://petpal.app", "all_locations": "San Francisco, CA, USA",
+    "long_description": "An app for dog walkers.", "one_liner": "Dog walking marketplace",
+    "team_size": 5, "industry": "Consumer", "subindustry": "Consumer -> Pets",
+    "launched_at": 1672531200, "tags": ["Marketplace"],
+    "batch": "Winter 2023", "status": "Active",
+    "industries": ["Consumer"], "regions": ["United States of America", "America / Canada"],
+    "stage": "Early", "url": "https://www.ycombinator.com/companies/petpal"
+  },
+  {
+    "id": 4, "name": "Voltwise", "slug": "voltwise", "former_names": [],
+    "website": "", "all_locations": "Paris, IDF, France",
+    "long_description": "Battery dispatch optimisation with energy forecasting.",
+    "one_liner": "Battery dispatch", "team_size": 40,
+    "industry": "Industrials", "subindustry": "Industrials -> Energy",
+    "launched_at": 1514764800, "tags": ["Energy", "Climate"],
+    "batch": "Summer 2018", "status": "Active",
+    "industries": ["Industrials", "Climate"], "regions": ["France", "Europe"],
+    "stage": "Growth", "url": "https://www.ycombinator.com/companies/voltwise"
+  }
+]

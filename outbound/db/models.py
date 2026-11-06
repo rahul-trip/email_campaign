@@ -34,6 +34,7 @@ from outbound.domain.enums import (
     AuthTokenPurpose,
     CallOutcome,
     CampaignStatus,
+    CandidateVerdict,
     CompanySource,
     CompanyStatus,
     ConsentBasis,
@@ -130,6 +131,7 @@ class CampaignRow(Mutable, Base):
     name: Mapped[str] = mapped_column(String(200))
     target_titles: Mapped[list[str]] = mapped_column(Json)
     icp_description: Mapped[str | None] = mapped_column(Text)
+    icp_brief: Mapped[dict[str, Any] | None] = mapped_column(Json)  # domain.brief.Brief
     min_fit_score: Mapped[int] = mapped_column(Integer, default=60)
     research_questions: Mapped[list[str]] = mapped_column(Json, default=list)
     cadence_days: Mapped[list[int]] = mapped_column(Json, default=lambda: [0, 3, 8])
@@ -849,6 +851,36 @@ class CreditGrantRow(AppendOnly, Base):
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     note: Mapped[str] = mapped_column(Text, default="")
     granted_by: Mapped[str | None] = mapped_column(String(36))
+
+
+class DiscoveryCandidateRow(Mutable, Base):
+    """A company discovery found for a campaign, where, and what it decided (migration 0019).
+    One row per company per campaign, so nothing is screened twice. ``company_id`` and
+    ``run_id`` are plain ids, not foreign keys: deleting a lead leaves the record of finding it."""
+
+    __tablename__ = "discovery_candidates"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "campaign_id", "name_key"),
+        _tenant_fk("discovery_candidates", "campaign_id", "campaigns"),
+        Index("ix_discovery_candidates_run", "workspace_id", "run_id"),
+    )
+
+    campaign_id: Mapped[str] = mapped_column(String(36))
+    run_id: Mapped[str | None] = mapped_column(String(36))
+    name: Mapped[str] = mapped_column(String(300))
+    name_key: Mapped[str] = mapped_column(String(300))
+    domain: Mapped[str | None] = mapped_column(String(255))
+    sources: Mapped[list[str]] = mapped_column(Json, default=list)
+    source_urls: Mapped[list[str]] = mapped_column(Json, default=list)
+    description: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    screen_score: Mapped[int | None] = mapped_column(Integer)
+    rank_score: Mapped[int | None] = mapped_column(Integer)
+    verdict: Mapped[CandidateVerdict] = mapped_column(
+        enum_type(CandidateVerdict, "candidate_verdict")
+    )
+    reason: Mapped[str] = mapped_column(Text, default="")
+    company_id: Mapped[str | None] = mapped_column(String(36))
 
 
 class UsageEventRow(AppendOnly, Base):

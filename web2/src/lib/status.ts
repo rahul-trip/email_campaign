@@ -70,6 +70,23 @@ export const importRowStatus: Vocabulary = {
   rejected: s("Rejected", "stopped"),
 };
 
+/** What discovery decided about a company it found (``CandidateVerdict``). */
+export const candidateVerdict: Vocabulary = {
+  accepted: s("Added as a lead", "good"),
+  over_limit: s("Fits, waiting for the next run", "working"),
+  unresolved: s("Fits, no website yet", "attention"),
+  already_lead: s("A lead already", "stopped"),
+  rejected: s("Does not fit", "stopped"),
+};
+
+/** Where discovery looked, as the run page names it. */
+export const discoverySource: Record<string, string> = {
+  yc_directory: "Y Combinator directory",
+  companies_house: "Companies House",
+  exa: "Exa company search",
+  articles: "Lists and articles",
+};
+
 export const callOutcome: Vocabulary = {
   hit: s("Hit", "good"),
   miss: s("Miss", "stopped"),

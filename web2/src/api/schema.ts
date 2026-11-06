@@ -924,6 +924,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/candidates/{candidate_id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Candidate
+         * @description Add a company the run found, but did not add, as a lead.
+         */
+        post: operations["promote_candidate_api_candidates__candidate_id__promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies": {
         parameters: {
             query?: never;
@@ -1801,6 +1821,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sources
+         * @description Where discovery's companies came from, and how many of each source's leads qualified.
+         */
+        get: operations["sources_api_reports_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/review": {
         parameters: {
             query?: never;
@@ -1987,6 +2027,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/{run_id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Candidates
+         * @description Every company the run found, best ranked first, with what it decided about each.
+         */
+        get: operations["run_candidates_api_runs__run_id__candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}/leads": {
         parameters: {
             query?: never;
@@ -2060,6 +2120,23 @@ export interface paths {
         head?: never;
         /** Update Campaign */
         patch: operations["update_campaign_api_settings_campaigns__campaign_id__patch"];
+        trace?: never;
+    };
+    "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Campaign Brief */
+        post: operations["regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/settings/mailboxes/{mailbox_id}/dns-check": {
@@ -2669,6 +2746,10 @@ export interface components {
         CampaignOut: {
             /** Cadence Days */
             cadence_days: number[];
+            /** Icp Brief */
+            icp_brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Icp Description */
             icp_description: string | null;
             /** Id */
@@ -2686,6 +2767,10 @@ export interface components {
         CampaignPatch: {
             /** Cadence Days */
             cadence_days?: number[] | null;
+            /** Icp Brief */
+            icp_brief?: {
+                [key: string]: unknown;
+            } | null;
             /** Icp Description */
             icp_description?: string | null;
             /** Min Fit Score */
@@ -2697,6 +2782,40 @@ export interface components {
             /** Target Titles */
             target_titles?: string[] | null;
         };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Company Id */
+            company_id: string | null;
+            /** Description */
+            description: string;
+            /** Domain */
+            domain: string | null;
+            /** Evidence */
+            evidence: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Rank Score */
+            rank_score: number | null;
+            /** Reason */
+            reason: string;
+            /** Run Id */
+            run_id: string | null;
+            /** Screen Score */
+            screen_score: number | null;
+            /** Source Urls */
+            source_urls: string[];
+            /** Sources */
+            sources: string[];
+            verdict: components["schemas"]["CandidateVerdict"];
+        };
+        /**
+         * CandidateVerdict
+         * @description What discovery decided about a company it found (``discovery_candidates.verdict``).
+         * @enum {string}
+         */
+        CandidateVerdict: "accepted" | "rejected" | "unresolved" | "already_lead" | "over_limit";
         /** ChangePasswordIn */
         ChangePasswordIn: {
             /** Current Password */
@@ -3216,10 +3335,18 @@ export interface components {
         DiscoverySearchOut: {
             /** Already Leads */
             already_leads: number;
+            /** Angle */
+            angle: string;
+            /** Found */
+            found: number;
             /** New Leads */
             new_leads: number;
+            /** Pages */
+            pages: string[];
             /** Query */
             query: string;
+            /** Source */
+            source: string;
         };
         /** EmailOut */
         EmailOut: {
@@ -4014,6 +4141,11 @@ export interface components {
             /** Messages Cancelled */
             messages_cancelled: number;
         };
+        /** PromoteIn */
+        PromoteIn: {
+            /** Domain */
+            domain?: string | null;
+        };
         /**
          * Provenance
          * @enum {string}
@@ -4382,6 +4514,21 @@ export interface components {
             kind: string;
             /** Text */
             text: string;
+        };
+        /** SourceYieldOut */
+        SourceYieldOut: {
+            /** Days */
+            days: number;
+            /** Found */
+            found: number;
+            /** Leads */
+            leads: number;
+            /** Qualified */
+            qualified: number;
+            /** Rate */
+            rate: number;
+            /** Source */
+            source: string;
         };
         /** StageOut */
         StageOut: {
@@ -6601,6 +6748,41 @@ export interface operations {
             };
         };
     };
+    promote_candidate_api_candidates__candidate_id__promote_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                candidate_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromoteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     companies_api_companies_get: {
         parameters: {
             query?: {
@@ -8231,6 +8413,26 @@ export interface operations {
             };
         };
     };
+    sources_api_reports_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceYieldOut"][];
+                };
+            };
+        };
+    };
     queue_api_review_get: {
         parameters: {
             query?: never;
@@ -8564,6 +8766,37 @@ export interface operations {
             };
         };
     };
+    run_candidates_api_runs__run_id__candidates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     run_leads_api_runs__run_id__leads_get: {
         parameters: {
             query?: never;
@@ -8693,6 +8926,37 @@ export interface operations {
                 "application/json": components["schemas"]["CampaignPatch"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -10,6 +10,7 @@ from typing import Any
 from outbound.db.errors import NotFound
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
+from outbound.domain.brief import Brief
 from outbound.domain.entities import Campaign, CountryPolicy, Workspace
 from outbound.domain.enums import (
     EntityType,
@@ -18,6 +19,8 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.providers.ports import LlmClient
+from outbound.services.brief import draft_brief
 from outbound.services.dns_check import (
     COMMON_DKIM_SELECTORS,
     MxLookup,
@@ -88,8 +91,10 @@ class SettingsService:
         dns_lookup: TxtLookup = system_lookup,
         mx_lookup: MxLookup | None = None,
         actor: str = OPERATOR,
+        llm: LlmClient | None = None,  # drafts a campaign's brief; behind the meter
     ) -> None:
         self._uow = uow_factory
+        self._llm = llm
         self._workspace_id = workspace_id
         self._dns = dns_lookup
         # MX is looked up for real only when the TXT lookup is the real one too (tests inject both)
@@ -183,6 +188,8 @@ class SettingsService:
             return created
 
     def update_campaign(self, campaign_id: str, changes: dict[str, Any]) -> Campaign:
+        if changes.get("icp_brief") is not None:  # cleaned like a model's, so it is always usable
+            changes = {**changes, "icp_brief": Brief.from_json(changes["icp_brief"]).to_json()}
         try:
             with self._uow(self._workspace_id) as uow:
                 updated = uow.campaigns.update(campaign_id, changes)
@@ -190,6 +197,19 @@ class SettingsService:
                 return updated
         except ValueError as error:
             raise SettingsError(str(error)) from None
+
+    def regenerate_brief(self, campaign_id: str) -> Campaign:
+        """Draft the campaign's brief again from its description and the sender profile. The
+        model is asked outside any transaction; the brief replaces the one stored."""
+        with self._uow(self._workspace_id) as uow:
+            campaign = uow.campaigns.get(campaign_id)
+            profile = dict(self._workspace(uow).sender_profile)
+        brief = draft_brief(self._llm, campaign=campaign, profile=profile)
+        with self._uow(self._workspace_id) as uow:
+            updated = uow.campaigns.update(campaign_id, {"icp_brief": brief.to_json()})
+            self._record_change(uow, "campaign_brief_drafted", {"campaign_id": campaign_id})
+            uow.commit()
+            return updated
 
     # ------------------------------------------------------------------ country policies
 

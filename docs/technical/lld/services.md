@@ -30,12 +30,15 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 
 | Module | Main symbols | Used by |
 |---|---|---|
-| `intake.py` | `IntakeService` (`run`, `needing_confirmation`, `confirm`), `DomainResolver`, `match_confidence`, `discover_rows`, `discovery_query`, `load_rows`, `parse_target` | CLI `targets`, `run --mode discovery\|mixed`; API targets router; webhook; `pipeline.discover_companies` |
+| `intake.py` | `IntakeService` (`run`, `needing_confirmation`, `confirm`), `DomainResolver`, `match_confidence`, `load_rows`, `parse_target` | CLI `targets`, `run --mode discovery\|mixed`; API targets router; webhook; `pipeline.discover_companies` |
 | `review.py` | `ReviewService` (`queue`, `resolve`, `show`, `approve`, `reject`), `ReviewError`, `footer_of` | CLI `review`; API review router |
 | `leads.py` | `LeadService` (below), `LeadError` | API leads, targets and privacy routers; data-fix scripts |
 | `privacy.py` | `PrivacyService` (`forget`, `suppress_contact`, `suppress_company`, `suppress_value`, `delete_lead`) | CLI `forget`, `suppress`, `delete-lead`; API privacy router |
 | `forget.py` | `forget_email`, `stop_contact`, `suppress_if_nobody_left` | `PrivacyService` (runs inside the caller's unit of work) |
-| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
+| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns and `regenerate_brief`, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
+| `discovery.py` | `Discoverer`, `ArticleSource`, `plan_queries`, `merge`, `screen`, `rank_score`, `domain_resolver`, `Discovery` | `pipeline.discover_companies` |
+| `candidates.py` | `CandidateService` (`for_run`, `promote`) | API runs router |
+| `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
 | `runs.py` | `RunService` (`queue`, `get`, `recent`, `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
 | `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
@@ -68,12 +71,23 @@ Services are the operator's use cases: add targets, review an email, edit a lead
    Otherwise it creates the company, or **merges** into an existing one with the same registrable domain: notes are appended, and differing values become events rather than overwrites. An operator-given person or address becomes an `active` contact, and an `operator_given` address. Each row is recorded with its status, resolved domain, confidence and reason.
 4. With `validate_only`, no search is made and the transaction is rolled back.
 
-**Discovery** (`discover_rows`):
+**Discovery** (`discovery.py::Discoverer`, [ADR 0031](../adr/0031-multi-source-discovery-screened-before-intake.md)):
 
-1. `discovery_query` phrases the campaign's ideal customer as a search for *companies offering* it.
-2. It asks for twice the wanted count.
-3. It skips platforms, free-mail domains, articles and documents (by path), and duplicates.
-4. Each row holds **only the website**, plus a note with the page it was found on, never the hit's title ([ADR 0023](../adr/0023-discovery-stores-websites-unconfirmed-people.md)).
+1. **The brief.** The campaign's brief is read, or drafted (`brief.py::draft_brief`) and saved if it is empty.
+2. **Fits waiting from earlier runs go first** (`candidates.waiting`, verdict `over_limit`), with no new screening. If they fill the count, the run stops there.
+3. **Every source that suits the brief is asked** (`domain.discovery.plan_sources`), the ones whose leads passed the fit gate most often in the last `YIELD_DAYS` first (`candidates.source_yield`; a source with fewer than `MIN_HISTORY` companies counts as average). Each is asked for its usual amount times `share` (half to double, by its qualified rate against the average):
+   - the `LeadSource`s (`yc_directory`, `companies_house`, `exa`), for `PER_SOURCE × share` companies, with `source_query(brief, examples=…)`, where the examples are the campaign's best qualified leads (`companies.qualified_domains`, at most `EXAMPLES`) for lookalike search;
+   - `ArticleSource`, for up to `MAX_SEARCHES × share` list-page searches (planned by `plan_queries`, or by `article_queries` from the brief). It reads the best `PAGES_PER_SEARCH` pages of each, never one read before, and makes one model call per page.
+
+   Article searches stop early once there are `ENOUGH` fresh companies per wanted lead. Every search is a `discovery_query` event, recording its source, angle, pages and how many companies it found.
+4. **Merge** (`merge`): one entry per company, matched by website, else by `name_key`.
+5. **Set aside** companies already screened for this campaign (`candidates.known_keys`) and those that are already leads.
+6. **Screen** (`screen`): one model call per `SCREEN_BATCH` companies. A company fails if it has a disqualifier or scores under `SCREEN_MIN`. Without a model, the brief's words are matched instead.
+7. **Rank** (`rank_score`): the screening score plus a bonus for corroboration.
+8. **Add the best fits** through `IntakeService.run` (`company_source=discovery`, which charges the credit), up to the count. A company with no website gets one `DomainResolver` search, and below `MIN_CONFIDENCE` it is `unresolved`.
+9. **Keep a row for every company** (`discovery_candidates`) with its verdict and reason.
+
+`candidates.py::CandidateService` lists a run's candidates and promotes one: it goes through intake as a **manual** lead chosen by the operator, and the verdict becomes `accepted`.
 
 ## Review
 

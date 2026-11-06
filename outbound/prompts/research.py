@@ -22,7 +22,11 @@ or 'LTIMindtree'; never a page title, headline or slogan; empty if the pages do 
 "summary": "<2-3 sentences: what the company does and for whom>",
 "products": ["<product or service>", ...],
 "news": ["<recent, specific, dated if the text dates it>", ...],
-"hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...]}}
+"hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...],
+"ruled_out": [{{"id": "<a rule's id, e.g. 'D1'>", "evidence": "<the words on the pages that
+show it>"}}, ...]}}
+"ruled_out" lists only rules you are given under "What rules a company out" that the pages
+clearly show this company meets; when in doubt, leave it out. An empty list is a good answer.
 List every product or service, every recent news item and every hook the text supports; do
 not leave a point out to keep the lists short. A hook must be something only this company
 would have said or done. {_JSON_ONLY}"""
@@ -69,6 +73,24 @@ You judge how well a company matches a seller's ideal customer, from 0 (no match
 Return: {{"score": <integer 0-100>, "reason": "<one sentence naming the deciding factor>"}}
 {_JSON_ONLY}"""
 
+QUALIFY_SYSTEM_PROMPT = f"""\
+You check one company against each criterion of a seller's ideal-customer brief, one by one,
+from what research found about it. {_GROUNDED}
+
+For every criterion you are given, by its id:
+- "met" when the research shows it, quoting or closely paraphrasing the words that show it;
+- "not_met" when the research shows the opposite;
+- "unknown" when the research does not say. Unknown is a good answer: never guess.
+Must-haves (M) are what the company needs to be, signals (S) are signs they may buy now, and
+disqualifiers (D) rule the company out when met.
+
+Return: {{"criteria": [{{"id": "<M1, S1, D1...>", "verdict": "met|not_met|unknown",
+"evidence": "<the words that show it, empty when unknown>",
+"source": "<the URL the evidence is from, if the research gives one, else empty>"}}, ...],
+"why_now": "<one sentence: why this company might buy now, or empty if nothing shows it>",
+"risks": ["<a concrete reason this company may not buy>", ...]}}
+{_JSON_ONLY}"""
+
 
 def _block(title: str, body: str) -> str:
     return f"## {title}\n{body.strip() or '(nothing)'}\n"
@@ -78,8 +100,10 @@ def untrusted(title: str, body: str) -> str:
     return f"## {title}\n{untrusted_text(body)}\n"
 
 
-def build_site_user_prompt(company: str, domain: str, pages: str) -> str:
-    return _block("Company", f"{company} ({domain})") + untrusted("Pages", pages)
+def build_site_user_prompt(company: str, domain: str, pages: str, rules: Sequence[str] = ()) -> str:
+    """``rules`` are the brief's disqualifiers as "D1. <text>" lines, if it has any."""
+    ruled = _block("What rules a company out", "\n".join(rules)) if rules else ""
+    return _block("Company", f"{company} ({domain})") + ruled + untrusted("Pages", pages)
 
 
 def build_signals_user_prompt(
@@ -117,6 +141,29 @@ def build_fit_user_prompt(
         + _block("Company", company)
         + untrusted("What they do", summary)
         + untrusted("Products", "\n".join(f"- {p}" for p in products))
-        + _block("Operator notes", notes)
+        + untrusted("Notes, including where the company was found", notes)
         + untrusted("Answers to research questions", answers)
+    )
+
+
+def build_qualify_user_prompt(
+    *,
+    brief: str,
+    criteria: Sequence[str],
+    company: str,
+    research: str,
+    notes: str,
+    answers: str,
+    pages: str,
+) -> str:
+    """``criteria`` are "M1. <text> (counts 3)" lines; ``notes`` include what discovery found,
+    which came from the web, so they are fenced like the pages."""
+    return (
+        _block("Who the seller looks for", brief)
+        + _block("Criteria", "\n".join(criteria))
+        + _block("Company", company)
+        + untrusted("What research found", research)
+        + untrusted("Notes, including where the company was found", notes)
+        + untrusted("Answers to research questions", answers)
+        + untrusted("Pages", pages)
     )

@@ -29,8 +29,6 @@ from outbound.services.intake import (
     IntakeService,
     RowOutcome,
     detect_anchor,
-    discover_rows,
-    discovery_query,
     load_rows,
     match_confidence,
     parse_target,
@@ -577,48 +575,6 @@ def test_a_campaign_is_attached_to_every_company(factory: UnitOfWorkFactory, ws:
         company = uow.companies.by_domain("acme.com")
         assert company is not None
         assert company.campaign_id == campaign.id
-
-
-def test_discovery_rows_are_websites_only_and_skip_platforms_and_repeats() -> None:
-    search = FakeSearch(
-        {
-            "grid": [
-                hit("https://acme.com/a", "Acme | Home"),
-                hit("https://acme.com/b", "Acme again"),
-                hit("https://linkedin.com/company/x", "X"),
-                hit("https://beta.io", "Beta"),
-            ]
-        }
-    )
-    assert discover_rows(search, ["grid software"]) == [
-        {"website": "acme.com", "notes": "Found by discovery: https://acme.com/a"},
-        {"website": "beta.io", "notes": "Found by discovery: https://beta.io"},
-    ]
-
-
-def test_discovery_never_names_a_company_after_an_article_and_skips_documents() -> None:
-    # The real run: an ICP search returned reports and blog posts, and their headlines became
-    # company names ("6 Grid Trends to Watch in 2026" for amperon.co).
-    search = FakeSearch(
-        {
-            "companies": [
-                hit("https://www.ltm.com/uploads/report/2026/06/utilities-report.pdf", "AI Report"),
-                hit("https://www.ifs.com/en/insights/assets/2026-utility-predictions", "2026"),
-                hit("https://www.amperon.co/blog/6-grid-trends-to-watch-in-2026", "6 Grid Trends"),
-                hit("https://www.volue.com/distribution", "Modern Grids. Stronger Communities."),
-                hit("https://www.misoenergy.org", "MISO"),
-            ]
-        }
-    )
-    rows = discover_rows(search, [discovery_query("grid operators")], per_query=5)
-    assert [r["website"] for r in rows] == ["volue.com", "misoenergy.org"]
-    assert all("company" not in r for r in rows)
-
-
-def test_discovery_asks_for_companies_rather_than_articles() -> None:
-    query = discovery_query("utilities and  grid operators")
-    assert query.startswith("companies")
-    assert query.endswith("utilities and grid operators")
 
 
 def test_discovered_companies_are_marked_as_discovered_and_not_operator_chosen(

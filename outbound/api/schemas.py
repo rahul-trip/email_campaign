@@ -8,6 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from outbound.domain.enums import (
+    CandidateVerdict,
     CompanyStatus,
     ConsentBasis,
     HoldReason,
@@ -615,6 +616,30 @@ class DiscoverySearchOut(Out):
     query: str
     new_leads: int
     already_leads: int
+    source: str
+    angle: str
+    found: int
+    pages: list[str]
+
+
+class CandidateOut(Out):
+    id: str
+    run_id: str | None
+    name: str
+    domain: str | None
+    sources: list[str]
+    source_urls: list[str]
+    description: str
+    evidence: str
+    screen_score: int | None
+    rank_score: int | None
+    verdict: CandidateVerdict
+    reason: str
+    company_id: str | None
+
+
+class PromoteIn(In):
+    domain: str | None = Field(default=None, max_length=255)
 
 
 class RunCallOut(Out):
@@ -648,6 +673,15 @@ class QualityOut(Out):
     catch_all_share: float | None
 
 
+class SourceYieldOut(Out):
+    source: str
+    found: int  # companies it named
+    leads: int  # of those, how many became leads
+    qualified: int  # of those, how many passed the fit gate
+    rate: float  # qualified / found
+    days: int  # the window counted
+
+
 class CostOut(Out):
     total: int
     per_prospect: int | None
@@ -669,6 +703,7 @@ class CampaignOut(Out):
     min_fit_score: int
     research_questions: list[str]
     cadence_days: list[int]
+    icp_brief: dict[str, Any] | None = None
 
 
 class CampaignIn(In):
@@ -687,6 +722,7 @@ class CampaignPatch(In):
     min_fit_score: int | None = Field(default=None, ge=0, le=100)
     research_questions: list[str] | None = Field(default=None, max_length=3)
     cadence_days: list[int] | None = None
+    icp_brief: dict[str, Any] | None = None  # cleaned by ``domain.brief.Brief``
 
 
 class PolicyOut(Out):

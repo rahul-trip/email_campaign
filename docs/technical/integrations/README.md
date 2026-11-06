@@ -15,13 +15,15 @@ Every outside system Outbound depends on: what it is for, how it is reached, wha
 | Vendor | Role | Port | Registry name | Settings | Cache (TTL) | Live check (2026-10-19) | Page |
 |---|---|---|---|---|---|---|---|
 | Tavily | Search, page extraction, discovery, LinkedIn-title search | `SearchProvider` | — (always Tavily) | `TAVILY_API_KEY` | `search`, `extract` (30 days) | Works, including `site:` search and extract | [tavily](tavily.md) |
+| Exa | Company search and lookalikes for discovery | `LeadSource` | — | `EXA_API_KEY` (optional) | `find` (30 days) | Not live-checked | [exa](exa.md) |
+| Y Combinator directory | Start-up directory for discovery (public yc-oss mirror) | `LeadSource` | — (always on) | none | the directory in memory for a day; `find` (30 days) | Not yet | [yc-directory](yc-directory.md) |
 | Hunter | Finder and verifier | `EmailFinder`, `EmailVerifier` | `hunter` | `HUNTER_API_KEY` | `find`, `verify` (90 days) | Verifier works | [hunter](hunter.md) |
 | ZeroBounce | Finder and verifier | `EmailFinder`, `EmailVerifier` | `zerobounce` | `ZEROBOUNCE_API_KEY` | `find`, `verify` (90 days) | Verifier works | [zerobounce](zerobounce.md) |
 | MyEmailVerifier | Verifier (the default) | `EmailVerifier` | `myemailverifier` | `MYEMAILVERIFIER_API_KEY` | `verify` (90 days) | Works | [myemailverifier](myemailverifier.md) |
 | OrbiSearch | Verifier only (no finder API) | `EmailVerifier` | `orbisearch` | `ORBISEARCH_API_KEY` | `verify` (90 days) | Works | [orbisearch](orbisearch.md) |
 | Enrichley | Catch-all resolver, answers at once | `CatchAllResolver` | `enrichley` | `ENRICHLEY_API_KEY` | `resolve` (90 days) | Not checked | [enrichley](enrichley.md) |
 | Scrubby | Catch-all resolver, asynchronous (24–72 h); the default | `CatchAllResolver` | `scrubby` | `SCRUBBY_API_KEY`, `SCRUBBY_BASE_URL` | `resolve` (90 days) | **Fails**: no answer before the timeout; base URL unconfirmed | [scrubby](scrubby.md) |
-| Companies House | UK company register (free) | `CompanyRegistry` | — | `COMPANIES_HOUSE_API_KEY` (optional) | `lookup` (30 days) | Works | [companies-house](companies-house.md) |
+| Companies House | UK company register (free); also finds UK companies by industry code for discovery | `CompanyRegistry`, `LeadSource` | — | `COMPANIES_HOUSE_API_KEY` (optional) | `lookup` (30 days) | Works | [companies-house](companies-house.md) |
 | LLM (Anthropic by default; any OpenAI-compatible API) | Research, fit, persona, copy, critic | `LlmClient` | `LLM_PROVIDER` preset | `LLM_PROVIDER`, `LLM_MODEL`, the provider's key, `LLM_BASE_URL` | **Not cached** | Works | [llm](llm.md) |
 | IMAP mailbox | Save and delete drafts; read Sent | `Mailbox` | — | `IMAP_*`, `EMAIL_ADDRESS`, `EMAIL_PASSWORD`, folders | — | Login, save, find and delete a draft all work | [imap-mailbox](imap-mailbox.md) |
 

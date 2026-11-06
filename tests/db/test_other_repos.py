@@ -249,6 +249,17 @@ def test_a_campaign_has_defaults_and_a_unique_name(factory: UnitOfWorkFactory, w
             uow.campaigns.create("expo", ["CEO"])
 
 
+def test_a_campaign_keeps_its_ideal_customer_brief(factory: UnitOfWorkFactory, ws: str) -> None:
+    brief = {"summary": "grid start-ups", "company_type": "startup", "keywords": ["grid"]}
+    with factory(ws) as uow:
+        campaign = uow.campaigns.create("expo", ["CTO"])
+        assert campaign.icp_brief is None
+        uow.campaigns.update(campaign.id, {"icp_brief": brief})
+        uow.commit()
+    with factory(ws) as uow:
+        assert uow.campaigns.get(campaign.id).icp_brief == brief
+
+
 def test_an_import_batch_counts_rows_by_outcome(factory: UnitOfWorkFactory, ws: str) -> None:
     with factory(ws) as uow:
         batch = uow.imports.create_batch(ImportSource.CSV, "operator", filename="expo.csv")

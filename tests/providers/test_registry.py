@@ -7,6 +7,7 @@ from outbound.providers.adapters.hunter import HunterFinder
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder
 from outbound.providers.errors import ProviderAuthError
 from outbound.providers.registry import (
+    build_company_sources,
     build_finder_chain,
     build_resolver,
     build_verifier,
@@ -71,3 +72,13 @@ def test_single_verifier_and_resolver_builders_follow_settings() -> None:
 
 def test_secrets_do_not_appear_in_the_settings_repr() -> None:
     assert "super-secret" not in repr(settings(hunter_api_key="super-secret"))
+
+
+def test_discovery_sources_follow_the_keys_that_are_set() -> None:
+    assert [s.name for s in build_company_sources(settings())] == ["yc_directory"]
+    both = settings(companies_house_api_key="c", exa_api_key="e")
+    assert [s.name for s in build_company_sources(both)] == [
+        "yc_directory",
+        "companies_house",
+        "exa",
+    ]

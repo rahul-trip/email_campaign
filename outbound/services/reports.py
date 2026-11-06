@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.discovery import YIELD_DAYS, SourceYield
 from outbound.domain.enums import CallOutcome, CompanyStatus, HoldReason, MessageState
 
 CATCH_ALL_HOLDS = (HoldReason.CATCH_ALL_RESOLVING, HoldReason.CATCH_ALL_UNVERIFIED)
@@ -88,6 +90,14 @@ class ReportService:
         return QualityReport(
             touch.written, touch.flagged, touch.sent, touch.unedited, companies, holds
         )
+
+    def sources(self, days: int = YIELD_DAYS) -> list[tuple[str, SourceYield]]:
+        """Where discovery's companies came from in the last ``days``, and how many of each
+        source's leads passed the fit gate: the record discovery weighs its sources by. Best
+        first."""
+        with self._uow(self._workspace_id) as uow:
+            found = uow.candidates.source_yield(since=utcnow() - timedelta(days=days))
+        return sorted(found.items(), key=lambda item: (-item[1].rate, -item[1].found, item[0]))
 
     def cost(self, since: datetime, until: datetime) -> CostReport:
         with self._uow(self._workspace_id) as uow:

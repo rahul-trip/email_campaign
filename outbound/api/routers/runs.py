@@ -7,16 +7,20 @@ from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
+    CandidateOut,
     CostOut,
     DiscoverySearchOut,
+    PromoteIn,
     QualityOut,
     RunCallOut,
     RunIn,
     RunLeadOut,
     RunOut,
+    SourceYieldOut,
     StatusOut,
 )
 from outbound.db.types import utcnow
+from outbound.domain.discovery import YIELD_DAYS
 from outbound.domain.errors import InvalidInput
 from outbound.domain.permissions import Permission as P
 from outbound.services.runs import RunRequest
@@ -84,6 +88,28 @@ def run_searches(
     return [DiscoverySearchOut.model_validate(x) for x in svc.runs.searches(run_id)]
 
 
+@router.get(
+    "/runs/{run_id}/candidates",
+    response_model=list[CandidateOut],
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
+def run_candidates(run_id: str, svc: Annotated[Services, Depends(services)]) -> list[CandidateOut]:
+    """Every company the run found, best ranked first, with what it decided about each."""
+    return [CandidateOut.model_validate(c) for c in svc.candidates.for_run(run_id)]
+
+
+@router.post(
+    "/candidates/{candidate_id}/promote",
+    response_model=CandidateOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def promote_candidate(
+    candidate_id: str, body: PromoteIn, svc: Annotated[Services, Depends(services)]
+) -> CandidateOut:
+    """Add a company the run found, but did not add, as a lead."""
+    return CandidateOut.model_validate(svc.candidates.promote(candidate_id, body.domain))
+
+
 @router.post(
     "/runs/{run_id}/cancel", response_model=RunOut, dependencies=[Depends(require(P.RUNS_WRITE))]
 )
@@ -117,6 +143,20 @@ def quality(svc: Annotated[Services, Depends(services)]) -> QualityOut:
         flag_rate=report.flag_rate,
         catch_all_share=report.catch_all_share,
     )
+
+
+@router.get(
+    "/reports/sources",
+    response_model=list[SourceYieldOut],
+    dependencies=[Depends(require(P.REPORTS_READ))],
+)
+def sources(svc: Annotated[Services, Depends(services)]) -> list[SourceYieldOut]:
+    """Where discovery's companies came from, and how many of each source's leads qualified."""
+    return [
+        SourceYieldOut(source=name, found=y.found, leads=y.leads, qualified=y.qualified,
+                       rate=round(y.rate, 3), days=YIELD_DAYS)
+        for name, y in svc.reports.sources()
+    ]  # fmt: skip
 
 
 @router.get(

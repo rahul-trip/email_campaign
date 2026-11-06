@@ -831,6 +831,69 @@ function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
   );
 }
 
+type Criterion = { id: string; kind: string; criterion: string; weight: number; verdict: string; evidence?: string; source?: string };
+type QualificationData = { criteria?: Criterion[]; why_now?: string; risks?: string[] };
+
+const KIND = { must_have: "Must have", signal: "Sign they may buy now", disqualifier: "Rules them out" } as Record<string, string>;
+const VERDICT = {
+  met: { text: "Yes", tone: "text-good" },
+  not_met: { text: "No", tone: "text-error" },
+  unknown: { text: "Not known", tone: "text-muted" },
+} as Record<string, { text: string; tone: string }>;
+
+/** The brief's criteria one by one: what research found for each, and where. */
+function Qualification({ data }: { data: QualificationData }) {
+  const criteria = data.criteria ?? [];
+  const risks = (data.risks ?? []).filter(Boolean);
+  return (
+    <div className="mt-2 space-y-2">
+      {criteria.length > 0 && (
+        <ul className="space-y-1.5 text-[13px]">
+          {criteria.map((c) => {
+            const verdict = VERDICT[c.verdict] ?? VERDICT.unknown;
+            return (
+              <li key={c.id} className="flex gap-2">
+                <span className={`w-16 shrink-0 text-xs font-medium ${verdict.tone}`}>{verdict.text}</span>
+                <div className="min-w-0">
+                  <div>
+                    {c.criterion}
+                    <span className="ml-1.5 text-[11px] text-muted">
+                      {KIND[c.kind] ?? c.kind}
+                      {c.weight > 1 ? ` · counts ${c.weight}` : ""}
+                    </span>
+                  </div>
+                  {c.evidence && (
+                    <div className="text-xs text-muted">
+                      {c.evidence}
+                      {c.source && (
+                        <a href={c.source} target="_blank" rel="noreferrer" className="ml-1 text-primary hover:underline">
+                          source
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {data.why_now && (
+        <p className="text-[13px]">
+          <span className="font-medium">Why now: </span>
+          {data.why_now}
+        </p>
+      )}
+      {risks.length > 0 && (
+        <div className="text-[13px]">
+          <span className="font-medium">Risks: </span>
+          {risks.join("; ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A titled block of the research, with a rule above it so the card reads as sections. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -864,6 +927,7 @@ function Research({ company }: { company: Company }) {
   const answers = Object.entries(company.research_answers ?? {});
   const hiring = String(research.hiring ?? "").trim();
   const sector = String(research.sector ?? "").trim();
+  const qualification = research.qualification as QualificationData | undefined;
   const decision = (company.policy_decision ?? {}) as { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
   const empty = !research.summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
   if (empty) return null;
@@ -881,6 +945,7 @@ function Research({ company }: { company: Company }) {
             <p className="text-[13px] leading-relaxed">
               <strong>{company.fit_score}/100.</strong> {company.fit_reason}
             </p>
+            {qualification && <Qualification data={qualification} />}
           </Section>
         )}
         {products.length > 0 && (

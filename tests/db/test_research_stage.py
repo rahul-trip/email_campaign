@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
 from outbound.domain.entities import Company
@@ -32,7 +34,15 @@ def runner_for(
     return Runner(factory, ws, [stage], Guards())
 
 
-def add(factory: UnitOfWorkFactory, ws: str, domain: str, **kwargs: object) -> str:
+def add(
+    factory: UnitOfWorkFactory,
+    ws: str,
+    domain: str,
+    *,
+    brief: dict[str, Any] | None = None,
+    source: CompanySource = CompanySource.MANUAL,
+    **kwargs: object,
+) -> str:
     with factory(ws) as uow:
         campaign = uow.campaigns.create(
             "expo",
@@ -40,9 +50,11 @@ def add(factory: UnitOfWorkFactory, ws: str, domain: str, **kwargs: object) -> s
             icp_description="Utilities",
             research_questions=["Do they trade power?"],
         )
+        if brief:
+            uow.campaigns.update(campaign.id, {"icp_brief": brief})
         company = uow.companies.create(
             domain=domain,
-            source=CompanySource.MANUAL,
+            source=source,
             campaign_id=campaign.id,
             **kwargs,  # type: ignore[arg-type]
         )
@@ -243,3 +255,33 @@ def test_dated_news_found_by_search_is_saved_with_the_research(
         }
     ]
     assert research["triggers"] == []
+
+
+BRIEF = {
+    "must_haves": [{"text": "operates on the power grid", "weight": 3}],
+    "disqualifiers": ["sells forecasting software"],
+}
+RULED_OUT = {"site": {"summary": "x", "ruled_out": [{"id": "D1", "evidence": "Forecaster"}]}}
+
+
+def test_a_discovered_lead_its_site_rules_out_is_scored_zero_without_more_research(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add(factory, ws, "acme.co.uk", brief=BRIEF, source=CompanySource.DISCOVERY)
+    llm = FakeLlm(RULED_OUT)
+    runner_for(factory, ws, FakeSearch(PAGES), llm=llm).run_pipeline()
+    assert llm.calls == ["site"]
+    with factory(ws) as uow:
+        company = uow.companies.get(cid)
+    assert company.fit_score == 0
+    assert company.fit_reason == "Ruled out: sells forecasting software (Forecaster)"
+    assert company.research is not None and company.research["qualification"]["ruled_out"]
+
+
+def test_a_lead_the_operator_typed_is_researched_in_full_against_the_brief(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    add(factory, ws, "acme.co.uk", brief=BRIEF)
+    llm = FakeLlm(RULED_OUT)
+    runner_for(factory, ws, FakeSearch(PAGES), llm=llm).run_pipeline()
+    assert "qualify" in llm.calls and "persona" in llm.calls

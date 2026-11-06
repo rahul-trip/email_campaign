@@ -169,9 +169,13 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/runs` | login | — | 200 `list[RunOut]` (the 20 most recent) | — | `RunService.recent` |
 | `GET /api/runs/{run_id}` | login | — | 200 `RunOut` (live cost while running) | — | `RunService.get` |
 | `POST /api/runs/{run_id}/cancel` | login + CSRF | — | 200 `RunOut` | — | `RunService.cancel` |
+| `GET /api/runs/{run_id}/searches` | login (`runs.read`) | — | 200 `list[DiscoverySearchOut {query, new_leads, already_leads, source, angle, found, pages[]}]` | 404 | `RunService.searches` |
+| `GET /api/runs/{run_id}/candidates` | login (`runs.read`) | — | 200 `list[CandidateOut {id, run_id, name, domain, sources[], source_urls[], description, evidence, screen_score, rank_score, verdict, reason, company_id}]`, best ranked first | 404 | `CandidateService.for_run` |
+| `POST /api/candidates/{candidate_id}/promote` | login + CSRF (`leads.write`) | `PromoteIn {domain?}` | 200 `CandidateOut` (`accepted`, with `company_id`) | 404; 422 already a lead, no website known and none given, or intake refused it | `CandidateService.promote` |
 | `GET /api/status` | login | — | 200 `StatusOut` (counts by status, review queue, holds) | — | `ReportService.status` |
 | `GET /api/reports/quality` | login | — | 200 `QualityOut` | — | `ReportService.quality` |
 | `GET /api/reports/cost` | login | query `days` 1–365 (30) | 200 `CostOut` | — | `ReportService.cost` |
+| `GET /api/reports/sources` | `reports:read` | — | 200 `SourceYieldOut[]`: per discovery source over 90 days, companies named, leads, passed the fit gate, rate | — | `ReportService.sources` |
 
 ## Settings
 
@@ -183,7 +187,8 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `PUT /api/settings/workspace` | login + CSRF | `WorkspaceSettingsIn {safe_to_send_only?, budget_per_prospect_micro_usd 0–100,000,000 or null?, few_shot_examples 0–20?, timezone?, country_policy_enabled?, footer_enabled?}` | 200 object | 422 `send_enabled` before Phase 5; unknown fields | `SettingsService.update_workspace_settings` |
 | `GET /api/settings/campaigns` | login | — | 200 `list[CampaignOut]` | — | `SettingsService.campaigns` |
 | `POST /api/settings/campaigns` | login + CSRF | `CampaignIn {name, target_titles, icp_description?, min_fit_score 0–100 (60), research_questions ≤ 3, cadence_days}` | 201 `CampaignOut` | — | `SettingsService.create_campaign` |
-| `PATCH /api/settings/campaigns/{campaign_id}` | login + CSRF | `CampaignPatch` | 200 `CampaignOut` | — | `SettingsService.update_campaign` |
+| `PATCH /api/settings/campaigns/{campaign_id}` | login + CSRF | `CampaignPatch` (`icp_brief` is cleaned by `domain.brief.Brief`) | 200 `CampaignOut` | — | `SettingsService.update_campaign` |
+| `POST /api/settings/campaigns/{campaign_id}/brief/regenerate` | login + CSRF (`campaigns:write`) | — | 200 `CampaignOut` with a new `icp_brief` | 404 no such campaign | `SettingsService.regenerate_brief` |
 | `GET /api/settings/policies` | login | — | 200 `list[PolicyOut]` | — | `SettingsService.policies` |
 | `PUT /api/settings/policies/{country_code}` | login + CSRF | `PolicyIn {rule, requires_corporate_subscriber, allowed_provenance?, footer_template?, reviewed_by?}` | 200 `PolicyOut` (version bumped on change) | — | `SettingsService.save_policy` |
 | `DELETE /api/settings/policies/{country_code}` | login + CSRF | — | 204 | — | `SettingsService.delete_policy` |

@@ -246,6 +246,18 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `outbound/api/deps.py::_audit_view`, `outbound/domain/permissions.py::Principal.superadmin_view`.
 - **Links:** [identity and access](lld/identity-and-access.md#planned).
 
+### R-29 · P3 · Vendor: the Y Combinator directory comes from an unofficial public mirror
+
+- **What:** discovery's start-up directory reads `yc-oss.github.io/api/companies/all.json`, a community mirror rebuilt daily from YC's own directory, not an API YC offers. Its freshness and terms of use have not been confirmed; if it stops updating or disappears, discovery logs `discovery_source_failed` and carries on with the other sources.
+- **Read:** `outbound/providers/adapters/yc_directory.py`, `outbound/services/discovery.py::Discoverer`.
+- **Links:** [YC directory](integrations/yc-directory.md), [ADR 0031](adr/0031-multi-source-discovery-screened-before-intake.md).
+
+### R-30 · P3 · Vendor: Exa and Companies House advanced search are not live-checked
+
+- **What:** both discovery sources were built from their vendors' documentation. Exa's price per `find` (`exa:find`, 90,000 micro-USD) is an estimate from its public pricing; names come from page titles, which research later replaces. Companies House returns no websites, so every fit it finds costs one `DomainResolver` search and may end *unresolved*; how often that happens is unknown.
+- **Read:** `outbound/providers/adapters/exa.py`, `outbound/providers/adapters/companies_house.py::CompaniesHouse.find`, `outbound/providers/pricing.py`.
+- **Links:** [Exa](integrations/exa.md), [Companies House](integrations/companies-house.md).
+
 ## Closed entries
 
 ### R-02 · Pipeline: scheduled work never runs in production (B7) — closed 2026-10-23

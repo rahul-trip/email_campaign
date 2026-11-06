@@ -46,6 +46,8 @@ It is a small LangGraph, so that only the workers a lead needs run, and so the r
 | `outbound/stages/research/graph.py::build_research_graph` | function | Compiles the graph over `ResearchDeps(search, llm, registry)` |
 | `outbound/stages/research/graph.py::run_research` | function | Invokes the graph and folds its state into a `ResearchOutput` |
 | `outbound/stages/research/graph.py::plan_workers` | function | Which workers run, deterministically |
+| `outbound/stages/research/graph.py::after_site` | function | The supervisor: the planned workers, or only `fit` for a discovered lead the site rules out |
+| `outbound/domain/qualification.py::qualify` | function | The fit score and reason from per-criterion answers (pure) |
 | `outbound/stages/research/graph.py::search_people` | function | The LinkedIn-title search with employer confirmation |
 | `outbound/stages/research/facts.py::infer_country`, `find_incorporation_markers`, `best_registry_match`, `classify_legal_entity` | functions | Code-only compliance facts |
 
@@ -55,7 +57,8 @@ It is a small LangGraph, so that only the workers a lead needs run, and so the r
 flowchart LR
     START --> pages
     pages --> site
-    site --> sup{"supervisor<br/>(plan_workers)"}
+    site --> sup{"supervisor<br/>(after_site)"}
+    sup -->|"discovered and the site meets a disqualifier"| fit
     sup -->|"country unknown or GB"| legal
     sup -->|"campaign has questions"| signals
     sup -->|"no operator-added contact"| persona
@@ -75,9 +78,11 @@ The workers chosen after `site` run in parallel, and each feeds `fit`. There is 
 | `legal` (code) | Country: the operator's country if given; else `infer_country`. A strong signal (a stated registration in England, Scotland, Wales or Northern Ireland, or a country-code domain) sets it; a weak signal (phone prefix, UK postcode) is only a **suggestion** shown to the operator. For GB, including a suggested GB: `find_incorporation_markers` near the company's own name, plus `best_registry_match` from Companies House, then `classify_legal_entity`. The result is corporate subscriber only on positive evidence, else unknown | 0–1 registry lookup (free) |
 | `signals` | One search (`"<name> <domain> careers hiring technology"`), then the model answers the campaign's questions and lists hiring and tech signals | 1 search, 1 model call |
 | `persona` | If the site was read (not `thin`) and the team-like pages hold more than 100 characters, the model lists people with at least a first and last name. Otherwise, if the campaign has target titles, `search_people` | 0–1 model call or 1 search |
-| `fit` | If there is an ideal-customer description, the model scores fit 0–100 with a reason | 0–1 model call |
+| `fit` | **With a brief that has criteria:** the model answers each numbered criterion (`M1`… must-haves, `S1`… buying signals, `D1`… disqualifiers) with `met`/`not_met`/`unknown`, evidence and source, plus `why_now` and `risks` (`QUALIFY_SYSTEM_PROMPT`, given the findings, the notes including where discovery found the company, the answers and the pages). `outbound/domain/qualification.py::qualify` scores it in code: a met disqualifier gives 0; must-haves give up to 80 by weight, an unknown counting half (60 with none); each met signal adds 10, up to 20. The scale is set against the gate's default minimum of 60. When the site already ruled the lead out, no call is made. **Otherwise,** if there is an ideal-customer description, the model scores fit 0–100 with a reason | 0–1 model call |
 
 So a lead costs 1–3 search or extract credits and 1–4 model calls. The model calls are not cached ([metering](metering.md#cache)).
+
+**Ruling out early** (`after_site`): when the campaign has a brief, the site worker is also given its disqualifiers and returns any the pages clearly show as `ruled_out` (`D1` and the words). For a lead the operator did not choose (`OPERATOR_CHOSEN`), one valid id sends the graph straight to `fit`, which scores it 0 without another call: no news, legal, signals or people searches. An id the brief does not have is ignored. A lead the operator chose runs every planned worker, and the site's ruling is kept if the qualifier's reply leaves that disqualifier out.
 
 **Which workers run** (`plan_workers`):
 
@@ -107,7 +112,7 @@ People are de-duplicated by name, and at most 5 are kept.
 
 | Field | Rule |
 |---|---|
-| `research` | `summary`, `products`, `news`, `hooks`, `hiring`, `tech`, `pages`, `site_emails` (addresses at the company's own domain found in the pages, at most 10), `thin`, `country_evidence`, `country_suggestion`, `legal_evidence`, `workers` |
+| `research` | `summary`, `products`, `news`, `hooks`, `hiring`, `tech`, `pages`, `site_emails` (addresses at the company's own domain found in the pages, at most 10), `thin`, `country_evidence`, `country_suggestion`, `legal_evidence`, `workers` (those that ran), and with a brief `qualification`: `score`, `reason`, `ruled_out`, `criteria` (`id`, `kind`, `criterion`, `weight`, `verdict`, `evidence`, `source`), `why_now`, `risks` |
 | `research_answers` | The campaign questions' answers |
 | `fit_score`, `fit_reason` | From `fit`, or empty |
 | `name` | The site's own name when it differs. An operator-set name is protected by `manual_fields` |
@@ -154,7 +159,8 @@ The module creates a logger but emits no events of its own. Its calls appear as 
 
 | File | Proves |
 |---|---|
-| `tests/stages/test_research_graph.py` | Worker planning; the site name used by later workers; employer confirmation (one shared word is not enough); unconfirmed people; no people from a thin site; profile-title parsing; the fit and signals workers with a scripted model |
+| `tests/stages/test_research_graph.py` | Worker planning; the site name used by later workers; employer confirmation (one shared word is not enough); unconfirmed people; no people from a thin site; profile-title parsing; the fit and signals workers with a scripted model; ruling a discovered lead out after the site (`after_site`), the site told the disqualifiers, criterion-by-criterion qualification with a brief |
+| `tests/domain/test_qualification.py` | The criteria's ids, weighted must-haves, an unknown counting half, the signal cap, a met disqualifier giving 0, garbled answers as unknown, the stored JSON |
 | `tests/db/test_research_stage.py` | What the stage writes; the operator's name and country kept; a phone number only suggests a country; no search when the operator gave a contact; a model failure fails the lead; unconfirmed people saved |
 
 ## Known limitations
