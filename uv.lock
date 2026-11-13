@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -1572,6 +1572,7 @@ wheels = [
 name = "outbound"
 version = "0.0.1"
 source = { editable = "." }
+default-groups = ["dev", "legacy"]
 dependencies = [
     { name = "alembic" },
     { name = "argon2-cffi" },
@@ -1626,7 +1627,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = ">=2.2" },
     { name = "langgraph", specifier = ">=1.0.10,<2" },
     { name = "openpyxl", specifier = ">=3.1" },
-    { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.3" },
     { name = "python-multipart", specifier = ">=0.0.9" },
