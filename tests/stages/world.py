@@ -29,7 +29,7 @@ PROFILE = {
 class SiteSearch(FakeSearch):
     """Every site has a team page naming Jane Doe, and a footer that shows its legal form."""
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         self.extracted.append(urls)
         domain = urls[0].split("//")[1]
         return [

@@ -26,6 +26,18 @@ PLATFORM_DOMAINS = frozenset(
         "github.com", "wikipedia.org", "crunchbase.com", "medium.com", "reddit.com",
         "glassdoor.com", "indeed.com", "bloomberg.com", "reuters.com", "forbes.com",
         "amazon.com", "google.com", "bing.com",
+        # Directories, review sites and data brokers: they list companies, never are one.
+        "clutch.co", "g2.com", "capterra.com", "softwareadvice.com", "trustpilot.com",
+        "yelp.com", "goodfirms.co", "sortlist.com", "zoominfo.com", "dnb.com", "owler.com",
+        "tracxn.com", "pitchbook.com", "cbinsights.com", "dealroom.co", "wellfound.com",
+        "angel.co", "builtin.com", "europages.com", "kompass.com", "thomasnet.com",
+        "yellowpages.com", "manta.com", "apollo.io", "rocketreach.co", "signalhire.com",
+        "leadiq.com", "marketbeat.com", "researchgate.net", "tavily.com",
+        # News and reference sites.
+        "techcrunch.com", "ft.com", "wsj.com", "businessinsider.com", "cnbc.com",
+        "theguardian.com", "bbc.com", "bbc.co.uk", "sifted.eu", "venturebeat.com",
+        "wired.com", "forbes.co.uk", "inc.com", "fastcompany.com", "gartner.com",
+        "statista.com", "quora.com", "substack.com", "wordpress.com", "blogspot.com",
     }
 )  # fmt: skip
 

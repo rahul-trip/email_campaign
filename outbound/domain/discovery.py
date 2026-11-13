@@ -18,9 +18,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from outbound.domain.brief import Brief, CompanyType
+from outbound.domain.domains import is_free_mail, is_platform, registrable_domain
 from outbound.domain.enums import CompanyStatus
+from outbound.domain.names import company_tokens, domain_label
 
 MAX_QUERY_WORDS = 30
+MIN_NAME_LETTERS = 3  # a shorter name is too common to match a domain by
 
 
 def normal(query: str) -> str:
@@ -164,3 +167,36 @@ def name_key(name: str) -> str:
         if shorter == text or not shorter:
             return text
         text = shorter
+
+
+def website_from_links(name: str, page_url: str, links: Iterable[tuple[str, str]]) -> str | None:
+    """A company's own website, from the links on the page that named it (``(words, address)``
+    pairs), when one is clear. A link counts when its domain *is* the company's name
+    (``fingrid.fi`` for Fingrid), or when it says the company's name and goes to the site's front
+    page (``Austrian Power Grid`` to ``apg.at/``). Links back to the page's own site, to
+    platforms and to free mail never count, nor does a name two different sites both claim."""
+    wanted = company_tokens(name)
+    if not wanted:
+        return None
+    joined = "".join(wanted)
+    if len(joined) < MIN_NAME_LETTERS:
+        return None  # "E" is the label of e.org, and of a hundred other things
+    own = registrable_domain(page_url)
+    exact: dict[str, None] = {}
+    front: dict[str, None] = {}
+    for words, address in links:
+        domain = registrable_domain(address)
+        if not domain or domain == own or is_platform(domain) or is_free_mail(domain):
+            continue
+        if joined in (domain_label(domain), domain.replace(".", "").replace("-", "")):
+            exact[domain] = None
+            continue
+        path = address.split("//", 1)[-1].partition("/")[2].split("?")[0].split("#")[0]
+        if not path.strip("/") and name_key(words) == name_key(name):
+            front[domain] = None
+    for found in (exact, front):
+        if len(found) == 1:
+            return next(iter(found))
+        if len(found) > 1:
+            return None  # two sites claim the name: not clear enough to take
+    return None

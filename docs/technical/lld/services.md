@@ -53,7 +53,7 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 `IntakeService.run(rows, source, company_source, campaign_id, filename, validate_only)`:
 
 1. **Parse** each row into a `Target` and detect its anchor (`detect_anchor`): domain or website, company name, email, person and company, or LinkedIn URL.
-2. **Resolve before the transaction.** Rows without a domain are looked up by name with one metered search each (`DomainResolver.by_name`). LinkedIn rows are looked up by the profile slug (`by_linkedin`). `match_confidence` scores a site with no model involved:
+2. **Resolve before the transaction.** Rows without a domain are looked up by name with metered searches (`DomainResolver.candidates`, ten results for the plain name, then for `<name> homepage` only if the first gave no site whose domain is the name; `by_name` returns the best). LinkedIn rows are looked up by the profile slug (`by_linkedin`). `match_confidence` scores a site with no model involved:
 
    | Match | Confidence |
    |---|---|
@@ -82,9 +82,9 @@ Services are the operator's use cases: add targets, review an email, edit a lead
    Article searches stop early once there are `ENOUGH` fresh companies per wanted lead. Every search is a `discovery_query` event, recording its source, angle, pages and how many companies it found.
 4. **Merge** (`merge`): one entry per company, matched by website, else by `name_key`.
 5. **Set aside** companies already screened for this campaign (`candidates.known_keys`) and those that are already leads.
-6. **Screen** (`screen`): one model call per `SCREEN_BATCH` companies. A company fails if it has a disqualifier or scores under `SCREEN_MIN`. Without a model, the brief's words are matched instead.
+6. **Screen** (`screen`): one model call per `SCREEN_BATCH` companies, each answered with a `role` from the closed list `ROLES` (anything else is `unclear`) and a score. A company fits only if it hits no disqualifier and is a `buyer` scoring `SCREEN_MIN` or more, or `unclear` scoring `UNCLEAR_MIN`; a vendor, competitor, investor or adviser never fits. Without a model, the brief's words are matched instead.
 7. **Rank** (`rank_score`): the screening score plus a bonus for corroboration.
-8. **Add the best fits** through `IntakeService.run` (`company_source=discovery`, which charges the credit), up to the count. A company with no website gets one `DomainResolver` search, and below `MIN_CONFIDENCE` it is `unresolved`.
+8. **Add the best fits** through `IntakeService.run` (`company_source=discovery`, which charges the credit), up to the count. A company's website is, in order: its source's; a link on the page that named it (`ArticleSource`, `domain.discovery.website_from_links`); the top `DomainResolver.candidates` result when its domain is the company's name (`MIN_CONFIDENCE`, 0.9); or the one a model picks by number from the likeliest `WEBSITE_CHOICES` (`Discoverer._picked`; none, junk or an error means none). With none the company is `unresolved`; `_take_waiting` retries unresolved ones with over-limit ones after, and one still unresolved is `rejected` ("no website found after a second look").
 9. **Keep a row for every company** (`discovery_candidates`) with its verdict and reason.
 
 `candidates.py::CandidateService` lists a run's candidates and promotes one: it goes through intake as a **manual** lead chosen by the operator, and the verdict becomes `accepted`.

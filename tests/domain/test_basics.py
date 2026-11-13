@@ -10,7 +10,7 @@ from outbound.domain.domains import is_free_mail, is_platform, registrable_domai
 from outbound.domain.hashing import hash_value
 from outbound.domain.ids import new_id
 from outbound.domain.money import format_usd, micro_to_usd, usd_to_micro
-from outbound.domain.names import employer_matches, read_profile_title, same_person
+from outbound.domain.names import company_tokens, employer_matches, read_profile_title, same_person
 
 
 def test_ids_are_unique_and_sort_by_creation_time() -> None:
@@ -60,6 +60,11 @@ def test_registrable_domain(typed: str, expected: str | None) -> None:
 def test_free_mail_and_platform_lists() -> None:
     assert is_free_mail("gmail.com") and not is_free_mail("acme.com")
     assert is_platform("linkedin.com") and not is_platform("acme.com")
+
+
+@pytest.mark.parametrize("domain", ["clutch.co", "g2.com", "zoominfo.com", "techcrunch.com"])
+def test_directories_review_sites_and_news_are_never_a_target_company(domain: str) -> None:
+    assert is_platform(domain)
 
 
 @pytest.mark.parametrize(
@@ -125,3 +130,17 @@ def test_an_employer_matches_on_the_whole_name_or_the_website_never_one_word(
     employer: str, company: str, domain: str, same: bool
 ) -> None:
     assert employer_matches(employer, company, domain) is same
+
+
+@pytest.mark.parametrize(
+    ("name", "tokens"),
+    [
+        ("Ørsted", ["orsted"]),
+        ("Straße Energie GmbH", ["strasse", "energie"]),
+        ("Æther Ltd", ["aether"]),
+    ],
+)
+def test_letters_that_accent_stripping_leaves_alone_are_spelled_as_websites_spell_them(
+    name: str, tokens: list[str]
+) -> None:
+    assert company_tokens(name) == tokens
