@@ -18,6 +18,7 @@ from outbound.domain.enums import (
     MessageState,
     PolicyRule,
     Provenance,
+    RunKind,
     RunStatus,
     SuppressionKind,
     SuppressionReason,
@@ -719,6 +720,28 @@ def test_recent_runs_are_listed_newest_first(factory: UnitOfWorkFactory, ws: str
     first = runs.queue(RunRequest(limit=1))
     second = runs.queue(RunRequest(limit=2))
     assert [r.id for r in runs.recent()] == [second.id, first.id]
+
+
+def test_a_persons_runs_stay_listed_however_many_background_runs_follow_them(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    # Live: the worker adds a sync run every few minutes, 549 of them against 41 real runs, and
+    # the newest 20 of every kind pushed a person's runs off the Runs page within hours.
+    runs = RunService(factory, ws)
+    mine = [runs.queue(RunRequest(limit=n)) for n in (1, 2, 3)]
+    with factory(ws) as uow:
+        background = [uow.runs.queue(RunKind.SYNC, {"jobs": ["credit_resume"]}) for _ in range(30)]
+        uow.commit()
+    listed = [r.id for r in runs.recent()]
+    assert listed == [r.id for r in reversed(mine)]  # all three, none of the 30
+    assert not set(background) & set(listed)
+    runs.get(background[0])  # a background run can still be opened by its id
+
+
+def test_the_runs_list_holds_more_than_the_old_twenty(factory: UnitOfWorkFactory, ws: str) -> None:
+    runs = RunService(factory, ws)
+    queued = [runs.queue(RunRequest(limit=1 + n % 50)) for n in range(25)]
+    assert [r.id for r in runs.recent()] == [r.id for r in reversed(queued)]
 
 
 def test_every_save_of_the_profile_records_a_review_the_client_cannot_forge(

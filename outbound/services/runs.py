@@ -13,6 +13,10 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import RunKind, RunStatus
 from outbound.services import defaults
 
+# Every kind a person can see; the worker's housekeeping is not one of them.
+OPERATOR_KINDS = (RunKind.PIPELINE, RunKind.IMPORT, RunKind.BAKEOFF)
+HISTORY = 200  # how many of them the list holds, newest first
+
 
 class RunMode(StrEnum):
     MANUAL = "manual"  # only the targets the operator added
@@ -125,9 +129,12 @@ class RunService:
                 )
             return run
 
-    def recent(self, limit: int = 20) -> list[RunView]:
+    def recent(self, limit: int = HISTORY) -> list[RunView]:
+        """The runs a person started or imported, newest first. The worker's own housekeeping
+        (``RunKind.SYNC``, a run every few minutes) is left out: it is 90% of all runs, and
+        listed with the rest it pushed a person's runs off the list within hours."""
         with self._uow(self._workspace_id) as uow:
-            return uow.runs.recent(limit)
+            return uow.runs.recent(limit, kinds=OPERATOR_KINDS)
 
     def leads(self, run_id: str) -> list[RunLead]:
         """Every lead this run moved, held, failed or deferred, in the order it first touched

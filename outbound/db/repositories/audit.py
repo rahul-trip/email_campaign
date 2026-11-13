@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -128,13 +129,12 @@ class RunRepository(ScopedRepository):
     def get(self, run_id: str) -> RunView:
         return self._view(self._row(RunRow, run_id))
 
-    def recent(self, limit: int = 20) -> list[RunView]:
-        stmt = (
-            select(RunRow)
-            .where(RunRow.workspace_id == self._workspace_id)
-            .order_by(RunRow.created_at.desc(), RunRow.id.desc())
-            .limit(limit)
-        )
+    def recent(self, limit: int = 20, *, kinds: Collection[RunKind] | None = None) -> list[RunView]:
+        """The newest runs first; only these ``kinds`` when given, else every kind."""
+        stmt = select(RunRow).where(RunRow.workspace_id == self._workspace_id)
+        if kinds is not None:
+            stmt = stmt.where(RunRow.kind.in_(kinds))
+        stmt = stmt.order_by(RunRow.created_at.desc(), RunRow.id.desc()).limit(limit)
         return [self._view(row) for row in self._session.scalars(stmt)]
 
     @staticmethod

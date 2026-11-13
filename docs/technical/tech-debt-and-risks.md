@@ -260,6 +260,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-32 · P3 · Runs: a person's runs scrolled off the Runs page — closed 2026-11-14
+
+- **Was:** `RunRepository.recent` listed the 20 newest runs of every kind. The worker adds a `sync` run for each workspace every tick (549 of them against 41 real runs in one database), so a person's runs left the list within hours, "Runs this week" counted background runs, and the Dashboard's "latest run" could be a sync. No run was ever deleted; they were only not shown.
+- **Fixed by:** `RunService.recent` lists only `OPERATOR_KINDS` (pipeline, import, bakeoff), newest first, up to `HISTORY` (200). A sync run can still be opened by its id. The API shape is unchanged.
+- **Evidence:** `tests/db/test_leads_and_settings.py` (a person's runs stay listed after 30 background runs; the list holds more than twenty).
+- **Still open:** the list has no paging, so a workspace with more than 200 runs loses the oldest from view (not from the database); and `sync` runs are never pruned (about 200 rows a day per workspace).
+
 ### R-31 · P2 · Discovery: wrong or missing websites for the companies it finds — closed 2026-11-13
 
 - **Was:** three faults in how a discovered company's website was found.

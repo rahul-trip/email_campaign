@@ -39,7 +39,7 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `discovery.py` | `Discoverer`, `ArticleSource`, `plan_queries`, `merge`, `screen`, `rank_score`, `domain_resolver`, `Discovery` | `pipeline.discover_companies` |
 | `candidates.py` | `CandidateService` (`for_run`, `promote`) | API runs router |
 | `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
-| `runs.py` | `RunService` (`queue`, `get`, `recent`, `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
+| `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`: the worker's `sync` runs are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
 | `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
 | `webhook.py` | `WebhookService.receive`, `sign`, `verify` | API webhook router |
