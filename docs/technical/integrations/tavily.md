@@ -16,7 +16,7 @@ applies_to: Phase 3b
 | **Registry** | Always Tavily (`outbound/providers/registry.py::build_search`) |
 | **Settings** | `TAVILY_API_KEY` (required for the worker; without it the API's intake leaves name-only rows `pending`) |
 | **Price** | `tavily:search` and `tavily:extract`, 8,000 micro-USD each ([prices](README.md#prices)) |
-| **Cache** | `search` on `{query, max_results}`; `extract` on the sorted URLs; 30 days |
+| **Cache** | `search` on `{query, max_results}`; `extract` on the sorted URLs (and `links` when set); 30 days |
 | **Status** | Live-checked 2026-10-19: search, `site:` search and extract work |
 
 ## Endpoints used
@@ -24,7 +24,7 @@ applies_to: Phase 3b
 | Operation | Method and path | Auth | Timeout and retry |
 |---|---|---|---|
 | `search(query, max_results)` | `POST https://api.tavily.com/search` with `{query, max_results (1–20), search_depth: "basic"}` | `Authorization: Bearer <key>` | `HttpClient`: 30 s, 3 attempts |
-| `extract(urls)` | `POST https://api.tavily.com/extract` with `{urls (≤ 20 per request), format: "text"}` | Bearer | As above; more than 20 URLs are split into batches |
+| `extract(urls, links=False)` | `POST https://api.tavily.com/extract` with `{urls (≤ 20 per request), format: "text"}`; with `links=True`, `format: "markdown"`, from which `PageText.links` (the `[words](address)` pairs) is read and the text is returned as plain words (discovery's article reader uses it) | Bearer | As above; more than 20 URLs are split into batches |
 
 ## Mapping
 

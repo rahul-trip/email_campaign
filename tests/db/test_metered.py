@@ -113,7 +113,7 @@ class FakeSearch:
         self.searches += 1
         return self._hits
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         self.extracts += 1
         return [PageText(url=u, text="about us") for u in urls]
 

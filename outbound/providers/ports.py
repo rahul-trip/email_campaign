@@ -127,9 +127,17 @@ class SearchHit(_Model):
     published_date: str | None = None  # as the vendor gives it; news searches only
 
 
+class PageLink(_Model):
+    """A link on a page: what it says and where it goes."""
+
+    text: str
+    url: str
+
+
 class PageText(_Model):
     url: str
     text: str
+    links: tuple[PageLink, ...] = ()  # only when the page was fetched ``links=True``
 
 
 class SearchProvider(Protocol):
@@ -147,8 +155,10 @@ class SearchProvider(Protocol):
         only what was published in the last that many days."""
         ...
 
-    def extract(self, urls: list[str]) -> list[PageText]:
-        """Fetch page text. URLs the vendor could not fetch are left out, not raised."""
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
+        """Fetch page text. URLs the vendor could not fetch are left out, not raised. With
+        ``links``, each page also lists the links on it (``PageText.links``); its text then has
+        the link addresses removed, the words kept."""
         ...
 
 

@@ -24,8 +24,14 @@ def split_name(full_name: str) -> tuple[str | None, str | None]:
     return parts[0], " ".join(parts[1:]) or None
 
 
+# Letters that accent-stripping leaves alone, as websites spell them ("Ørsted" is orsted.com).
+_TRANSLITERATE = str.maketrans(
+    {"ø": "o", "æ": "ae", "œ": "oe", "ß": "ss", "ł": "l", "đ": "d", "ð": "d", "þ": "th"}
+)
+
+
 def _plain(name: str) -> list[str]:
-    decomposed = unicodedata.normalize("NFKD", name.casefold())
+    decomposed = unicodedata.normalize("NFKD", name.casefold().translate(_TRANSLITERATE))
     letters = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
     return re.findall(r"[^\W_]+", letters)
 

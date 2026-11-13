@@ -55,3 +55,4 @@ An ADR records one architecturally significant decision: the context, what was d
 | [0029](0029-shared-lead-directory-with-no-contributor-attribution.md) | A cross-workspace verified lead directory, with attribution structurally absent rather than filtered out | Accepted | 2026-10-26 |
 | [0030](0030-rules-based-inbox-classification-no-model.md) | Reply classification is rules-only until a later phase, and only two categories act automatically | Accepted | 2026-10-26 |
 | [0031](0031-multi-source-discovery-screened-before-intake.md) | Discovery looks in several sources, and screens every company against the brief before it becomes a lead | Accepted | 2026-11-06 |
+| [0032](0032-discovery-roles-and-website-picks-by-closed-choice.md) | Discovery decides what a company is, and which site is its own, by closed choice | Accepted | 2026-11-14 |

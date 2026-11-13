@@ -55,6 +55,7 @@ class FakeLlm:
         "You write the brief that says which companies": "brief",
         "You read one web page that names companies": "extract",
         "You decide which companies fit": "screen",
+        "You pick a company's own website": "website",
         "You check one company against each criterion": "qualify",
     }
 
@@ -63,6 +64,7 @@ class FakeLlm:
         self.users: dict[str, str] = {}
         self.replies: dict[str, Any] = {
             "discovery": {"queries": ["grid forecasting for wind farm operators in Germany"]},
+            "website": {"n": 0},  # no website is clearly theirs, unless a test says otherwise
             "brief": {
                 "summary": "Utilities and grid operators that need better load forecasts.",
                 "company_type": "any",
@@ -133,6 +135,7 @@ def screen_all(score: int, **by_name: int) -> Callable[[str], dict[str, Any]]:
             out.append(
                 {
                     "n": int(n),
+                    "role": "buyer" if given >= 50 else "competitor",
                     "score": given,
                     "matched": ["fits"] if given >= 50 else [],
                     "disqualified_by": [] if given >= 50 else ["competitor"],
@@ -187,7 +190,7 @@ class FakeSearch:
         self.searches.append(query)
         return self.hits
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         self.extracted.append(urls)
         return [PageText(url=u, text=self.pages[u]) for u in urls if u in self.pages]
 

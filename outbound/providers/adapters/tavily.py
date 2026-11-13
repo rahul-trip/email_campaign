@@ -9,6 +9,7 @@ or pay-as-you-go limit is exhausted, which is reported as ``BudgetExceeded``.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -17,12 +18,25 @@ import httpx
 
 from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.http import HttpClient, require_api_key
-from outbound.providers.ports import PageText, SearchHit
+from outbound.providers.ports import PageLink, PageText, SearchHit
 
 BASE_URL = "https://api.tavily.com"
 _MAX_RESULTS = 20  # per search
 _MAX_EXTRACT_URLS = 20  # per extract request
 _LIMIT_STATUSES = {432, 433}
+_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+_ANY_LINK = re.compile(r"\[([^\]]+)\]\([^)\s]*(?:\s+\"[^\"]*\")?\)")  # relative ones too
+_LINK = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)(?:\s+\"[^\"]*\")?\)")
+
+
+def _with_links(markdown: str) -> tuple[str, tuple[PageLink, ...]]:
+    """A markdown page as plain words plus the links it holds: images dropped, each
+    ``[words](address)`` kept as its words, and the pairs listed once each."""
+    found: dict[tuple[str, str], None] = {}
+    for match in _LINK.finditer(_IMAGE.sub("", markdown)):
+        found[(" ".join(match.group(1).split()), match.group(2))] = None
+    text = _ANY_LINK.sub(lambda m: m.group(1), _IMAGE.sub("", markdown))
+    return text, tuple(PageLink(text=words, url=url) for words, url in found)
 
 
 class TavilySearch:
@@ -73,16 +87,23 @@ class TavilySearch:
             if item.get("url")
         ]
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         pages: list[PageText] = []
         for start in range(0, len(urls), _MAX_EXTRACT_URLS):
             batch = urls[start : start + _MAX_EXTRACT_URLS]
-            payload = self._post("/extract", {"urls": batch, "format": "text"})
-            pages.extend(
-                PageText(url=item["url"], text=item.get("raw_content") or "")
-                for item in payload.get("results", [])
-                if item.get("url") and item.get("raw_content")
-            )
+            # Plain text has no links; markdown keeps them, and only asking for it costs the
+            # same credit.
+            body = {"urls": batch, "format": "markdown" if links else "text"}
+            payload = self._post("/extract", body)
+            for item in payload.get("results", []):
+                content = item.get("raw_content")
+                if not item.get("url") or not content:
+                    continue
+                if links:
+                    text, found = _with_links(content)
+                    pages.append(PageText(url=item["url"], text=text, links=found))
+                else:
+                    pages.append(PageText(url=item["url"], text=content))
         return pages
 
     def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:

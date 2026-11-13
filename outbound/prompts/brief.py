@@ -15,7 +15,9 @@ writes to, the questions it wants answered). {UNTRUSTED_RULE}
 
 The brief describes the BUYER, never the seller: companies that would buy what the seller
 sells. A company that sells the same thing as the seller is a competitor, so list it under
-disqualifiers.
+disqualifiers. So is a company that only sells software, data or services to those buyers
+without being one of them (a vendor to the same market): list "vendor to <the buyers>, not
+one of them" under disqualifiers too.
 
 Return one JSON object and nothing else:
 {{"summary": "<two or three sentences: who the ideal customer is and why they buy>",

@@ -92,3 +92,41 @@ class TestTavilySearch(SearchProviderContract):
         assert not {"topic", "start_date", "filter_by_published_date"} & set(
             json.loads(seen[0].read())
         )
+
+
+def test_extract_with_links_asks_for_markdown_and_returns_the_links_and_plain_words() -> None:
+    sent: list[dict[str, object]] = []
+    markdown = (
+        "Grid operators: [Fingrid](https://www.fingrid.fi/en/) and "
+        '[Austrian Power Grid](https://www.apg.at/ "APG") ![logo](https://cdn.example/x.png) '
+        "[Fingrid](https://www.fingrid.fi/en/)"
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.read()))
+        return httpx.Response(
+            200, json={"results": [{"url": "https://list.example/p", "raw_content": markdown}]}
+        )
+
+    [page] = TavilySearch(SECRET, client=mock_client(handler)).extract(
+        ["https://list.example/p"], links=True
+    )
+    assert sent[0]["format"] == "markdown"
+    assert page.text == "Grid operators: Fingrid and Austrian Power Grid  Fingrid"
+    assert [(link.text, link.url) for link in page.links] == [
+        ("Fingrid", "https://www.fingrid.fi/en/"),
+        ("Austrian Power Grid", "https://www.apg.at/"),
+    ]
+
+
+def test_extract_without_links_still_asks_for_plain_text() -> None:
+    sent: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.read()))
+        return httpx.Response(
+            200, json={"results": [{"url": "https://a.example", "raw_content": "words"}]}
+        )
+
+    [page] = TavilySearch(SECRET, client=mock_client(handler)).extract(["https://a.example"])
+    assert sent[0]["format"] == "text" and page.links == ()

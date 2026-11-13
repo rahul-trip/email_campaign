@@ -32,10 +32,11 @@ def test_two_workspaces_get_their_own_meters_over_one_shared_client(
     mine, theirs = services.for_tenant(ws), services.for_tenant(other_ws)
     assert (mine.workspace_id, theirs.workspace_id) == (ws, other_ws)
 
-    mine.intake.run([{"Company": "Acme Energy"}])  # a name with no domain: one search
+    # A name with no domain: the name, then its homepage, when the first finds no site.
+    mine.intake.run([{"Company": "Acme Energy"}])
 
-    assert (ledger_rows(factory, ws), ledger_rows(factory, other_ws)) == (1, 0)
-    assert len(search.searches) == 1  # one shared client, called once
+    assert (ledger_rows(factory, ws), ledger_rows(factory, other_ws)) == (2, 0)
+    assert len(search.searches) == 2  # one shared client, every call on my meter
 
 
 def test_what_a_person_does_is_recorded_as_them_not_as_the_operator(

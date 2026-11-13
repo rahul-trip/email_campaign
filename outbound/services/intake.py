@@ -60,6 +60,7 @@ from outbound.providers.ports import SearchHit, SearchProvider
 log = get_logger(__name__)
 
 CONFIDENCE_THRESHOLD = 0.8
+EXACT_MATCH = 0.9  # the website's name is the company's name: no second search is needed
 
 # Loose header matching: lower-case, letters and digits only, then look up the meaning.
 _HEADERS = {
@@ -205,6 +206,16 @@ class Resolution:
     searched: bool = True
 
 
+@dataclass(frozen=True)
+class SiteCandidate:
+    """A website a search for a company's name found, with the page that was found there."""
+
+    domain: str
+    confidence: float
+    title: str = ""
+    snippet: str = ""
+
+
 def match_confidence(name: str, domain: str, hit: SearchHit) -> float:
     """How sure we are that ``domain`` is the official site of ``name`` (no model involved).
 
@@ -229,24 +240,37 @@ def match_confidence(name: str, domain: str, hit: SearchHit) -> float:
 
 
 class DomainResolver:
-    """Finds a company's official domain with one web search per name."""
+    """Finds a company's official domain: a web search for its name, and a second for its homepage
+    when the first gives no site that carries the name."""
 
     def __init__(self, search: SearchProvider) -> None:
         self._search = search
 
+    def candidates(self, name: str, country: str = "") -> list[SiteCandidate]:
+        """Every website the searches for ``name`` found, the likeliest first, each once."""
+        # The plain name first, with ten results. "<name> official website" came back as five
+        # pages of aggregators (data sites, profiles, the search vendor itself) with the
+        # company's own site missing, for ENGIE, RWE, Iberdrola and Statkraft alike. When the
+        # name alone does not give a site that is the company's name (Fingrid, Swissgrid and
+        # TransnetBW came back as profiles), one more search for its "homepage" usually does.
+        found: dict[str, SiteCandidate] = {}
+        for query in (f"{name} {country}".strip(), f"{name} homepage {country}".strip()):
+            for hit in self._search.search(query, max_results=10):
+                domain = registrable_domain(hit.url)
+                if not domain or is_platform(domain) or is_free_mail(domain):
+                    continue
+                confidence = match_confidence(name, domain, hit)
+                if domain not in found or confidence > found[domain].confidence:
+                    found[domain] = SiteCandidate(domain, confidence, hit.title, hit.snippet)
+            if any(c.confidence >= EXACT_MATCH for c in found.values()):
+                break
+        return sorted(found.values(), key=lambda c: -c.confidence)  # stable: ties keep order
+
     def by_name(self, name: str, country: str = "") -> Resolution:
-        query = f"{name} official website {country}".strip()
-        best: tuple[float, str] | None = None
-        for hit in self._search.search(query, max_results=5):
-            domain = registrable_domain(hit.url)
-            if not domain or is_platform(domain) or is_free_mail(domain):
-                continue
-            confidence = match_confidence(name, domain, hit)
-            if best is None or confidence > best[0]:
-                best = (confidence, domain)
-        if best is None:
+        found = self.candidates(name, country)
+        if not found:
             return Resolution(None, note=f"no website found for {name!r}")
-        return Resolution(best[1], best[0])
+        return Resolution(found[0].domain, found[0].confidence)
 
     def by_linkedin(self, slug: str, country: str = "") -> Resolution:
         words = slug.replace("-", " ").strip()

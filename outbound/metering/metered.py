@@ -433,12 +433,15 @@ class MeteredSearch:
             ttl=NEWS_TTL if topic == "news" else self._ttl,
         )
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
+        request: dict[str, object] = {"urls": sorted(urls)}
+        if links:  # only when set, so earlier cached pages still match
+            request["links"] = True
         return self._meter.call(
             provider=self.name,
             operation="extract",
-            request={"urls": sorted(urls)},
-            run=lambda: self._inner.extract(urls),
+            request=request,
+            run=lambda: self._inner.extract(urls, links=links),
             encode=lambda pages: {"items": [p.model_dump(mode="json") for p in pages]},
             decode=lambda stored: [PageText.model_validate(i) for i in stored["items"]],
             found=bool,

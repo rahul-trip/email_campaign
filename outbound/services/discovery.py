@@ -36,6 +36,7 @@ from outbound.domain.discovery import (
     name_key,
     plan_sources,
     share,
+    website_from_links,
 )
 from outbound.domain.domains import is_free_mail, is_platform, registrable_domain
 from outbound.domain.entities import Campaign
@@ -51,9 +52,11 @@ from outbound.prompts.discovery import (
     EXTRACT_SYSTEM_PROMPT,
     SCREEN_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
+    WEBSITE_SYSTEM_PROMPT,
     extract_user_prompt,
     screen_user_prompt,
     user_prompt,
+    website_user_prompt,
 )
 from outbound.providers.errors import ProviderError
 from outbound.providers.llm_json import parse_json_object
@@ -65,7 +68,7 @@ from outbound.providers.ports import (
     SourceQuery,
 )
 from outbound.services.brief import draft_brief
-from outbound.services.intake import DomainResolver, IntakeService
+from outbound.services.intake import DomainResolver, IntakeService, SiteCandidate
 
 log = get_logger(__name__)
 
@@ -73,11 +76,23 @@ HISTORY = 30  # how many earlier searches a run remembers and avoids
 MAX_SEARCHES = 4  # article searches per run: enough angles, not a runaway bill
 PAGES_PER_SEARCH = 3  # the best list pages a search finds; one extract credit reads five
 PAGE_CHARS = 12_000  # of each page the model reads
+# A long list page names 20+ companies, and a reasoning model thinks first: 2,000 cut it off.
+EXTRACT_MAX_TOKENS = 6_000
 PER_SOURCE = 25  # companies asked of each directory, before weighting by its record
 EXAMPLES = 3  # qualified leads given to lookalike sources as examples
 SCREEN_BATCH = 15  # companies screened per model call
 SCREEN_MIN = 50  # below this a company does not fit
-MIN_CONFIDENCE = 0.65  # a website found by search below this is not trusted
+UNCLEAR_MIN = 60  # a company the text does not place needs more than the pass mark
+# What a company is to the seller; only a buyer fits. Anything else the model says is unclear.
+BUYER = "buyer"
+ROLES = frozenset({BUYER, "vendor", "competitor", "investor", "adviser_or_media", "unclear"})
+WEBSITE_CHOICES = 5  # likeliest sites shown to the model when none is an exact match
+# A website found by search is trusted only when its domain *is* the company's name (0.95).
+# Operator imports accept 0.8, where a name merely inside the domain passes ("acme" at
+# acmeenergy.com) because a person is asked below that; discovery has nobody to ask, and the
+# looser tier gave SONI soniassociates.net and Terna ternaofficial.com. A page that merely
+# mentions the name scores 0.65 and would send research to the wrong company.
+MIN_CONFIDENCE = 0.9
 ENOUGH = 4  # stop searching for articles once this many fresh companies per wanted lead exist
 CORROBORATION_BONUS = 5  # per extra source that named the same company, up to three
 
@@ -211,18 +226,23 @@ class ArticleSource:
         self.read = urls
         self._skip.update(urls)
         mentions: list[CompanyMention] = []
-        for page in self._search.extract(urls):
-            mentions += self._read(page.url, page.text[:PAGE_CHARS])
+        # With links: the page names the companies and often links to each one's own site.
+        for page in self._search.extract(urls, links=True):
+            mentions += self._read(
+                page.url, page.text[:PAGE_CHARS], [(link.text, link.url) for link in page.links]
+            )
         return mentions[:limit]
 
-    def _read(self, url: str, text: str) -> list[CompanyMention]:
+    def _read(
+        self, url: str, text: str, links: Sequence[tuple[str, str]] = ()
+    ) -> list[CompanyMention]:
         try:
             reply = self._llm.complete(
                 EXTRACT_SYSTEM_PROMPT,
                 extract_user_prompt(url, text),
                 json_mode=True,
                 temperature=0.1,
-                max_tokens=2_000,
+                max_tokens=EXTRACT_MAX_TOKENS,
             )
             companies = parse_json_object(self._llm.name, reply.text).get("companies", [])
         except ProviderError as error:
@@ -239,7 +259,9 @@ class ArticleSource:
             out.append(
                 CompanyMention(
                     name=name,
-                    domain=_usable_domain(str(item.get("website") or "")),
+                    # The website the page states, else one it links to that is clearly theirs.
+                    domain=_usable_domain(str(item.get("website") or ""))
+                    or website_from_links(name, url, links),
                     description=said,
                     source=ARTICLES,
                     source_url=url,
@@ -335,7 +357,16 @@ def _judge(llm: LlmClient, brief: Brief, batch: Sequence[Found]) -> dict[int, Sc
         score = min(max(score, 0), 100) if isinstance(score, int) else 0
         out_by = [str(d) for d in item.get("disqualified_by") or [] if str(d).strip()]
         reason = " ".join(str(item.get("reason") or "").split())[:300]
-        fits = score >= SCREEN_MIN and not out_by
+        role = str(item.get("role") or "").strip().lower()
+        role = role if role in ROLES else "unclear"
+        # Only a buyer fits. Text that does not place the company passes only on a higher
+        # score: "unknown" sits at 40-60, and a vendor the model called a vendor must not
+        # get in on a 55.
+        fits = not out_by and (
+            (role == BUYER and score >= SCREEN_MIN) or (role == "unclear" and score >= UNCLEAR_MIN)
+        )
+        if not out_by and role not in {BUYER, "unclear"}:
+            reason = f"{role.replace('_', ' ')}: {reason}".strip(": ")
         judged[item["n"]] = Screening(score, reason or "; ".join(out_by), fits)
     return judged
 
@@ -369,7 +400,7 @@ class Discoverer:
     search: SearchProvider
     llm: LlmClient | None
     sources: Sequence[LeadSource] = ()
-    resolve: Callable[[str], tuple[str | None, float | None]] | None = None
+    resolve: Callable[[str], list[SiteCandidate]] | None = None
 
     def run(
         self, campaign: Campaign, profile: Mapping[str, Any], count: int, run_id: str | None
@@ -513,6 +544,9 @@ class Discoverer:
                 source_urls=list(candidate.source_urls),
             )
             verdict, why, company_id = self._place(campaign, item, known_domains)
+            if verdict is CandidateVerdict.UNRESOLVED and candidate.verdict is verdict:
+                # Looked for twice and still no website: not tried again every run.
+                verdict, why = CandidateVerdict.REJECTED, "no website found after a second look"
             added += verdict is CandidateVerdict.ACCEPTED
             with self.uow(self.workspace_id) as uow:
                 uow.candidates.decide(
@@ -527,7 +561,7 @@ class Discoverer:
     ) -> tuple[CandidateVerdict, str, str | None]:
         """Add a company that fits as a lead: its website from the source, or one search."""
         if not item.domain:
-            item.domain = self._website(item.name)
+            item.domain = self._website(item)
         if not item.domain:
             return CandidateVerdict.UNRESOLVED, "fits, but its website could not be confirmed", None
         if item.domain in known_domains:
@@ -538,17 +572,43 @@ class Discoverer:
         known_domains.add(item.domain)
         return CandidateVerdict.ACCEPTED, "", company_id
 
-    def _website(self, name: str) -> str | None:
+    def _website(self, item: Found) -> str | None:
+        """The company's own website: the search result whose domain is its name; else the one
+        a model picks from the likeliest results by reading them (it may pick none)."""
         if self.resolve is None:
             return None
         try:
-            domain, confidence = self.resolve(name)
+            found = self.resolve(item.name)
         except ProviderError as error:
             log.warning("discovery_website_failed", reason=str(error)[:200])
             return None
-        if not domain or (confidence or 0) < MIN_CONFIDENCE:
+        if found and found[0].confidence >= MIN_CONFIDENCE:
+            return found[0].domain
+        return self._picked(item, found[:WEBSITE_CHOICES])
+
+    def _picked(self, item: Found, choices: Sequence[SiteCandidate]) -> str | None:
+        if self.llm is None or not choices:
             return None
-        return domain
+        try:
+            reply = self.llm.complete(
+                WEBSITE_SYSTEM_PROMPT,
+                website_user_prompt(
+                    item.name,
+                    item.description,
+                    [(c.domain, c.title, c.snippet) for c in choices],
+                ),
+                json_mode=True,
+                temperature=0.0,
+                max_tokens=400,
+            )
+            n = parse_json_object(self.llm.name, reply.text).get("n")
+        except ProviderError as error:
+            log.warning("discovery_website_pick_failed", reason=str(error)[:200])
+            return None
+        # By number only, from the list that was shown: anything else is no website.
+        if isinstance(n, int) and not isinstance(n, bool) and 1 <= n <= len(choices):
+            return choices[n - 1].domain
+        return None
 
     def _add(self, campaign: Campaign, item: Found) -> tuple[str | None, str]:
         note = "Found by discovery ({}): {}".format(
@@ -618,12 +678,7 @@ class Discoverer:
             uow.commit()
 
 
-def domain_resolver(search: SearchProvider) -> Callable[[str], tuple[str | None, float | None]]:
-    """One search for a company's website by its name (``intake.DomainResolver``)."""
-    resolver = DomainResolver(search)
-
-    def resolve(name: str) -> tuple[str | None, float | None]:
-        found = resolver.by_name(name)
-        return found.domain, found.confidence
-
-    return resolve
+def domain_resolver(search: SearchProvider) -> Callable[[str], list[SiteCandidate]]:
+    """The websites a search for a company's name finds, likeliest first
+    (``intake.DomainResolver.candidates``)."""
+    return DomainResolver(search).candidates

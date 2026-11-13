@@ -49,11 +49,19 @@ are given the brief and a numbered list of companies, each with a short descript
 source said about it. {UNTRUSTED_RULE}
 
 Return one JSON object and nothing else:
-{{"companies": [{{"n": <number>, "score": <0-100>, "matched": ["<must-have or signal it
+{{"companies": [{{"n": <number>, "role": "buyer" | "vendor" | "competitor" | "investor" |
+"adviser_or_media" | "unclear", "score": <0-100>, "matched": ["<must-have or signal it
 meets>", ...], "disqualified_by": ["<disqualifier it hits>", ...], "reason": "<one sentence
 naming the deciding factor>"}}, ...]}}
 Rules:
 - One entry for every number you were given.
+- "role" says what the company is to the seller. "buyer": the kind of organisation the brief
+  describes, which would itself use what the seller sells. "vendor": it sells software, data,
+  equipment or services TO such organisations. "competitor": it sells what the seller sells.
+  "investor": a fund or asset manager that owns but does not operate. "adviser_or_media": a
+  consultancy, association, publisher or event. "unclear": the text does not say.
+- Only a buyer fits. A vendor to the buyers is never a fit, however close its market, and
+  whatever the disqualifiers list.
 - A company that hits any disqualifier (a competitor, the wrong kind of company, the wrong
   place) scores under 30 and names the disqualifier.
 - 80 or more only when the description clearly shows the essential must-haves.
@@ -104,4 +112,37 @@ def screen_user_prompt(brief: Brief, companies: Sequence[tuple[str, str, str, st
         f"The brief:\n{untrusted_text(brief_text(brief))}\n\n"
         f"The companies:\n{untrusted_text(listed)}\n\n"
         f"Judge all {len(companies)}."
+    )
+
+
+WEBSITE_SYSTEM_PROMPT = f"""\
+You pick a company's own website from web search results. You are given the company (its name
+and what is known about it) and a numbered list of websites, each with the title and text of
+the page found there. {UNTRUSTED_RULE}
+
+Return one JSON object and nothing else: {{"n": <the number of the company's own website, or 0>}}
+Rules:
+- The company's own website is the one it runs itself. A page ABOUT the company on somebody
+  else's site (a profile, a news story, a directory, a register, an investor's portfolio page)
+  is not it.
+- A company is often known by initials, or by a name in its own language, so its website's
+  name may be an abbreviation of its name. That is fine when the page text shows it is them.
+- A different company with a similar name, or the same name in another country than the one
+  described, is not it.
+- When no website is clearly theirs, answer 0. A wrong website is worse than none."""
+
+
+def website_user_prompt(
+    name: str, description: str, candidates: Sequence[tuple[str, str, str]]
+) -> str:
+    """``candidates`` are (domain, page title, page text), numbered from 1 in order."""
+    listed = "\n".join(
+        f"{n}. {domain}\n   Title: {title or '(none)'}\n   Text: {text[:300] or '(none)'}"
+        for n, (domain, title, text) in enumerate(candidates, start=1)
+    )
+    return (
+        f"The company: {untrusted_text(name)}\n"
+        f"What is known about it:\n{untrusted_text(description or '(nothing)')}\n\n"
+        f"The websites:\n{untrusted_text(listed)}\n\n"
+        "Which is the company's own website?"
     )

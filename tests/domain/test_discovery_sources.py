@@ -15,6 +15,7 @@ from outbound.domain.discovery import (
     name_key,
     plan_sources,
     share,
+    website_from_links,
 )
 from outbound.domain.enums import CandidateVerdict
 
@@ -113,3 +114,40 @@ def test_a_good_source_gets_a_bigger_share_and_a_poor_one_a_smaller_but_never_no
     assert share(EXA, yields) == pytest.approx(1.0)
     assert share(CH, yields) == 1.0  # nothing known yet
     assert share(YC, {}) == 1.0
+
+
+PAGE = "https://list.example/grid-operators"
+
+
+@pytest.mark.parametrize(
+    ("name", "links", "expected"),
+    [
+        # The link's own domain is the company's name.
+        ("Fingrid", [("Finland", "https://www.fingrid.fi/en/")], "fingrid.fi"),
+        # The name's words on a link to a site's front page.
+        ("Austrian Power Grid AG", [("Austrian Power Grid", "https://www.apg.at/")], "apg.at"),
+        # The same words on a link into somebody else's article are not the company's site.
+        ("Statkraft", [("Statkraft", "https://news.example/story/statkraft-profits")], None),
+        # Links to the page's own site, to platforms, and to free mail never count.
+        (
+            "Fingrid",
+            [
+                ("Fingrid", "https://list.example/fingrid"),
+                ("Fingrid", "https://www.linkedin.com/company/fingrid"),
+            ],
+            None,
+        ),
+        # Two sites that both fit the name are not clear enough to take.
+        ("Acme", [("Acme", "https://acme.com/"), ("Acme", "https://acme.io/")], None),
+        # A domain that is the name beats a front-page link that only says it.
+        ("Acme", [("Acme", "https://other.com/"), ("see", "https://acme.com/about")], "acme.com"),
+        ("", [("x", "https://x.com/")], None),
+        # A name too short to tell sites apart (the live run matched "E" to e.org).
+        ("E", [("E", "https://www.e.org/")], None),
+        ("RWE", [("RWE", "https://www.rwe.com/")], "rwe.com"),
+    ],
+)
+def test_a_companys_own_website_is_taken_from_the_page_that_names_it_only_when_clear(
+    name: str, links: list[tuple[str, str]], expected: str | None
+) -> None:
+    assert website_from_links(name, PAGE, links) == expected

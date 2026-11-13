@@ -74,16 +74,20 @@ class CandidateRepository(ScopedRepository):
         return [snapshot(row, DiscoveryCandidate) for row in self._session.scalars(stmt)]
 
     def waiting(self, campaign_id: str, limit: int) -> list[DiscoveryCandidate]:
-        """Companies that fit but were over an earlier run's limit, best first: the next run
-        adds these before it looks for more."""
+        """Companies that fit but were not added: over an earlier run's limit, or with no website
+        found then. Over-limit ones first, each best first: the next run adds these before it
+        looks for more, and looks again for the missing websites."""
         stmt = (
             select(DiscoveryCandidateRow)
             .where(
                 DiscoveryCandidateRow.workspace_id == self._workspace_id,
                 DiscoveryCandidateRow.campaign_id == campaign_id,
-                DiscoveryCandidateRow.verdict == CandidateVerdict.OVER_LIMIT,
+                DiscoveryCandidateRow.verdict.in_(
+                    [CandidateVerdict.OVER_LIMIT, CandidateVerdict.UNRESOLVED]
+                ),
             )
             .order_by(
+                (DiscoveryCandidateRow.verdict != CandidateVerdict.OVER_LIMIT),
                 DiscoveryCandidateRow.rank_score.desc().nulls_last(),
                 DiscoveryCandidateRow.created_at,
             )

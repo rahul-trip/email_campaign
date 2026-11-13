@@ -25,6 +25,7 @@ from outbound.domain.enums import (
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import PageText, SearchHit
 from outbound.services.intake import (
+    DomainResolver,
     IntakeReport,
     IntakeService,
     RowOutcome,
@@ -58,7 +59,7 @@ class FakeSearch:
                 return hits
         return []
 
-    def extract(self, urls: list[str]) -> list[PageText]:
+    def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         return []
 
 
@@ -618,3 +619,74 @@ def test_a_website_must_hold_the_whole_company_name_to_be_taken_without_asking(
 ) -> None:
     found = match_confidence(name, domain, hit(f"https://{domain}", "Tata Power | Business"))
     assert at_least <= found < below
+
+
+def test_a_website_is_looked_up_by_the_plain_name_and_ten_results() -> None:
+    # "<name> official website" returned five aggregator pages and never the company's own site
+    # for ENGIE, RWE, Iberdrola or Statkraft; the plain name finds it.
+    asked: list[tuple[str, int]] = []
+
+    class Recording(FakeSearch):
+        def search(
+            self,
+            query: str,
+            *,
+            max_results: int = 5,
+            topic: str = "general",
+            days: int | None = None,
+        ) -> list[SearchHit]:
+            asked.append((query, max_results))
+            return [
+                hit("https://leadiq.com/c/rwe", "RWE | LeadIQ"),
+                hit("https://www.rwe.com/en/", "RWE"),
+            ]
+
+    found = DomainResolver(Recording()).by_name("RWE")
+    assert asked == [("RWE", 10)]
+    assert (found.domain, found.confidence) == ("rwe.com", 0.95)
+
+
+def test_a_second_search_for_the_homepage_is_made_only_when_the_name_alone_finds_no_site() -> None:
+    # Live: "Fingrid" alone returned profiles and news; "Fingrid homepage" returned fingrid.fi.
+    asked: list[str] = []
+
+    class Answering(FakeSearch):
+        def search(
+            self,
+            query: str,
+            *,
+            max_results: int = 5,
+            topic: str = "general",
+            days: int | None = None,
+        ) -> list[SearchHit]:
+            asked.append(query)
+            if "homepage" in query:
+                return [hit("https://www.fingrid.fi/en/", "Fingrid")]
+            return [hit("https://news.example/fingrid-story", "Fingrid raises tariffs")]
+
+    found = DomainResolver(Answering()).by_name("Fingrid")
+    assert asked == ["Fingrid", "Fingrid homepage"]
+    assert (found.domain, found.confidence) == ("fingrid.fi", 0.95)
+
+
+def test_the_websites_a_name_finds_are_listed_once_each_with_the_likeliest_first() -> None:
+    class Answering(FakeSearch):
+        def search(
+            self,
+            query: str,
+            *,
+            max_results: int = 5,
+            topic: str = "general",
+            days: int | None = None,
+        ) -> list[SearchHit]:
+            return [
+                hit("https://leadiq.com/c/pse", "PSE | LeadIQ"),  # a platform: never a candidate
+                hit("https://www.pse.pl/a", "Polskie Sieci Elektroenergetyczne"),
+                hit("https://www.pse.pl/b", "Polskie Sieci Elektroenergetyczne"),
+                hit("https://www.pse.com/", "Something else"),
+            ]
+
+    found = DomainResolver(Answering()).candidates("Polskie Sieci Elektroenergetyczne")
+    assert [c.domain for c in found] == ["pse.pl", "pse.com"]
+    assert found[0].confidence > found[1].confidence
+    assert found[0].title == "Polskie Sieci Elektroenergetyczne"

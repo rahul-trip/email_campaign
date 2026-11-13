@@ -166,7 +166,7 @@ def test_a_uk_sole_trader_is_held_and_nothing_further_is_spent_on_it(
     world = World()
 
     class Bare(SiteSearch):
-        def extract(self, urls: list[str]) -> list[PageText]:
+        def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
             domain = urls[0].split("//")[1]
             return [PageText(url=f"https://{domain}", text="Bob fixes boilers in Leeds. LS1 4AP.")]
 
