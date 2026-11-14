@@ -264,6 +264,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `outbound/services/autodiscovery.py::AutoDiscovery`, `outbound/services/runs.py::RunRequest`.
 - **Links:** [the tick](lld/runner-and-worker.md#the-tick).
 
+### R-34 · P2 · Dependencies: advisory checks and update PRs are switched off during development
+
+- **What:** on 2026-11-14 the owner paused two safeguards so that a newly published advisory cannot block a deploy and package-bump PRs stop arriving. In `.github/workflows/ci.yml` the `pip-audit` and `npm audit` steps have `continue-on-error: true` (they still run and show red in the log, but the `checks` job and so the deploy pass). In `.github/dependabot.yml` every ecosystem has `open-pull-requests-limit: 0`. gitleaks (secrets) is unchanged. GitHub's own Dependabot *security* alerts and security-update PRs are a repository setting, not this file, and are not changed here.
+- **Risk:** a deploy can now ship a dependency with a known vulnerability without anyone being stopped. At the time of the pause the audits were clean (dnspython 2.9.2, opentelemetry-api 1.45.2).
+- **To restore:** delete the two `continue-on-error: true` lines and the comment above them in `ci.yml`; delete the `open-pull-requests-limit: 0` lines and the comment in `dependabot.yml`; run `uvx pip-audit` and `npm audit --audit-level=high` and bump what they report. Do this before the alpha opens to other customers.
+- **Read:** `.github/workflows/ci.yml` (job `security`), `.github/dependabot.yml`.
+
 ## Closed entries
 
 ### R-32 · P3 · Runs: a person's runs scrolled off the Runs page — closed 2026-11-14

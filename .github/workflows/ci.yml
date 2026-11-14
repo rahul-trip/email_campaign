@@ -131,7 +131,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+      # TEMPORARY (R-34): reported, but they no longer stop a deploy. Remove `continue-on-error`
+      # from both audit steps when development settles.
       - name: Known vulnerabilities in Python dependencies
+        continue-on-error: true
         run: |
           uv export --frozen --no-hashes --no-emit-project > requirements-audit.txt
           uvx pip-audit -r requirements-audit.txt --no-deps --disable-pip
@@ -139,5 +142,6 @@ jobs:
         with:
           node-version: 22
       - name: Known vulnerabilities in web2 dependencies
+        continue-on-error: true
         working-directory: web2
         run: npm audit --audit-level=high
