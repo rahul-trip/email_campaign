@@ -738,6 +738,22 @@ def test_a_persons_runs_stay_listed_however_many_background_runs_follow_them(
     runs.get(background[0])  # a background run can still be opened by its id
 
 
+def test_the_workers_own_pipeline_runs_are_not_listed_but_imports_and_discovery_runs_are(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    runs = RunService(factory, ws)
+    manual = runs.queue(RunRequest())
+    discovery = runs.queue(RunRequest(mode=RunMode.DISCOVERY, automatic=True))
+    with factory(ws) as uow:
+        timer = uow.runs.start(RunKind.PIPELINE, {"limit": 50, "only": []})  # the worker's timer
+        imported = uow.runs.start(RunKind.IMPORT, {"file": "targets.xlsx"})
+        uow.commit()
+    listed = {r.id for r in runs.recent()}
+    assert listed == {manual.id, discovery.id, imported}
+    assert timer not in listed
+    assert runs.get(timer).id == timer  # still there to open
+
+
 def test_the_runs_list_holds_more_than_the_old_twenty(factory: UnitOfWorkFactory, ws: str) -> None:
     runs = RunService(factory, ws)
     queued = [runs.queue(RunRequest(limit=1 + n % 50)) for n in range(25)]

@@ -66,6 +66,7 @@ def update_workspace_settings(
         "footer_enabled",
         "email_min_words",
         "email_max_words",
+        "auto_discovery",
     ):
         if changes.get(name, "") is None:
             changes.pop(name)

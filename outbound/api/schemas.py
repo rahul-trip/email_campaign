@@ -515,6 +515,7 @@ class WorkspaceSettingsIn(In):
     footer_enabled: bool | None = None
     email_min_words: int | None = Field(default=None, ge=40, le=500)
     email_max_words: int | None = Field(default=None, ge=40, le=600)
+    auto_discovery: bool | None = None
 
 
 class SenderProfileIn(In):

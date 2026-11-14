@@ -180,3 +180,32 @@ def test_a_run_whose_worker_died_is_failed_in_whichever_workspace(
     )
     assert worker.recover_stale() == [stale]
     assert run_status(factory, other_ws, stale) is RunStatus.FAILED
+
+
+def test_the_timers_pass_queues_the_search_a_campaign_is_due_and_then_still_ticks(
+    worker_container: Container, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    with factory(ws) as uow:
+        uow.campaigns.create("grids", ["CTO"], icp_description="grid operators")
+        uow.commit()
+    ticks: list[str] = []
+
+    class Ticking:
+        def run(self, *, limit: int, skip_idle: bool) -> None:
+            ticks.append("tick")
+
+    class Assembled:
+        tick = Ticking()
+        runs = RunService(factory, ws)
+
+    worker = Worker(
+        worker_container, lambda _ws: cast(Pipeline, Assembled()), tick_every=timedelta(minutes=15)
+    )
+    worker.run_once()
+    assert ticks == ["tick"]
+    with factory(ws) as uow:
+        (run,) = uow.runs.recent(10)
+    assert run.status is RunStatus.QUEUED and run.params["mode"] == "discovery"  # type: ignore[index]
+    worker.execute(Job(ws, Task.TICK))  # the next pass does not queue a second one
+    with factory(ws) as uow:
+        assert len(uow.runs.recent(10)) == 1

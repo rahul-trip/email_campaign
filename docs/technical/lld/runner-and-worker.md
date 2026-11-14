@@ -144,6 +144,8 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 2. If there are jobs, start a `sync` run and run each job inside `call_scope(run_id)`. One failing job is logged as `job_failed` and does not stop the others. Finish the sync run.
 3. `run_pipeline(limit)` — unless `skip_idle` is set and no lead is waiting, in which case no pipeline run starts at all, so a quiet workspace's Runs screen does not fill up with empty runs. The worker's own timer always passes `skip_idle=True`; a direct `tick` from the CLI does not.
 
+Before it calls `Tick.run`, the worker's tick job asks `services/autodiscovery.py::AutoDiscovery.queue_due` whether a campaign is due a search for new companies; if so it queues one ordinary discovery run (`RunRequest(mode=discovery, discover=10, automatic=True)`), which the next planning pass claims like any queued run. The rule (all must hold): the workspace setting `auto_discovery` is not false; the engine may run and a discovery credit is left (`metering.quota.quota_in`); the campaign has an ideal customer (`icp_description` or `icp_brief`); no requested pipeline run is queued or running; the campaign's last discovery run, manual or automatic, however it ended, is older than `INTERVAL` (24 h); fewer than `BACKLOG` (10) of its leads wait before the email step (`CompanyRepository.count_in`). One campaign is queued per pass. A failure is logged as `auto_discovery_failed` and the tick still runs.
+
 Everything is driven by status and `next_action_at`, so a tick that fires early repeats nothing.
 
 ### The worker: one process, every workspace

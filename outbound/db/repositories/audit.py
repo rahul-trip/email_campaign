@@ -129,11 +129,25 @@ class RunRepository(ScopedRepository):
     def get(self, run_id: str) -> RunView:
         return self._view(self._row(RunRow, run_id))
 
-    def recent(self, limit: int = 20, *, kinds: Collection[RunKind] | None = None) -> list[RunView]:
-        """The newest runs first; only these ``kinds`` when given, else every kind."""
+    def recent(
+        self,
+        limit: int = 20,
+        *,
+        kinds: Collection[RunKind] | None = None,
+        requested_only: bool = False,
+    ) -> list[RunView]:
+        """The newest runs first; only these ``kinds`` when given, else every kind.
+
+        ``requested_only`` drops the pipeline runs the worker's timer made on its own: a run
+        someone queued (or discovery queued) carries a ``mode`` in its params, a timer's does not.
+        """
         stmt = select(RunRow).where(RunRow.workspace_id == self._workspace_id)
         if kinds is not None:
             stmt = stmt.where(RunRow.kind.in_(kinds))
+        if requested_only:
+            stmt = stmt.where(
+                or_(RunRow.kind != RunKind.PIPELINE, RunRow.params["mode"].as_string().is_not(None))
+            )
         stmt = stmt.order_by(RunRow.created_at.desc(), RunRow.id.desc()).limit(limit)
         return [self._view(row) for row in self._session.scalars(stmt)]
 
