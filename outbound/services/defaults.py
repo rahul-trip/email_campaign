@@ -57,4 +57,5 @@ def default_workspace_settings() -> dict[str, Any]:
         "footer_enabled": True,
         "email_min_words": 120,  # the first email's length, set under Settings → Limits
         "email_max_words": 200,
+        "auto_discovery": True,  # the worker searches for a campaign's customers once a day
     }

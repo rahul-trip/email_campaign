@@ -258,7 +258,20 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `outbound/providers/adapters/exa.py`, `outbound/providers/adapters/companies_house.py::CompaniesHouse.find`, `outbound/providers/pricing.py`.
 - **Links:** [Exa](integrations/exa.md), [Companies House](integrations/companies-house.md).
 
+### R-33 · P3 · Runs: automatic discovery has no on-screen switch, and the worker drops `skip_directory`
+
+- **What:** (1) the worker queues a discovery run by itself once a day per campaign that has an ideal customer (`services/autodiscovery.py`). It is bounded (10 companies, one run at a time, discovery credits, the per-lead spend ceiling, 24 hours between runs) and switched off with the workspace setting `auto_discovery`, but that setting has no control in Settings yet, only the API (`PUT /api/settings/workspace`). (2) Found while adding it: `RunRequest.to_params` stores `skip_directory` but `RunRequest.from_params` does not read it back, so a run queued with *Find emails with the vendors* is executed by the worker without it. Not fixed here: it changes what a run does for people who use it.
+- **Read:** `outbound/services/autodiscovery.py::AutoDiscovery`, `outbound/services/runs.py::RunRequest`.
+- **Links:** [the tick](lld/runner-and-worker.md#the-tick).
+
 ## Closed entries
+
+### R-32 · P3 · Runs: a person's runs scrolled off the Runs page — closed 2026-11-14
+
+- **Was:** `RunRepository.recent` listed the 20 newest runs of every kind. The worker adds a `sync` run for each workspace every tick (549 of them against 41 real runs in one database), so a person's runs left the list within hours, "Runs this week" counted background runs, and the Dashboard's "latest run" could be a sync. No run was ever deleted; they were only not shown.
+- **Fixed by:** `RunService.recent` lists only `OPERATOR_KINDS` (pipeline, import, bakeoff), newest first, up to `HISTORY` (200), and of the pipeline runs only those someone queued (they carry a `mode`; the worker's timer passes do not, `requested_only`). A sync run or a timer pass can still be opened by its id. The API shape is unchanged.
+- **Evidence:** `tests/db/test_leads_and_settings.py` (a person's runs stay listed after 30 background runs; the list holds more than twenty; the worker's timer pipeline runs are not listed).
+- **Still open:** the list has no paging, so a workspace with more than 200 runs loses the oldest from view (not from the database); and `sync` runs are never pruned (about 200 rows a day per workspace).
 
 ### R-31 · P2 · Discovery: wrong or missing websites for the companies it finds — closed 2026-11-13
 

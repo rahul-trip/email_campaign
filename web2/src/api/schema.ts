@@ -4864,6 +4864,8 @@ export interface components {
          * @description Only the settings an operator may change, each with its real type.
          */
         WorkspaceSettingsIn: {
+            /** Auto Discovery */
+            auto_discovery?: boolean | null;
             /** Budget Per Prospect Micro Usd */
             budget_per_prospect_micro_usd?: number | null;
             /** Country Policy Enabled */

@@ -39,7 +39,8 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `discovery.py` | `Discoverer`, `ArticleSource`, `plan_queries`, `merge`, `screen`, `rank_score`, `domain_resolver`, `Discovery` | `pipeline.discover_companies` |
 | `candidates.py` | `CandidateService` (`for_run`, `promote`) | API runs router |
 | `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
-| `runs.py` | `RunService` (`queue`, `get`, `recent`, `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
+| `autodiscovery.py` | `AutoDiscovery.queue_due` (decides, and queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
+| `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`, `requested_only`: the worker's `sync` runs and its timer pipeline runs, which have no `mode` in their params, are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
 | `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
 | `webhook.py` | `WebhookService.receive`, `sign`, `verify` | API webhook router |
@@ -153,7 +154,7 @@ Details: [data lifecycle](../data/data-lifecycle.md#the-three-ways-out).
 
 ## Runs and reports
 
-- `RunService.queue(RunRequest)` inserts a `queued` run, with `mode`, `limit` (1–500), `discover` (1–50), `campaign` and `only` in `params`.
+- `RunService.queue(RunRequest)` inserts a `queued` run, with `mode`, `limit` (1–500), `discover` (1–50), `campaign` and `only` in `params` (and `automatic` when the worker queued it).
 - `cancel` stops a queued run at once, and asks a running one to stop between leads.
 - `get` returns live cost while running.
 - **Reports** (`ReportService`, over `ReportRepository`):

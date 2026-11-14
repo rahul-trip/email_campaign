@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -142,6 +142,17 @@ class CompanyRepository(ScopedRepository):
             or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
         )
         return self._session.scalars(stmt.limit(1)).first() is not None
+
+    def count_in(self, statuses: Collection[CompanyStatus], campaign_id: str) -> int:
+        """How many of a campaign's companies are in one of ``statuses`` and not waiting for
+        credits."""
+        stmt = select(func.count()).where(
+            CompanyRow.workspace_id == self._workspace_id,
+            CompanyRow.campaign_id == campaign_id,
+            CompanyRow.status.in_(statuses),
+            CompanyRow.credit_wait_step.is_(None),
+        )
+        return int(self._session.scalar(stmt) or 0)
 
     def search(
         self,

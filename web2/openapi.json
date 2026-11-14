@@ -7314,6 +7314,17 @@
         "additionalProperties": false,
         "description": "Only the settings an operator may change, each with its real type.",
         "properties": {
+          "auto_discovery": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Discovery"
+          },
           "budget_per_prospect_micro_usd": {
             "anyOf": [
               {

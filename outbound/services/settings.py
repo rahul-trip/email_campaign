@@ -66,6 +66,7 @@ SETTING_FIELDS = frozenset(
         "footer_enabled",  # off: no footer is added to any email
         "email_min_words",
         "email_max_words",
+        "auto_discovery",  # off: the worker never searches for companies on its own
     }
 )
 

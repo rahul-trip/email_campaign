@@ -13,6 +13,11 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import RunKind, RunStatus
 from outbound.services import defaults
 
+# The kinds a person can see; the worker's housekeeping (``SYNC``) is not one of them, and of
+# the pipeline runs only those someone queued (see ``RunRepository.recent``).
+OPERATOR_KINDS = (RunKind.PIPELINE, RunKind.IMPORT, RunKind.BAKEOFF)
+HISTORY = 200  # how many of them the list holds, newest first
+
 
 class RunMode(StrEnum):
     MANUAL = "manual"  # only the targets the operator added
@@ -29,6 +34,8 @@ class RunRequest:
     campaign: str = defaults.DEFAULT_CAMPAIGN_NAME
     # Find emails with the vendors, not the shared directory, for the leads this run works on.
     skip_directory: bool = False
+    # Queued by the worker's own discovery (``services.autodiscovery``), not by a person.
+    automatic: bool = False
 
     def to_params(self) -> dict[str, Any]:
         return {
@@ -38,6 +45,7 @@ class RunRequest:
             "discover": self.discover,
             "campaign": self.campaign,
             "skip_directory": self.skip_directory,
+            "automatic": self.automatic,
         }
 
     @classmethod
@@ -49,6 +57,7 @@ class RunRequest:
             mode=RunMode(data.get("mode", RunMode.MANUAL.value)),
             discover=int(data.get("discover", 10)),
             campaign=str(data.get("campaign", defaults.DEFAULT_CAMPAIGN_NAME)),
+            automatic=bool(data.get("automatic", False)),
         )
 
 
@@ -125,9 +134,13 @@ class RunService:
                 )
             return run
 
-    def recent(self, limit: int = 20) -> list[RunView]:
+    def recent(self, limit: int = HISTORY) -> list[RunView]:
+        """The runs a person queued or imported, and the discovery runs queued for them, newest
+        first. The worker's own timer work is left out: its sync runs (one every few minutes) and
+        its pipeline runs over whatever is due. Listed with the rest they pushed a person's runs
+        off the list within hours."""
         with self._uow(self._workspace_id) as uow:
-            return uow.runs.recent(limit)
+            return uow.runs.recent(limit, kinds=OPERATOR_KINDS, requested_only=True)
 
     def leads(self, run_id: str) -> list[RunLead]:
         """Every lead this run moved, held, failed or deferred, in the order it first touched

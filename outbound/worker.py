@@ -30,6 +30,7 @@ from outbound.db.types import utcnow
 from outbound.domain.enums import RunStatus
 from outbound.logging import get_logger
 from outbound.pipeline import Pipeline, execute_run
+from outbound.services.autodiscovery import AutoDiscovery
 from outbound.services.runs import RunRequest
 
 log = get_logger(__name__)
@@ -148,12 +149,23 @@ class Worker:
 
     def _tick(self, workspace_id: str) -> bool:
         try:
-            self._assemble(workspace_id).tick.run(limit=self._tick_limit, skip_idle=True)
+            pipeline = self._assemble(workspace_id)
+            self._queue_discovery(workspace_id, pipeline)
+            pipeline.tick.run(limit=self._tick_limit, skip_idle=True)
         except RunInProgress:
             log.info("tick_skipped", workspace_id=workspace_id, reason="a run is in progress")
         except Exception as error:  # one workspace's broken tick must not stop the others
             log.exception("tick_failed", workspace_id=workspace_id, error_type=type(error).__name__)
         return True
+
+    def _queue_discovery(self, workspace_id: str, pipeline: Pipeline) -> None:
+        """Queue the search for new companies a campaign is due; the run is picked up next."""
+        try:
+            AutoDiscovery(self._container.uow, workspace_id, pipeline.runs, self._now).queue_due()
+        except Exception as error:  # the tick's own work must still happen
+            log.exception(
+                "auto_discovery_failed", workspace_id=workspace_id, error_type=type(error).__name__
+            )
 
     def _fail(self, workspace_id: str, run_id: str, error: Exception) -> None:
         with self._container.uow(workspace_id) as uow:
