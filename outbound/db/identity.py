@@ -313,6 +313,17 @@ class SessionRepository:
         ).one_or_none()
         return snapshot(row, LoginSession) if row else None
 
+    def with_user(self, token_hash: str) -> tuple[LoginSession, User] | None:
+        """The session and its person in one round trip (this runs on every request)."""
+        found = self._session.execute(
+            select(SessionRow, UserRow)
+            .join(UserRow, UserRow.id == SessionRow.user_id)
+            .where(SessionRow.token_hash == token_hash)
+        ).one_or_none()
+        if found is None:
+            return None
+        return snapshot(found[0], LoginSession), snapshot(found[1], User)
+
     def seen(self, session_id: str, at: datetime) -> None:
         self._session.execute(
             update(SessionRow).where(SessionRow.id == session_id).values(last_seen_at=at)

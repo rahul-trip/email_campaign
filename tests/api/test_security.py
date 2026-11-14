@@ -125,6 +125,17 @@ def test_pages_carry_security_headers(served: Callable[..., TestClient]) -> None
     assert served().get("/api/health").headers["cache-control"] == "no-store"
 
 
+def test_hashed_assets_cache_for_good_and_the_page_is_always_revalidated(
+    served: Callable[..., TestClient],
+) -> None:
+    asset = served().get("/assets/app.js")
+    assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert served().get("/").headers["cache-control"] == "no-cache"
+    missing = served().get("/assets/nope.js")
+    assert missing.status_code == 404
+    assert "immutable" not in missing.headers.get("cache-control", "")
+
+
 def test_error_answers_carry_the_headers_too(served: Callable[..., TestClient]) -> None:
     response = served().get("/api/companies")  # 401
     assert response.status_code == 401

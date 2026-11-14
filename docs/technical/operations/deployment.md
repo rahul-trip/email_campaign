@@ -30,6 +30,7 @@ VM  /opt/outbound/
 
 - **Secrets live in Doppler.** Every container starts as `doppler run -- outbound …`. The VM holds only a read-only Doppler service token. Doppler also keeps an encrypted copy of the last secrets on the `outbound_doppler` volume, so a restart works while Doppler is unreachable.
 - **The database is Supabase Postgres.** The VM reaches it over the internet, encrypted; nothing database-related runs on the VM.
+- **The VM and the database share a region.** <a id="the-vm-and-the-database-share-a-region"></a>A request runs several SQL statements one after another, so each pays the distance between them. Choose the Supabase region to match the VM's zone (and both near the users); a transatlantic gap adds hundreds of milliseconds to every screen ([R-45](../tech-debt-and-risks.md)).
 - **The image is built on the VM** from the `Dockerfile`. There is no registry. Docker caches the dependency layers, so after the first build a code change rebuilds much faster.
 - **HTTPS is the job of the proxy already on the VM.** The app publishes its port on `127.0.0.1` only and sets `COOKIE_SECURE=true`. It refuses logins over plain http, so it is never reachable without the proxy.
 

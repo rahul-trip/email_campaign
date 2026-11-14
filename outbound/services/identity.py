@@ -193,10 +193,12 @@ class IdentityService:
             return None
         now = utcnow()
         with self._identity() as ids:
-            session = ids.sessions.by_hash(hash_token(token))
-            if session is None or session.revoked_at is not None or session.expires_at <= now:
+            found = ids.sessions.with_user(hash_token(token))
+            if found is None:
                 return None
-            user = ids.users.get(session.user_id)
+            session, user = found
+            if session.revoked_at is not None or session.expires_at <= now:
+                return None
             idle = STAFF_IDLE if user.platform_role else USER_IDLE
             if user.status is not UserStatus.ACTIVE or now - session.last_seen_at > idle:
                 return None
