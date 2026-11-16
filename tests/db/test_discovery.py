@@ -488,3 +488,90 @@ def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(
     with factory(ws) as uow:
         verdicts = {c.name: c.verdict for c in uow.candidates.for_run("run-1")}
     assert verdicts["Mystery"] is CandidateVerdict.UNRESOLVED  # its website search failed
+
+
+CUT_OFF = ProviderError(
+    "fake-llm", "the reply was cut off at the token limit; raise LLM_MAX_TOKENS"
+)
+
+
+def _failing(
+    times: int, then: Callable[[str], dict[str, object]]
+) -> Callable[[str], dict[str, object]]:
+    """A screening reply that is cut off ``times`` times, then answers."""
+    left = [times]
+
+    def reply(user: str) -> dict[str, object]:
+        if left[0] > 0:
+            left[0] -= 1
+            raise CUT_OFF
+        return then(user)
+
+    return reply
+
+
+def test_a_cut_off_screening_reply_is_asked_again_and_the_companies_are_judged(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(1, screen_all(80, Rival=10))
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.rejected, found.unscreened) == (2, 1, 0)
+    assert world.llm.calls.count("screen") == 2  # the cut-off reply, then the answer
+
+
+def test_companies_the_model_could_not_judge_are_kept_not_rejected(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    """Production lost 334 companies this way: a failed reply fell back to word matching, which
+    rejected them, and a company is never screened twice."""
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.rejected, found.unscreened) == (0, 0, 3)
+    with factory(ws) as uow:
+        candidates = uow.candidates.for_run("run-1")
+    assert {c.verdict for c in candidates} == {CandidateVerdict.UNSCREENED}
+    assert all(c.screen_score is None and c.company_id is None for c in candidates)
+
+
+def test_a_company_the_model_leaves_out_of_its_answer_is_unscreened(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    everyone = screen_all(80)
+    world.llm.replies["screen"] = lambda user: {"companies": everyone(user)["companies"][:1]}
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.unscreened) == (1, 2)
+
+
+def test_the_next_run_screens_unjudged_companies_first_in_the_same_rows(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    run(pipeline, container, ws, 5, "run-1")
+    world.llm.replies["screen"] = screen_all(80, Rival=10)
+    found = run(pipeline, container, ws, 5, "run-2")
+    assert (found.added, found.rejected, found.unscreened) == (2, 1, 0)
+    with factory(ws) as uow:
+        decided = {c.name: c for c in uow.candidates.for_run("run-2")}
+        [campaign] = uow.campaigns.all()
+        assert uow.candidates.unscreened(campaign.id, 10) == []
+    assert set(decided) == {"Gridcast", "Windwise", "Rival Forecasting"}  # three rows, not six
+    assert decided["Rival Forecasting"].verdict is CandidateVerdict.REJECTED
+    assert decided["Gridcast"].verdict is CandidateVerdict.ACCEPTED
+    assert decided["Gridcast"].screen_score == 80 and decided["Gridcast"].company_id
+
+
+def test_unjudged_companies_that_fill_the_count_save_the_searches(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    run(pipeline, container, ws, 5, "run-1")
+    world.llm.replies["screen"] = screen_all(80)
+    asked = len(world.directory.queries)
+    found = run(pipeline, container, ws, 2, "run-2")  # the first two fits are enough
+    assert found.added == 2 and found.searches == 0
+    assert len(world.directory.queries) == asked  # no source was asked again

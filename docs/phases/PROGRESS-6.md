@@ -101,6 +101,10 @@ Built:
   - `Discovery` lacks `screened` and per-source counts.
 - A live run against real keys to check that the YC mirror is fresh and that the planned searches read as intended.
 
+## Lead quality (2026-11-16)
+
+Found by reading the VM's worker log and database (read-only) and written up as a plan of small branches, each from `main`. Done: `phase-6/model-reply-budget` (migration 0020, R-35): discovery's model calls are no longer cut off, and a company the model could not judge is kept for the next run instead of rejected. Next, in order: the Y Combinator directory and Exa (the directory found nothing in every production run), a funnel report, the brief and scoring, decision-makers only, the catch-all resolver, the copy reading-grade limit.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

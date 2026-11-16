@@ -523,9 +523,9 @@ CREATE TABLE discovery_candidates (
   source_urls   JSON NOT NULL,           -- the directory page or list pages it was named on
   description   TEXT NOT NULL,
   evidence      TEXT NOT NULL,           -- what the sources said about it
-  screen_score  INTEGER,                 -- 0-100 from screening; NULL when screened by words or not at all
+  screen_score  INTEGER,                 -- 0-100 from screening; NULL when screened by words (no model) or not at all
   rank_score    INTEGER,
-  verdict       TEXT NOT NULL CHECK (verdict IN ('accepted','rejected','unresolved','already_lead','over_limit')),
+  verdict       TEXT NOT NULL CHECK (verdict IN ('accepted','rejected','unresolved','already_lead','over_limit','unscreened')),  -- 'unscreened' added in 0020: the model could not judge it; the next run screens it again
   reason        TEXT NOT NULL,
   company_id    TEXT,                    -- the lead it became
   UNIQUE (workspace_id, campaign_id, name_key),

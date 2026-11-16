@@ -804,7 +804,8 @@
           "rejected",
           "unresolved",
           "already_lead",
-          "over_limit"
+          "over_limit",
+          "unscreened"
         ],
         "title": "CandidateVerdict",
         "type": "string"

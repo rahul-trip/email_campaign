@@ -68,6 +68,7 @@ def test_verdicts_are_the_closed_set_stored_with_each_candidate() -> None:
         "unresolved",
         "already_lead",
         "over_limit",
+        "unscreened",
     }
 
 

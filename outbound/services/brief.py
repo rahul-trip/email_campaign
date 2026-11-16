@@ -17,7 +17,7 @@ from outbound.domain.entities import Campaign
 from outbound.logging import get_logger
 from outbound.prompts.brief import SYSTEM_PROMPT, user_prompt
 from outbound.providers.errors import ProviderError
-from outbound.providers.llm_json import parse_json_object
+from outbound.providers.llm_json import ask_object
 from outbound.providers.ports import LlmClient
 
 log = get_logger(__name__)
@@ -26,14 +26,8 @@ log = get_logger(__name__)
 def draft_brief(llm: LlmClient | None, *, campaign: Campaign, profile: Mapping[str, Any]) -> Brief:
     if llm is not None:
         try:
-            reply = llm.complete(
-                SYSTEM_PROMPT,
-                user_prompt(campaign, profile),
-                json_mode=True,
-                temperature=0.2,
-                max_tokens=1_200,
-            )
-            brief = Brief.from_json(parse_json_object(llm.name, reply.text))
+            reply = ask_object(llm, SYSTEM_PROMPT, user_prompt(campaign, profile), temperature=0.2)
+            brief = Brief.from_json(reply)
             if not brief.is_empty:
                 return brief
         except ProviderError as error:

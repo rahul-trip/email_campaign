@@ -77,6 +77,7 @@ export const candidateVerdict: Vocabulary = {
   unresolved: s("Fits, no website yet", "attention"),
   already_lead: s("A lead already", "stopped"),
   rejected: s("Does not fit", "stopped"),
+  unscreened: s("Not judged yet, checked again next run", "working"),
 };
 
 /** Where discovery looked, as the run page names it. */

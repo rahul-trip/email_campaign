@@ -2815,7 +2815,7 @@ export interface components {
          * @description What discovery decided about a company it found (``discovery_candidates.verdict``).
          * @enum {string}
          */
-        CandidateVerdict: "accepted" | "rejected" | "unresolved" | "already_lead" | "over_limit";
+        CandidateVerdict: "accepted" | "rejected" | "unresolved" | "already_lead" | "over_limit" | "unscreened";
         /** ChangePasswordIn */
         ChangePasswordIn: {
             /** Current Password */

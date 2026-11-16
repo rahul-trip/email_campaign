@@ -202,6 +202,7 @@ class CandidateVerdict(StrEnum):
     UNRESOLVED = "unresolved"  # it fits, but its website could not be found with confidence
     ALREADY_LEAD = "already_lead"  # the workspace has it already
     OVER_LIMIT = "over_limit"  # it fits, but the run had found enough (or credits ran out)
+    UNSCREENED = "unscreened"  # the model could not judge it; a later run screens it again
 
 
 class UsageStep(StrEnum):

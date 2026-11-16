@@ -24,7 +24,7 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CallOutcome
 from outbound.logging import get_logger
 from outbound.metering.budget import BudgetPolicy, check_budget
-from outbound.providers.errors import BudgetExceeded
+from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.ports import (
     CatchAllResolver,
     CompanyMention,
@@ -187,6 +187,7 @@ class Meter:
         cost: int = 0,
         response: dict[str, Any] | None = None,
         latency_ms: int | None = None,
+        reason: str | None = None,
     ) -> None:
         scope = current_scope()
         with self._uow(self._workspace_id) as uow:
@@ -211,6 +212,7 @@ class Meter:
             outcome=outcome.value,
             cost_micro_usd=cost,
             latency_ms=latency_ms,
+            **({"reason": reason} if reason else {}),
         )
 
     def call[T](
@@ -245,6 +247,9 @@ class Meter:
                 outcome=CallOutcome.ERROR,
                 response={"error": type(error).__name__},
                 latency_ms=_elapsed_ms(started),
+                # A ProviderError's message never holds a key or an address (errors.py), so it
+                # is safe to log; without it a cut-off model reply looked like any failure.
+                reason=str(error)[:200] if isinstance(error, ProviderError) else None,
             )
             raise
         self.record(
