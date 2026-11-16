@@ -511,6 +511,14 @@
       },
       "CampaignOut": {
         "properties": {
+          "brief_gaps": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Brief Gaps",
+            "type": "array"
+          },
           "cadence_days": {
             "items": {
               "type": "integer"
@@ -565,6 +573,14 @@
               "type": "string"
             },
             "title": "Target Titles",
+            "type": "array"
+          },
+          "title_warnings": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Title Warnings",
             "type": "array"
           }
         },

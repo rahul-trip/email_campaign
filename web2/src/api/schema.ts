@@ -2764,6 +2764,11 @@ export interface components {
         };
         /** CampaignOut */
         CampaignOut: {
+            /**
+             * Brief Gaps
+             * @default []
+             */
+            brief_gaps?: string[];
             /** Cadence Days */
             cadence_days: number[];
             /** Icp Brief */
@@ -2782,6 +2787,11 @@ export interface components {
             research_questions: string[];
             /** Target Titles */
             target_titles: string[];
+            /**
+             * Title Warnings
+             * @default []
+             */
+            title_warnings?: string[];
         };
         /** CampaignPatch */
         CampaignPatch: {

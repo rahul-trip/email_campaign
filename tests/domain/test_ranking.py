@@ -126,3 +126,22 @@ def test_chosen_people_keep_the_order_the_operator_left_them_in() -> None:
     second = contact("second", "CTO", rank=2)
     ranked = rank_contacts([second, first], WANTED, chosen_ids={"second"})
     assert [r.contact.id for r in ranked] == ["first", "second"]
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Head of Energy Trading", True),
+        ("CTO", True),
+        ("VP of Engineering", True),
+        ("Energy Traders", True),
+        ("Power System Engineer", True),
+        ("VPP/DER platforms", False),
+        ("BESS integrators", False),
+        ("Grid operators", False),
+    ],
+)
+def test_a_wanted_title_must_name_a_job_not_a_kind_of_company(title: str, expected: bool) -> None:
+    from outbound.domain.ranking import is_role
+
+    assert is_role(title) is expected

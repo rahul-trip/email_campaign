@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { Button, Card, Empty, Field, Input, PageHeader, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
+import { Button, Callout, Card, Empty, Field, Input, PageHeader, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
 import { lines } from "../lib/format";
 
 type Campaign = Schemas["CampaignOut"];
@@ -50,6 +50,15 @@ export function CampaignsPage() {
                 {all.map((c, i) => (
                   <div key={c.id} className="space-y-5">
                     <Card title={c.name} subtitle={`Minimum fit ${c.min_fit_score} · ${c.target_titles.length} job title${c.target_titles.length === 1 ? "" : "s"}`}>
+                      {(c.title_warnings ?? []).length > 0 && (
+                        <Callout tone="attention" title="Check the job titles" className="mb-4">
+                          <ul className="list-disc pl-4">
+                            {(c.title_warnings ?? []).map((w) => (
+                              <li key={w}>{w}</li>
+                            ))}
+                          </ul>
+                        </Callout>
+                      )}
                       <CampaignForm campaign={c} onSaved={saved} />
                     </Card>
                     <BriefCard key={JSON.stringify(c.icp_brief)} campaign={c} onSaved={saved} tour={i === 0 ? "campaign-brief" : undefined} />
@@ -211,6 +220,15 @@ function BriefCard({ campaign, onSaved, tour }: { campaign: Campaign; onSaved: (
         </p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
+          {(campaign.brief_gaps ?? []).length > 0 && (
+            <Callout tone="attention" title="This brief is thin, so leads are judged loosely" className="md:col-span-2">
+              <ul className="list-disc pl-4">
+                {(campaign.brief_gaps ?? []).map((g) => (
+                  <li key={g}>{g}</li>
+                ))}
+              </ul>
+            </Callout>
+          )}
           <Field label="In short" className="md:col-span-2">
             <Textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
           </Field>
