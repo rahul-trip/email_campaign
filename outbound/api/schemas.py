@@ -528,6 +528,8 @@ class WorkspaceSettingsIn(In):
     email_max_words: int | None = Field(default=None, ge=40, le=600)
     auto_discovery: bool | None = None
     auto_approve_cold: bool | None = None
+    auto_discovery_per_day: int | None = Field(default=None, ge=1, le=6)
+    auto_discovery_review_limit: int | None = Field(default=None, ge=1, le=500)
 
 
 class SenderProfileIn(In):
@@ -606,6 +608,27 @@ class RunOut(Out):
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
+
+
+class AutoDiscoveryOut(Out):
+    reason: (
+        Literal[
+            "off",
+            "no_campaign",
+            "no_credits",
+            "run_in_progress",
+            "review_full",
+            "backlog",
+            "not_yet",
+        ]
+        | None
+    )  # why nothing is queued now; None: a search is due
+    campaign: str | None
+    last_search: datetime | None
+    next_search: datetime | None
+    per_day: int
+    review_limit: int
+    waiting_for_review: int
 
 
 class RunStepOut(Out):

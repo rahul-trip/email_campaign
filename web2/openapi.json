@@ -386,6 +386,88 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "AutoDiscoveryOut": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "last_search": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Search"
+          },
+          "next_search": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Search"
+          },
+          "per_day": {
+            "title": "Per Day",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "no_campaign",
+                  "no_credits",
+                  "run_in_progress",
+                  "review_full",
+                  "backlog",
+                  "not_yet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review_limit": {
+            "title": "Review Limit",
+            "type": "integer"
+          },
+          "waiting_for_review": {
+            "title": "Waiting For Review",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "campaign",
+          "last_search",
+          "next_search",
+          "per_day",
+          "review_limit",
+          "waiting_for_review"
+        ],
+        "title": "AutoDiscoveryOut",
+        "type": "object"
+      },
       "Body_upload_targets_api_targets_upload_post": {
         "properties": {
           "campaign_id": {
@@ -7544,6 +7626,32 @@
             ],
             "title": "Auto Discovery"
           },
+          "auto_discovery_per_day": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Discovery Per Day"
+          },
+          "auto_discovery_review_limit": {
+            "anyOf": [
+              {
+                "maximum": 500.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Discovery Review Limit"
+          },
           "budget_per_prospect_micro_usd": {
             "anyOf": [
               {
@@ -13149,6 +13257,28 @@
           }
         },
         "summary": "Start Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/auto-discovery": {
+      "get": {
+        "description": "Whether the worker will search for new companies by itself, and when, or why not.",
+        "operationId": "auto_discovery_api_runs_auto_discovery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDiscoveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auto Discovery",
         "tags": [
           "runs"
         ]

@@ -357,6 +357,9 @@ function Limits() {
   const [examples, setExamples] = useState(5);
   const [footer, setFooter] = useState(true);
   const [autoCold, setAutoCold] = useState(false);
+  const [autoFind, setAutoFind] = useState(true);
+  const [perDay, setPerDay] = useState(4);
+  const [reviewLimit, setReviewLimit] = useState(50);
   const [minWords, setMinWords] = useState(120);
   const [maxWords, setMaxWords] = useState(200);
   useEffect(() => {
@@ -368,6 +371,9 @@ function Limits() {
     setExamples(Number(s.few_shot_examples ?? 5));
     setFooter(s.footer_enabled !== false);
     setAutoCold(s.auto_approve_cold === true);
+    setAutoFind(s.auto_discovery !== false);
+    setPerDay(Number(s.auto_discovery_per_day ?? 4));
+    setReviewLimit(Number(s.auto_discovery_review_limit ?? 50));
     setMinWords(Number(s.email_min_words ?? 120));
     setMaxWords(Number(s.email_max_words ?? 200));
   }, [settings.data]);
@@ -381,6 +387,9 @@ function Limits() {
             few_shot_examples: examples,
             footer_enabled: footer,
             auto_approve_cold: autoCold,
+            auto_discovery: autoFind,
+            auto_discovery_per_day: perDay,
+            auto_discovery_review_limit: reviewLimit,
             email_min_words: minWords,
             email_max_words: maxWords,
           },
@@ -388,6 +397,7 @@ function Limits() {
       ),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["workspace-settings"] }),
   });
+  const badDiscovery = perDay < 1 || perDay > 6 || reviewLimit < 1 || reviewLimit > 500;
   const badLength = minWords < 40 || maxWords > 600 || minWords > maxWords;
   const badBudget = budget.trim() !== "" && (Number.isNaN(Number(budget)) || Number(budget) < 0);
   return (
@@ -419,6 +429,19 @@ function Limits() {
               hint="Your company, postal address and a plain way to say no: the country's footer, or a short default where it has none. Kept when a country rule is skipped. The US, UK, EU and Canada expect an address and an opt-out even when no consent is needed."
             />
           </div>
+          <div className="mt-4" data-tour="settings-auto-discovery">
+            <Checkbox checked={autoFind} onChange={setAutoFind} label="Search for new companies by itself" hint="The worker looks for companies that fit the active campaign and adds the best as leads, using discovery credits." />
+            {autoFind && (
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <Field label="Searches a day" hint="1 to 6. Four is about every six hours.">
+                  <Input type="number" min={1} max={6} value={perDay} onChange={(e) => setPerDay(Number(e.target.value))} />
+                </Field>
+                <Field label="Stop while Review holds" hint="No search while this many drafts wait for you; it resumes below. 1 to 500.">
+                  <Input type="number" min={1} max={500} value={reviewLimit} onChange={(e) => setReviewLimit(Number(e.target.value))} />
+                </Field>
+              </div>
+            )}
+          </div>
           <div className="mt-3" data-tour="settings-auto-approve">
             <Checkbox
               checked={autoCold}
@@ -429,7 +452,7 @@ function Limits() {
           </div>
           <p className="mt-4 text-xs text-muted">Automatic sending is off and cannot be switched on until the sending phase. Approved emails are saved as drafts.</p>
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-            <Button busy={save.isPending} disabled={badBudget || badLength} onClick={() => save.mutate()}>
+            <Button busy={save.isPending} disabled={badBudget || badLength || badDiscovery} onClick={() => save.mutate()}>
               Save limits
             </Button>
             <SaveNote mutation={save} />

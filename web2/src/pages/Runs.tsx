@@ -51,6 +51,7 @@ export function RunsPage() {
       <PageHeader title="Runs" subtitle="A run moves every company that is due as far as it can go, step by step, and records what it spent." />
 
       <RunStats runs={runs.data ?? []} />
+      <AutoDiscoveryLine />
 
       <Card tour="start-run" title="Start a run" className="mb-5">
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
@@ -233,5 +234,30 @@ function RunSummary({ run }: { run: Run }) {
       ) : null}
       {line && <p className={`text-[11px] ${totals.newLeads === 0 ? "text-attention" : "text-muted"}`}>{line}</p>}
     </div>
+  );
+}
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** Whether the worker searches for new companies by itself, when it next will, or why it is not. */
+function AutoDiscoveryLine() {
+  const state = useQuery({ queryKey: ["auto-discovery"], queryFn: () => ok(client.GET("/api/runs/auto-discovery")), refetchInterval: 30000 });
+  const d = state.data;
+  if (!d) return null;
+  const every = `about every ${Math.round(24 / d.per_day)} hours`;
+  const why: Record<string, string> = {
+    off: "Automatic discovery is switched off (Settings, Limits).",
+    no_campaign: "Automatic discovery waits for an active campaign that says who it is after.",
+    no_credits: "Automatic discovery is paused: no discovery credits are left.",
+    run_in_progress: "A run is in progress; the next search waits for it.",
+    review_full: `Automatic discovery is paused: Review holds ${d.waiting_for_review} drafts. It resumes below ${d.review_limit}.`,
+    backlog: "Automatic discovery waits while the leads already found are being worked on.",
+  };
+  const text = d.reason == null || d.reason === "not_yet" ? `Automatic discovery is on, ${every}.${d.next_search ? ` Next search around ${clock(d.next_search)}.` : " The next search starts on the next pass."}` : why[d.reason];
+  const paused = d.reason !== null && d.reason !== "not_yet" && d.reason !== "run_in_progress";
+  return (
+    <Callout tone={paused ? "attention" : "info"} className="mb-5">
+      {text}
+    </Callout>
   );
 }

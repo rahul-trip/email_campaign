@@ -67,6 +67,8 @@ SETTING_FIELDS = frozenset(
         "email_min_words",
         "email_max_words",
         "auto_discovery",  # off: the worker never searches for companies on its own
+        "auto_discovery_per_day",  # searches a day, 1 to 6
+        "auto_discovery_review_limit",  # no search while Review holds this many drafts
         "auto_approve_cold",  # on: emails to cold leads (fit 80 or lower) skip Review
     }
 )

@@ -15,7 +15,14 @@ from datetime import datetime, timedelta
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import Campaign
-from outbound.domain.enums import CampaignStatus, CompanyStatus, RunKind, RunStatus, UsageStep
+from outbound.domain.enums import (
+    CampaignStatus,
+    CompanyStatus,
+    MessageState,
+    RunKind,
+    RunStatus,
+    UsageStep,
+)
 from outbound.logging import get_logger
 from outbound.metering.quota import quota_in
 from outbound.services.runs import RunMode, RunRequest, RunService
@@ -23,7 +30,10 @@ from outbound.services.runs import RunMode, RunRequest, RunService
 log = get_logger(__name__)
 
 SETTING = "auto_discovery"  # a workspace setting; on unless switched off
-INTERVAL = timedelta(hours=24)  # one search per campaign a day, however it ended
+PER_DAY_SETTING = "auto_discovery_per_day"  # searches a day, 1 to 6
+LIMIT_SETTING = "auto_discovery_review_limit"  # no search while Review holds this many drafts
+PER_DAY = 4  # about every six hours
+REVIEW_LIMIT = 50
 COUNT = 10  # leads to add per search (capped by the workspace's discovery credits)
 BACKLOG = 10  # no search while this many of the campaign's leads still wait for their emails
 # Where a lead still has work to do before it has an email: the backlog a search would add to.
@@ -35,6 +45,33 @@ BEFORE_EMAIL = (
 )
 _SEARCHING = (RunMode.DISCOVERY.value, RunMode.MIXED.value)
 
+# Why nothing is queued now. ``not_yet`` is only the wait between two searches.
+OFF = "off"
+NO_CAMPAIGN = "no_campaign"
+NO_CREDITS = "no_credits"
+RUN_IN_PROGRESS = "run_in_progress"
+REVIEW_FULL = "review_full"
+BACKLOG_FULL = "backlog"
+NOT_YET = "not_yet"
+
+
+def interval_for(per_day: int) -> timedelta:
+    """The wait between two searches: a day divided by how many a day."""
+    return timedelta(hours=24) / max(1, min(6, per_day))
+
+
+@dataclass(frozen=True)
+class DiscoveryState:
+    """Whether the next search can be queued, and if not, why: what the Runs page says."""
+
+    reason: str | None  # None: due now
+    campaign: str | None
+    last_search: datetime | None
+    next_search: datetime | None
+    per_day: int
+    review_limit: int
+    waiting_for_review: int
+
 
 @dataclass(frozen=True)
 class AutoDiscovery:
@@ -43,28 +80,26 @@ class AutoDiscovery:
     runs: RunService
     now: Callable[[], datetime] = utcnow
 
-    def queue_due(self) -> str | None:
-        """Queue a discovery run for the first campaign that is due one; returns the run's id.
-        One at a time: the next campaign gets its turn once this run has been queued a day."""
+    def state(self) -> DiscoveryState:
+        """Everything ``queue_due`` weighs, in the order it weighs it."""
         moment = self.now()
         with self.uow_factory(self.workspace_id) as uow:
             workspace = uow.workspace()
-            if workspace is None or not workspace.settings.get(SETTING, True):
-                return None
-            quota, _ = quota_in(uow, moment)
-            if not quota.engine or not quota.has_credit(UsageStep.DISCOVERY):
-                return None  # nothing could be added, so do not search
-            campaigns = [
-                c
-                for c in uow.campaigns.all()
-                if c.status is CampaignStatus.ACTIVE and _describes_customer(c)
-            ]
+            settings = workspace.settings if workspace else {}
+            per_day = max(1, min(6, int(settings.get(PER_DAY_SETTING) or PER_DAY)))
+            limit = max(1, int(settings.get(LIMIT_SETTING) or REVIEW_LIMIT))
+            waiting = uow.messages.count_in_state(MessageState.GENERATED)
+            campaign = next(
+                (
+                    c
+                    for c in uow.campaigns.all()
+                    if c.status is CampaignStatus.ACTIVE and _describes_customer(c)
+                ),
+                None,
+            )
             recent = uow.runs.recent(100, kinds=(RunKind.PIPELINE,), requested_only=True)
-            if any(r.status in (RunStatus.QUEUED, RunStatus.RUNNING) for r in recent):
-                return None  # a run is already on its way
-            chosen: str | None = None
-            for campaign in campaigns:
-                last = max(
+            last = (
+                max(
                     (
                         r.created_at
                         for r in recent
@@ -74,19 +109,50 @@ class AutoDiscovery:
                     ),
                     default=None,
                 )
-                if last is not None and moment - last < INTERVAL:
-                    continue
-                if uow.companies.count_in(BEFORE_EMAIL, campaign.id) >= BACKLOG:
-                    continue  # plenty waiting; finish those first
-                chosen = campaign.name
-                break
-        if chosen is None:
+                if campaign
+                else None
+            )
+            next_search = last + interval_for(per_day) if last else None
+            quota, _ = quota_in(uow, moment)
+            backlog = uow.companies.count_in(BEFORE_EMAIL, campaign.id) if campaign else 0
+            busy = any(r.status in (RunStatus.QUEUED, RunStatus.RUNNING) for r in recent)
+
+            reason: str | None = None
+            if workspace is None or not settings.get(SETTING, True):
+                reason = OFF
+            elif campaign is None:
+                reason = NO_CAMPAIGN
+            elif not quota.engine or not quota.has_credit(UsageStep.DISCOVERY):
+                reason = NO_CREDITS  # nothing could be added, so do not search
+            elif busy:
+                reason = RUN_IN_PROGRESS
+            elif waiting >= limit:
+                reason = REVIEW_FULL  # enough drafts wait for you; no more until you work them
+            elif next_search is not None and moment < next_search:
+                reason = NOT_YET
+            elif backlog >= BACKLOG:
+                reason = BACKLOG_FULL  # plenty waiting; finish those first
+        return DiscoveryState(
+            reason,
+            campaign.name if campaign else None,
+            last,
+            next_search,
+            per_day,
+            limit,
+            waiting,
+        )
+
+    def queue_due(self) -> str | None:
+        """Queue a discovery run for the active campaign if it is due one; returns the run's id."""
+        state = self.state()
+        if state.reason is not None or state.campaign is None:
+            log.debug("auto_discovery_skipped", reason=state.reason)
             return None
         request = RunRequest(
-            mode=RunMode.DISCOVERY, discover=COUNT, campaign=chosen, automatic=True
+            mode=RunMode.DISCOVERY, discover=COUNT, campaign=state.campaign, automatic=True
         )
         run = self.runs.queue(request)
-        log.info("auto_discovery_queued", run_id=run.id, campaign=chosen)
+        log.info("auto_discovery_queued", run_id=run.id, campaign=state.campaign)
         return run.id
 
 

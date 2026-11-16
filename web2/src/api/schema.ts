@@ -2013,6 +2013,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/auto-discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auto Discovery
+         * @description Whether the worker will search for new companies by itself, and when, or why not.
+         */
+        get: operations["auto_discovery_api_runs_auto_discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -2772,6 +2792,23 @@ export interface components {
             workspace: string;
             /** Workspace Id */
             workspace_id: string | null;
+        };
+        /** AutoDiscoveryOut */
+        AutoDiscoveryOut: {
+            /** Campaign */
+            campaign: string | null;
+            /** Last Search */
+            last_search: string | null;
+            /** Next Search */
+            next_search: string | null;
+            /** Per Day */
+            per_day: number;
+            /** Reason */
+            reason: ("off" | "no_campaign" | "no_credits" | "run_in_progress" | "review_full" | "backlog" | "not_yet") | null;
+            /** Review Limit */
+            review_limit: number;
+            /** Waiting For Review */
+            waiting_for_review: number;
         };
         /** Body_upload_targets_api_targets_upload_post */
         Body_upload_targets_api_targets_upload_post: {
@@ -5036,6 +5073,10 @@ export interface components {
             auto_approve_cold?: boolean | null;
             /** Auto Discovery */
             auto_discovery?: boolean | null;
+            /** Auto Discovery Per Day */
+            auto_discovery_per_day?: number | null;
+            /** Auto Discovery Review Limit */
+            auto_discovery_review_limit?: number | null;
             /** Budget Per Prospect Micro Usd */
             budget_per_prospect_micro_usd?: number | null;
             /** Country Policy Enabled */
@@ -8905,6 +8946,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_discovery_api_runs_auto_discovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDiscoveryOut"];
                 };
             };
         };
