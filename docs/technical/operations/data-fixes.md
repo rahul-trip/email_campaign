@@ -50,6 +50,14 @@ Paid vendor calls (re-running research) MUST be behind their own flag (`--rerun-
 
 A fix the services cannot express (a schema change, a bulk rewrite of JSON) is a migration, not a script ([migrations](../data/migrations.md)). A fix to a single lead belongs in the app, through the lead page.
 
+## Re-score leads after a brief or scoring change
+
+Leads disqualified under the old scoring (for example by the 60-for-nothing base before 2026-11-16, [R-37](../tech-debt-and-risks.md)) stay disqualified until someone sends them back. No script is needed: the app already does it.
+
+1. Fix the campaign's brief first (Campaigns → *Who we look for*: must-haves, rule-outs, keywords).
+2. Leads page, filter *Disqualified*. For each lead worth another look, open it and press **Research again**. It becomes `new`, and the next run (or `outbound run`) researches it again and re-scores it against the new brief. Searches are served from the cache; the model calls are not, so each costs a few cents.
+3. Leads that now fit go on to people, address and copy; the rest are disqualified again with the new reason shown on the lead.
+
 ## How to refresh this page
 
 ```bash

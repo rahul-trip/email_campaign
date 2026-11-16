@@ -27,7 +27,7 @@ from typing import Any
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
-from outbound.domain.brief import Brief
+from outbound.domain.brief import Brief, fill_gaps, lacks_substance
 from outbound.domain.discovery import (
     ARTICLES,
     YIELD_DAYS,
@@ -35,6 +35,7 @@ from outbound.domain.discovery import (
     clean,
     name_key,
     plan_sources,
+    search_terms,
     share,
     website_from_links,
 )
@@ -67,7 +68,7 @@ from outbound.providers.ports import (
     SearchProvider,
     SourceQuery,
 )
-from outbound.services.brief import draft_brief
+from outbound.services.brief import draft
 from outbound.services.intake import DomainResolver, IntakeService, SiteCandidate
 
 log = get_logger(__name__)
@@ -188,17 +189,21 @@ def _planned(raw: Iterable[object], *, used: Sequence[str], limit: int) -> list[
     return [PlannedQuery(q, angles.get(q, "")) for q in clean(texts, used=used, limit=limit)]
 
 
-def source_query(brief: Brief, *, examples: Sequence[str] = ()) -> SourceQuery:
+def source_query(
+    brief: Brief, *, examples: Sequence[str] = (), known: Iterable[str] = ()
+) -> SourceQuery:
     """What a directory is asked, from the brief; ``examples`` are the websites of leads that
-    qualified, which lookalike sources find more like, after the brief's own examples."""
+    qualified, which lookalike sources find more like, after the brief's own examples, and
+    ``known`` the websites to leave out because they were found before."""
     return SourceQuery(
-        keywords=brief.keywords or brief.segments,
+        keywords=search_terms(brief),
         segments=brief.segments,
         regions=brief.regions,
         founded_after=brief.founded_after,
         industry_codes=brief.industry_codes,
         text=brief.summary,
         seed_domains=tuple(dict.fromkeys([*brief.seed_companies, *examples])),
+        exclude_domains=tuple(sorted(set(known))),
     )
 
 
@@ -423,6 +428,8 @@ class Discoverer:
             earlier = uow.events.latest(
                 EntityType.WORKSPACE, self.workspace_id, "discovery_query", HISTORY * 4
             )
+        # Websites seen before, as leads or as candidates (a key with a dot is a website).
+        known_sites = known_domains | {k for k in known_keys if "." in k}
         mine = [e.data for e in reversed(earlier) if e.data.get("campaign") == campaign.name]
         # Article searches already run, oldest first, and every page they read.
         used = [str(d.get("query", "")) for d in mine if d.get("source", ARTICLES) == ARTICLES]
@@ -461,7 +468,7 @@ class Discoverer:
                 calls += made
                 continue
             source = next(s for s in self.sources if s.name == name)
-            query = source_query(brief, examples=examples)
+            query = source_query(brief, examples=examples, known=known_sites)
             try:
                 got = source.find(query, limit=max(1, int(PER_SOURCE * weight)))
             except ProviderError as error:
@@ -485,15 +492,31 @@ class Discoverer:
 
     def _brief(self, campaign: Campaign, profile: Mapping[str, Any]) -> Brief:
         brief = Brief.from_json(campaign.icp_brief)
+        redraft = False
         if not brief.is_empty:
-            return brief
-        brief = draft_brief(self.llm, campaign=campaign, profile=profile)
+            if not (lacks_substance(brief) and self._may_redraft(campaign)):
+                return brief
+            redraft = True  # thin, and not yet tried again: a failed first drafting leaves this
+        drafted = draft(self.llm, campaign=campaign, profile=profile)
+        # A redraft fills what is empty and never replaces what a person wrote.
+        brief = fill_gaps(brief, drafted.brief) if redraft else drafted.brief
         with self.uow(self.workspace_id) as uow:
             uow.campaigns.update(campaign.id, {"icp_brief": brief.to_json()})
             uow.events.append(EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted",
-                              SYSTEM, {"campaign_id": campaign.id})  # fmt: skip
+                              SYSTEM, {"campaign_id": campaign.id, "redraft": redraft,
+                                       "fell_back": drafted.fell_back})  # fmt: skip
             uow.commit()
         return brief
+
+    def _may_redraft(self, campaign: Campaign) -> bool:
+        """Once per campaign: a thin brief is drafted again by the next run, not by every run."""
+        with self.uow(self.workspace_id) as uow:
+            earlier = uow.events.latest(
+                EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted", 50
+            )
+        return not any(
+            e.data.get("campaign_id") == campaign.id and e.data.get("redraft") for e in earlier
+        )
 
     def _carried(self, campaign: Campaign) -> list[Found]:
         """Companies an earlier run found but could not screen, oldest first, a few per run."""

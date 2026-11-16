@@ -5,8 +5,10 @@ The brief's must-haves, buying signals and disqualifiers become numbered checks 
 it found it. ``qualify`` turns those answers into the fit score and a reason a person can check:
 
 - a disqualifier that is met rules the company out (score 0), whatever else is true;
-- must-haves give up to 80, counted by weight, an unknown one counting half (60 when none is
-  set, so a brief of rule-outs only passes the default fit minimum of 60 when none is met);
+- must-haves give up to 80, counted by weight, an unknown one counting half. A brief with no
+  must-haves of its own is judged against its summary, company type and size instead
+  (``implied_must_haves``), so a company nothing says is a fit no longer scores 60 for nothing.
+  Only a brief with none of those (rule-outs only) scores 60 when none is met;
 - each buying signal that is met adds 10, up to 20.
 
 The scale meets the gate's default minimum of 60: every must-have met passes, and a company
@@ -20,7 +22,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from outbound.domain.brief import Brief
+from outbound.domain.brief import Brief, CompanyType, Criterion
 
 MUST_HAVE_POINTS = 80
 NO_MUST_HAVES = 60
@@ -82,10 +84,33 @@ class Qualification:
         }
 
 
+_TYPE_WORDS = {
+    CompanyType.STARTUP: "a start-up or scale-up, not an established firm",
+    CompanyType.SME: "a small or mid-sized business",
+    CompanyType.ENTERPRISE: "a large enterprise",
+    CompanyType.PUBLIC_SECTOR: "a public-sector body",
+}
+
+
+def implied_must_haves(brief: Brief) -> tuple[Criterion, ...]:
+    """What a brief with no must-haves still says a customer is: the summary (weight 2), the
+    company type and the size. Never added to a brief that has must-haves of its own."""
+    implied: list[Criterion] = []
+    if brief.summary:
+        implied.append(Criterion(f"It is the kind of company described here: {brief.summary}", 2))
+    if brief.company_type in _TYPE_WORDS:
+        implied.append(Criterion(f"It is {_TYPE_WORDS[brief.company_type]}", 1))
+    if brief.size_range:
+        implied.append(Criterion(f"Its size is about {brief.size_range}", 1))
+    return tuple(implied)
+
+
 def checks(brief: Brief) -> list[Check]:
-    """The brief's criteria, numbered: must-haves, then signals, then disqualifiers."""
+    """The brief's criteria, numbered: must-haves (or, with none, those the brief implies),
+    then signals, then disqualifiers."""
+    musts = brief.must_haves or implied_must_haves(brief)
     return [
-        *(Check(f"M{n}", "must_have", c.text, c.weight) for n, c in enumerate(brief.must_haves, 1)),
+        *(Check(f"M{n}", "must_have", c.text, c.weight) for n, c in enumerate(musts, 1)),
         *(Check(f"S{n}", "signal", t, 1) for n, t in enumerate(brief.buying_signals, 1)),
         *(Check(f"D{n}", "disqualifier", t, 1) for n, t in enumerate(brief.disqualifiers, 1)),
     ]

@@ -271,6 +271,34 @@ def register(app: typer.Typer) -> None:
         if report.catch_all_share:
             typer.echo(f"  catch-all held share: {report.catch_all_share:.0%}")
 
+    @report_app.command("funnel")
+    def report_funnel(
+        days: Annotated[int, typer.Option(help="Look back this many days.")] = 30,
+        workspace: WorkspaceName = defaults.DEFAULT_WORKSPACE_NAME,
+        database_url: DatabaseUrl = None,
+    ) -> None:
+        """From a company found to a draft in Review: where the companies go, and which
+        vendors fail."""
+        container = build_container(settings_for(database_url))
+        report = ReportService(container.uow, workspace_id_or_exit(container, workspace)).funnel(
+            days
+        )
+        typer.echo(f"last {days} day(s)")
+        share = report.judged_share
+        judged = f" ({share:.0%} judged by the model)" if share is not None else ""
+        typer.echo(f"companies named by discovery {report.named}{judged}")
+        for verdict, n in sorted(report.verdicts.items(), key=lambda item: -item[1]):
+            typer.echo(f"  {verdict.value:<14}{n:>5}")
+        typer.echo(f"leads added {report.leads}")
+        for key, n in report.outcomes.items():
+            typer.echo(f"  {key:<30}{n:>5}")
+        typer.echo("vendor calls that reached the vendor, and how many failed")
+        for vendor in report.vendors:
+            typer.echo(
+                f"  {vendor.provider:<20}{vendor.calls:>5} calls {vendor.errors:>4} failed"
+                f" ({vendor.error_rate:.0%})"
+            )
+
     @report_app.command("cost")
     def report_cost(
         days: Annotated[int, typer.Option(help="Look back this many days.")] = 30,

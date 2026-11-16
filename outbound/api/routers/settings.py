@@ -17,10 +17,28 @@ from outbound.api.schemas import (
     SuppressionOut,
     WorkspaceSettingsIn,
 )
+from outbound.domain.brief import Brief
+from outbound.domain.brief import gaps as brief_gaps
+from outbound.domain.entities import Campaign
 from outbound.domain.permissions import Permission as P
+from outbound.domain.ranking import is_role
 from outbound.services.settings import profile_template
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
+
+
+def _campaign(campaign: Campaign) -> CampaignOut:
+    """The campaign with what is weak in it: gaps in its brief, entries in its job titles
+    that are not job titles."""
+    out = CampaignOut.model_validate(campaign)
+    out.brief_gaps = list(brief_gaps(Brief.from_json(campaign.icp_brief)))
+    out.title_warnings = [
+        f'"{t}" is not a job title, so a search for it finds nobody: use a role such as'
+        ' "Head of Operations".'
+        for t in campaign.target_titles
+        if not is_role(t)
+    ]
+    return out
 
 
 @router.get("/sender-profile", dependencies=[Depends(require(P.SETTINGS_READ))])
@@ -77,7 +95,7 @@ def update_workspace_settings(
     "/campaigns", response_model=list[CampaignOut], dependencies=[Depends(require(P.SETTINGS_READ))]
 )
 def campaigns(svc: Annotated[Services, Depends(services)]) -> list[CampaignOut]:
-    return [CampaignOut.model_validate(c) for c in svc.settings.campaigns()]
+    return [_campaign(c) for c in svc.settings.campaigns()]
 
 
 @router.post(
@@ -88,9 +106,7 @@ def campaigns(svc: Annotated[Services, Depends(services)]) -> list[CampaignOut]:
 )
 def create_campaign(body: CampaignIn, svc: Annotated[Services, Depends(services)]) -> CampaignOut:
     fields = body.model_dump(exclude={"name", "target_titles"})
-    return CampaignOut.model_validate(
-        svc.settings.create_campaign(body.name, body.target_titles, **fields)
-    )
+    return _campaign(svc.settings.create_campaign(body.name, body.target_titles, **fields))
 
 
 @router.patch(
@@ -102,7 +118,7 @@ def update_campaign(
     campaign_id: str, body: CampaignPatch, svc: Annotated[Services, Depends(services)]
 ) -> CampaignOut:
     changes = body.model_dump(exclude_unset=True)
-    return CampaignOut.model_validate(svc.settings.update_campaign(campaign_id, changes))
+    return _campaign(svc.settings.update_campaign(campaign_id, changes))
 
 
 @router.post(
@@ -113,7 +129,7 @@ def update_campaign(
 def regenerate_campaign_brief(
     campaign_id: str, svc: Annotated[Services, Depends(services)]
 ) -> CampaignOut:
-    return CampaignOut.model_validate(svc.settings.regenerate_brief(campaign_id))
+    return _campaign(svc.settings.regenerate_brief(campaign_id))
 
 
 @router.get(

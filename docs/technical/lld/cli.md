@@ -45,6 +45,7 @@ The entry points are `outbound = "outbound.cli.main:app"` (`pyproject.toml`) and
 | `review approve` | `REF --edit FILE --acknowledge-skips` | Approve, optionally with an edited text; skipped checks need the flag | `ReviewService.approve` |
 | `review reject` | `REF --reason` | Reject and end work on the lead | `ReviewService.reject` |
 | `report quality` | | Unedited share, flags, holds | `ReportService.quality` |
+| `report funnel` | `--days 30` | Companies named, judged, became leads, where the leads are now, vendor failure rates | `ReportService.funnel` |
 | `report cost` | `--days 30` | Spend per provider and per prospect | `ReportService.cost` |
 | `sender-profile show` / `review --yes` | | Print the profile; confirm every statement is true (sets `reviewed_at`) | `SettingsService` |
 | `forget` | `EMAIL --yes` | Erase a person | `PrivacyService.forget` |

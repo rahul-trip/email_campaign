@@ -379,6 +379,40 @@ def test_the_brief_is_drafted_on_the_first_run_and_steers_the_sources(
     assert "grid forecasting" in world.search.searches[0]  # the articles search the brief
 
 
+def test_a_thin_brief_is_drafted_again_once_and_a_persons_words_stay(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+        uow.campaigns.update(campaign.id, {"icp_brief": {"summary": "Energy start-ups"}})
+        uow.commit()
+    run(pipeline, container, ws, 5, "run-1")
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+    brief = campaign.icp_brief or {}
+    assert brief["summary"] == "Energy start-ups"  # what a person wrote is not replaced
+    assert brief["keywords"] == ["grid forecasting", "load forecasting"]  # what was empty is filled
+    assert world.llm.calls.count("brief") == 1
+    # The brief now has substance, and in any case one try again is all a campaign gets.
+    run(pipeline, container, ws, 5, "run-2")
+    assert world.llm.calls.count("brief") == 1
+
+
+def test_a_brief_the_second_drafting_could_not_improve_is_not_drafted_a_third_time(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["brief"] = {"summary": "Energy start-ups"}  # the model gives nothing more
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+        uow.campaigns.update(campaign.id, {"icp_brief": {"summary": "Energy start-ups"}})
+        uow.commit()
+    for n in range(3):
+        run(pipeline, container, ws, 5, f"run-{n}")
+    assert world.llm.calls.count("brief") == 1
+
+
 def test_each_search_is_shown_on_the_run_with_its_source_and_angle(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
@@ -471,6 +505,22 @@ def test_the_campaigns_qualified_leads_are_examples_to_find_more_like(
         uow.commit()
     run(pipeline, container, ws, 5, "run-1")
     assert "best.io" in world.directory.queries[0].seed_domains
+
+
+def test_websites_found_on_earlier_runs_are_left_out_of_the_next_search(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        uow.companies.create(domain="lead.io", source=CompanySource.MANUAL)
+        uow.commit()
+    world.directory.mentions = [yc("Gridcast", "gridcast.io")]
+    run(pipeline, container, ws, 5, "run-1")
+    run(pipeline, container, ws, 5, "run-2")
+    first, second = world.directory.queries[:2]
+    assert "lead.io" in first.exclude_domains  # a lead already
+    assert "gridcast.io" not in first.exclude_domains
+    assert "gridcast.io" in second.exclude_domains  # a candidate of the first run
 
 
 def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(

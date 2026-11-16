@@ -10,6 +10,7 @@ from outbound.api.schemas import (
     CandidateOut,
     CostOut,
     DiscoverySearchOut,
+    FunnelOut,
     PromoteIn,
     QualityOut,
     RunCallOut,
@@ -18,6 +19,7 @@ from outbound.api.schemas import (
     RunOut,
     SourceYieldOut,
     StatusOut,
+    VendorErrorsOut,
 )
 from outbound.db.types import utcnow
 from outbound.domain.discovery import YIELD_DAYS
@@ -157,6 +159,31 @@ def sources(svc: Annotated[Services, Depends(services)]) -> list[SourceYieldOut]
                        rate=round(y.rate, 3), days=YIELD_DAYS)
         for name, y in svc.reports.sources()
     ]  # fmt: skip
+
+
+@router.get(
+    "/reports/funnel", response_model=FunnelOut, dependencies=[Depends(require(P.REPORTS_READ))]
+)
+def funnel(
+    svc: Annotated[Services, Depends(services)], days: Annotated[int, Query(ge=1, le=365)] = 30
+) -> FunnelOut:
+    """From a company found to a draft in Review: what became of each, and which vendors fail."""
+    report = svc.reports.funnel(days)
+    return FunnelOut(
+        days=report.days,
+        named=report.named,
+        judged=report.judged,
+        judged_share=report.judged_share,
+        lead_share=report.lead_share,
+        verdicts={v.value: n for v, n in report.verdicts.items()},
+        leads=report.leads,
+        outcomes=report.outcomes,
+        vendors=[
+            VendorErrorsOut(provider=v.provider, calls=v.calls, errors=v.errors,
+                            error_rate=round(v.error_rate, 3))
+            for v in report.vendors
+        ],
+    )  # fmt: skip
 
 
 @router.get(

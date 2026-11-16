@@ -1,0 +1,190 @@
+[
+ {
+  "name": "Squid",
+  "website": "https://squid.energy",
+  "all_locations": "London, England, United Kingdom",
+  "long_description": "We believe the electricity grid is the most important machine on Earth. If we want electrification to move fast, the teams planning and operating networks need software that is as modern as the challenge.\r\n\r\nOur thesis is simple. Better decisions come from one unified, trusted network model. When everyone works from the same model, planning becomes consistent, assumptions are visible, and progress stops getting lost in spreadsheets and static reports.\r\n\r\nSquid is AI powered grid planning in your browser. We have spent years inside National Grid, Octopus Energy, and AWS, building and learning what breaks. Now we are building what we wished existed.",
+  "one_liner": "AI agents for power grid planning  \ud83e\udd91 ",
+  "team_size": 5,
+  "subindustry": "Industrials -> Energy",
+  "tags": [],
+  "isHiring": false,
+  "batch": "Winter 2026",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Energy"
+  ],
+  "regions": [
+   "United Kingdom",
+   "Europe"
+  ],
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/squid"
+ },
+ {
+  "name": "Condor Energy",
+  "website": "https://www.condor.energy",
+  "all_locations": "Paris, \u00cele-de-France, France",
+  "long_description": "Condor helps large electricity consumers - C&I and data centers - cut electricity costs by helping the grid.\r\nWe are former electricity traders and energy physicists. We build an AI-powered software that our clients use to optimize their energy procurement - making sure they always have access to cheap & reliable power.",
+  "one_liner": "Software for enterprise energy procurement.",
+  "team_size": 3,
+  "subindustry": "Industrials -> Energy",
+  "tags": [],
+  "isHiring": false,
+  "batch": "Winter 2026",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Energy"
+  ],
+  "regions": [
+   "France",
+   "Europe"
+  ],
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/condor-energy"
+ },
+ {
+  "name": "Nira Energy",
+  "website": "https://www.niraenergy.com/",
+  "all_locations": "Remote",
+  "long_description": "Nira is a map tool, built for renewable energy developers, that shows available capacity at every interconnection point on the electrical grid. Customers like AES and Cypress Creek use Nira to find the most profitable points on the grid to site new projects.",
+  "one_liner": "Software to find the best sites for renewables on the electrical grid",
+  "team_size": 20,
+  "subindustry": "Industrials -> Climate",
+  "tags": [
+   "Solar Power",
+   "Climate",
+   "Energy",
+   "Renewable Energy",
+   "ClimateTech"
+  ],
+  "isHiring": true,
+  "batch": "Winter 2022",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Climate"
+  ],
+  "regions": [
+   "Remote",
+   "Fully Remote"
+  ],
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/nira-energy"
+ },
+ {
+  "name": "Raptor Maps",
+  "website": "http://www.raptormaps.com",
+  "all_locations": "Boston, MA, USA; Somerville, MA, USA; Remote",
+  "long_description": "Solar power is the #1 source of new energy in the world. Raptor Maps is a fast-growing, MIT-born startup that builds software to manage the solar lifecycle. We are deployed across 45 countries and 200+ million solar panels. Our software enables the solar industry to scale. \r\n\r\nWe're headquartered at Greentown Labs, the largest cleantech incubator in the US and also support fully remote employees.",
+  "one_liner": "Raptor Maps builds software to manage the solar PV lifecycle.",
+  "team_size": 75,
+  "subindustry": "Industrials -> Climate",
+  "tags": [
+   "Solar Power",
+   "Climate",
+   "Renewable Energy"
+  ],
+  "isHiring": false,
+  "batch": "Summer 2016",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Climate"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Fully Remote"
+  ],
+  "stage": "Growth",
+  "url": "https://www.ycombinator.com/companies/raptor-maps"
+ },
+ {
+  "name": "Evardi",
+  "website": "https://evardi.ai/",
+  "all_locations": "San Francisco, CA, USA",
+  "long_description": "At least 94% of US outage minutes start on the distribution grid, and most utilities are blind between the substation and the meter. Evardi builds a live model of a utility\u2019s network from data it already has, matching every meter to its transformer and using virtual meters to show load and solar on every transformer. On top of that model, our AI agents do the engineering work utilities need at the grid edge: checking switching orders, finding outages after extreme weather and planning for new load from DERs and data centers. Because the model sees every transformer, it will also help utilities decide when new wires are really needed, and how distribution load can free up transmission for new data centers. We\u2019re working with utilities across the globe that together serve over 10 million customers.",
+  "one_liner": "Agents that engineer the grid edge",
+  "team_size": 4,
+  "subindustry": "Industrials -> Energy",
+  "tags": [
+   "Smart Grid",
+   "Energy",
+   "AI"
+  ],
+  "isHiring": false,
+  "batch": "Fall 2026",
+  "status": "Active",
+  "industries": [
+   "Industrials",
+   "Energy"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada"
+  ],
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/evardi"
+ },
+ {
+  "name": "Endla",
+  "website": "https://endla.com",
+  "all_locations": "Brisbane, QLD, Australia; Remote",
+  "long_description": "Endla increases the value of oil & gas wells by providing software that helps design the well that maximizes ROI.\r\n\r\nOur product AlphaSpace, optimizes the well design by automatically producing many high-quality options which the engineer can then measure against their business objectives (auto-design). Having software that finds the optimal solution, empowers the engineer to work a layer up on understanding the problem and specifying the important objectives.\r\n\r\nOur vision is to make auto-design and auto-operation software part of the workflow for every engineer working with physical assets.",
+  "one_liner": "Software that increases the value of oil & gas wells",
+  "team_size": 8,
+  "subindustry": "B2B -> Engineering, Product and Design",
+  "tags": [
+   "Analytics",
+   "Energy",
+   "Big Data"
+  ],
+  "isHiring": false,
+  "batch": "Summer 2021",
+  "status": "Active",
+  "industries": [
+   "B2B",
+   "Engineering, Product and Design"
+  ],
+  "regions": [
+   "Australia",
+   "Oceania",
+   "Remote",
+   "Fully Remote"
+  ],
+  "stage": "Early",
+  "url": "https://www.ycombinator.com/companies/endla"
+ },
+ {
+  "name": "Benchling",
+  "website": "http://benchling.com",
+  "all_locations": "San Francisco, CA, USA",
+  "long_description": "Biotechnology is rewriting life as we know it, from the medicines we take, to the crops we grow, the materials we wear, and the household goods that we rely on every day. Biotech R&D is radically transforming our world, but to move at the new speed of science, scientists need better technology.\r\n\r\nBenchling\u2019s mission is to unlock the power of biotechnology. The world\u2019s biotech leaders and innovators use our R&D Cloud to power the development of breakthrough products and accelerate time to milestone and market.",
+  "one_liner": "Unlocking the power of biotech with modern software for modern science",
+  "team_size": 750,
+  "subindustry": "B2B",
+  "tags": [
+   "SaaS",
+   "B2B",
+   "Biotech"
+  ],
+  "isHiring": false,
+  "batch": "Summer 2012",
+  "status": "Active",
+  "industries": [
+   "B2B"
+  ],
+  "regions": [
+   "United States of America",
+   "America / Canada",
+   "Remote",
+   "Partly Remote"
+  ],
+  "stage": "Growth",
+  "url": "https://www.ycombinator.com/companies/benchling"
+ }
+]

@@ -4,7 +4,8 @@ Docs: https://docs.exa.ai/reference/search and https://docs.exa.ai/reference/fin
 The key goes in the ``x-api-key`` header. ``/search`` with ``category: company`` returns company
 home pages for a description of the companies wanted; ``/findSimilar`` returns pages like a
 given one, which finds lookalikes of an example customer. A short extract of each page's text
-comes back with it, for screening. Paid per request.
+comes back with it, for screening. Sites already known go in ``excludeDomains`` (up to 1,200;
+allowed with the company category). Paid per request.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from outbound.providers.ports import CompanyMention, SourceQuery
 BASE_URL = "https://api.exa.ai"
 MAX_RESULTS = 25  # one request's price covers up to 25 results
 MAX_SEEDS = 2  # lookalike requests per search
+MAX_EXCLUDED = 1_200  # the most domains a request may leave out
 TEXT_CHARS = 600
 # "Name | tagline", "Name - tagline", "Name: tagline", with an en or em dash too.
 _TITLE_SPLIT = re.compile(r"\s+[|\-\u2013\u2014\u00b7]\s+|:\s+")
@@ -39,13 +41,17 @@ class ExaSearch:
         """Companies the query describes, then lookalikes of its example customers' websites."""
         size = max(1, min(limit, MAX_RESULTS))
         contents = {"text": {"maxCharacters": TEXT_CHARS}}
+        # Sites found on earlier runs are left out, so a repeated search brings new companies
+        # (the same 49 came back five times before).
+        skip = {"excludeDomains": list(query.exclude_domains[:MAX_EXCLUDED])}
+        skip = skip if query.exclude_domains else {}
         found: dict[str, CompanyMention] = {}
         text = query.text.strip() or _described(query)
         if text:
             payload = self._http.post_object(
                 "/search",
                 {"query": text, "type": "auto", "category": "company", "numResults": size,
-                 "contents": contents},
+                 "contents": contents, **skip},
             )  # fmt: skip
             _collect(found, payload, "")
         # Example customers given as websites; a bare name cannot be looked alike.
@@ -54,7 +60,7 @@ class ExaSearch:
             payload = self._http.post_object(
                 "/findSimilar",
                 {"url": f"https://{seed}", "numResults": size, "excludeSourceDomain": True,
-                 "category": "company", "contents": contents},
+                 "category": "company", "contents": contents, **skip},
             )  # fmt: skip
             _collect(found, payload, seed)
         return list(found.values())

@@ -683,6 +683,25 @@ class SourceYieldOut(Out):
     days: int  # the window counted
 
 
+class VendorErrorsOut(Out):
+    provider: str
+    calls: int  # calls that reached the vendor
+    errors: int
+    error_rate: float
+
+
+class FunnelOut(Out):
+    days: int
+    named: int  # companies discovery named
+    judged: int  # of those, scored by the model
+    judged_share: float | None
+    lead_share: float | None  # companies that became leads, of those named
+    verdicts: dict[str, int]  # what screening decided, by verdict
+    leads: int  # companies added in the period
+    outcomes: dict[str, int]  # where they are now: waiting, failed:<stage>, held:<reason>, status
+    vendors: list[VendorErrorsOut]
+
+
 class CostOut(Out):
     total: int
     per_prospect: int | None
@@ -705,6 +724,8 @@ class CampaignOut(Out):
     research_questions: list[str]
     cadence_days: list[int]
     icp_brief: dict[str, Any] | None = None
+    brief_gaps: list[str] = []  # what the brief leaves out that weakens discovery and scoring
+    title_warnings: list[str] = []  # wanted "job titles" that are not jobs
 
 
 class CampaignIn(In):
