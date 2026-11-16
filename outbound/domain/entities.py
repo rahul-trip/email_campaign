@@ -245,6 +245,8 @@ class ProviderCall:
     company_id: str | None
     contact_id: str | None
     created_at: datetime
+    detail: dict[str, Any] | None = None  # what it asked and got, in words
+    # (the response itself is not exposed)
 
 
 @dataclass(frozen=True)

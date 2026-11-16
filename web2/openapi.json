@@ -418,6 +418,11 @@
       },
       "CallOut": {
         "properties": {
+          "asked": {
+            "default": "",
+            "title": "Asked",
+            "type": "string"
+          },
           "at": {
             "format": "date-time",
             "title": "At",
@@ -426,6 +431,11 @@
           "cost_micro_usd": {
             "title": "Cost Micro Usd",
             "type": "integer"
+          },
+          "got": {
+            "default": "",
+            "title": "Got",
+            "type": "string"
           },
           "operation": {
             "title": "Operation",
@@ -7389,6 +7399,11 @@
       },
       "WaterfallOut": {
         "properties": {
+          "asked": {
+            "default": "",
+            "title": "Asked",
+            "type": "string"
+          },
           "at": {
             "format": "date-time",
             "title": "At",
@@ -7408,6 +7423,11 @@
           "cost_micro_usd": {
             "title": "Cost Micro Usd",
             "type": "integer"
+          },
+          "got": {
+            "default": "",
+            "title": "Got",
+            "type": "string"
           },
           "latency_ms": {
             "anyOf": [

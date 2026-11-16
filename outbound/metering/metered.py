@@ -150,6 +150,8 @@ class Meter:
         *,
         ttl: timedelta,
         decode: Callable[[dict[str, Any]], Any],
+        asked: str = "",
+        got: Callable[[Any], str] | None = None,
     ) -> Any | None:
         """A stored answer to this exact request, recorded as a free cache hit; else ``None``."""
         digest = request_hash(provider, operation, request)
@@ -172,6 +174,7 @@ class Meter:
                 run_id=scope.run_id,
                 company_id=scope.company_id,
                 contact_id=scope.contact_id,
+                detail=_detail(asked, got(result) if got else ""),
             )
             uow.commit()
         log.debug("provider_call", provider=provider, operation=operation, outcome="cache_hit")
@@ -188,6 +191,7 @@ class Meter:
         response: dict[str, Any] | None = None,
         latency_ms: int | None = None,
         reason: str | None = None,
+        detail: dict[str, str] | None = None,
     ) -> None:
         scope = current_scope()
         with self._uow(self._workspace_id) as uow:
@@ -202,6 +206,7 @@ class Meter:
                 run_id=scope.run_id,
                 company_id=scope.company_id,
                 contact_id=scope.contact_id,
+                detail=detail,
             )
             uow.commit()
         emit = log.warning if outcome is CallOutcome.ERROR else log.info
@@ -227,14 +232,20 @@ class Meter:
         found: Callable[[T], bool] = lambda _: True,
         cost: Callable[[T], int] | None = None,
         ttl: timedelta | None = None,
+        asked: str = "",
+        got: Callable[[T], str] | None = None,
     ) -> T:
-        """Cache, cap, call, record. ``found`` false makes the entry a miss (still reusable)."""
+        """Cache, cap, call, record. ``found`` false makes the entry a miss (still reusable).
+        ``asked`` and ``got`` say in words what was asked and what came back; they are kept on
+        the ledger row for the lead page."""
         if ttl is not None:
-            cached: T | None = self.lookup(provider, operation, request, ttl=ttl, decode=decode)
+            cached: T | None = self.lookup(
+                provider, operation, request, ttl=ttl, decode=decode, asked=asked, got=got
+            )
             if cached is not None:
                 return cached
 
-        self._enforce_cap(provider, operation, request)
+        self._enforce_cap(provider, operation, request, asked)
 
         started = time.monotonic()
         try:
@@ -250,6 +261,9 @@ class Meter:
                 # A ProviderError's message never holds a key or an address (errors.py), so it
                 # is safe to log; without it a cut-off model reply looked like any failure.
                 reason=str(error)[:200] if isinstance(error, ProviderError) else None,
+                detail=_detail(
+                    asked, str(error)[:200] if isinstance(error, ProviderError) else "failed"
+                ),
             )
             raise
         self.record(
@@ -260,10 +274,13 @@ class Meter:
             cost=cost(result) if cost else self.price(provider, operation),
             response=encode(result),
             latency_ms=_elapsed_ms(started),
+            detail=_detail(asked, got(result) if got else ""),
         )
         return result
 
-    def _enforce_cap(self, provider: str, operation: str, request: Mapping[str, Any]) -> None:
+    def _enforce_cap(
+        self, provider: str, operation: str, request: Mapping[str, Any], asked: str = ""
+    ) -> None:
         scope = current_scope()
         with self._uow(self._workspace_id) as uow:
             reason = check_budget(
@@ -284,6 +301,7 @@ class Meter:
                 run_id=scope.run_id,
                 company_id=scope.company_id,
                 contact_id=scope.contact_id,
+                detail=_detail(asked, reason),
             )
             uow.commit()
         log.warning(
@@ -294,6 +312,22 @@ class Meter:
             reason=reason,
         )
         raise BudgetExceeded(provider, reason)
+
+
+DETAIL_CHARS = 300
+
+
+def _detail(asked: str, got: str = "") -> dict[str, str] | None:
+    """What a call asked and what came back, in a line each, for the lead page. May name a
+    person or an address, like the stored answer does, so it is erased with it."""
+    if not asked and not got:
+        return None
+    return {"asked": asked[:DETAIL_CHARS], "got": got[:DETAIL_CHARS]}
+
+
+def _quote(text: str, limit: int = 120) -> str:
+    one = " ".join(text.split())
+    return f'"{one[:limit]}{"…" if len(one) > limit else ""}"'
 
 
 def _elapsed_ms(started: float) -> int:
@@ -324,6 +358,8 @@ class MeteredFinder:
             found=lambda r: r.email is not None,
             cost=lambda r: price if r.billed else 0,
             ttl=self._ttl,
+            asked=f"{person.first_name} {person.last_name} at {domain}",
+            got=lambda r: "address found" if r.email else "nothing found",
         )
 
 
@@ -347,6 +383,8 @@ class MeteredVerifier:
             decode=VerificationResult.model_validate,
             cost=lambda r: price if r.billed else 0,
             ttl=self._ttl,
+            asked=email,
+            got=lambda r: f"{r.status.value}{f' ({r.raw_status})' if r.raw_status else ''}",
         )
 
 
@@ -368,8 +406,9 @@ class MeteredResolver:
 
     def submit(self, email: str) -> ResolutionTicket:
         known: ResolutionResult | None = self._meter.lookup(
-            self.name, "resolve", {"email": email}, ttl=self._ttl, decode=_decode_resolution
-        )
+            self.name, "resolve", {"email": email}, ttl=self._ttl, decode=_decode_resolution,
+            asked=email, got=lambda r: r.status.value,
+        )  # fmt: skip
         if known is not None:
             return ResolutionTicket(ref="cached", email=email, provider=self.name, result=known)
 
@@ -382,6 +421,8 @@ class MeteredResolver:
             encode=lambda t: t.model_dump(mode="json"),
             decode=ResolutionTicket.model_validate,
             cost=lambda t: 0 if t.result is not None and not t.result.billed else price,
+            asked=email,
+            got=lambda t: t.result.status.value if t.result is not None else "queued",
         )
         if ticket.result is not None:
             self._remember(email, ticket.result)
@@ -400,6 +441,7 @@ class MeteredResolver:
             {"email": email},
             outcome=CallOutcome.HIT,
             response=result.model_dump(mode="json"),
+            detail=_detail(email, result.status.value),
         )
 
 
@@ -436,6 +478,10 @@ class MeteredSearch:
             decode=lambda stored: [SearchHit.model_validate(i) for i in stored["items"]],
             found=bool,
             ttl=NEWS_TTL if topic == "news" else self._ttl,
+            asked=_quote(query)
+            + (", news" if topic == "news" else "")
+            + (f", last {days} days" if days else ""),
+            got=lambda hits: f"{len(hits)} result{'s' if len(hits) != 1 else ''}",
         )
 
     def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
@@ -451,6 +497,9 @@ class MeteredSearch:
             decode=lambda stored: [PageText.model_validate(i) for i in stored["items"]],
             found=bool,
             ttl=self._ttl,
+            asked=", ".join(sorted(urls)[:3])
+            + (f" +{len(urls) - 3} more" if len(urls) > 3 else ""),
+            got=lambda pages: f"{len(pages)} of {len(urls)} pages read",
         )
 
 
@@ -474,6 +523,8 @@ class MeteredLeadSource:
             decode=lambda stored: [CompanyMention.model_validate(i) for i in stored["items"]],
             found=bool,
             ttl=self._ttl,
+            asked=_quote(", ".join([*query.keywords, *query.regions]) or "the brief"),
+            got=lambda found: f"{len(found)} companies",
         )
 
 
@@ -526,6 +577,8 @@ class MeteredLlm:
             decode=LlmResult.model_validate,
             cost=lambda r: llm_cost(self._prices, self.model, r.input_tokens, r.output_tokens),
             ttl=self._ttl,
+            asked=f"{self.model}: {_quote(system, 80)}",
+            got=lambda r: f"{r.input_tokens} tokens in, {r.output_tokens} out",
         )
 
 
@@ -550,4 +603,10 @@ class MeteredRegistry:
             decode=lambda stored: [RegistryEntry.model_validate(i) for i in stored["items"]],
             found=bool,
             ttl=self._ttl,
+            asked=_quote(company_name),
+            got=lambda entries: (
+                f"{len(entries)} match{'es' if len(entries) != 1 else ''}"
+                if entries
+                else "no match"
+            ),
         )

@@ -665,6 +665,7 @@ class ProviderCallRow(AppendOnly, Base):
     response: Mapped[dict[str, Any] | None] = mapped_column(Json)
     cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    detail: Mapped[dict[str, Any] | None] = mapped_column(Json)  # {"asked": ..., "got": ...}
 
 
 class EventRow(AppendOnly, Base):

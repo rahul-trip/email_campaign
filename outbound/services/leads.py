@@ -142,6 +142,8 @@ class WaterfallStep:
     cost_micro_usd: int
     latency_ms: int | None
     contact_id: str | None
+    asked: str = ""  # what the call asked, in words ("" for calls made before this was kept)
+    got: str = ""
 
 
 class LeadService:
@@ -927,4 +929,6 @@ def _step(row: ProviderCall) -> WaterfallStep:
         row.cost_micro_usd,
         row.latency_ms,
         row.contact_id,
+        (row.detail or {}).get("asked", ""),
+        (row.detail or {}).get("got", ""),
     )

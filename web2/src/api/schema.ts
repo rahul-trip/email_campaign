@@ -2751,12 +2751,22 @@ export interface components {
         /** CallOut */
         CallOut: {
             /**
+             * Asked
+             * @default
+             */
+            asked?: string;
+            /**
              * At
              * Format: date-time
              */
             at: string;
             /** Cost Micro Usd */
             cost_micro_usd: number;
+            /**
+             * Got
+             * @default
+             */
+            got?: string;
             /** Operation */
             operation: string;
             /** Outcome */
@@ -4928,6 +4938,11 @@ export interface components {
         /** WaterfallOut */
         WaterfallOut: {
             /**
+             * Asked
+             * @default
+             */
+            asked?: string;
+            /**
              * At
              * Format: date-time
              */
@@ -4936,6 +4951,11 @@ export interface components {
             contact_id: string | null;
             /** Cost Micro Usd */
             cost_micro_usd: number;
+            /**
+             * Got
+             * @default
+             */
+            got?: string;
             /** Latency Ms */
             latency_ms: number | null;
             /** Operation */

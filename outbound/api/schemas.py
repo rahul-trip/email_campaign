@@ -310,6 +310,8 @@ class WaterfallOut(Out):
     cost_micro_usd: int
     latency_ms: int | None
     contact_id: str | None
+    asked: str = ""
+    got: str = ""
 
 
 class FactOut(Out):
@@ -323,6 +325,8 @@ class CallOut(Out):
     operation: str
     outcome: str
     cost_micro_usd: int
+    asked: str = ""
+    got: str = ""
 
 
 class IncidentOut(Out):

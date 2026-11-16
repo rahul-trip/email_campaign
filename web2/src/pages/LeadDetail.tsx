@@ -290,6 +290,7 @@ export function LeadDetailPage() {
                         <Th>When</Th>
                         <Th>Vendor</Th>
                         <Th>Call</Th>
+                        <Th>What was asked</Th>
                         <Th>Result</Th>
                         <Th className="text-right">Cost</Th>
                       </tr>
@@ -300,8 +301,19 @@ export function LeadDetailPage() {
                           <Td className="whitespace-nowrap text-xs text-muted">{when(step.at)}</Td>
                           <Td className="font-medium">{step.provider}</Td>
                           <Td className="text-xs">{words(step.operation)}</Td>
+                          <Td className="max-w-xs break-words text-xs">
+                            {step.asked ? (
+                              <>
+                                {step.asked}
+                                {step.contact_id && contacts.find((c) => c.id === step.contact_id)?.full_name && <span className="text-muted"> · for {contacts.find((c) => c.id === step.contact_id)?.full_name}</span>}
+                              </>
+                            ) : (
+                              <span className="text-muted">not recorded</span>
+                            )}
+                          </Td>
                           <Td>
                             <StatusBadge status={describe(callOutcome, step.outcome)} />
+                            {step.got && <div className="mt-0.5 text-[11px] text-muted">{step.got}</div>}
                           </Td>
                           <Td className="text-right font-mono text-xs">{usd(step.cost_micro_usd)}</Td>
                         </tr>
