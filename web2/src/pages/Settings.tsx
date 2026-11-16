@@ -1,19 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowRight, Download, Lock, Upload } from "lucide-react";
+import { ArrowRight, Download, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { client, ok } from "../api/client";
-import { Button, Callout, Card, Checkbox, Field, Input, Label, PageHeader, Problem, QueryState, SaveNote, Segmented, Select, Skeleton, Tabs, Textarea, buttonClass } from "../components/ui";
-import { lines, when } from "../lib/format";
+import { Button, Callout, Card, Checkbox, Field, Input, PageHeader, Problem, QueryState, SaveNote, Skeleton, Tabs, buttonClass } from "../components/ui";
+import { when } from "../lib/format";
 import { useOpen, useSetup, SetupList } from "../lib/setup";
 import { Mailboxes } from "./Mailboxes";
 import { PlanAndUsage } from "./SettingsPlan";
 import { Integrations } from "./SettingsIntegrations";
 import { Account, Team } from "./SettingsTeam";
+import { AboutFields, FooterPreview, LegalFields, SignatureFields, VoiceFields, useSenderProfile, type Profile } from "./SenderProfileParts";
 import type { SettingsTab } from "./settingsTabs";
 
 type Tab = SettingsTab;
-type Profile = Record<string, unknown>;
 
 export function SettingsPage() {
   const { tab = "setup" } = useSearch({ from: "/settings" });
@@ -90,61 +90,11 @@ function Setup() {
 
 // ------------------------------------------------------------------ sender profile
 
-const LEGAL: [string, string, string?][] = [
-  ["legal_name", "Legal name", "Printed in every footer."],
-  ["postal_address", "Postal address", "Required by the US, EU and Canadian footers."],
-  ["registration_details", "Registration details", "Company number and where registered, for the UK footer."],
-  ["contact_info", "Contact details", "A way to reach you, for the Canadian footer."],
-];
-const SIGNATURE: [string, string][] = [
-  ["signature_name", "Your name"],
-  ["signature_title", "Your title"],
-];
-const ABOUT: [string, string][] = [
-  ["company_name", "Company name"],
-  ["domain", "Website"],
-  ["industry", "Industry"],
-  ["geographic_focus", "Where you sell"],
-];
-const LISTS: [string, string, string][] = [
-  ["value_propositions", "Value propositions", "What you offer, one per line."],
-  ["case_studies", "Proof points", "One per line, and only what you can show. The writer may quote them."],
-  ["technologies", "Technologies", "One per line."],
-  ["target_verticals", "Target industries", "One per line."],
-];
-
 export function SenderProfile() {
   const queryClient = useQueryClient();
-  const profile = useQuery({ queryKey: ["sender"], queryFn: () => ok(client.GET("/api/settings/sender-profile")) });
-  const policies = useQuery({ queryKey: ["policies"], queryFn: () => ok(client.GET("/api/settings/policies")) });
-  const [draft, setDraft] = useState<Profile>({});
-  // The one-per-line boxes keep exactly what was typed, so Enter makes a new line straight away.
-  const [typed, setTyped] = useState<Record<string, string>>({});
-  // Up to four emails the operator has sent: each is several paragraphs, so one box each.
-  const [examples, setExamples] = useState<string[]>(["", "", "", ""]);
-  useEffect(() => {
-    const loaded = profile.data as Profile | undefined;
-    if (!loaded) return;
-    setDraft(loaded);
-    const sent = (loaded.style_examples as string[] | undefined) ?? [];
-    setExamples([0, 1, 2, 3].map((i) => sent[i] ?? ""));
-    setTyped(Object.fromEntries(LISTS.map(([key]) => [key, ((loaded[key] as string[] | undefined) ?? []).join("\n")])));
-  }, [profile.data]);
-  const save = useMutation({
-    mutationFn: () => {
-      const listed = Object.fromEntries(LISTS.map(([key]) => [key, lines(typed[key] ?? "")]));
-      const style_examples = examples.map((e) => e.trim()).filter(Boolean);
-      return ok(client.PUT("/api/settings/sender-profile", { body: { ...draft, ...listed, style_examples } }));
-    },
-    onSuccess: () => {
-      for (const key of ["sender", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
-    },
-  });
-  const text = (key: string) => String(draft[key] ?? "");
-  const set = (key: string) => (e: { target: { value: string } }) => setDraft({ ...draft, [key]: e.target.value });
-
+  const p = useSenderProfile();
   return (
-    <QueryState query={profile} rows={8}>
+    <QueryState query={p.query} rows={8}>
       {(saved) => {
         const reviewed = (saved as Profile).reviewed_at as string | undefined;
         return (
@@ -159,81 +109,25 @@ export function SenderProfile() {
               )}
               <ProfileFile onUploaded={() => { for (const key of ["sender", "status"]) void queryClient.invalidateQueries({ queryKey: [key] }); }} />
               <Card title="1. Legal identity" subtitle="Printed in the footer the law of each country requires.">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {LEGAL.map(([key, label, hint]) => (
-                    <Field key={key} label={label} hint={hint}>
-                      {key === "postal_address" ? <Textarea rows={2} value={text(key)} onChange={set(key)} /> : <Input value={text(key)} onChange={set(key)} />}
-                    </Field>
-                  ))}
-                </div>
+                <LegalFields p={p} />
               </Card>
               <Card title="2. Signature" subtitle="Ends every email.">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {SIGNATURE.map(([key, label]) => (
-                    <Field key={key} label={label}>
-                      <Input value={text(key)} onChange={set(key)} />
-                    </Field>
-                  ))}
-                </div>
+                <SignatureFields p={p} />
               </Card>
               <Card title="3. What the writer may use" subtitle="The copywriter draws on these. Only true statements.">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {ABOUT.map(([key, label]) => (
-                    <Field key={key} label={label}>
-                      <Input value={text(key)} onChange={set(key)} />
-                    </Field>
-                  ))}
-                  <Field label="Mission" className="sm:col-span-2">
-                    <Input value={text("mission")} onChange={set("mission")} />
-                  </Field>
-                  {LISTS.map(([key, label, hint]) => (
-                    <Field key={key} label={label} hint={hint}>
-                      <Textarea rows={4} value={typed[key] ?? ""} onChange={(e) => setTyped({ ...typed, [key]: e.target.value })} />
-                    </Field>
-                  ))}
-                  <Field label="About you" hint="Background, voice and what sets you apart. The copywriter reads all of it." className="sm:col-span-2">
-                    <Textarea rows={6} value={text("narrative")} onChange={set("narrative")} />
-                  </Field>
-                </div>
+                <AboutFields p={p} />
               </Card>
               <Card tour="settings-voice" title="4. How you write" subtitle="How the emails sound and what you want from them.">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Greeting" hint="Code adds it, so every email opens the same way.">
-                    <Select value={text("greeting") || "Hi"} onChange={set("greeting")}>
-                      <option value="Hi">Hi Jane,</option>
-                      <option value="Hello">Hello Jane,</option>
-                      <option value="Dear">Dear Jane,</option>
-                    </Select>
-                  </Field>
-                  <Field label="What you want from these emails" hint="For example: explore a partnership, or book a demo. The closing ask follows it.">
-                    <Textarea rows={2} value={text("outreach_goal")} onChange={set("outreach_goal")} placeholder="a short call to explore working together" />
-                  </Field>
-                </div>
-                <Label className="mb-1 mt-4">Emails you have sent before (optional, up to four)</Label>
-                <p className="mb-2 text-xs text-muted">
-                  The writer reads these for what you offer and how direct you are. They are a reference, not a template: it will not copy their wording, greeting or bullet lists. Corrections you make on Review teach it more than these do.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {examples.map((example, i) => (
-                    <Textarea
-                      key={i}
-                      rows={6}
-                      aria-label={`Past email ${i + 1}`}
-                      value={example}
-                      onChange={(e) => setExamples(examples.map((old, j) => (j === i ? e.target.value : old)))}
-                      placeholder={`Past email ${i + 1}`}
-                    />
-                  ))}
-                </div>
+                <VoiceFields p={p} />
               </Card>
               <div className="sticky bottom-0 z-10 -mx-1 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface/95 px-4 py-3 backdrop-blur">
-                <Button busy={save.isPending} onClick={() => save.mutate()}>
+                <Button busy={p.save.isPending} onClick={() => p.save.mutate()}>
                   Confirm and save
                 </Button>
-                <SaveNote mutation={save} done="Saved and confirmed." />
+                <SaveNote mutation={p.save} done="Saved and confirmed." />
               </div>
             </div>
-            <FooterPreview profile={draft} policies={policies.data ?? []} />
+            <FooterPreview profile={p.draft} />
           </div>
         );
       }}
@@ -241,13 +135,7 @@ export function SenderProfile() {
   );
 }
 
-/** Field names a footer template may use, mapped to the profile key that fills them (domain/footer.py). */
-const PLACEHOLDERS: Record<string, string> = {
-  sender_legal_name: "legal_name",
-  postal_address: "postal_address",
-  registration_details: "registration_details",
-  contact_info: "contact_info",
-};
+// ------------------------------------------------------------------ sender profile file
 
 /** Fill the whole profile from a file: download the empty file, fill it in, upload it back. */
 function ProfileFile({ onUploaded }: { onUploaded: () => void }) {
@@ -309,40 +197,6 @@ function ProfileFile({ onUploaded }: { onUploaded: () => void }) {
       <p className="mt-2 text-xs text-muted">Keep the keys exactly as they are; a file with other keys is refused. Lists (value propositions, technologies, target verticals, case studies, style examples) are lists of text. The greeting is Hi, Hello or Dear. Uploading replaces what is saved and counts as confirming the profile.</p>
       {done && <Callout tone="good" className="mt-3">{done}</Callout>}
       <Problem error={download.error ?? upload.error} className="mt-3" />
-    </Card>
-  );
-}
-
-function FooterPreview({ profile, policies }: { profile: Profile; policies: { country_code: string; rule: string; footer_template?: string | null }[] }) {
-  const withFooter = policies.filter((p) => p.footer_template);
-  const [code, setCode] = useState("");
-  const chosen = withFooter.find((p) => p.country_code === code) ?? withFooter.find((p) => p.country_code === "US") ?? withFooter[0];
-  if (!chosen) return null;
-  const parts = (chosen.footer_template ?? "").split(/(\{\w+\})/g);
-  return (
-    <Card title="Footer preview" className="h-fit xl:sticky xl:top-[72px]" subtitle="As this profile fills the country's footer. The server builds the real one.">
-      <Segmented label="Country" value={chosen.country_code} onChange={setCode} options={withFooter.slice(0, 6).map((p) => [p.country_code, p.country_code] as const)} />
-      <div className="mt-3 rounded-lg border border-line bg-surface-low p-3 text-xs leading-relaxed">
-        <Label className="mb-1.5 flex items-center gap-1">
-          <Lock className="size-3" aria-hidden /> Legal footer
-        </Label>
-        {parts.map((part, i) => {
-          const name = part.match(/^\{(\w+)\}$/)?.[1];
-          if (!name) return <span key={i}>{part}</span>;
-          if (name === "data_source") return <span key={i}>your company&apos;s website</span>;
-          const value = String(profile[PLACEHOLDERS[name] ?? name] ?? "").trim();
-          return value ? (
-            <span key={i} className="font-medium">
-              {value}
-            </span>
-          ) : (
-            <span key={i} className="rounded bg-error-container px-1 text-on-error-container">
-              [missing {name.replaceAll("_", " ")}]
-            </span>
-          );
-        })}
-      </div>
-      <p className="mt-2 text-[11px] text-muted">A missing field stops the email from being written for that country.</p>
     </Card>
   );
 }
