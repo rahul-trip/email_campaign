@@ -27,7 +27,7 @@ function Layout() {
   return (
     <div className="min-h-screen">
       <div className="fixed inset-x-0 top-0 z-40">
-        <div className="flex h-7 items-center justify-center gap-2 bg-attention text-[11px] font-bold uppercase tracking-widest text-white" role="status">
+        <div className="flex h-7 items-center justify-center gap-2 bg-attention text-caption font-bold uppercase tracking-widest text-white" role="status">
           <ShieldCheck size={13} aria-hidden /> Admin · Alpha
           <span className="font-normal normal-case tracking-normal opacity-90">— you are changing other companies' accounts</span>
         </div>
@@ -38,7 +38,7 @@ function Layout() {
             </span>
             <span className="text-lg font-bold tracking-tight">Outbound</span>
           </Link>
-          <div className="ml-auto flex items-center gap-3 text-[13px]">
+          <div className="ml-auto flex items-center gap-3 text-body">
             <span className="hidden text-muted sm:inline">
               {me.data?.user.email} · {staff}
             </span>
@@ -58,7 +58,7 @@ function Layout() {
               key={to}
               to={to}
               activeOptions={{ exact: to === "/" }}
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] text-muted hover:bg-surface-low hover:text-ink"
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-body text-muted hover:bg-surface-low hover:text-ink"
               activeProps={{ className: "bg-primary-fixed font-semibold !text-primary hover:bg-primary-fixed" }}
             >
               <Icon size={17} aria-hidden /> {label}
@@ -68,7 +68,7 @@ function Layout() {
       </aside>
       <nav aria-label="Admin sections" className="fixed inset-x-0 top-[76px] z-30 flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1 lg:hidden">
         {NAV.map(({ to, label }) => (
-          <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="shrink-0 rounded-lg px-3 py-1 text-[13px] text-muted" activeProps={{ className: "bg-primary-fixed font-semibold !text-primary" }}>
+          <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="shrink-0 rounded-lg px-3 py-1 text-body text-muted" activeProps={{ className: "bg-primary-fixed font-semibold !text-primary" }}>
             {label}
           </Link>
         ))}

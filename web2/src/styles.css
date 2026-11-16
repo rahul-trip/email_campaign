@@ -111,6 +111,10 @@
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
 
+  /* The three text sizes. Use these; one-off pixel sizes are not used. */
+  --text-body: 0.8125rem; /* 13px: running text and controls */
+  --text-caption: 0.75rem; /* 12px: hints, labels and badges, the smallest text */
+
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-low: var(--surface-low);

@@ -34,7 +34,7 @@ const variants: Record<Variant, string> = {
   danger: "bg-error text-white hover:opacity-90",
   "danger-ghost": "text-error hover:bg-error-container hover:text-on-error-container",
 };
-const sizes: Record<Size, string> = { sm: "h-7 px-2.5 text-xs gap-1", md: "h-8 px-3 text-[13px] gap-1.5" };
+const sizes: Record<Size, string> = { sm: "h-7 px-2.5 text-xs gap-1", md: "h-8 px-3 text-body gap-1.5" };
 
 /** The class list of a button, for a router Link that should look like one. */
 export const buttonClass = (variant: Variant = "primary", size: Size = "md", className?: string) =>
@@ -151,7 +151,7 @@ export function PageHeader({ title, subtitle, actions, crumbs }: { title: ReactN
 
 /** A small uppercase label above a group of content. */
 export const Label = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div className={cx("text-[11px] font-semibold uppercase tracking-wider text-muted", className)}>{children}</div>
+  <div className={cx("text-caption font-semibold uppercase tracking-wider text-muted", className)}>{children}</div>
 );
 
 /** One number with its label, for the summary rows at the top of a page. */
@@ -183,7 +183,7 @@ export function Facts({ facts }: { facts: { label: ReactNode; value: ReactNode }
 // ------------------------------------------------------------------ form fields
 
 const field =
-  "rounded-lg border border-outline bg-surface-low px-2.5 text-[13px] text-ink outline-none transition placeholder:text-muted/70 focus:border-primary-container focus:bg-surface focus:ring-2 focus:ring-primary-container/20 disabled:opacity-60";
+  "rounded-lg border border-outline bg-surface-low px-2.5 text-body text-ink outline-none transition placeholder:text-muted/70 focus:border-primary-container focus:bg-surface focus:ring-2 focus:ring-primary-container/20 disabled:opacity-60";
 
 /** Full width unless the page gives the control a width of its own. */
 const width = (className?: string) => (className && /(^|\s)(w-|min-w-|max-w-)/.test(className) ? "" : "w-full");
@@ -204,18 +204,18 @@ export function Field({ label, hint, children, className }: { label: ReactNode; 
     <label className={cx("block", className)}>
       <span className="mb-1 block text-xs font-medium text-ink">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] leading-snug text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-caption leading-snug text-muted">{hint}</span>}
     </label>
   );
 }
 
 export function Checkbox({ label, hint, checked, onChange, disabled }: { label: ReactNode; hint?: ReactNode; checked: boolean; onChange: (value: boolean) => void; disabled?: boolean }) {
   return (
-    <label className={cx("flex items-start gap-2 text-[13px]", disabled ? "opacity-60" : "cursor-pointer")}>
+    <label className={cx("flex items-start gap-2 text-body", disabled ? "opacity-60" : "cursor-pointer")}>
       <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary-container)]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
       <span>
         <span className="font-medium">{label}</span>
-        {hint && <span className="block text-[11px] text-muted">{hint}</span>}
+        {hint && <span className="block text-caption text-muted">{hint}</span>}
       </span>
     </label>
   );
@@ -332,11 +332,11 @@ export function Empty({ icon, title, children, action }: { icon?: ReactNode; tit
 
 export const Table = ({ children, className }: { children: ReactNode; className?: string }) => (
   <div className={cx("relative overflow-x-auto", className)}>
-    <table className="w-full border-collapse text-left text-[13px]">{children}</table>
+    <table className="w-full border-collapse text-left text-body">{children}</table>
   </div>
 );
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => (
-  <th scope="col" className={cx("border-b border-line bg-surface-low px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted", className)}>
+  <th scope="col" className={cx("border-b border-line bg-surface-low px-3 py-2 text-caption font-semibold uppercase tracking-wider text-muted", className)}>
     {children}
   </th>
 );
@@ -388,7 +388,7 @@ export function Tabs<T extends string>({
             onClick={() => onChange(id)}
             onKeyDown={(event) => move(event, index)}
             className={cx(
-              "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-container/40",
+              "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-body font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary-container/40",
               value === id ? "border-primary-container text-primary" : "border-transparent text-muted hover:text-ink",
             )}
           >
@@ -453,7 +453,7 @@ export function Dialog({ title, children, onClose, footer, tone }: { title: Reac
             <X className="size-4" />
           </button>
         </div>
-        <div className="space-y-3 px-5 py-4 text-[13px]">{children}</div>
+        <div className="space-y-3 px-5 py-4 text-body">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
       </div>
     </div>
@@ -524,7 +524,7 @@ export function Avatar({ name, className }: { name: string; className?: string }
       .map((part) => part[0]!.toUpperCase())
       .join("") || "?";
   return (
-    <span aria-hidden className={cx("flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-[11px] font-semibold text-primary", className)}>
+    <span aria-hidden className={cx("flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-fixed text-caption font-semibold text-primary", className)}>
       {initials}
     </span>
   );
@@ -582,10 +582,10 @@ export function Menu({ label, button, items, header, align = "right", tour, butt
                 setOpen(false);
                 item.onSelect();
               }}
-              className={cx("flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[13px] outline-none hover:bg-surface-low focus:bg-surface-low", item.tone === "danger" ? "text-error" : "text-ink", item.current && "font-semibold")}
+              className={cx("flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-body outline-none hover:bg-surface-low focus:bg-surface-low", item.tone === "danger" ? "text-error" : "text-ink", item.current && "font-semibold")}
             >
               <span className="flex items-center gap-2">{item.label}</span>
-              {item.hint && <span className="text-[11px] text-muted">{item.hint}</span>}
+              {item.hint && <span className="text-caption text-muted">{item.hint}</span>}
             </button>
           ))}
         </div>

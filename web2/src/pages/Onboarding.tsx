@@ -59,8 +59,8 @@ export function OnboardingPage() {
               const complete = doneStep(s.id);
               return (
                 <li key={s.id}>
-                  <button type="button" aria-current={s.id === current ? "step" : undefined} onClick={() => setChosen(s.id)} className={cx("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] hover:bg-surface-low", s.id === current && "bg-primary-fixed font-semibold text-primary")}>
-                    <span className={cx("flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px]", complete ? "border-good bg-good text-white" : "border-outline")}>
+                  <button type="button" aria-current={s.id === current ? "step" : undefined} onClick={() => setChosen(s.id)} className={cx("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-body hover:bg-surface-low", s.id === current && "bg-primary-fixed font-semibold text-primary")}>
+                    <span className={cx("flex size-5 shrink-0 items-center justify-center rounded-full border text-caption", complete ? "border-good bg-good text-white" : "border-outline")}>
                       {complete ? <Check className="size-3" aria-label="Done" /> : n + 1}
                     </span>
                     {s.title}

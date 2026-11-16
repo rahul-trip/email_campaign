@@ -99,7 +99,7 @@ function CustomerLine({ row }: { row: Row }) {
         <A to="/customers/$id" params={{ id: row.id }} className="font-semibold hover:text-primary hover:underline">
           {row.name}
         </A>
-        <span className="block font-mono text-[11px] text-muted">{row.slug}</span>
+        <span className="block font-mono text-caption text-muted">{row.slug}</span>
       </Td>
       <Td>{row.plan_name}</Td>
       <Td>
@@ -151,7 +151,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
       }
     >
       {invite.isSuccess ? (
-        <p role="status" className="text-[13px]">
+        <p role="status" className="text-body">
           Created. {invite.data.invited} has an invitation by email; they set a password and start the guided setup. The new workspace is on the default plan.
         </p>
       ) : (

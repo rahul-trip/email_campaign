@@ -228,7 +228,7 @@ export function FooterPreview({ profile }: { profile: Profile }) {
           );
         })}
       </div>
-      <p className="mt-2 text-[11px] text-muted">A missing field stops the email from being written for that country.</p>
+      <p className="mt-2 text-caption text-muted">A missing field stops the email from being written for that country.</p>
     </Card>
   );
 }

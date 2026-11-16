@@ -193,7 +193,7 @@ function Policies() {
           )
         }
       </QueryState>
-      <p className="px-4 py-3 text-[11px] text-muted">
+      <p className="px-4 py-3 text-caption text-muted">
         Footer fields: <code className="font-mono">{"{sender_legal_name}"}</code>, <code className="font-mono">{"{postal_address}"}</code>, <code className="font-mono">{"{registration_details}"}</code>, <code className="font-mono">{"{contact_info}"}</code> and <code className="font-mono">{"{data_source}"}</code> (where the address came from). Countries without a rule, and leads with no known country, are held for you. Removing a rule does the same for its leads.
       </p>
     </Card>
@@ -247,13 +247,13 @@ function PolicyRow({ policy }: { policy: Policy }) {
             </option>
           ))}
         </Select>
-        <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted">
+        <label className="mt-1.5 flex items-center gap-1.5 text-caption text-muted">
           <input type="checkbox" checked={corporate} onChange={(e) => setCorporate(e.target.checked)} className="accent-[var(--primary-container)]" /> Incorporated companies only
         </label>
         <fieldset className="mt-1.5">
-          <legend className="text-[11px] text-muted">Only addresses from (none ticked: any)</legend>
+          <legend className="text-caption text-muted">Only addresses from (none ticked: any)</legend>
           {SOURCES.map(([value, label]) => (
-            <label key={value} className="flex items-center gap-1.5 text-[11px] text-muted">
+            <label key={value} className="flex items-center gap-1.5 text-caption text-muted">
               <input
                 type="checkbox"
                 checked={sources.includes(value)}
@@ -266,11 +266,11 @@ function PolicyRow({ policy }: { policy: Policy }) {
         </fieldset>
       </Td>
       <Td className="min-w-64">
-        <Textarea rows={3} aria-label={`Footer for ${policy.country_code}`} value={footer} onChange={(e) => setFooter(e.target.value)} className="font-mono text-[11px]" placeholder={rule === "block" ? "Not used while blocked" : "Footer text with {fields}"} />
+        <Textarea rows={3} aria-label={`Footer for ${policy.country_code}`} value={footer} onChange={(e) => setFooter(e.target.value)} className="font-mono text-caption" placeholder={rule === "block" ? "Not used while blocked" : "Footer text with {fields}"} />
       </Td>
       <Td className="min-w-40">
         <Input aria-label={`Reviewer for ${policy.country_code}`} placeholder="Who checked this?" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
-        <div className="mt-1 font-mono text-[10px] text-muted">version {policy.version}</div>
+        <div className="mt-1 font-mono text-caption text-muted">version {policy.version}</div>
       </Td>
       <Td className="whitespace-nowrap">
         <Button size="sm" variant={changed ? "primary" : "secondary"} busy={save.isPending} disabled={!changed} onClick={() => save.mutate()}>
@@ -330,7 +330,7 @@ function Suppressions() {
                   {rows.map((e) => (
                     <tr key={e.fingerprint + e.kind}>
                       <Td className="text-xs">{e.kind === "email" ? "Address" : "Domain"}</Td>
-                      <Td className="font-mono text-[11px]">{e.fingerprint}…</Td>
+                      <Td className="font-mono text-caption">{e.fingerprint}…</Td>
                       <Td className="text-xs">{words(e.reason)}</Td>
                       <Td className="whitespace-nowrap text-xs text-muted">{when(e.created_at)}</Td>
                     </tr>
@@ -355,7 +355,7 @@ function Suppressions() {
           <Button busy={add.isPending} disabled={!valid} onClick={() => setAsking(true)}>
             <Ban className="size-3.5" aria-hidden /> Add
           </Button>
-          <p className="text-[11px] text-muted">The value is kept only as a one-way fingerprint. A fingerprint of a guessable address can still be tested, so treat the list as sensitive.</p>
+          <p className="text-caption text-muted">The value is kept only as a one-way fingerprint. A fingerprint of a guessable address can still be tested, so treat the list as sensitive.</p>
         </div>
       </Card>
       {asking && (

@@ -103,13 +103,13 @@ function People() {
                       <tr key={e.id}>
                         <Td>
                           <span className="font-medium">{e.full_name}</span>
-                          <span className="block text-[11px] text-muted">{e.title ?? "no title"}</span>
+                          <span className="block text-caption text-muted">{e.title ?? "no title"}</span>
                         </Td>
                         <Td className="font-mono text-xs">{e.email}</Td>
                         <Td>{e.company_domain}</Td>
                         <Td>
                           {e.status === "verified" ? <Pill tone="good">verified</Pill> : <Pill tone={e.status === "invalid" ? "error" : "attention"}>{e.status}</Pill>}
-                          {e.employment_status === "left" && <span className="ml-1 text-[11px] text-muted">left the company</span>}
+                          {e.employment_status === "left" && <span className="ml-1 text-caption text-muted">left the company</span>}
                         </Td>
                         <Td className="whitespace-nowrap text-xs text-muted">
                           <When iso={e.verified_at} /> · {e.source}
@@ -279,7 +279,7 @@ function Companies() {
                       <tr key={c.id}>
                         <Td>
                           <span className="font-medium">{c.domain}</span>
-                          {c.name && <span className="block text-[11px] text-muted">{c.name}</span>}
+                          {c.name && <span className="block text-caption text-muted">{c.name}</span>}
                         </Td>
                         <Td>{c.country_code ?? "—"}</Td>
                         <Td className="font-mono text-xs">{c.email_pattern ?? "—"}</Td>

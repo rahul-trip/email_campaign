@@ -29,7 +29,7 @@ export function Integrations() {
         {(data) => {
           const url = `${window.location.origin}${data.path}`;
           return (
-            <div className="space-y-4 text-[13px]">
+            <div className="space-y-4 text-body">
               <div>
                 <div className="mb-1 text-xs font-medium">Send a POST to</div>
                 <div className="flex items-center gap-2">
@@ -139,7 +139,7 @@ const FIELDS: [string, string, string][] = [
 function BodyFormat() {
   return (
     <Card tour="integrations-format" title="Request body" subtitle="The JSON your system sends. Copy either shape as a starting point.">
-      <div className="space-y-4 text-[13px]">
+      <div className="space-y-4 text-body">
         <div>
           <div className="mb-1 text-xs font-medium">One target</div>
           <CodeBlock label="one-target body" text={SINGLE} />
@@ -212,7 +212,7 @@ curl -X POST '${url}' \\
 }`;
   return (
     <Card tour="integrations-example" title="Example" subtitle="A complete request you can run from a terminal, after setting WEBHOOK_SECRET to your secret.">
-      <div className="space-y-4 text-[13px]">
+      <div className="space-y-4 text-body">
         <div>
           <div className="mb-1 text-xs font-medium">Body</div>
           <CodeBlock label="example body" text={body} />

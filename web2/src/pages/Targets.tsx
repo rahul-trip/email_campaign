@@ -233,7 +233,7 @@ function UploadFile({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
     <Card title="Upload a CSV or Excel file" subtitle="Columns are matched loosely: Company, Website, Email, Person, Title, LinkedIn, Country, Notes, Priority. Up to 2 MB.">
       <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline bg-surface-low px-4 py-8 text-center transition-colors hover:border-primary-container">
         <FileSpreadsheet className="size-9 text-muted" aria-hidden />
-        <span className="mt-2 text-[13px] font-semibold">{file ? file.name : "Choose a .csv or .xlsx file"}</span>
+        <span className="mt-2 text-body font-semibold">{file ? file.name : "Choose a .csv or .xlsx file"}</span>
         <span className="mt-0.5 text-xs text-muted">{file ? `${Math.ceil(file.size / 1024)} KB` : "Nothing is saved until you import after the preview."}</span>
         <input
           aria-label="Targets file"

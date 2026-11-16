@@ -67,7 +67,7 @@ function Setup() {
         )}
       </Card>
       <Card title="Elsewhere" className="h-fit">
-        <ul className="space-y-2 text-[13px]">
+        <ul className="space-y-2 text-body">
           {[
             ["/campaigns", "Campaigns", "Job titles, ideal customer, questions"],
             ["/compliance", "Policies and privacy", "Country rules, do not contact, erasure"],
@@ -76,7 +76,7 @@ function Setup() {
               <Link to={to} className="group flex items-center justify-between rounded-lg border border-line px-3 py-2 hover:bg-surface-low">
                 <span>
                   <span className="font-medium">{title}</span>
-                  <span className="block text-[11px] text-muted">{detail}</span>
+                  <span className="block text-caption text-muted">{detail}</span>
                 </span>
                 <ArrowRight className="size-4 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden />
               </Link>

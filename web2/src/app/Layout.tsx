@@ -112,18 +112,18 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
         <nav aria-label="Main" data-tour="nav" className="flex flex-col gap-4 px-2 py-3">
           {NAV.map((group) => (
             <div key={group.label} className="flex flex-col gap-0.5">
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">{group.label}</div>
+              <div className="px-3 pb-1 text-caption font-semibold uppercase tracking-wider text-muted">{group.label}</div>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const count = item.badge ? counts[item.badge] : 0;
                 if (item.soon)
                   return (
-                    <div key={item.to} title={item.soonNote} className="flex cursor-not-allowed select-none items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-muted/60">
+                    <div key={item.to} title={item.soonNote} className="flex cursor-not-allowed select-none items-center justify-between rounded-lg px-3 py-1.5 text-body text-muted/60">
                       <span className="flex items-center gap-2">
                         <Icon size={18} aria-hidden />
                         {item.label}
                       </span>
-                      <span className="rounded bg-surface-container px-1.5 text-[10px] font-semibold uppercase">Soon</span>
+                      <span className="rounded bg-surface-container px-1.5 text-caption font-semibold uppercase">Soon</span>
                     </div>
                   );
                 return (
@@ -131,7 +131,7 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
                     key={item.to}
                     to={item.to}
                     activeOptions={{ exact: item.to === "/" }}
-                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface-low hover:text-ink"
+                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-body text-muted transition-colors hover:bg-surface-low hover:text-ink"
                     activeProps={{ className: "bg-primary-fixed font-semibold !text-primary hover:bg-primary-fixed" }}
                   >
                     <span className="flex items-center gap-2">
@@ -141,7 +141,7 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
                     {count > 0 && (
                       <span
                         aria-label={`${count} waiting`}
-                        className={cx("rounded-full px-1.5 font-mono text-[11px] font-semibold", item.badge === "review" ? "bg-attention-container text-on-attention-container" : "bg-error-container text-on-error-container")}
+                        className={cx("rounded-full px-1.5 font-mono text-caption font-semibold", item.badge === "review" ? "bg-attention-container text-on-attention-container" : "bg-error-container text-on-error-container")}
                       >
                         {count}
                       </span>
@@ -190,7 +190,7 @@ function Banners({ items }: { items: BannerItem[] }) {
 
 function Banner({ tone, children }: { tone: "attention" | "error"; children: ReactNode }) {
   return (
-    <div role="alert" className={cx("mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]", tone === "error" ? "border-error/30 bg-error-container text-on-error-container" : "border-attention/40 bg-attention-container text-on-attention-container")}>
+    <div role="alert" className={cx("mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-body", tone === "error" ? "border-error/30 bg-error-container text-on-error-container" : "border-attention/40 bg-attention-container text-on-attention-container")}>
       <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
       <div>{children}</div>
     </div>
@@ -230,9 +230,9 @@ function SearchBox() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Search leads by company or domain"
-        className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-9 pr-16 text-[13px] outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
+        className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-9 pr-16 text-body outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
       />
-      <kbd className="absolute right-2 top-1.5 rounded border border-line bg-surface px-1.5 font-mono text-[10px] text-muted">Ctrl K</kbd>
+      <kbd className="absolute right-2 top-1.5 rounded border border-line bg-surface px-1.5 font-mono text-caption text-muted">Ctrl K</kbd>
     </form>
   );
 }
@@ -244,7 +244,7 @@ function EngineChip({ run, stuck }: { run?: { status: string; created_at: string
     <Link
       to="/runs"
       className={cx(
-        "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold xl:inline-flex",
+        "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-caption font-semibold xl:inline-flex",
         stuck ? "bg-error-container text-on-error-container" : "bg-working-container text-on-working-container",
       )}
     >
@@ -257,7 +257,7 @@ function EngineChip({ run, stuck }: { run?: { status: string; created_at: string
 /** A superadmin reading a workspace they are not in. Stays in view; every write is refused. */
 function ViewingBanner({ name }: { name: string }) {
   return (
-    <div role="status" data-tour="viewing" className="sticky top-[60px] z-20 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error px-3 py-2 text-[13px] font-semibold text-white shadow">
+    <div role="status" data-tour="viewing" className="sticky top-[60px] z-20 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error px-3 py-2 text-body font-semibold text-white shadow">
       <span className="flex items-center gap-2">
         <Eye size={16} aria-hidden /> Superadmin view of {name}, read-only
       </span>
@@ -283,7 +283,7 @@ function WorkspaceSwitcher() {
       label="Switch workspace"
       tour="workspace-switcher"
       align="left"
-      buttonClassName="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-muted hover:bg-surface-low hover:text-ink"
+      buttonClassName="flex items-center gap-1 rounded-lg px-1.5 py-1 text-body font-semibold text-muted hover:bg-surface-low hover:text-ink"
       button={
         <>
           <span className="max-w-[180px] truncate">{workspace.name}</span>
@@ -328,8 +328,8 @@ function UserMenu() {
         <>
           <div className="font-semibold">{name}</div>
           <div className="text-muted">{me.user.email}</div>
-          {me.user.platform_role && <div className="mt-1 text-[11px] font-semibold uppercase text-primary">Platform {me.user.platform_role}</div>}
-          {others.isSuccess && <div className="mt-1 text-[11px] text-muted">Signed out of {others.data.signed_out} other session(s).</div>}
+          {me.user.platform_role && <div className="mt-1 text-caption font-semibold uppercase text-primary">Platform {me.user.platform_role}</div>}
+          {others.isSuccess && <div className="mt-1 text-caption text-muted">Signed out of {others.data.signed_out} other session(s).</div>}
         </>
       }
       items={[

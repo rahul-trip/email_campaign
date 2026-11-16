@@ -86,7 +86,7 @@ export function NotificationBell() {
     <div ref={root} className="relative" data-tour="notifications">
       <button type="button" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"} aria-expanded={open} onClick={() => setOpen(!open)} className="relative rounded-lg p-1.5 text-muted hover:bg-surface-low hover:text-ink">
         <Bell size={18} aria-hidden />
-        {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-center font-mono text-[10px] font-semibold leading-4 text-white">{unread}</span>}
+        {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error px-1 text-center font-mono text-caption font-semibold leading-4 text-white">{unread}</span>}
       </button>
       {open && (
         <div role="dialog" aria-label="Notifications" className="absolute right-0 top-full z-50 mt-2 w-96 max-w-[calc(100vw-1.5rem)] rounded-lg border border-line bg-surface shadow-lg">
@@ -104,14 +104,14 @@ export function NotificationBell() {
             <ul className="max-h-96 divide-y divide-line overflow-y-auto">
               {notices.data!.items.map((n) => (
                 <li key={n.id}>
-                  <button type="button" onClick={() => open1(n)} className={cx("flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-[13px] hover:bg-surface-low", !n.read && "bg-primary-fixed/40")}>
+                  <button type="button" onClick={() => open1(n)} className={cx("flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-body hover:bg-surface-low", !n.read && "bg-primary-fixed/40")}>
                     {(() => {
                       const Icon = describe(n).icon;
                       return <Icon className={cx("mt-0.5 size-4 shrink-0", n.kind === "hot_lead" ? "text-attention" : n.kind === "run_failed" ? "text-error" : "text-muted")} aria-hidden />;
                     })()}
                     <span className="min-w-0">
                       <span className={cx("block", !n.read && "font-semibold")}>{describe(n).text}</span>
-                      <span className="mt-0.5 block text-[11px] text-muted">
+                      <span className="mt-0.5 block text-caption text-muted">
                         {ago(n.created_at)}
                         {typeof n.data.workspace_name === "string" && n.kind !== "join_requested" && n.kind !== "join_approved" && n.kind !== "join_rejected" ? ` · ${n.data.workspace_name}` : ""}
                       </span>

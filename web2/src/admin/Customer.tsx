@@ -95,13 +95,13 @@ function Header({ d, onChange }: { d: Detail; onChange: () => void }) {
               Extend access
             </Button>
             {me.data?.user.platform_role === "superadmin" && (
-              <a href={`/w/${row.slug}/`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-outline px-3 text-[13px] font-semibold hover:bg-surface-low">
+              <a href={`/w/${row.slug}/`} className="inline-flex h-8 items-center gap-1 rounded-lg border border-outline px-3 text-body font-semibold hover:bg-surface-low">
                 Open workspace <ExternalLink className="size-3.5" aria-hidden />
               </a>
             )}
             <Menu
               label="More actions"
-              buttonClassName="inline-flex h-8 items-center rounded-lg border border-outline px-3 text-[13px] font-semibold hover:bg-surface-low"
+              buttonClassName="inline-flex h-8 items-center rounded-lg border border-outline px-3 text-body font-semibold hover:bg-surface-low"
               button={<>More ▾</>}
               items={[
                 { label: "Change plan", onSelect: () => setAction("plan") },
@@ -192,7 +192,7 @@ function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; o
       }
     >
       {grant.isSuccess ? (
-        <p role="status" className="text-[13px]">
+        <p role="status" className="text-body">
           Granted {amount} credits for {stepName(step).toLowerCase()}.{" "}
           {grant.data.resumed_leads + grant.data.resumed_rows > 0 ? `${grant.data.resumed_rows} waiting added as leads and ${grant.data.resumed_leads} lead(s) set going.` : "Nothing was waiting."}
         </p>
@@ -212,7 +212,7 @@ function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; o
               <Input type="number" min={1} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} className="w-full" />
             </Field>
           </div>
-          <fieldset className="space-y-1 text-[13px]">
+          <fieldset className="space-y-1 text-body">
             <legend className="mb-1 text-xs font-medium">Expires</legend>
             {(
               [
@@ -279,7 +279,7 @@ function ExtendDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; 
           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full" />
         </Field>
       )}
-      {preview && <p className="text-[13px]">New end: <strong>{preview.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</strong></p>}
+      {preview && <p className="text-body">New end: <strong>{preview.toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })}</strong></p>}
       <Note value={note} onChange={setNote} />
       <Problem error={extend.error} />
     </Dialog>
@@ -358,7 +358,7 @@ function StatusDialog({ d, to, onClose, onDone }: { d: Detail; to: "active" | "p
         </>
       }
     >
-      <p className="text-[13px]">{effect}</p>
+      <p className="text-body">{effect}</p>
       <Note value={note} onChange={setNote} />
       <Problem error={change.error} />
     </Dialog>
@@ -372,7 +372,7 @@ const Meters = ({ d }: { d: Detail }) => (
     {d.row.steps
       .filter((s) => s.limit !== null || s.used > 0)
       .map((s) => (
-        <li key={s.step} className="flex items-center justify-between gap-3 text-[13px]">
+        <li key={s.step} className="flex items-center justify-between gap-3 text-body">
           <span>{stepName(s.step)}</span>
           <UseBar used={s.used} total={s.limit === null ? null : s.limit + s.granted} />
         </li>
@@ -392,9 +392,9 @@ function Overview({ d, onChange }: { d: Detail; onChange: () => void }) {
       </Card>
       <Card title="Waiting work" subtitle="Stopped only because an allowance ran out. It continues by itself when credits exist.">
         {d.row.waiting === 0 ? (
-          <p className="text-[13px] text-muted">Nothing is waiting.</p>
+          <p className="text-body text-muted">Nothing is waiting.</p>
         ) : (
-          <div className="flex items-center justify-between gap-3 text-[13px]">
+          <div className="flex items-center justify-between gap-3 text-body">
             <span>{d.row.waiting} lead(s) waiting</span>
             <Button size="sm" busy={resume.isPending} onClick={() => resume.mutate()}>
               Resume all now
@@ -404,7 +404,7 @@ function Overview({ d, onChange }: { d: Detail; onChange: () => void }) {
         <Problem error={resume.error instanceof ApiProblem && resume.error.code === "no_credits" ? new Error(`${resume.error.message}`) : resume.error} className="mt-2" />
       </Card>
       <Card title="Totals">
-        <dl className="space-y-1.5 text-[13px]">
+        <dl className="space-y-1.5 text-body">
           <Line label="Leads" value={d.row.leads} />
           <Line label="Vendor spend this month" value={usd(d.row.spend_micro_usd)} />
           <Line label="Last active" value={d.row.last_active ? new Date(d.row.last_active).toLocaleString() : "never"} />
@@ -468,7 +468,7 @@ function Limits({ d, onChange }: { d: Detail; onChange: () => void }) {
       </Card>
       <Card title="History" subtitle="Every override and grant. Withdrawing one keeps its record.">
         <Problem error={revoke.error} className="mb-2" />
-        <ul className="divide-y divide-line text-[13px]">
+        <ul className="divide-y divide-line text-body">
           {[
             ...d.grants.map((g) => ({ at: g.created_at, id: g.id, kind: "grant" as const, dead: g.revoked_at, text: `+${g.amount} ${stepName(g.step).toLowerCase()}`, extra: g.expires_at ? `expires ${new Date(g.expires_at).toLocaleDateString()}` : "never expires", note: g.note })),
             ...d.overrides.map((o) => ({ at: o.created_at, id: o.id, kind: "override" as const, dead: o.revoked_at, text: `${o.key.replace("limit.", "limit: ").replace("feature.", "feature: ")} → ${o.value === null ? "unlimited" : String(o.value)}`, extra: o.expires_at ? `until ${new Date(o.expires_at).toLocaleDateString()}` : "no end", note: o.note })),
@@ -569,7 +569,7 @@ function Access({ d, onChange }: { d: Detail; onChange: () => void }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card title="Status">
-        <div className="space-y-2 text-[13px]">
+        <div className="space-y-2 text-body">
           <div>
             <AccessPill row={d.row} /> <span className="ml-2 text-muted">{d.row.status}</span>
           </div>
@@ -645,7 +645,7 @@ function Members({ d, onChange }: { d: Detail; onChange: () => void }) {
             <tr key={m.user_id}>
               <Td>
                 <span className="font-medium">{m.name || m.email}</span>
-                {m.name && <span className="block text-[11px] text-muted">{m.email}</span>}
+                {m.name && <span className="block text-caption text-muted">{m.email}</span>}
               </Td>
               <Td>
                 <Select aria-label={`Role of ${m.email}`} value={m.role} onChange={(e) => role.mutate({ id: m.user_id, role: e.target.value as "admin" | "member" })}>
@@ -687,7 +687,7 @@ function Mailboxes({ d, onChange }: { d: Detail; onChange: () => void }) {
   return (
     <Card title="Mailboxes" subtitle="Addresses and health only; the customer connects and manages them.">
       {d.mailboxes.length === 0 ? (
-        <p className="text-[13px] text-muted">None connected.</p>
+        <p className="text-body text-muted">None connected.</p>
       ) : (
         <Table>
           <thead>
@@ -733,9 +733,9 @@ function Activity({ d }: { d: Detail }) {
   return (
     <Card title="Activity" subtitle="Admin actions on this customer and its key events.">
       {d.activity.length === 0 ? (
-        <p className="text-[13px] text-muted">Nothing yet.</p>
+        <p className="text-body text-muted">Nothing yet.</p>
       ) : (
-        <ul className="divide-y divide-line text-[13px]">
+        <ul className="divide-y divide-line text-body">
           {d.activity.map((a) => (
             <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
               <When iso={a.at} time />

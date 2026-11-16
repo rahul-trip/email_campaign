@@ -18,7 +18,7 @@ export function When({ iso, time }: { iso?: string | null; time?: boolean }) {
 
 export function Pill({ tone, children }: { tone: "good" | "attention" | "error" | "muted"; children: ReactNode }) {
   const tones = { good: "bg-good-container text-on-good-container", attention: "bg-attention-container text-on-attention-container", error: "bg-error-container text-on-error-container", muted: "bg-surface-container text-muted" };
-  return <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold", tones[tone])}>{children}</span>;
+  return <span className={cx("inline-flex items-center rounded-full px-2 py-0.5 text-caption font-semibold", tones[tone])}>{children}</span>;
 }
 
 export function AccessPill({ row }: { row: Pick<Row, "access" | "access_until" | "status"> }) {

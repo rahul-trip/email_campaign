@@ -162,23 +162,23 @@ function Queue({ items, current, onPick }: { items: Item[]; current: string; onP
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold">
+                  <span className="truncate text-body font-semibold">
                     {item.company.hot && <Flame className="mr-1 inline size-3.5 text-attention" aria-label="Hot lead" />}
                     {item.company.name ?? item.company.domain}
                   </span>
-                  {item.company.country_code && <span className="font-mono text-[10px] text-muted">{item.company.country_code}</span>}
+                  {item.company.country_code && <span className="font-mono text-caption text-muted">{item.company.country_code}</span>}
                 </div>
                 <div className="mt-0.5 truncate text-xs">{item.contact.full_name ?? "Name unknown"}</div>
-                <div className="truncate text-[11px] text-muted">{item.contact.title ?? "Title unknown"}</div>
+                <div className="truncate text-caption text-muted">{item.contact.title ?? "Title unknown"}</div>
                 {item.message.created_at && (
-                  <div className="mt-0.5 text-[11px] text-muted" title={when(item.message.created_at)}>
+                  <div className="mt-0.5 text-caption text-muted" title={when(item.message.created_at)}>
                     Written {ago(item.message.created_at)}
                   </div>
                 )}
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-1.5">
-                  <span className="truncate font-mono text-[10px] text-muted">{item.message.subject}</span>
+                  <span className="truncate font-mono text-caption text-muted">{item.message.subject}</span>
                   {item.flagged && (
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded bg-attention-container px-1.5 text-[10px] font-semibold text-on-attention-container">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded bg-attention-container px-1.5 text-caption font-semibold text-on-attention-container">
                       <Flag className="size-3" aria-hidden /> Flagged
                     </span>
                   )}
@@ -260,11 +260,11 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="truncate text-[15px] font-semibold">
-                  To {item.contact.full_name ?? "unknown"} <span className="font-mono text-[13px] font-normal text-muted">&lt;{address?.email ?? "no address"}&gt;</span>
+                  To {item.contact.full_name ?? "unknown"} <span className="font-mono text-body font-normal text-muted">&lt;{address?.email ?? "no address"}&gt;</span>
                 </h2>
                 {address && <StatusBadge status={describe(emailStatus, address.status)} title={isSafeToSend(address.status, address.verification_skipped) ? "Safe to send" : "Not safe to send"} />}
                 {address?.verification_skipped && (
-                  <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container">Not verified: you skipped the check</span>
+                  <span className="rounded-full bg-attention-container px-2 py-0.5 text-caption font-medium text-on-attention-container">Not verified: you skipped the check</span>
                 )}
               </div>
               {item.message.created_at && (
@@ -297,7 +297,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               <a href={opening.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
                 {opening.headline}
               </a>
-              {opening.date && <span className="ml-1 font-mono text-[11px] text-muted">({opening.date})</span>}
+              {opening.date && <span className="ml-1 font-mono text-caption text-muted">({opening.date})</span>}
               <span className="text-muted"> · check it is right before you approve</span>
             </p>
           ) : (
@@ -307,7 +307,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
           )}
 
           <label className="mt-3 block">
-            <span className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted">
+            <span className="mb-1.5 flex items-center justify-between text-caption font-semibold uppercase tracking-wider text-muted">
               Email, exactly as it will be drafted
               {edited && <span className="rounded bg-attention-container px-1.5 py-0.5 font-mono normal-case tracking-normal text-on-attention-container">edited by you</span>}
             </span>
@@ -322,12 +322,12 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               className="w-full resize-y rounded-lg border border-outline bg-surface p-3.5 text-[15px] leading-6 outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
             />
           </label>
-          <p className="mt-1.5 text-[11px] text-muted">The legal footer for the country is part of the text. An edit that removes it is refused.</p>
+          <p className="mt-1.5 text-caption text-muted">The legal footer for the country is part of the text. An edit that removes it is refused.</p>
 
           {edited && (
             <div className="mt-3">
               <Label className="mb-1">Your changes</Label>
-              <pre aria-label="Changes" className="whitespace-pre-wrap rounded-lg border border-line bg-surface-low p-3 font-sans text-[13px] leading-relaxed">
+              <pre aria-label="Changes" className="whitespace-pre-wrap rounded-lg border border-line bg-surface-low p-3 font-sans text-body leading-relaxed">
                 {diffWords(item.message.generated_body, text).map((part, i) => (
                   <span key={i} className={part.added ? "rounded bg-good-container text-on-good-container" : part.removed ? "rounded bg-error-container text-on-error-container line-through" : undefined}>
                     {part.value}
@@ -348,7 +348,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
                   key={suggestion}
                   type="button"
                   onClick={() => setInstructions(instructions.trim() ? `${instructions.trim()} ${suggestion}` : suggestion)}
-                  className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] hover:border-primary-container hover:text-primary"
+                  className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-caption hover:border-primary-container hover:text-primary"
                 >
                   {suggestion}
                 </button>
@@ -411,7 +411,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               </Button>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted">Approving does not send anything: within 15 minutes it is saved as a draft in your mailbox.</p>
+          <p className="mt-2 text-caption text-muted">Approving does not send anything: within 15 minutes it is saved as a draft in your mailbox.</p>
           <Problem error={approve.error ?? rewrite.error} className="mt-3" />
         </Card>
 
@@ -463,11 +463,11 @@ function Context({
           {company.fit_score == null && <span className="text-xs text-muted">not scored</span>}
         </div>
         {company.fit_reason && <p className="mt-1 text-xs text-muted">{company.fit_reason}</p>}
-        {Boolean(research.summary) && <p className="mt-2 text-[13px] leading-relaxed">{String(research.summary)}</p>}
+        {Boolean(research.summary) && <p className="mt-2 text-body leading-relaxed">{String(research.summary)}</p>}
         {hooks.length > 0 && (
           <>
             <Label className="mb-1 mt-3">What the research found</Label>
-            <ul className="list-disc space-y-0.5 pl-4 text-[13px]">
+            <ul className="list-disc space-y-0.5 pl-4 text-body">
               {hooks.map((hook) => (
                 <li key={hook}>{hook}</li>
               ))}
@@ -477,7 +477,7 @@ function Context({
         {answers.length > 0 && (
           <>
             <Label className="mb-1 mt-3">Your research questions</Label>
-            <dl className="space-y-1.5 text-[13px]">
+            <dl className="space-y-1.5 text-body">
               {answers.map(([question, answer]) => (
                 <div key={question}>
                   <dt className="text-xs text-muted">{question}</dt>
@@ -496,7 +496,7 @@ function Context({
 
       {history.length > 0 && (
         <Card tour="review-history" title="History of this email">
-          <ol className="space-y-2 text-[13px]">
+          <ol className="space-y-2 text-body">
             {history.map((h, i) => (
               <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3">
                 <span className="font-medium">{h.what}</span>
@@ -510,8 +510,8 @@ function Context({
         </Card>
       )}
 
-      <Card title="Checks" actions={flagged ? <span className="rounded bg-attention-container px-1.5 py-0.5 text-[11px] font-semibold text-on-attention-container">Flagged</span> : undefined}>
-        <ul className="space-y-1.5 text-[13px]">
+      <Card title="Checks" actions={flagged ? <span className="rounded bg-attention-container px-1.5 py-0.5 text-caption font-semibold text-on-attention-container">Flagged</span> : undefined}>
+        <ul className="space-y-1.5 text-body">
           {checks.map(([rule, label]) => {
             const bad = failing.has(rule);
             return (
@@ -530,7 +530,7 @@ function Context({
           </Callout>
         )}
         {lint.word_count != null && (
-          <p className="mt-2 font-mono text-[11px] text-muted">
+          <p className="mt-2 font-mono text-caption text-muted">
             As written: {lint.word_count} words, reading grade {lint.reading_grade}. Your edits are checked again when you approve.
           </p>
         )}

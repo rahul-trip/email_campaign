@@ -86,7 +86,7 @@ export function DashboardPage() {
         <>
           <Label className="mb-2">Needs you</Label>
           {needCards.length === 0 ? (
-            <p data-tour="needs-you" className="mb-6 flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-[13px] text-muted">
+            <p data-tour="needs-you" className="mb-6 flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-body text-muted">
               <CheckCircle2 className="size-4 text-good" aria-hidden /> Nothing needs you right now.
             </p>
           ) : (
@@ -128,12 +128,12 @@ export function DashboardPage() {
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>
-                          {gate && <span className="rounded bg-attention px-1 text-[9px] font-bold uppercase tracking-wider text-white">You</span>}
+                          <span className="font-mono text-caption text-muted">{String(index + 1).padStart(2, "0")}</span>
+                          {gate && <span className="rounded bg-attention px-1 text-caption font-bold uppercase tracking-wider text-white">You</span>}
                         </div>
                         <div className="mt-1 truncate text-xs font-semibold">{stage.label}</div>
                         <div className="mt-1 font-mono text-xl font-semibold">{count}</div>
-                        <div className="mt-0.5 truncate text-[11px] text-muted" title={stage.note}>
+                        <div className="mt-0.5 truncate text-caption text-muted" title={stage.note}>
                           {stage.note}
                         </div>
                         <div className="mt-2 h-1 rounded-full bg-surface-container">
@@ -148,7 +148,7 @@ export function DashboardPage() {
           )}
   
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Left the main path</span>
+            <span className="mr-1 text-caption font-semibold uppercase tracking-wider text-muted">Left the main path</span>
             {SIDE_EXITS.map((key) => (
               <Link key={key} to="/leads" search={{ status: key }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-1.5 py-1 hover:bg-surface-low">
                 <StatusBadge status={describe(leadStatus, key)} />
@@ -259,7 +259,7 @@ function NeedCard({ count, label, detail, to, action, tone }: { count: number; l
   return (
     <div className={cx("group flex flex-col rounded-xl border p-4 transition-colors", live ? (tone === "error" ? "border-error/40 bg-surface" : "border-attention/50 bg-attention-container/25") : "border-line bg-surface")}>
       <div className={cx("font-mono text-[28px] font-semibold leading-9", live ? (tone === "error" ? "text-error" : "text-attention") : "text-muted")}>{count}</div>
-      <div className="text-[13px] font-semibold">{label}</div>
+      <div className="text-body font-semibold">{label}</div>
       <p className="mt-0.5 line-clamp-2 min-h-8 text-xs text-muted" title={detail}>
         {detail}
       </p>
@@ -276,7 +276,7 @@ function Metric({ label, value, hint, tone }: { label: string; value: ReactNode;
     <div>
       <Label>{label}</Label>
       <div className={cx("mt-0.5 font-mono text-2xl font-semibold", tone === "primary" && "text-primary")}>{value}</div>
-      {hint && <div className="font-mono text-[11px] text-muted">{hint}</div>}
+      {hint && <div className="font-mono text-caption text-muted">{hint}</div>}
     </div>
   );
 }
@@ -295,7 +295,7 @@ export function BudgetMeter({ spent, ceiling }: { spent: number; ceiling: number
   const used = Math.min(100, Math.round((spent / ceiling) * 100));
   return (
     <div className="col-span-2">
-      <div className="mb-1 flex justify-between font-mono text-[11px] text-muted">
+      <div className="mb-1 flex justify-between font-mono text-caption text-muted">
         <span>Average spend against the ceiling</span>
         <span className={cx("font-semibold", used > 90 ? "text-error" : used > 70 ? "text-attention" : "text-good")}>{used}% used</span>
       </div>
@@ -339,7 +339,7 @@ export function RunCounts({ counts }: { counts: Record<string, unknown> | null |
   return (
     <ul className="flex flex-wrap gap-1.5">
       {stages.map(([stage, outcome]) => (
-        <li key={stage} className="rounded-md border border-line bg-surface-low px-2 py-0.5 text-[11px]">
+        <li key={stage} className="rounded-md border border-line bg-surface-low px-2 py-0.5 text-caption">
           <span className="font-semibold">{stage}</span>{" "}
           <span className="text-muted">
             {Object.entries(outcome)
@@ -361,7 +361,7 @@ function GetStarted() {
   const left = setup.data.items.filter((i) => i.status === "missing");
   return (
     <Card tour="get-started" className="mb-6" tone="attention" title="Get started" subtitle={`${left.length} thing${left.length === 1 ? "" : "s"} to do before the engine can draft your first email.`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-body">
         <span>
           Next: <strong>{setup.data.next?.title}</strong>
         </span>

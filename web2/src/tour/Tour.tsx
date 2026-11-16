@@ -153,7 +153,7 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
             className="fixed z-[70] rounded-xl border border-line bg-surface p-4 shadow-2xl"
             style={cardPosition(box)}
           >
-            <div className="flex items-center justify-between gap-2 text-[11px] text-muted">
+            <div className="flex items-center justify-between gap-2 text-caption text-muted">
               <span>
                 {section.title} · section {at.section + 1} of {SECTIONS.length} · step {at.step + 1} of {section.steps.length}
               </span>
@@ -164,12 +164,12 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
               ))}
             </div>
             <h2 className="mt-3 text-[15px] font-semibold">{step.title}</h2>
-            <p className="mt-1 text-[13px] leading-relaxed text-ink">{step.body}</p>
+            <p className="mt-1 text-body leading-relaxed text-ink">{step.body}</p>
             {leadNeeded(section.place) && firstLead.isSuccess && !leadId && (
               <p className="mt-2 rounded-lg bg-attention-container p-2 text-xs text-on-attention-container">There is no lead yet, so there is nothing to point at. Add a lead and start a run, then take the tour again.</p>
             )}
             {step.target && !box && !(leadNeeded(section.place) && firstLead.isSuccess && !leadId) && (
-              <p className="mt-2 text-[11px] text-muted">This part of the screen appears once there is something to show.</p>
+              <p className="mt-2 text-caption text-muted">This part of the screen appears once there is something to show.</p>
             )}
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Button autoFocus onClick={next}>

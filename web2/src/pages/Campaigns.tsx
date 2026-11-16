@@ -58,7 +58,7 @@ export function CampaignsPage() {
                       title={
                         <span className="flex flex-wrap items-center gap-2">
                           {c.name}
-                          <span className={c.status === "active" ? "rounded-full bg-good-container px-2 py-0.5 text-[11px] font-medium text-on-good-container" : "rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-medium text-muted"}>
+                          <span className={c.status === "active" ? "rounded-full bg-good-container px-2 py-0.5 text-caption font-medium text-on-good-container" : "rounded-full bg-surface-container px-2 py-0.5 text-caption font-medium text-muted"}>
                             {c.status === "active" ? "Active" : "Paused"}
                           </span>
                         </span>
@@ -380,7 +380,7 @@ export function BriefSummary({ campaign }: { campaign: Campaign }) {
     ["Kinds of company", list("segments")],
   ];
   return (
-    <div className="space-y-3 text-[13px]">
+    <div className="space-y-3 text-body">
       {brief.summary && <p>{String(brief.summary)}</p>}
       {(campaign.brief_gaps ?? []).length > 0 && (
         <Callout tone="attention" title="This brief is thin, so leads are judged loosely">
