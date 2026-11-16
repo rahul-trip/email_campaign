@@ -9,6 +9,7 @@ failed lead costs a whole stage to retry.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -37,15 +38,33 @@ _REMINDER = (
 _CUT_OFF = "cut off at the token limit"
 
 
-def _ask_once[M: BaseModel](
-    llm: LlmClient, system: str, user: str, model: type[M], temperature: float | None
-) -> M:
-    reply = llm.complete(system, user, json_mode=True, temperature=temperature)
+def _ask[T](
+    llm: LlmClient, system: str, user: str, temperature: float | None, read: Callable[[str], T]
+) -> T:
+    """One model call whose reply ``read`` turns into a value, asked a second time with a
+    reminder when the first reply was broken, mis-shaped or cut off. ``read`` raises
+    ``ProviderError`` for a reply it cannot use. Rate limits and other errors are not retried
+    here, because the shared HTTP client already handles those."""
+
+    def once(prompt: str) -> T:
+        return read(llm.complete(system, prompt, json_mode=True, temperature=temperature).text)
+
     try:
-        return model.model_validate(parse_json_object(llm.name, reply.text))
-    except ValidationError as error:
-        message = f"the reply did not have the expected shape: {error}"
-        raise ProviderError(llm.name, message) from None
+        return once(user)
+    except ProviderError as error:
+        if error.retryable or not _worth_asking_again(str(error)):
+            raise
+        why = "it was cut off" if _CUT_OFF in str(error) else str(error).split(": ", 1)[-1][:120]
+        return once(user + _REMINDER.format(why=why))
+
+
+def ask_object(
+    llm: LlmClient, system: str, user: str, *, temperature: float | None = None
+) -> dict[str, Any]:
+    """A model call whose reply must be a JSON object, of any shape. The reply is not capped
+    here: the model's configured limit applies, because a reasoning model spends tokens
+    thinking first and a cap chosen for the answer alone cuts the answer off."""
+    return _ask(llm, system, user, temperature, lambda text: parse_json_object(llm.name, text))
 
 
 def ask_json[M: BaseModel](
@@ -59,16 +78,17 @@ def ask_json[M: BaseModel](
     """A model call whose reply must be a JSON object of the given shape.
 
     ``temperature`` overrides the configured one (extraction wants it low). A broken, mis-shaped
-    or cut-off reply is asked for once more; only rate limits and other errors are not retried
-    here, because the shared HTTP client already handles those.
+    or cut-off reply is asked for once more (``ask_object`` explains why).
     """
-    try:
-        return _ask_once(llm, system, user, model, temperature)
-    except ProviderError as error:
-        if error.retryable or not _worth_asking_again(str(error)):
-            raise
-        why = "it was cut off" if _CUT_OFF in str(error) else str(error).split(": ", 1)[-1][:120]
-        return _ask_once(llm, system, user + _REMINDER.format(why=why), model, temperature)
+
+    def read(text: str) -> M:
+        try:
+            return model.model_validate(parse_json_object(llm.name, text))
+        except ValidationError as error:
+            message = f"the reply did not have the expected shape: {error}"
+            raise ProviderError(llm.name, message) from None
+
+    return _ask(llm, system, user, temperature, read)
 
 
 def _worth_asking_again(message: str) -> bool:

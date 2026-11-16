@@ -38,10 +38,10 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns and `regenerate_brief`, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
 | `discovery.py` | `Discoverer`, `ArticleSource`, `plan_queries`, `merge`, `screen`, `rank_score`, `domain_resolver`, `Discovery` | `pipeline.discover_companies` |
 | `candidates.py` | `CandidateService` (`for_run`, `promote`) | API runs router |
-| `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
+| `brief.py` | `draft` / `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*, saying whether it `fell_back`; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
 | `autodiscovery.py` | `AutoDiscovery.queue_due` (decides, and queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
 | `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`, `requested_only`: the worker's `sync` runs and its timer pipeline runs, which have no `mode` in their params, are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
-| `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
+| `reports.py` | `ReportService` (`status`, `quality`, `funnel`, `sources`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
 | `webhook.py` | `WebhookService.receive`, `sign`, `verify` | API webhook router |
 | `seed.py` | `seed_defaults` | CLI `seed` (and the `migrate` service on every deploy) |
@@ -74,19 +74,19 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 
 **Discovery** (`discovery.py::Discoverer`, [ADR 0031](../adr/0031-multi-source-discovery-screened-before-intake.md)):
 
-1. **The brief.** The campaign's brief is read, or drafted (`brief.py::draft_brief`) and saved if it is empty.
-2. **Fits waiting from earlier runs go first** (`candidates.waiting`, verdict `over_limit`), with no new screening. If they fill the count, the run stops there.
+1. **The brief.** The campaign's brief is read, or drafted (`brief.py::draft`) and saved if it is empty. A brief with neither keywords nor must-haves (`domain.brief.lacks_substance`) is drafted once more, once per campaign, and only its empty fields are filled (`fill_gaps`); both draftings are `campaign_brief_drafted` events with `redraft` and `fell_back`.
+2. **Fits waiting from earlier runs go first** (`candidates.waiting`, verdict `over_limit`), with no new screening. If they fill the count, the run stops there. Then **companies an earlier run could not screen** (`candidates.unscreened`, verdict `unscreened`, at most `SCREEN_CARRIED` oldest first) are screened and settled in the same rows; if they fill the count, the run stops there too, with no source asked.
 3. **Every source that suits the brief is asked** (`domain.discovery.plan_sources`), the ones whose leads passed the fit gate most often in the last `YIELD_DAYS` first (`candidates.source_yield`; a source with fewer than `MIN_HISTORY` companies counts as average). Each is asked for its usual amount times `share` (half to double, by its qualified rate against the average):
-   - the `LeadSource`s (`yc_directory`, `companies_house`, `exa`), for `PER_SOURCE × share` companies, with `source_query(brief, examples=…)`, where the examples are the campaign's best qualified leads (`companies.qualified_domains`, at most `EXAMPLES`) for lookalike search;
+   - the `LeadSource`s (`yc_directory`, `companies_house`, `exa`), for `PER_SOURCE × share` companies, with `source_query(brief, examples=…, known=…)` (`known`: every website already a lead or candidate, left out by the source before it applies its limit), where the examples are the campaign's best qualified leads (`companies.qualified_domains`, at most `EXAMPLES`) for lookalike search;
    - `ArticleSource`, for up to `MAX_SEARCHES × share` list-page searches (planned by `plan_queries`, or by `article_queries` from the brief). It reads the best `PAGES_PER_SEARCH` pages of each, never one read before, and makes one model call per page.
 
    Article searches stop early once there are `ENOUGH` fresh companies per wanted lead. Every search is a `discovery_query` event, recording its source, angle, pages and how many companies it found.
 4. **Merge** (`merge`): one entry per company, matched by website, else by `name_key`.
 5. **Set aside** companies already screened for this campaign (`candidates.known_keys`) and those that are already leads.
-6. **Screen** (`screen`): one model call per `SCREEN_BATCH` companies, each answered with a `role` from the closed list `ROLES` (anything else is `unclear`) and a score. A company fits only if it hits no disqualifier and is a `buyer` scoring `SCREEN_MIN` or more, or `unclear` scoring `UNCLEAR_MIN`; a vendor, competitor, investor or adviser never fits. Without a model, the brief's words are matched instead.
+6. **Screen** (`screen`): one model call per `SCREEN_BATCH` companies, each answered with a `role` from the closed list `ROLES` (anything else is `unclear`) and a score. A company fits only if it hits no disqualifier and is a `buyer` scoring `SCREEN_MIN` or more, or `unclear` scoring `UNCLEAR_MIN`; a vendor, competitor, investor or adviser never fits. Every discovery model call goes through `llm_json.ask_object`, with no reply cap of its own (the model's configured limit applies) and one more try after a cut-off or broken reply. A company the model still did not judge (its batch failed, or its answer left the company out) is `UNJUDGED` and kept as `unscreened`, never rejected on words. Only with no model at all are the brief's words matched instead.
 7. **Rank** (`rank_score`): the screening score plus a bonus for corroboration.
 8. **Add the best fits** through `IntakeService.run` (`company_source=discovery`, which charges the credit), up to the count. A company's website is, in order: its source's; a link on the page that named it (`ArticleSource`, `domain.discovery.website_from_links`); the top `DomainResolver.candidates` result when its domain is the company's name (`MIN_CONFIDENCE`, 0.9); or the one a model picks by number from the likeliest `WEBSITE_CHOICES` (`Discoverer._picked`; none, junk or an error means none). With none the company is `unresolved`; `_take_waiting` retries unresolved ones with over-limit ones after, and one still unresolved is `rejected` ("no website found after a second look").
-9. **Keep a row for every company** (`discovery_candidates`) with its verdict and reason.
+9. **Keep a row for every company** (`discovery_candidates`) with its verdict and reason. A company found earlier (`Found.candidate_id`) has its row updated (`candidates.decide`), never a second one added.
 
 `candidates.py::CandidateService` lists a run's candidates and promotes one: it goes through intake as a **manual** lead chosen by the operator, and the verdict becomes `accepted`.
 
@@ -160,6 +160,7 @@ Details: [data lifecycle](../data/data-lifecycle.md#the-three-ways-out).
 - **Reports** (`ReportService`, over `ReportRepository`):
   - `status`: counts by status, the review queue, holds;
   - `quality`: unedited share of sent touch-1 emails against the 80 % target, flag rate, holds by reason, catch-all share;
+  - `funnel(days)`: what discovery named (and how many the model scored), the screening verdicts, where the leads added in the period are now (`outcome`: `waiting`, `failed:<stage>`, `held:<reason>` or the status) and each vendor's calls and failures, cache hits not counted;
   - `cost`: spend by vendor and per prospect over a window.
 
 ## Webhook

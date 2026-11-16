@@ -63,3 +63,14 @@ def test_the_reports_say_where_good_leads_come_from(
         {"source": "yc_directory", "found": 1, "leads": 0, "qualified": 0, "rate": 0.0,
          "days": 90},
     ]  # fmt: skip
+
+
+def test_the_funnel_report_counts_what_discovery_named_and_what_became_of_it(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    _found(factory, ws)
+    funnel = api.get("/api/reports/funnel", params={"days": 7}).json()
+    assert funnel["named"] == 2 and funnel["judged"] == 2
+    assert funnel["verdicts"] == {"rejected": 1, "unresolved": 1}
+    assert funnel["leads"] == 0 and funnel["vendors"] == []
+    assert api.get("/api/reports/funnel", params={"days": 0}).status_code == 422

@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 
 from outbound.providers.errors import ProviderError
-from outbound.providers.llm_json import ask_json
+from outbound.providers.llm_json import ask_json, ask_object
 from outbound.providers.ports import LlmResult
 
 
@@ -24,6 +24,7 @@ class Scripted:
         self._replies = list(replies)
         self.users: list[str] = []
         self.temperatures: list[float | None] = []
+        self.max_tokens: list[int | None] = []
 
     def complete(
         self,
@@ -36,6 +37,7 @@ class Scripted:
     ) -> LlmResult:
         self.users.append(user)
         self.temperatures.append(temperature)
+        self.max_tokens.append(max_tokens)
         reply = self._replies.pop(0)
         if isinstance(reply, Exception):
             raise reply
@@ -96,3 +98,44 @@ def test_the_temperature_is_passed_on_to_both_tries() -> None:
     llm = Scripted("nope", '{"people": []}')
     ask_json(llm, "s", "u", Answer, temperature=0.2)
     assert llm.temperatures == [0.2, 0.2]
+
+
+# ----------------------------------------------------------------------------- ask_object
+
+
+def test_ask_object_returns_the_object_whatever_its_shape() -> None:
+    llm = Scripted('Here you go: {"companies": [{"n": 1}], "anything": true}')
+    assert ask_object(llm, "s", "u") == {"companies": [{"n": 1}], "anything": True}
+
+
+def test_ask_object_asks_a_cut_off_reply_again_and_says_why() -> None:
+    llm = Scripted(CUT_OFF, '{"companies": []}')
+    assert ask_object(llm, "s", "u", temperature=0.1) == {"companies": []}
+    assert "it was cut off" in llm.users[1]
+    assert llm.temperatures == [0.1, 0.1]
+
+
+def test_ask_object_sets_no_reply_cap_of_its_own() -> None:
+    """The model's configured limit applies: a cap sized for the answer cut a reasoning model's
+    answer off in production (screening: 18 failed calls, 334 companies rejected unread)."""
+    llm = Scripted(CUT_OFF, '{"a": 1}')
+    ask_object(llm, "s", "u")
+    assert llm.max_tokens == [None, None]
+
+
+def test_ask_object_fails_after_one_more_try() -> None:
+    llm = Scripted(CUT_OFF, CUT_OFF)
+    with pytest.raises(ProviderError, match="cut off"):
+        ask_object(llm, "s", "u")
+    assert len(llm.users) == 2
+
+
+def test_ask_object_does_not_retry_a_rate_limit_or_a_json_array() -> None:
+    limited = Scripted(ProviderError("scripted", "429", retryable=True), "{}")
+    with pytest.raises(ProviderError, match="429"):
+        ask_object(limited, "s", "u")
+    assert len(limited.users) == 1
+    array = Scripted("[1, 2]", "[3]")
+    with pytest.raises(ProviderError):
+        ask_object(array, "s", "u")
+    assert len(array.users) == 2  # "no JSON object" is worth one more try, then it fails

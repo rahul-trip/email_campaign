@@ -379,6 +379,40 @@ def test_the_brief_is_drafted_on_the_first_run_and_steers_the_sources(
     assert "grid forecasting" in world.search.searches[0]  # the articles search the brief
 
 
+def test_a_thin_brief_is_drafted_again_once_and_a_persons_words_stay(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+        uow.campaigns.update(campaign.id, {"icp_brief": {"summary": "Energy start-ups"}})
+        uow.commit()
+    run(pipeline, container, ws, 5, "run-1")
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+    brief = campaign.icp_brief or {}
+    assert brief["summary"] == "Energy start-ups"  # what a person wrote is not replaced
+    assert brief["keywords"] == ["grid forecasting", "load forecasting"]  # what was empty is filled
+    assert world.llm.calls.count("brief") == 1
+    # The brief now has substance, and in any case one try again is all a campaign gets.
+    run(pipeline, container, ws, 5, "run-2")
+    assert world.llm.calls.count("brief") == 1
+
+
+def test_a_brief_the_second_drafting_could_not_improve_is_not_drafted_a_third_time(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["brief"] = {"summary": "Energy start-ups"}  # the model gives nothing more
+    with factory(ws) as uow:
+        [campaign] = uow.campaigns.all()
+        uow.campaigns.update(campaign.id, {"icp_brief": {"summary": "Energy start-ups"}})
+        uow.commit()
+    for n in range(3):
+        run(pipeline, container, ws, 5, f"run-{n}")
+    assert world.llm.calls.count("brief") == 1
+
+
 def test_each_search_is_shown_on_the_run_with_its_source_and_angle(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
@@ -473,6 +507,22 @@ def test_the_campaigns_qualified_leads_are_examples_to_find_more_like(
     assert "best.io" in world.directory.queries[0].seed_domains
 
 
+def test_websites_found_on_earlier_runs_are_left_out_of_the_next_search(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        uow.companies.create(domain="lead.io", source=CompanySource.MANUAL)
+        uow.commit()
+    world.directory.mentions = [yc("Gridcast", "gridcast.io")]
+    run(pipeline, container, ws, 5, "run-1")
+    run(pipeline, container, ws, 5, "run-2")
+    first, second = world.directory.queries[:2]
+    assert "lead.io" in first.exclude_domains  # a lead already
+    assert "gridcast.io" not in first.exclude_domains
+    assert "gridcast.io" in second.exclude_domains  # a candidate of the first run
+
+
 def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
@@ -488,3 +538,90 @@ def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(
     with factory(ws) as uow:
         verdicts = {c.name: c.verdict for c in uow.candidates.for_run("run-1")}
     assert verdicts["Mystery"] is CandidateVerdict.UNRESOLVED  # its website search failed
+
+
+CUT_OFF = ProviderError(
+    "fake-llm", "the reply was cut off at the token limit; raise LLM_MAX_TOKENS"
+)
+
+
+def _failing(
+    times: int, then: Callable[[str], dict[str, object]]
+) -> Callable[[str], dict[str, object]]:
+    """A screening reply that is cut off ``times`` times, then answers."""
+    left = [times]
+
+    def reply(user: str) -> dict[str, object]:
+        if left[0] > 0:
+            left[0] -= 1
+            raise CUT_OFF
+        return then(user)
+
+    return reply
+
+
+def test_a_cut_off_screening_reply_is_asked_again_and_the_companies_are_judged(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(1, screen_all(80, Rival=10))
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.rejected, found.unscreened) == (2, 1, 0)
+    assert world.llm.calls.count("screen") == 2  # the cut-off reply, then the answer
+
+
+def test_companies_the_model_could_not_judge_are_kept_not_rejected(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    """Production lost 334 companies this way: a failed reply fell back to word matching, which
+    rejected them, and a company is never screened twice."""
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.rejected, found.unscreened) == (0, 0, 3)
+    with factory(ws) as uow:
+        candidates = uow.candidates.for_run("run-1")
+    assert {c.verdict for c in candidates} == {CandidateVerdict.UNSCREENED}
+    assert all(c.screen_score is None and c.company_id is None for c in candidates)
+
+
+def test_a_company_the_model_leaves_out_of_its_answer_is_unscreened(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    everyone = screen_all(80)
+    world.llm.replies["screen"] = lambda user: {"companies": everyone(user)["companies"][:1]}
+    found = run(pipeline, container, ws, 5, "run-1")
+    assert (found.added, found.unscreened) == (1, 2)
+
+
+def test_the_next_run_screens_unjudged_companies_first_in_the_same_rows(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    run(pipeline, container, ws, 5, "run-1")
+    world.llm.replies["screen"] = screen_all(80, Rival=10)
+    found = run(pipeline, container, ws, 5, "run-2")
+    assert (found.added, found.rejected, found.unscreened) == (2, 1, 0)
+    with factory(ws) as uow:
+        decided = {c.name: c for c in uow.candidates.for_run("run-2")}
+        [campaign] = uow.campaigns.all()
+        assert uow.candidates.unscreened(campaign.id, 10) == []
+    assert set(decided) == {"Gridcast", "Windwise", "Rival Forecasting"}  # three rows, not six
+    assert decided["Rival Forecasting"].verdict is CandidateVerdict.REJECTED
+    assert decided["Gridcast"].verdict is CandidateVerdict.ACCEPTED
+    assert decided["Gridcast"].screen_score == 80 and decided["Gridcast"].company_id
+
+
+def test_unjudged_companies_that_fill_the_count_save_the_searches(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    world.llm.replies["screen"] = _failing(99, screen_all(80))
+    run(pipeline, container, ws, 5, "run-1")
+    world.llm.replies["screen"] = screen_all(80)
+    asked = len(world.directory.queries)
+    found = run(pipeline, container, ws, 2, "run-2")  # the first two fits are enough
+    assert found.added == 2 and found.searches == 0
+    assert len(world.directory.queries) == asked  # no source was asked again

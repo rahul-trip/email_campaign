@@ -14,6 +14,7 @@ from outbound.domain.discovery import (
     article_queries,
     name_key,
     plan_sources,
+    search_terms,
     share,
     website_from_links,
 )
@@ -68,6 +69,7 @@ def test_verdicts_are_the_closed_set_stored_with_each_candidate() -> None:
         "unresolved",
         "already_lead",
         "over_limit",
+        "unscreened",
     }
 
 
@@ -151,3 +153,20 @@ def test_a_companys_own_website_is_taken_from_the_page_that_names_it_only_when_c
     name: str, links: list[tuple[str, str]], expected: str | None
 ) -> None:
     assert website_from_links(name, PAGE, links) == expected
+
+
+def test_a_directory_is_searched_for_the_brief_keywords_when_it_has_any() -> None:
+    assert search_terms(STARTUPS) == ("energy forecasting", "grid analytics")
+
+
+def test_without_keywords_the_telling_words_of_segments_and_summary_are_searched() -> None:
+    brief = Brief.from_json(
+        {
+            "summary": "Energy start-ups",
+            "segments": ["VPP/DER platforms", "Grid analytics start-ups"],
+        }
+    )
+    # "start-ups" and "platforms" fit every company, so they pick none out.
+    assert search_terms(brief) == ("vpp", "der", "grid", "analytics", "energy")
+    assert search_terms(Brief()) == ()
+    assert search_terms(Brief.from_json({"summary": "Companies and platforms"})) == ()

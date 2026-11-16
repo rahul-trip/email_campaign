@@ -4,13 +4,14 @@ import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card, Label, PageHeader, Problem, Segmented, Skeleton, Stat, Table, Td, Th } from "../components/ui";
 import { percent, usd } from "../lib/format";
-import { callOutcome, describe, describeHold, discoverySource } from "../lib/status";
+import { callOutcome, candidateVerdict, describe, describeHold, discoverySource, leadOutcome } from "../lib/status";
 import { BudgetMeter, ProviderBars } from "./Dashboard";
 
 export function ReportsPage() {
   const [days, setDays] = useState(30);
   const cost = useQuery({ queryKey: ["cost", days], queryFn: () => ok(client.GET("/api/reports/cost", { params: { query: { days } } })) });
   const quality = useQuery({ queryKey: ["quality"], queryFn: () => ok(client.GET("/api/reports/quality")) });
+  const funnel = useQuery({ queryKey: ["funnel", days], queryFn: () => ok(client.GET("/api/reports/funnel", { params: { query: { days } } })) });
   const sources = useQuery({ queryKey: ["report-sources"], queryFn: () => ok(client.GET("/api/reports/sources")) });
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
@@ -140,6 +141,66 @@ export function ReportsPage() {
                   <span className="font-mono text-xs">{n}</span>
                 </span>
               ))}
+            </div>
+          )}
+        </Card>
+
+        <Card
+          tour="reports-funnel"
+          title="From a company found to a draft"
+          subtitle={`Last ${days === 365 ? "year" : `${days} days`}: what discovery named and what became of it, where the leads added are now, and how often each vendor failed.`}
+          className="lg:col-span-2 p-0"
+        >
+          {funnel.isPending ? (
+            <div className="p-4">
+              <Skeleton />
+            </div>
+          ) : !funnel.data || (funnel.data.named === 0 && funnel.data.leads === 0) ? (
+            <p className="p-4 text-sm text-muted">Nothing in this period yet.</p>
+          ) : (
+            <div className="grid gap-4 p-4 md:grid-cols-3">
+              <div>
+                <Label className="mb-2">Companies named: {funnel.data.named}</Label>
+                <p className="mb-2 text-xs text-muted">
+                  {percent(funnel.data.judged_share)} read by the model · {percent(funnel.data.lead_share)} became leads
+                </p>
+                <ul className="space-y-1 text-sm">
+                  {Object.entries(funnel.data.verdicts)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([verdict, n]) => (
+                      <li key={verdict} className="flex justify-between gap-2">
+                        <span>{describe(candidateVerdict, verdict).label}</span>
+                        <span className="font-mono text-xs">{n}</span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+              <div>
+                <Label className="mb-2">Leads added: {funnel.data.leads}</Label>
+                <p className="mb-2 text-xs text-muted">Where they are now</p>
+                <ul className="space-y-1 text-sm">
+                  {Object.entries(funnel.data.outcomes).map(([key, n]) => (
+                    <li key={key} className="flex justify-between gap-2">
+                      <span>{leadOutcome(key)}</span>
+                      <span className="font-mono text-xs">{n}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <Label className="mb-2">Vendors that failed</Label>
+                <p className="mb-2 text-xs text-muted">Calls that reached the vendor</p>
+                <ul className="space-y-1 text-sm">
+                  {funnel.data.vendors.map((v) => (
+                    <li key={v.provider} className="flex justify-between gap-2">
+                      <span>{v.provider}</span>
+                      <span className={`font-mono text-xs ${v.error_rate >= 0.25 ? "text-error" : ""}`}>
+                        {v.errors} of {v.calls} ({percent(v.error_rate)})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </Card>

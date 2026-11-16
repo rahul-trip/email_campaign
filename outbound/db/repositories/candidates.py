@@ -95,6 +95,21 @@ class CandidateRepository(ScopedRepository):
         )
         return [snapshot(row, DiscoveryCandidate) for row in self._session.scalars(stmt)]
 
+    def unscreened(self, campaign_id: str, limit: int) -> list[DiscoveryCandidate]:
+        """Companies found but never judged against the brief (the model's reply failed),
+        oldest first, for a later run to screen."""
+        stmt = (
+            select(DiscoveryCandidateRow)
+            .where(
+                DiscoveryCandidateRow.workspace_id == self._workspace_id,
+                DiscoveryCandidateRow.campaign_id == campaign_id,
+                DiscoveryCandidateRow.verdict == CandidateVerdict.UNSCREENED,
+            )
+            .order_by(DiscoveryCandidateRow.created_at, DiscoveryCandidateRow.id)
+            .limit(limit)
+        )
+        return [snapshot(row, DiscoveryCandidate) for row in self._session.scalars(stmt)]
+
     def known_keys(self, campaign_id: str) -> set[str]:
         """The companies already screened for this campaign: each one's key (its website, or
         its name key without one) and its name key, so a later mention of it without a
@@ -154,12 +169,18 @@ class CandidateRepository(ScopedRepository):
         company_id: str | None = None,
         domain: str | None = None,
         run_id: str | None = None,
+        screen_score: int | None = None,
+        rank_score: int | None = None,
     ) -> DiscoveryCandidate:
         """A new verdict for a company found earlier (a later run added it, or a person did).
         The run that decided it is recorded, so it shows on that run's page."""
         row = self._row(DiscoveryCandidateRow, candidate_id)
         row.verdict = verdict
         row.reason = reason
+        if screen_score is not None:
+            row.screen_score = screen_score
+        if rank_score is not None:
+            row.rank_score = rank_score
         if company_id is not None:
             row.company_id = company_id
         if domain is not None:

@@ -144,3 +144,32 @@ def test_a_company_kept_by_its_website_is_also_known_by_its_name(
         uow.commit()
     with factory(ws) as uow:
         assert uow.candidates.known_keys(cid) == {"gridcast.io", "gridcast"}
+
+
+def test_unscreened_companies_are_listed_oldest_first_and_decided_with_their_scores(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = _campaign(factory, ws)
+    with factory(ws) as uow:
+        for n in range(3):
+            uow.candidates.add(
+                campaign_id=cid, run_id="run-1", name=f"Co{n}", name_key=f"co{n}",
+                verdict=CandidateVerdict.UNSCREENED, reason="the model could not judge it",
+            )  # fmt: skip
+        uow.candidates.add(
+            campaign_id=cid, run_id="run-1", name="Done", name_key="done",
+            verdict=CandidateVerdict.REJECTED,
+        )  # fmt: skip
+        uow.commit()
+    with factory(ws) as uow:
+        waiting = uow.candidates.unscreened(cid, 2)
+        assert [c.name for c in waiting] == ["Co0", "Co1"]  # not Co2 (limit), not Done
+        assert uow.candidates.waiting(cid, 10) == []  # unscreened is not "fits, waiting"
+        decided = uow.candidates.decide(
+            waiting[0].id, CandidateVerdict.ACCEPTED, reason="fits", screen_score=77,
+            rank_score=82, run_id="run-2",
+        )  # fmt: skip
+        uow.commit()
+    assert (decided.screen_score, decided.rank_score, decided.run_id) == (77, 82, "run-2")
+    with factory(ws) as uow:
+        assert [c.name for c in uow.candidates.unscreened(cid, 10)] == ["Co1", "Co2"]

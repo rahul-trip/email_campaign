@@ -27,7 +27,7 @@ from typing import Any
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
-from outbound.domain.brief import Brief
+from outbound.domain.brief import Brief, fill_gaps, lacks_substance
 from outbound.domain.discovery import (
     ARTICLES,
     YIELD_DAYS,
@@ -35,6 +35,7 @@ from outbound.domain.discovery import (
     clean,
     name_key,
     plan_sources,
+    search_terms,
     share,
     website_from_links,
 )
@@ -59,7 +60,7 @@ from outbound.prompts.discovery import (
     website_user_prompt,
 )
 from outbound.providers.errors import ProviderError
-from outbound.providers.llm_json import parse_json_object
+from outbound.providers.llm_json import ask_object
 from outbound.providers.ports import (
     CompanyMention,
     LeadSource,
@@ -67,7 +68,7 @@ from outbound.providers.ports import (
     SearchProvider,
     SourceQuery,
 )
-from outbound.services.brief import draft_brief
+from outbound.services.brief import draft
 from outbound.services.intake import DomainResolver, IntakeService, SiteCandidate
 
 log = get_logger(__name__)
@@ -76,11 +77,12 @@ HISTORY = 30  # how many earlier searches a run remembers and avoids
 MAX_SEARCHES = 4  # article searches per run: enough angles, not a runaway bill
 PAGES_PER_SEARCH = 3  # the best list pages a search finds; one extract credit reads five
 PAGE_CHARS = 12_000  # of each page the model reads
-# A long list page names 20+ companies, and a reasoning model thinks first: 2,000 cut it off.
-EXTRACT_MAX_TOKENS = 6_000
+# No model reply here is capped below the configured limit: a reasoning model thinks before it
+# answers, and a cap sized for the answer cut screening off in production (R-34).
 PER_SOURCE = 25  # companies asked of each directory, before weighting by its record
 EXAMPLES = 3  # qualified leads given to lookalike sources as examples
-SCREEN_BATCH = 15  # companies screened per model call
+SCREEN_BATCH = 10  # companies screened per model call
+SCREEN_CARRIED = 40  # earlier, unscreened companies judged per run (a few model calls)
 SCREEN_MIN = 50  # below this a company does not fit
 UNCLEAR_MIN = 60  # a company the text does not place needs more than the pass mark
 # What a company is to the seller; only a buyer fits. Anything else the model says is unclear.
@@ -108,6 +110,12 @@ class Screening:
     score: int | None
     reason: str
     fits: bool
+    # False when the model gave no judgement (its reply failed): the company is kept to be
+    # screened again, not rejected on words.
+    judged: bool = True
+
+
+UNJUDGED = Screening(None, "the model could not judge it; it will be screened again", False, False)
 
 
 @dataclass
@@ -121,6 +129,7 @@ class Found:
     evidence: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
     source_urls: list[str] = field(default_factory=list)
+    candidate_id: str | None = None  # the stored candidate, when an earlier run found it
 
     @property
     def corroboration(self) -> int:
@@ -134,6 +143,7 @@ class Discovery:
     searches: int = 0
     found: int = 0
     rejected: int = 0
+    unscreened: int = 0  # kept for a later run: the model could not judge them
 
 
 # --------------------------------------------------------------------------- planning
@@ -148,14 +158,13 @@ def plan_queries(
     planned: list[PlannedQuery] = []
     if llm is not None:
         try:
-            reply = llm.complete(
+            reply = ask_object(
+                llm,
                 SYSTEM_PROMPT,
                 user_prompt(brief, used, count),
-                json_mode=True,
                 temperature=0.9,  # new angles, not the same ones again
-                max_tokens=800,
             )
-            raw = parse_json_object(llm.name, reply.text).get("queries", [])
+            raw = reply.get("queries", [])
             planned = _planned(raw if isinstance(raw, list) else [], used=used, limit=count)
         except ProviderError as error:
             log.warning("discovery_planning_failed", reason=str(error)[:200])
@@ -180,17 +189,21 @@ def _planned(raw: Iterable[object], *, used: Sequence[str], limit: int) -> list[
     return [PlannedQuery(q, angles.get(q, "")) for q in clean(texts, used=used, limit=limit)]
 
 
-def source_query(brief: Brief, *, examples: Sequence[str] = ()) -> SourceQuery:
+def source_query(
+    brief: Brief, *, examples: Sequence[str] = (), known: Iterable[str] = ()
+) -> SourceQuery:
     """What a directory is asked, from the brief; ``examples`` are the websites of leads that
-    qualified, which lookalike sources find more like, after the brief's own examples."""
+    qualified, which lookalike sources find more like, after the brief's own examples, and
+    ``known`` the websites to leave out because they were found before."""
     return SourceQuery(
-        keywords=brief.keywords or brief.segments,
+        keywords=search_terms(brief),
         segments=brief.segments,
         regions=brief.regions,
         founded_after=brief.founded_after,
         industry_codes=brief.industry_codes,
         text=brief.summary,
         seed_domains=tuple(dict.fromkeys([*brief.seed_companies, *examples])),
+        exclude_domains=tuple(sorted(set(known))),
     )
 
 
@@ -237,14 +250,13 @@ class ArticleSource:
         self, url: str, text: str, links: Sequence[tuple[str, str]] = ()
     ) -> list[CompanyMention]:
         try:
-            reply = self._llm.complete(
+            reply = ask_object(
+                self._llm,
                 EXTRACT_SYSTEM_PROMPT,
                 extract_user_prompt(url, text),
-                json_mode=True,
                 temperature=0.1,
-                max_tokens=EXTRACT_MAX_TOKENS,
             )
-            companies = parse_json_object(self._llm.name, reply.text).get("companies", [])
+            companies = reply.get("companies", [])
         except ProviderError as error:
             log.warning("discovery_page_unread", reason=str(error)[:200])
             return []
@@ -324,30 +336,31 @@ def merge(mentions: Iterable[CompanyMention]) -> list[Found]:
 
 
 def screen(llm: LlmClient | None, brief: Brief, found: Sequence[Found]) -> dict[str, Screening]:
-    """Each company's fit with the brief, by key. With no model, or when a batch fails, a
-    company fits when its description uses the brief's own words."""
+    """Each company's fit with the brief, by key. With no model a company fits when its
+    description uses the brief's own words. When the model's reply fails, or leaves a company
+    out, that company is ``UNJUDGED``: kept and screened again by a later run, never rejected
+    on words alone (a failed batch once rejected 334 companies that were never read)."""
     out: dict[str, Screening] = {}
     for start in range(0, len(found), SCREEN_BATCH):
         batch = found[start : start + SCREEN_BATCH]
         judged = _judge(llm, brief, batch) if llm is not None else {}
         for n, item in enumerate(batch, start=1):
-            out[item.key] = judged.get(n) or _by_words(brief, item)
+            if llm is None:
+                out[item.key] = _by_words(brief, item)
+            else:
+                out[item.key] = judged.get(n) or UNJUDGED
     return out
 
 
 def _judge(llm: LlmClient, brief: Brief, batch: Sequence[Found]) -> dict[int, Screening]:
     listed = [(f.name, f.domain or "", f.description, " / ".join(f.evidence)) for f in batch]
     try:
-        reply = llm.complete(
-            SCREEN_SYSTEM_PROMPT,
-            screen_user_prompt(brief, listed),
-            json_mode=True,
-            temperature=0.1,
-            max_tokens=200 + 120 * len(batch),
+        reply = ask_object(
+            llm, SCREEN_SYSTEM_PROMPT, screen_user_prompt(brief, listed), temperature=0.1
         )
-        companies = parse_json_object(llm.name, reply.text).get("companies", [])
+        companies = reply.get("companies", [])
     except ProviderError as error:
-        log.warning("discovery_screening_failed", reason=str(error)[:200])
+        log.warning("discovery_screening_failed", companies=len(batch), reason=str(error)[:200])
         return {}
     judged: dict[int, Screening] = {}
     for item in companies if isinstance(companies, list) else []:
@@ -415,6 +428,8 @@ class Discoverer:
             earlier = uow.events.latest(
                 EntityType.WORKSPACE, self.workspace_id, "discovery_query", HISTORY * 4
             )
+        # Websites seen before, as leads or as candidates (a key with a dot is a website).
+        known_sites = known_domains | {k for k in known_keys if "." in k}
         mine = [e.data for e in reversed(earlier) if e.data.get("campaign") == campaign.name]
         # Article searches already run, oldest first, and every page they read.
         used = [str(d.get("query", "")) for d in mine if d.get("source", ARTICLES) == ARTICLES]
@@ -426,6 +441,19 @@ class Discoverer:
         if added >= count:
             log.info("discovery_done", asked=count, calls=0, found=0, added=added)
             return Discovery(added=added)
+
+        # Then the companies an earlier run found but the model could not judge: screening
+        # them costs a few model calls, where searching for new ones costs searches as well.
+        rejected = already = unscreened = 0
+        carried = self._carried(campaign)
+        if carried:
+            added, (rejected, already, unscreened) = self._settle(
+                campaign, run_id, brief, carried, count, added, known_domains
+            )
+            if added >= count:
+                log.info("discovery_done", asked=count, calls=0, found=0, added=added,
+                         rejected=rejected, unscreened=unscreened)  # fmt: skip
+                return Discovery(added, already, 0, 0, rejected, unscreened)
 
         available = {s.name for s in self.sources} | ({ARTICLES} if self.llm else set())
         mentions: list[CompanyMention] = []
@@ -440,7 +468,7 @@ class Discoverer:
                 calls += made
                 continue
             source = next(s for s in self.sources if s.name == name)
-            query = source_query(brief, examples=examples)
+            query = source_query(brief, examples=examples, known=known_sites)
             try:
                 got = source.find(query, limit=max(1, int(PER_SOURCE * weight)))
             except ProviderError as error:
@@ -452,18 +480,91 @@ class Discoverer:
                          angle="directory", pages=[], found=len(got))  # fmt: skip
 
         merged = [f for f in merge(mentions) if f.key not in known_keys]
+        added, (r, a, u) = self._settle(
+            campaign, run_id, brief, merged, count, added, known_domains
+        )
+        rejected, already, unscreened = rejected + r, already + a, unscreened + u
+        log.info("discovery_done", asked=count, calls=calls, found=len(merged), added=added,
+                 rejected=rejected, already_leads=already, unscreened=unscreened)  # fmt: skip
+        return Discovery(added, already, calls, len(merged), rejected, unscreened)
+
+    # ----------------------------------------------------------------------- steps
+
+    def _brief(self, campaign: Campaign, profile: Mapping[str, Any]) -> Brief:
+        brief = Brief.from_json(campaign.icp_brief)
+        redraft = False
+        if not brief.is_empty:
+            if not (lacks_substance(brief) and self._may_redraft(campaign)):
+                return brief
+            redraft = True  # thin, and not yet tried again: a failed first drafting leaves this
+        drafted = draft(self.llm, campaign=campaign, profile=profile)
+        # A redraft fills what is empty and never replaces what a person wrote.
+        brief = fill_gaps(brief, drafted.brief) if redraft else drafted.brief
+        with self.uow(self.workspace_id) as uow:
+            uow.campaigns.update(campaign.id, {"icp_brief": brief.to_json()})
+            uow.events.append(EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted",
+                              SYSTEM, {"campaign_id": campaign.id, "redraft": redraft,
+                                       "fell_back": drafted.fell_back})  # fmt: skip
+            uow.commit()
+        return brief
+
+    def _may_redraft(self, campaign: Campaign) -> bool:
+        """Once per campaign: a thin brief is drafted again by the next run, not by every run."""
+        with self.uow(self.workspace_id) as uow:
+            earlier = uow.events.latest(
+                EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted", 50
+            )
+        return not any(
+            e.data.get("campaign_id") == campaign.id and e.data.get("redraft") for e in earlier
+        )
+
+    def _carried(self, campaign: Campaign) -> list[Found]:
+        """Companies an earlier run found but could not screen, oldest first, a few per run."""
+        with self.uow(self.workspace_id) as uow:
+            waiting = uow.candidates.unscreened(campaign.id, SCREEN_CARRIED)
+        return [
+            Found(
+                key=c.name_key,
+                name=c.name,
+                domain=c.domain,
+                description=c.description,
+                evidence=[c.evidence] if c.evidence else [],
+                sources=list(c.sources),
+                source_urls=list(c.source_urls),
+                candidate_id=c.id,
+            )
+            for c in waiting
+        ]
+
+    def _settle(
+        self,
+        campaign: Campaign,
+        run_id: str | None,
+        brief: Brief,
+        merged: Sequence[Found],
+        count: int,
+        added: int,
+        known_domains: set[str],
+    ) -> tuple[int, tuple[int, int, int]]:
+        """Screen companies, add the best fits as leads up to ``count``, and keep every one with
+        its verdict. Returns the new total added and (rejected, already leads, unscreened)."""
         already = [f for f in merged if f.domain and f.domain in known_domains]
         fresh = [f for f in merged if not (f.domain and f.domain in known_domains)]
         screenings = screen(self.llm, brief, fresh)
         fresh.sort(key=lambda f: -rank_score(f, screenings[f.key]))
 
-        rejected = 0
+        rejected = unscreened = 0
         for item in already:
             self._keep(
                 campaign, run_id, item, None, CandidateVerdict.ALREADY_LEAD, "a lead already"
             )
         for item in fresh:
             screening = screenings[item.key]
+            if not screening.judged:
+                unscreened += 1
+                self._keep(campaign, run_id, item, None, CandidateVerdict.UNSCREENED,
+                           screening.reason)  # fmt: skip
+                continue
             if not screening.fits:
                 rejected += 1
                 self._keep(campaign, run_id, item, screening, CandidateVerdict.REJECTED,
@@ -477,23 +578,7 @@ class Discoverer:
             added += verdict is CandidateVerdict.ACCEPTED
             self._keep(campaign, run_id, item, screening, verdict, why or screening.reason,
                        company_id=company_id)  # fmt: skip
-        log.info("discovery_done", asked=count, calls=calls, found=len(merged), added=added,
-                 rejected=rejected, already_leads=len(already))  # fmt: skip
-        return Discovery(added, len(already), calls, len(merged), rejected)
-
-    # ----------------------------------------------------------------------- steps
-
-    def _brief(self, campaign: Campaign, profile: Mapping[str, Any]) -> Brief:
-        brief = Brief.from_json(campaign.icp_brief)
-        if not brief.is_empty:
-            return brief
-        brief = draft_brief(self.llm, campaign=campaign, profile=profile)
-        with self.uow(self.workspace_id) as uow:
-            uow.campaigns.update(campaign.id, {"icp_brief": brief.to_json()})
-            uow.events.append(EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted",
-                              SYSTEM, {"campaign_id": campaign.id})  # fmt: skip
-            uow.commit()
-        return brief
+        return added, (rejected, len(already), unscreened)
 
     def _articles(
         self,
@@ -590,18 +675,17 @@ class Discoverer:
         if self.llm is None or not choices:
             return None
         try:
-            reply = self.llm.complete(
+            reply = ask_object(
+                self.llm,
                 WEBSITE_SYSTEM_PROMPT,
                 website_user_prompt(
                     item.name,
                     item.description,
                     [(c.domain, c.title, c.snippet) for c in choices],
                 ),
-                json_mode=True,
                 temperature=0.0,
-                max_tokens=400,
             )
-            n = parse_json_object(self.llm.name, reply.text).get("n")
+            n = reply.get("n")
         except ProviderError as error:
             log.warning("discovery_website_pick_failed", reason=str(error)[:200])
             return None
@@ -638,7 +722,18 @@ class Discoverer:
         *,
         company_id: str | None = None,
     ) -> None:
+        scores = {
+            "screen_score": screening.score if screening else None,
+            "rank_score": rank_score(item, screening) if screening else None,
+        }
         with self.uow(self.workspace_id) as uow:
+            if item.candidate_id:  # found by an earlier run: its row gets the new verdict
+                uow.candidates.decide(
+                    item.candidate_id, verdict, reason=reason, company_id=company_id,
+                    domain=item.domain, run_id=run_id, **scores,
+                )  # fmt: skip
+                uow.commit()
+                return
             uow.candidates.add(
                 campaign_id=campaign.id,
                 run_id=run_id,
@@ -649,8 +744,7 @@ class Discoverer:
                 source_urls=item.source_urls,
                 description=item.description,
                 evidence=" | ".join(item.evidence)[:2_000],
-                screen_score=screening.score if screening else None,
-                rank_score=rank_score(item, screening) if screening else None,
+                **scores,
                 verdict=verdict,
                 reason=reason,
                 company_id=company_id,

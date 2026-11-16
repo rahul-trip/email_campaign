@@ -77,6 +77,7 @@ export const candidateVerdict: Vocabulary = {
   unresolved: s("Fits, no website yet", "attention"),
   already_lead: s("A lead already", "stopped"),
   rejected: s("Does not fit", "stopped"),
+  unscreened: s("Not judged yet, checked again next run", "working"),
 };
 
 /** Where discovery looked, as the run page names it. */
@@ -154,6 +155,14 @@ export function describe(vocabulary: Vocabulary, value: string): StatusInfo {
 
 export function describeHold(reason: string): HoldInfo {
   return holdReason[reason] ?? { label: humanize(reason), why: "", fix: "", action: "decide" };
+}
+
+/** Where a lead is, from the funnel report's key (``waiting``, ``failed:<stage>``, ``held:<reason>``, a status). */
+export function leadOutcome(key: string): string {
+  if (key === "waiting") return "Waiting to start";
+  if (key.startsWith("failed:")) return `Failed at ${humanize(key.slice(7)).toLowerCase()}`;
+  if (key.startsWith("held:")) return `Held: ${describeHold(key.slice(5)).label.toLowerCase()}`;
+  return humanize(key);
 }
 
 /** The eight stages a lead passes through, as the journey page names them. */

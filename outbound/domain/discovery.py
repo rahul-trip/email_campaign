@@ -132,6 +132,35 @@ def share(source: str, yields: Mapping[str, SourceYield]) -> float:
     return max(MIN_SHARE, min(MAX_SHARE, rates[source] / average))
 
 
+# Words that say what kind of company is wanted, not what it does: every start-up is a company
+# and a "platform", so they pick none out.
+GENERIC_WORDS = frozenset(
+    """a an and are as at be by company companies corporate corporation corporations enterprise
+    enterprises firm firms for from in industry industries into is it its mid mid-sized
+    mid-market of on operator operators or organisation organisations organization
+    organizations other others platform platforms player players provider providers sector
+    sectors service services size sized small smaller larger large medium solution solutions
+    sme smes start-up start-ups startup startups stage stages that the their these this those
+    to tool tools up ups vendor vendors well with without who work works""".split()  # noqa: SIM905 - a long word list reads better as text
+)
+MAX_TERMS = 12
+
+
+def search_terms(brief: Brief) -> tuple[str, ...]:
+    """The words a directory is searched for: the brief's keywords, else the telling words of
+    its segments and summary (generic ones such as "start-ups" or "platforms" dropped). A
+    keyword phrase stays whole when it is the only thing said, so a source that takes phrases
+    still gets them."""
+    if brief.keywords:
+        return brief.keywords
+    words: dict[str, None] = {}
+    for text in (*brief.segments, brief.summary):
+        for word in re.findall(r"[a-z0-9][a-z0-9-]*[a-z0-9]|[a-z0-9]", text.lower()):
+            if word not in GENERIC_WORDS and len(word) > 1:
+                words[word] = None
+    return tuple(words)[:MAX_TERMS]
+
+
 def article_queries(brief: Brief, *, used: Iterable[str], limit: int) -> list[str]:
     """Searches for pages that name many companies like the ones wanted, built from the brief:
     what they do, the kind of company and where ("energy forecasting start-ups in Europe"), then

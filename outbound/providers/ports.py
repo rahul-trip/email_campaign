@@ -175,6 +175,9 @@ class SourceQuery(_Model):
     industry_codes: tuple[str, ...] = ()
     text: str = ""  # a free-text search, for sources that take one
     seed_domains: tuple[str, ...] = ()  # example customers, for lookalike sources
+    # Websites already known (leads, earlier candidates): a source leaves them out before it
+    # applies its limit, so each run brings companies not seen before.
+    exclude_domains: tuple[str, ...] = ()
 
 
 class CompanyMention(_Model):

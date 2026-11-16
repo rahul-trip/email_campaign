@@ -173,3 +173,65 @@ def test_tenant_bound_keys_refuse_to_migrate_over_a_cross_workspace_link(fresh_u
         engine.dispose()
     with pytest.raises(RuntimeError, match=r"companies\.campaign_id"):
         migrate.upgrade(fresh_url)
+
+
+def test_companies_rejected_by_word_matching_come_back_to_be_screened(fresh_url: str) -> None:
+    """Migration 0020 gives the companies a failed model reply got rejected on words (no score,
+    the word matcher's reason) the verdict ``unscreened``; every other verdict stays."""
+    migrate.upgrade(fresh_url, "0019")
+    engine = create_engine(fresh_url)
+    now = "2026-11-16 00:00:00+00:00"
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                sa.text(
+                    "INSERT INTO workspaces (id, name, slug, join_code, status, sender_profile, "
+                    "settings, created_at, updated_at) VALUES ('w1', 'w1', 'w1', 'CODE0001', "
+                    "'active', '{}', '{}', :now, :now)"
+                ),
+                {"now": now},
+            )
+            connection.execute(
+                sa.text(
+                    "INSERT INTO campaigns (id, workspace_id, name, target_titles, "
+                    "research_questions, cadence_days, min_fit_score, status, icp_brief, "
+                    "created_at, updated_at) VALUES ('c1', 'w1', 'default', '[]', '[]', '[]', "
+                    "60, 'active', '{}', :now, :now)"
+                ),
+                {"now": now},
+            )
+            rows = [  # (name, verdict, score, reason)
+                ("lost", "rejected", None, "nothing it says matches the brief"),
+                ("judged", "rejected", 20, "nothing it says matches the brief"),
+                ("said_why", "rejected", None, "a competitor"),
+                ("added", "accepted", None, "its description mentions 'grid'"),
+            ]
+            for name, verdict, score, reason in rows:
+                connection.execute(
+                    sa.text(
+                        "INSERT INTO discovery_candidates (id, workspace_id, campaign_id, name, "
+                        "name_key, sources, source_urls, description, evidence, screen_score, "
+                        "verdict, reason, created_at, updated_at) VALUES (:n, 'w1', 'c1', :n, "
+                        ":n, '[]', '[]', '', '', :score, :verdict, :reason, :now, :now)"
+                    ),
+                    {"n": name, "score": score, "verdict": verdict, "reason": reason, "now": now},
+                )
+        migrate.upgrade(fresh_url)
+        with engine.connect() as connection:
+            after: dict[str, str] = dict(
+                connection.execute(sa.text("SELECT name, verdict FROM discovery_candidates")).all()
+            )
+        assert after == {
+            "lost": "unscreened",
+            "judged": "rejected",
+            "said_why": "rejected",
+            "added": "accepted",
+        }
+        migrate.downgrade(fresh_url, "0019")
+        with engine.connect() as connection:
+            back: dict[str, str] = dict(
+                connection.execute(sa.text("SELECT name, verdict FROM discovery_candidates")).all()
+            )
+        assert back["lost"] == "rejected"
+    finally:
+        engine.dispose()

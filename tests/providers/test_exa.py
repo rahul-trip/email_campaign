@@ -40,6 +40,20 @@ def test_companies_are_searched_for_by_what_the_brief_says() -> None:
     assert "European grid operators" in found[0].description
 
 
+def test_websites_found_before_are_left_out_of_both_kinds_of_search() -> None:
+    seen: list[httpx.Request] = []
+    query = SourceQuery(
+        text="grid", seed_domains=("kraken.tech",), exclude_domains=("gridcast.io", "voltwise.com")
+    )
+    exa(seen).find(query, limit=10)
+    assert [json.loads(r.content)["excludeDomains"] for r in seen] == [
+        ["gridcast.io", "voltwise.com"]
+    ] * 2
+    seen.clear()
+    exa(seen).find(SourceQuery(text="grid"), limit=10)
+    assert "excludeDomains" not in json.loads(seen[0].content)  # nothing known: nothing sent
+
+
 def test_without_a_summary_the_brief_words_make_the_search() -> None:
     seen: list[httpx.Request] = []
     exa(seen).find(SourceQuery(keywords=("grid forecasting",), regions=("UK",)), limit=5)
