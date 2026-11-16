@@ -713,3 +713,11 @@ def test_notes_which_may_carry_what_discovery_read_on_the_web_are_fenced() -> No
     for prompt in (fit, actor):
         fenced = prompt.split("<untrusted>")
         assert any(planted in part.split("</untrusted>")[0] for part in fenced[1:])
+
+
+def test_titles_that_are_kinds_of_company_are_not_searched_for() -> None:
+    search = FakeSearch({}, REAL_HITS)
+    assert search_people(search, "Volue", "volue.com", ["BESS integrators", "VPP platforms"]) == []
+    assert search.searches == []  # nothing to ask for: no search was made
+    search_people(search, "Volue", "volue.com", ["BESS integrators", "CTO"])
+    assert "BESS" not in search.searches[0] and '"CTO"' in search.searches[0]

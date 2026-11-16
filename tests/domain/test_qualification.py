@@ -90,3 +90,35 @@ def test_the_breakdown_is_stored_as_plain_json() -> None:
         "evidence": "the site says so",
         "source": "https://acme.com",
     }
+
+
+SUMMARY_ONLY = Brief.from_json(
+    {"summary": "Energy start-ups", "company_type": "startup", "size_range": "10-200"}
+)
+
+
+def test_a_brief_without_must_haves_is_judged_against_its_summary_type_and_size() -> None:
+    assert checks(SUMMARY_ONLY) == [
+        Check("M1", "must_have", "It is the kind of company described here: Energy start-ups", 2),
+        Check("M2", "must_have", "It is a start-up or scale-up, not an established firm", 1),
+        Check("M3", "must_have", "Its size is about 10-200", 1),
+    ]
+
+
+def test_a_company_that_does_not_match_the_summary_no_longer_scores_60_for_nothing() -> None:
+    fits = qualify(SUMMARY_ONLY, {"M1": said("met"), "M2": said("met"), "M3": said("met")})
+    utility = qualify(
+        SUMMARY_ONLY, {"M1": said("not_met"), "M2": said("not_met"), "M3": said("unknown")}
+    )
+    assert fits.score == 80 and fits.score >= 60
+    assert utility.score < 60  # 80 x 0.5 / 4
+    assert qualify(SUMMARY_ONLY, {}).score < 60  # nothing known: not a fit yet
+
+
+def test_must_haves_a_person_wrote_replace_the_implied_ones() -> None:
+    own = Brief.from_json({"summary": "Energy start-ups", "must_haves": ["has a CTO"]})
+    assert [c.text for c in checks(own)] == ["has a CTO"]
+
+
+def test_a_brief_with_nothing_to_judge_by_still_scores_60() -> None:
+    assert qualify(Brief(), {}).score == 60

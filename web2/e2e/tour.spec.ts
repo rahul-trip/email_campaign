@@ -56,7 +56,7 @@ test("every step of the tour points at something that exists", async ({ page }) 
   for (let guard = 0; guard < 80 && (await tour(page).isVisible()); guard++) {
     // "none" is a centred message with nothing to point at; anything else must be found.
     await expect(tour(page), await tour(page).locator("h2").textContent() ?? "").toHaveAttribute("data-target-found", /true|none/);
-    await page.getByRole("button", { name: /^(Next|Finish)$/ }).click();
+    await tour(page).getByRole("button", { name: /^(Next|Finish)$/ }).click();
   }
   await expect(tour(page)).toBeHidden();
 });
