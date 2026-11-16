@@ -35,12 +35,9 @@ def test_only_adapters_with_credentials_are_returned() -> None:
     assert sorted(configured_verifiers(s)) == ["hunter", "orbisearch"]
 
 
-def test_scrubby_needs_both_a_key_and_a_base_url() -> None:
-    assert configured_resolvers(settings(scrubby_api_key="s")) == {}
-    configured = configured_resolvers(
-        settings(scrubby_api_key="s", scrubby_base_url="https://x.test")
-    )
-    assert sorted(configured) == ["scrubby"]
+def test_scrubby_needs_only_a_key_its_address_is_documented() -> None:
+    assert configured_resolvers(settings(scrubby_base_url="https://x.test")) == {}
+    assert sorted(configured_resolvers(settings(scrubby_api_key="s"))) == ["scrubby"]
 
 
 def test_the_finder_chain_is_built_in_the_configured_order() -> None:

@@ -16,7 +16,7 @@ from outbound.domain.enums import (
     ContactStatus,
     Provenance,
 )
-from outbound.domain.ranking import RankedContact, rank_contacts
+from outbound.domain.ranking import RankedContact, can_be_written_to, rank_contacts
 from outbound.stages.base import StageContext, StageFailure, StageResult
 
 
@@ -43,6 +43,12 @@ class ContactsStage:
             raise StageFailure("no decision-maker was found on the site or in a public search")
         wanted = ctx.campaign.target_titles if ctx.campaign else ()
         chosen = ctx.read(lambda uow: operator_chosen(uow, usable))
+        if not any(can_be_written_to(c, wanted, chosen) for c in usable):
+            raise StageFailure(
+                "people were found, but none is a decision-maker (a founder, C-level, vice"
+                " president, director or one of the campaign's job titles): add the person you"
+                " want to write to on the lead page, then retry"
+            )
         ranked = rank_contacts(usable, wanted, chosen)
         return StageResult(
             CompanyStatus.CONTACTS_FOUND,

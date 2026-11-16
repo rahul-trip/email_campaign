@@ -421,6 +421,7 @@ A failed lead shows the step and the reason. The application retries automatical
 |---|---|---|
 | no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | If you know the right address, **Edit** the person and give it (the step is retried), or **Add a person** with their work email. If you know an address the check could not prove does work, press **Skip the check** next to it. A person with only a first name cannot be looked up by the finders (they need a full name), but an address you give is used as it is |
 | no decision-maker was found | The site named nobody and the search found nobody | Add a person yourself |
+| people were found, but none is a decision-maker | The site and the search named only people who cannot decide to buy (engineers, managers, or no title at all). Emails are written only to a founder, owner, C-level, vice president, director, head of, one of the campaign's job titles, or a person you add or choose | **Add a person** you want to write to (a person you add counts as chosen), then **Retry** |
 | the sender profile needs: legal_name, postal_address … | The footer cannot be filled | Fill in those fields in Settings → Sender profile, then Retry |
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |
 | no contact has an address that is safe to send to | The chosen address is no longer usable | Check the lead's People section |
@@ -525,7 +526,7 @@ Honest list of what is not there yet, so nothing surprises you.
 | **Changing the address of a person who already has one** is not possible | Add the person again with the right address, and suppress the old one if needed |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
-| Scrubby (catch-all resolver) has not worked live: its configured address did not answer. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | Confirm Scrubby's API address in your Scrubby account. Run `uv run python -m scripts.live_check` to re-check any vendor |
+| Scrubby (catch-all resolver) was repaired on 2026-11-16 and accepts and polls a batch; a finished answer has not been seen yet (it takes up to 24 hours). Enrichley, the real-time alternative, refused its key. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | After deploying, press *Find email again* on leads held for a catch-all. Run `uv run python -m scripts.live_check` to re-check any vendor |
 | Follow-up and Sent-sync behaviour with a real mailbox is not yet exercised by a real send | Try it with a few of your own addresses first |
 | No two-step sign-in, sign-up page or sign-in with Google or Microsoft | After the alpha (Phase 6f) |
 

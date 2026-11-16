@@ -34,7 +34,7 @@ The email stage finds one address that is safe to send to, for the best of the l
 
 | Symbol | Kind | What it does |
 |---|---|---|
-| `outbound/stages/email/stage.py::EmailStage` | `Stage` | `name="email"`, input `contacts_found`, `guard_policy=True`, `spends=True`; `MAX_CONTACTS = 3`, `POLL_DELAY = 6 h` |
+| `outbound/stages/email/stage.py::EmailStage` | `Stage` | `name="email"`, input `contacts_found`, `guard_policy=True`, `spends=True`; `MAX_CONTACTS = 3`, `POLL_DELAY = 6 h`. Tries only people who can be written to (`ranking.can_be_written_to`: a decision-maker, someone the operator added or chose, or the person ranked first) |
 | `outbound/stages/email/stage.py::EmailDeps` | dataclass | `finders`, `verifier`, `resolver` (optional), `poll_delay` |
 | `outbound/stages/email/waterfall.py::Waterfall` | class | `run(contact, emails, target) → Outcome`. Decides only; writes nothing |
 | `outbound/stages/email/waterfall.py::Target` | dataclass | `domain`, `name`, `pattern`, `site_emails`, `safe_to_send_only`, `is_blocked` |
@@ -133,7 +133,8 @@ One lead's error is logged (`catch_all_poll_failed`) and the others continue.
 
 | Situation | Lead status |
 |---|---|
-| Nothing usable for any of the three contacts | `failed` at `email`, reason listing up to three problems |
+| Nobody who can be written to (no decision-maker, nobody the operator chose) | `failed` at `email`: "nobody at this lead is a decision-maker or was chosen…"; no vendor is called ([R-38](../tech-debt-and-risks.md)) |
+| Nothing usable for any of the (up to three) people tried | `failed` at `email`, reason listing up to three problems |
 | A pending resolver answer | `held` / `catch_all_resolving`, wakes in 6 h |
 | Only an unproven catch-all, safeguard on | `held` / `catch_all_unverified` |
 | Policy refuses the chosen provenance or recipient (e.g. a guessed Canadian address; consent belongs to someone else) | `held` with the policy's reason; the addresses are still saved |

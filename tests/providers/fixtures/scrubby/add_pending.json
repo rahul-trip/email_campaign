@@ -1,5 +1,10 @@
 {
-  "email": "jane@acme.com",
-  "status": "pending",
-  "identifier": "https://webhook.scrubby.io/result"
+  "status": "processing",
+  "identifier": "2fbf182d25594091a2ab66a37bbe9f4d",
+  "fetch_result_endpoint": "/fetch_bulk_results/deep",
+  "total": 1,
+  "credits_used": 3,
+  "remaining_credits": 9910353,
+  "retry_after_seconds": 86400,
+  "verification_type": "Deep"
 }

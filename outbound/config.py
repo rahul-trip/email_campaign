@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     myemailverifier_api_key: SecretStr = SecretStr("")
     enrichley_api_key: SecretStr = SecretStr("")
     scrubby_api_key: SecretStr = SecretStr("")
-    scrubby_base_url: str = ""  # the public docs do not state it; copy it from your Scrubby account
+    scrubby_base_url: str = ""  # empty: Scrubby's documented https://api.scrubby.io
     tavily_api_key: SecretStr = SecretStr("")
     companies_house_api_key: SecretStr = SecretStr("")  # free key from Companies House
     exa_api_key: SecretStr = SecretStr("")  # optional: company search and lookalikes

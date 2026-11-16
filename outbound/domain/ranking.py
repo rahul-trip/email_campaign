@@ -30,12 +30,15 @@ _ABBREVIATIONS = {
 }
 
 # Lower is more senior. The label is stored on the contact as ``seniority``.
+# C-level comes before vice president (a "vice president" is not a "president").
 _LEVELS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("vp", re.compile(r"\bvice president\b")),
     (
         "c_level",
-        re.compile(r"\bchief\b|\bfounder\b|\bowner\b|\bpresident\b|managing director|\bpartner\b"),
+        re.compile(
+            r"\bchief\b|\bfounder\b|\bowner\b|(?<!vice )\bpresident\b|managing director|\bpartner\b"
+        ),
     ),
+    ("vp", re.compile(r"\bvice president\b")),
     ("director", re.compile(r"\bdirector\b|\bhead of\b")),
     ("manager", re.compile(r"\bmanager\b|\blead\b")),
 )
@@ -90,6 +93,37 @@ def wanted_index(title: str | None, wanted: Sequence[str]) -> int:
         if words and words <= text:
             return index
     return len(wanted)
+
+
+DECISION_LEVELS = frozenset({"c_level", "vp", "director"})
+
+
+def is_decision_maker(title: str | None, wanted: Sequence[str] = ()) -> bool:
+    """Whether a person can decide to buy: they hold one of the campaign's wanted titles, or are
+    a founder, owner, C-level, vice president, director or head of. An engineer or a manager
+    is not, and nobody without a title can be known to be."""
+    if not (title or "").strip():
+        return False
+    return wanted_index(title, wanted) < len(wanted) or seniority_of(title) in DECISION_LEVELS
+
+
+def can_be_written_to(
+    contact: Contact,
+    wanted: Sequence[str],
+    chosen_ids: Collection[str] = (),
+    *,
+    first_counts: bool = False,
+) -> bool:
+    """Whether an email may be written to this person: a decision-maker, or someone the operator
+    chose (added, gave an address or a consent for). With ``first_counts`` the person ranked
+    first also counts: once a lead has been ranked, that is a decision-maker or a person the
+    operator moved to the front ("write to someone else")."""
+    return (
+        contact.source is ContactSource.OPERATOR
+        or contact.id in chosen_ids
+        or (first_counts and contact.rank == 1)
+        or is_decision_maker(contact.title, wanted)
+    )
 
 
 @dataclass(frozen=True)

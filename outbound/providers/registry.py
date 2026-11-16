@@ -85,7 +85,7 @@ _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
 _RESOLVERS: dict[str, _Entry[CatchAllResolver]] = {
     "scrubby": _Entry(
         lambda s, c: ScrubbyResolver(_key(s.scrubby_api_key), s.scrubby_base_url, client=c),
-        lambda s: bool(_key(s.scrubby_api_key) and s.scrubby_base_url),
+        lambda s: bool(_key(s.scrubby_api_key)),
     ),
     "enrichley": _Entry(
         lambda s, c: EnrichleyResolver(_key(s.enrichley_api_key), client=c),

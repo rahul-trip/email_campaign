@@ -145,3 +145,43 @@ def test_a_wanted_title_must_name_a_job_not_a_kind_of_company(title: str, expect
     from outbound.domain.ranking import is_role
 
     assert is_role(title) is expected
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        ("Founder & CEO", True),
+        ("Chief Technology Officer", True),
+        ("VP of Sales", True),
+        ("Director of Operations", True),
+        ("Head of Energy Trading", True),
+        ("Power System Engineer", False),
+        ("Lead Engineer", False),
+        ("Product Manager", False),
+        ("Renewable Energy Sources", False),
+        ("Bachelor of Commerce", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_who_can_decide_to_buy(title: str | None, expected: bool) -> None:
+    from outbound.domain.ranking import is_decision_maker
+
+    assert is_decision_maker(title) is expected
+
+
+def test_a_campaigns_own_wanted_title_makes_its_holder_a_decision_maker() -> None:
+    from outbound.domain.ranking import is_decision_maker
+
+    assert not is_decision_maker("Energy Trader")
+    assert is_decision_maker("Senior Energy Trader", ["Energy Trader"])
+
+
+def test_a_c_level_is_ranked_above_a_vice_president_when_nothing_else_differs() -> None:
+    assert seniority_of("Chief Executive Officer") == "c_level"
+    assert seniority_of("President") == "c_level"
+    assert seniority_of("Senior Vice President, Sales") == "vp"  # not a "president"
+    assert order([contact("Vic", "VP of Engineering", 1), contact("Cee", "CEO", 2)], []) == [
+        "Cee",
+        "Vic",
+    ]

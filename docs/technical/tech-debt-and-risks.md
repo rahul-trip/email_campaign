@@ -96,7 +96,7 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
 
 ### R-09 · P1 · Vendors: the provider chain is unproven (E5, D5)
 
-- **What:** the finder chain in `outbound/config.py` is provisional until the Phase 0 bake-off runs on 30 known contacts. Scrubby, the default catch-all resolver, failed the live check: the connection opens, but no answer comes before the timeout. Its base URL is a guess from partial documentation.
+- **What:** the finder chain in `outbound/config.py` is provisional until the Phase 0 bake-off runs on 30 known contacts. Scrubby, the default catch-all resolver, was repaired on 2026-11-16 ([R-39](#r-39--p1--catch-all-resolver-every-scrubby-call-was-a-404-and-an-outage-held-leads-for-good--closed-2026-11-16)): the live check now submits a batch and polls it. Enrichley answers 403 to its key. The finders are still unproven.
 - **Links:** Phase 0 gate, Phase 3b E5 and D5, [integrations](integrations/README.md).
 
 ### R-10 · P1 · Budget: a running worker does not see budget changes (B4)
@@ -192,13 +192,6 @@ Read in `outbound/api/auth.py` and `deploy/`:
   - `messages.mailbox_id` is never set.
 - **Links:** Phase 3b B8, Phase 4, [deliver and sync LLD](lld/stage-deliver-and-sync.md).
 
-### R-21 · P3 · Ranking: a VP outranks a C-level person on a seniority tie
-
-- **What:** `outbound/domain/ranking.py::_LEVELS` lists `vp` before `c_level`, so that "vice president" is matched before the `president` pattern. `_level_index` uses the same order for ranking. When neither person holds a wanted title, a "VP Marketing" is ranked above a "Chief Executive Officer".
-- **Verified 2026-10-21:** `seniority_of` and `_level_index` give `vp` 0 and `c_level` 1.
-- **Effect:** small. Wanted titles and operator choices come first, and this only decides ties. No test or document says whether it is intended.
-- **Fix:** decide the intended order. If C-level should come first, keep the matching order and rank by a separate list. Then add a test.
-
 ### R-23 · P2 · Privacy: no way to answer a subject-access request
 
 - **What:** GDPR Art. 15 (and the UK GDPR) gives a person the right to a copy of the data held about them. The system can erase a person (`PrivacyService.forget`), but it has no command, endpoint or screen that gathers what is held about one address or name across `contacts`, `contact_emails`, `consents`, `notes`, `messages`, `provider_calls`, `import_rows` and `events`.
@@ -272,6 +265,27 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `.github/workflows/ci.yml` (job `security`), `.github/dependabot.yml`.
 
 ## Closed entries
+
+### R-40 · P3 · Copy: the reading-grade limit flagged plain technical emails — closed 2026-11-16
+
+- **Was:** `LintRules.max_reading_grade` was 10. On the VM, 3 of 7 drafts were flagged for grades 10.1 to 11.2 and every draft took two or three writing attempts, each a paid model call, to get under it. Plainly written copy about grid forecasting scores 10 to 11 on Flesch-Kincaid because its nouns are long ("forecasting", "utilities", "operators"). `docs/technical/lld/domain.md` also said 6.5, a limit dropped long ago.
+- **Fixed by:** `max_reading_grade` is 12. A text written for engineers in plain sentences passes; the dense, jargon-heavy text the rule exists for still fails (`test_a_dense_email_fails_the_reading_level`). The Review screen's checklist says 12.
+- **Evidence:** `tests/domain/test_copy_lint.py` (a plain technical email at grade 10.8 is not flagged; a dense one still is).
+- **Still open:** the grade is measured by vowel groups, not a dictionary, so it is approximate; whether 12 is the right number is a judgement to revisit with real "sent unedited" data from Reports.
+
+### R-39 · P1 · Catch-all resolver: every Scrubby call was a 404, and an outage held leads for good — closed 2026-11-16
+
+- **Was:** 13 of 20 addresses found were on catch-all domains, and 7 of the 14 leads that reached the email step were held. Every Scrubby `submit` in the production ledger had failed (13 of 13). Three causes: (1) the adapter was written from a partial reference and called `POST /add_email` and `GET /fetch_email/{email}`, which the API does not have (live: 404). Scrubby's published OpenAPI file (`https://docs.scrubby.io/scrubby-openapi.json`) has `POST /validate_email` (instant), and a bulk and a *deep* flow; (2) `Waterfall._resolve` recorded a failed resolver call as the verdict `catch_all_unverified`, so an outage looked like "the vendor could not prove it" and the hold was never retried; (3) found while repairing it: the shared `HttpClient` treats every 202 as "still processing" and retries, but Scrubby's bulk submit answers 202 Accepted as its success, so a single submit was sent, and billed, three times (one live check queued three batches).
+- **Fixed by:** `ScrubbyResolver` uses deep verification, the part of Scrubby that settles a catch-all address: `POST /validate_bulk_emails/deep/` returns an `identifier` (the ticket's ref), `POST /fetch_bulk_results/deep` says `processing` until `completed` (up to 24 hours), then `Valid`, `Invalid`, `Risky` or `Unknown` (the last two are `unresolved`); the base URL defaults to the documented `https://api.scrubby.io` and `SCRUBBY_BASE_URL` is optional; `HttpClient(accepted_is_final=True)` for Scrubby only; `Waterfall` sets `Outcome.resolver_down` when the resolver raises and records nothing, and `EmailStage` then fails the lead with "the catch-all resolver is not answering", which the tick retries (three attempts) instead of holding it as unproven.
+- **Evidence:** `tests/providers/test_scrubby.py` (documented routes, bodies and header; a 202 is billed once; case-insensitive result lookup; risky/unknown are unresolved), `tests/stages/test_waterfall.py` and `tests/db/test_email_stage.py` (a resolver outage is a retryable failure, no verdict recorded). Live, 2026-11-16: `scripts.live_check --only resolve:scrubby` submits a batch and polls it (pending, as a 24-hour job should be).
+- **Still open:** (a) the result of a *finished* deep batch has not been seen live (the first one finishes within a day), so the `Valid`/`Invalid`/`Risky` mapping is from the spec; (b) Enrichley, the real-time alternative, answered 403 to the key in Doppler `outbound/dev` (its adapter matches the published reference, so the account or key is at fault, not the request); (c) deep verification costs more credits per address than a plain check, and Scrubby's price is not public (`scrubby:resolve` is still recorded as 0); (d) the 7 held leads stay held until someone presses *Find email again* on each, after this is deployed.
+
+### R-38 · P1 · People: engineers and nobody at all were the recipients — closed 2026-11-16 (includes R-21)
+
+- **Was:** of 33 researched leads, 8 had no person and 5 failed at contacts; of those that reached the email step, the top-ranked people included a "Power System Engineer", a "Lead Engineer", a "Bachelor of Commerce" and an insurance agent at another company, and one draft was addressed to a person whose title was "Renewable Energy Sources". Four causes: (1) research read five fixed paths (`/`, `/about`, `/team`, `/news`, `/contact`), so a team page at `/company/leadership` was never read (only 8 of 33 leads had all five read, 6 had one); (2) `persona_node` searched LinkedIn only when the site named nobody, so a site that named one engineer ended the search; (3) `EmailStage` tried the top three people whoever they were, and the finders were paid for each; (4) R-21: `_LEVELS` listed `vp` before `c_level`, so a VP outranked a CEO.
+- **Fixed by:** `pages_node` asks for the home pages' links (`extract(..., links=True)`) and reads up to three more pages of the company's own site whose path or link text says leadership, management, team, board, founders, people or about (`team_links`; one more extract request, at most); `persona_node` also runs `search_people` when none of the site's people is a decision-maker (`domain/ranking.py::is_decision_maker`: a campaign's wanted title, or founder, owner, C-level, vice president, director or head of), and `search_people` makes two searches of two titles each, ten results each; `ContactsStage` fails a lead whose people include no decision-maker, with what to do ("add the person you want to write to on the lead page, then retry"); `EmailStage` looks up only decision-makers, people the operator added or chose, or the person ranked first (what *Write to someone else* leaves); `_LEVELS` puts `c_level` before `vp` (R-21 closed).
+- **Evidence:** `tests/domain/test_ranking.py`, `tests/stages/test_research_graph.py`, `tests/db/test_gate_and_contacts.py`, `tests/db/test_email_stage.py`.
+- **Still open:** `is_decision_maker` goes by words in a title, so "Assistant to the Chief Executive" counts and a title in another language does not. A person without a title cannot be known to decide, so a lead whose site lists only names with no titles waits for the operator. The extra people search costs up to two searches a lead (cached per company).
 
 ### R-37 · P2 · Scoring: a brief with no must-haves scored every company 60, and job titles that were kinds of company — closed 2026-11-16
 

@@ -22,7 +22,7 @@ The supervisor is plain code (``plan_workers``) so its routing rules are unit-te
 from __future__ import annotations
 
 import re
-from collections.abc import Hashable, Sequence
+from collections.abc import Collection, Hashable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
@@ -32,6 +32,7 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from outbound.domain.brief import Brief
+from outbound.domain.domains import registrable_domain
 from outbound.domain.enums import LegalEntityType
 from outbound.domain.names import (
     clean_person_name,
@@ -40,12 +41,18 @@ from outbound.domain.names import (
     read_profile_title,
 )
 from outbound.domain.qualification import Check, checks, qualify
-from outbound.domain.ranking import is_role
+from outbound.domain.ranking import is_decision_maker, is_role
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
 from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.llm_json import ask_json as ask
-from outbound.providers.ports import CompanyRegistry, LlmClient, SearchHit, SearchProvider
+from outbound.providers.ports import (
+    CompanyRegistry,
+    LlmClient,
+    PageText,
+    SearchHit,
+    SearchProvider,
+)
 from outbound.stages.research.facts import (
     CountryInference,
     best_registry_match,
@@ -61,7 +68,15 @@ PAGE_PATHS = ("", "/about", "/team", "/news", "/contact")  # five URLs = one ext
 # Generous, so no page is cut short before the model reads it (one extract credit either way).
 PAGE_CHARS = 12_000
 TOTAL_CHARS = 40_000
-TEAM_HINTS = ("team", "leadership", "people", "about", "management")
+TEAM_HINTS = (
+    "team", "leadership", "people", "about", "management", "board", "founder", "executive",
+)  # fmt: skip
+# Links worth following from the front pages to find who runs the company, best first.
+TEAM_LINK_WORDS = (
+    "leadership", "management", "team", "executive", "board", "founder", "people", "about",
+    "who-we-are", "our-story", "company",
+)  # fmt: skip
+MAX_TEAM_PAGES = 3  # one more extract request at most
 LINKEDIN_LOOKUPS = 10  # one search each; the lead page's button covers the rest
 MAX_PEOPLE = 25  # a guard against a page that lists a whole company; nobody real is dropped
 COMPANY_NEWS_DAYS = 180
@@ -304,8 +319,20 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
     def pages_node(state: ResearchState) -> ResearchState:
         inp = state["inp"]
         urls = [f"https://{inp.domain}{path}" for path in PAGE_PATHS]
-        found = {page.url: page.text for page in deps.search.extract(urls) if page.text.strip()}
+        pages = deps.search.extract(urls, links=True)
+        found = {page.url: page.text for page in pages if page.text.strip()}
         if found:
+            # The fixed paths guess where a team page is; the site's own links say. Pages that
+            # name who runs the company are read too, so the people are not just whoever the
+            # home page mentions.
+            more = team_links(pages, inp.domain, read=set(found))
+            if more:
+                try:
+                    found |= {p.url: p.text for p in deps.search.extract(more) if p.text.strip()}
+                except BudgetExceeded:
+                    raise
+                except ProviderError as error:
+                    log.warning("team_pages_unread", reason=str(error)[:200])
             return {"page_text": found, "thin": False}
         # The site could not be read: fall back to what a search says about the company.
         hits = deps.search.search(f"{inp.company_name} {inp.domain}", max_results=5)
@@ -471,8 +498,12 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
                 for m in team.people
                 if len(_clean_name(m.name).split()) >= 2
             ]
-        if not people and inp.target_titles:
-            people = search_people(deps.search, name, inp.domain, inp.target_titles)
+        # Nobody on the site who can decide (or nobody at all): ask the public search, which
+        # finds people by the campaign's job titles, and keep both lists.
+        if inp.target_titles and not any(
+            is_decision_maker(p.title, inp.target_titles) for p in people
+        ):
+            people = [*people, *search_people(deps.search, name, inp.domain, inp.target_titles)]
         found = _unique(people)[:MAX_PEOPLE]
         # A person with no profile link gets one search for it (a button on the lead page
         # does the same for anyone past the limit, or whose search found nothing).
@@ -568,6 +599,31 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
     return graph.compile()
 
 
+def team_links(pages: Sequence[PageText], domain: str, *, read: Collection[str]) -> list[str]:
+    """Links on the pages read that lead to the company's own team, leadership or about pages
+    and have not been read: same website, a path or words that say so, best match first, at
+    most ``MAX_TEAM_PAGES``."""
+    own = registrable_domain(domain)
+    seen = {u.rstrip("/").lower() for u in read}
+    scored: dict[str, int] = {}
+    for page in pages:
+        for link in page.links:
+            url = link.url.split("#")[0].split("?")[0].rstrip("/")
+            if not url or url.lower() in seen or registrable_domain(url) != own:
+                continue
+            path = url.split("://", 1)[-1].partition("/")[2].lower()
+            if not path or path.count("/") > 2 or path.rsplit(".", 1)[-1] in _NOT_PAGES:
+                continue
+            words = f"{path} {link.text.lower()}"
+            hits = [i for i, w in enumerate(TEAM_LINK_WORDS) if w in words]
+            if hits:
+                scored.setdefault(url, min(hits))
+    return sorted(scored, key=lambda u: (scored[u], u))[:MAX_TEAM_PAGES]
+
+
+_NOT_PAGES = frozenset({"pdf", "jpg", "jpeg", "png", "gif", "svg", "zip", "mp4", "xml"})
+
+
 def search_people(
     search: SearchProvider, company_name: str, domain: str, target_titles: Sequence[str]
 ) -> list[Person]:
@@ -578,10 +634,11 @@ def search_people(
     else is dropped: sharing one word ("Grid", "Energy") with the company is not enough.
     """
     roles = [t for t in target_titles if is_role(t)][:4]  # "BESS integrators" finds nobody
-    if not roles:
-        return []
-    titles = " OR ".join(f'"{t}"' for t in roles)
-    hits = search.search(f'site:linkedin.com/in "{company_name}" ({titles})', max_results=5)
+    hits: list[SearchHit] = []
+    for start in range(0, len(roles), 2):  # two searches at most, two titles each
+        titles = " OR ".join(f'"{t}"' for t in roles[start : start + 2])
+        query = f'site:linkedin.com/in "{company_name}" ({titles})'
+        hits += search.search(query, max_results=10)
     people: list[Person] = []
     for hit in hits:
         if "linkedin.com/in/" not in hit.url:

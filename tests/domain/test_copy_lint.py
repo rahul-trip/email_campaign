@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from outbound.domain.copy_lint import LintReport, LintRules, count_words, lint
+from outbound.domain.copy_lint import LintReport, LintRules, count_words, lint, reading_grade
 from outbound.domain.editing import edit_distance
 from tests.stages.fakes import GOOD_BODY as CORE
 
@@ -97,6 +97,17 @@ def test_a_dense_email_fails_the_reading_level() -> None:
         "Would a conversation be worthwhile?"
     )
     assert "reading_level" in issues(check(dense))
+
+
+def test_plain_technical_copy_at_grade_ten_or_eleven_is_not_flagged() -> None:
+    technical = (
+        "Your forecasting team spends hours reconciling weather inputs with demand data. "
+        "Our platform gives grid operators an auditable day-ahead forecast. It retrains itself "
+        "each night. Operators at three utilities reduced forecasting error without adding "
+        "engineers. Would a short call next week be worthwhile?"
+    )
+    assert 10.0 < reading_grade(technical) <= 12.0  # over the old limit, plainly written
+    assert "reading_level" not in issues(check(technical))
 
 
 @pytest.mark.parametrize(("questions", "bad"), [(0, True), (1, False), (2, False), (3, True)])

@@ -2,7 +2,7 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
+last_verified: 2026-11-16 (phase-6/lead-quality-part-2)
 applies_to: Phase 3b
 ---
 
@@ -14,34 +14,34 @@ applies_to: Phase 3b
 | **Port** | `CatchAllResolver` |
 | **Adapter** | `outbound/providers/adapters/scrubby.py::ScrubbyResolver` |
 | **Registry** | `scrubby` |
-| **Settings** | `SCRUBBY_API_KEY` and **`SCRUBBY_BASE_URL`** (required; no default) |
-| **Price** | `scrubby:resolve`: not public (`None`, recorded as 0) |
+| **Settings** | `SCRUBBY_API_KEY`; `SCRUBBY_BASE_URL` is optional (default `https://api.scrubby.io`) |
+| **Price** | `scrubby:resolve`: not public (`None`, recorded as 0). Deep verification uses more credits per address than a plain check |
 | **Cache** | An answer from `poll` is stored as a `resolve` hit, 90 days |
-| **Status** | **Fails the live check** (2026-10-19): the guessed `api.scrubby.io` accepts the connection but never answers. Unproven ([R-09](../tech-debt-and-risks.md#r-09--p1--vendors-the-provider-chain-is-unproven-e5-d5)) |
+| **Status** | Live-checked 2026-11-16: a deep batch is accepted and polls as pending. A finished batch has not been seen yet ([R-39](../tech-debt-and-risks.md#r-39--p1--catch-all-resolver-every-scrubby-call-was-a-404-and-an-outage-held-leads-for-good--closed-2026-11-16)) |
 
-> **Written from a partial reference.** The public documentation confirms the `x-api-key` header, `POST /add_email`, `GET /fetch_email/{email}`, a `pending` status, and a limit of 10 requests a second. It does **not** state the base URL, the request body, or the final result values. Until a live key confirms them, treat this adapter as unverified. Consider `enrichley` as the resolver meanwhile.
+Documentation: `https://docs.scrubby.io`; the OpenAPI file it renders is `https://docs.scrubby.io/scrubby-openapi.json`.
 
 ## Endpoints used
 
 | Operation | Method and path | Auth |
 |---|---|---|
-| `submit(email)` | `POST <SCRUBBY_BASE_URL>/add_email` with `{email}` (assumed) | `x-api-key` header |
-| `poll(ticket)` | `GET <SCRUBBY_BASE_URL>/fetch_email/<email>` | `x-api-key` |
+| `submit(email)` | `POST /validate_bulk_emails/deep/` with `{"email": [address]}`; answers **202** with an `identifier` | `x-api-key` header |
+| `poll(ticket)` | `POST /fetch_bulk_results/deep` with `{"identifier": ...}`; `status` is `processing` or `completed` | `x-api-key` |
 
-`submit` never carries a result: the lead is held as `catch_all_resolving`, and the [poller](../lld/stage-email.md#the-poller) asks every 6 hours from `tick`. Nothing schedules `tick` in production ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7)).
+Deep verification is the part of Scrubby that settles an address on a catch-all domain, and takes up to 24 hours. `submit` never carries a result: the lead is held as `catch_all_resolving`, and the [poller](../lld/stage-email.md#the-poller) asks every 6 hours from `tick`. The 202 is Scrubby's success, so its `HttpClient` is built with `accepted_is_final=True`; the default would retry it and submit, and bill, the batch again. Scrubby's instant `POST /validate_email` (a plain check, 100-second timeout) is not used: it does not settle catch-alls.
 
 ## Mapping
 
-| Scrubby `status` | Ours |
+| Scrubby `results[address].result` | Ours |
 |---|---|
-| `pending`, `processing`, `queued`, `in_progress` | No answer yet |
-| `valid`, `recovered`, `safe`, `deliverable` | `valid` |
-| `invalid`, `reject`, `rejected`, `undeliverable` | `invalid` |
-| Anything else (for example `catch-all`) | `unresolved` |
+| `pending`, or the batch `status` is `processing` | No answer yet |
+| `Valid` | `valid` |
+| `Invalid` | `invalid` |
+| `Risky`, `Unknown`, or no entry for the address | `unresolved` |
 
 ## Tests and fixtures
 
-`tests/providers/test_scrubby.py`. In `tests/providers/fixtures/scrubby/`, only `add_pending.json` and `fetch_pending.json` follow documented shapes; the valid, recovered, invalid and catch-all fixtures are guesses.
+`tests/providers/test_scrubby.py`. In `tests/providers/fixtures/scrubby/`, every fixture follows the shapes in the published OpenAPI file (`DeepBulkEmailResponse`, `FetchResultResponse`).
 
 ## Data sent to the vendor
 

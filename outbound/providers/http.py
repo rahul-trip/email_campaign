@@ -86,7 +86,11 @@ class HttpClient:
         attempts: int = DEFAULT_ATTEMPTS,
         wait: wait_base | None = None,
         client: httpx.Client | None = None,
+        accepted_is_final: bool = False,
     ) -> None:
+        # By default a 202 means "not finished, ask again" (Hunter's verifier). For a vendor
+        # whose submit documents 202 as its success, asking again would submit, and bill, twice.
+        self._accepted_is_final = accepted_is_final
         self._provider = provider
         self._attempts = attempts
         self._wait = wait if wait is not None else _DEFAULT_WAIT
@@ -174,7 +178,7 @@ class HttpClient:
             )
         if status in (401, 403):
             raise ProviderAuthError(self._provider, f"{where}: {status}", status_code=status)
-        if status == 202:  # accepted but not finished (Hunter's verifier); ask again
+        if status == 202 and not self._accepted_is_final:  # not finished (Hunter); ask again
             raise ProviderError(
                 self._provider, f"{where}: still processing", status_code=status, retryable=True
             )

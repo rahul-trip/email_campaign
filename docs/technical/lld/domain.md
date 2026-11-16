@@ -96,7 +96,7 @@ The function knows nothing about skips or recipients. `outbound/stages/policy.py
 1. **People the operator chose come first, in their existing rank order.** That means people added by the operator (`source = operator`), plus `chosen_ids`: people the operator gave an address or recorded consent for ([ADR 0022](../adr/0022-consent-belongs-to-the-recipient.md)).
 2. Everyone else is ordered by:
    1. the position of their title in the campaign's wanted titles;
-   2. seniority, in the order `vp`, `c_level`, `director`, `manager`, `other` (via `seniority_of`, which expands common abbreviations). Note that a VP ranks above a C-level title here ([R-21](../tech-debt-and-risks.md#r-21--p3--ranking-a-vp-outranks-a-c-level-person-on-a-seniority-tie));
+   2. seniority, in the order `c_level`, `vp`, `director`, `manager`, `other` (via `seniority_of`, which expands common abbreviations; a "vice president" is not a "president");
    3. their previous rank.
 
 ### Name matching
@@ -111,7 +111,7 @@ The function knows nothing about skips or recipients. `outbound/stages/policy.py
 |---|---|
 | `length` | 50–85 words for step 0; 25–50 for follow-ups |
 | `subject` | 2–5 words, all lower case |
-| `reading_level` | Flesch–Kincaid grade ≤ 6.5 (computed in `reading_grade`, no external word list) |
+| `reading_level` | Flesch–Kincaid grade ≤ 12 (`LintRules.max_reading_grade`; computed in `reading_grade`, no external word list) |
 | `call_to_action` | Exactly one `?` |
 | `links` | No link in step 0 |
 | `address_in_body` | No email address in the body |
@@ -175,7 +175,7 @@ The operator can add, edit and remove rules; every change writes `policy_changed
 
 - Suppression hashes can be checked against guessed addresses ([R-07](../tech-debt-and-risks.md#r-07--p1--data-no-backups-no-retention-unsalted-suppression-hashes-a6-e3)).
 - The seeded country rules are working defaults, not legal advice, and have no reviewer yet.
-- On a seniority tie a VP outranks a C-level person ([R-21](../tech-debt-and-risks.md#r-21--p3--ranking-a-vp-outranks-a-c-level-person-on-a-seniority-tie)).
+- `is_decision_maker` goes by words in a title ([R-38](../tech-debt-and-risks.md)).
 
 ## Extending it
 

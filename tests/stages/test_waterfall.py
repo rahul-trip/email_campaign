@@ -353,6 +353,29 @@ def test_an_undecided_resolver_leaves_the_address_unverified() -> None:
     assert out.records[0].status is E.CATCH_ALL_UNVERIFIED
 
 
+class BrokenResolver:
+    name = "scrubby"
+
+    def submit(self, email: str) -> ResolutionTicket:
+        raise ProviderError(self.name, "401: key refused")
+
+    def poll(self, ticket: ResolutionTicket) -> ResolutionResult | None:
+        return None
+
+
+def test_a_resolver_that_does_not_answer_is_not_the_same_as_one_that_cannot_prove_it() -> None:
+    second = FakeFinder("snov", "b@acme.com")
+    out = run(
+        [FakeFinder("hunter", "a@acme.com"), second],
+        FakeVerifier({"a@acme.com": V.CATCH_ALL, "b@acme.com": V.CATCH_ALL}),
+        resolver=BrokenResolver(),  # type: ignore[arg-type]
+    )
+    assert out.resolver_down and out.verdict is Verdict.NONE
+    assert not out.catch_all_unverified and out.records == []  # nothing is concluded
+    assert second.calls == 0  # the search stops: the next address would be a catch-all too
+    assert "scrubby: " in out.problems[0]
+
+
 def test_without_a_resolver_a_catch_all_is_unverified() -> None:
     out = run([FakeFinder("hunter", "a@acme.com")], FakeVerifier({"a@acme.com": V.CATCH_ALL}))
     assert out.catch_all_unverified
