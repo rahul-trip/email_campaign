@@ -526,7 +526,7 @@ Honest list of what is not there yet, so nothing surprises you.
 | **Changing the address of a person who already has one** is not possible | Add the person again with the right address, and suppress the old one if needed |
 | **First email only.** After drafting, a company stays *in sequence*; there are no follow-ups, replies or bounce handling | Phase 4 |
 | The copy writer and research use whatever model you configured. A small free model may miss details such as job titles | Use a stronger model for real outreach |
-| Scrubby (catch-all resolver) has not worked live: its configured address did not answer. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | Confirm Scrubby's API address in your Scrubby account. Run `uv run python -m scripts.live_check` to re-check any vendor |
+| Scrubby (catch-all resolver) was repaired on 2026-11-16 and accepts and polls a batch; a finished answer has not been seen yet (it takes up to 24 hours). Enrichley, the real-time alternative, refused its key. Companies House, the mailbox, Hunter, ZeroBounce, OrbiSearch and MyEmailVerifier were checked live on 2026-10-19 | After deploying, press *Find email again* on leads held for a catch-all. Run `uv run python -m scripts.live_check` to re-check any vendor |
 | Follow-up and Sent-sync behaviour with a real mailbox is not yet exercised by a real send | Try it with a few of your own addresses first |
 | No two-step sign-in, sign-up page or sign-in with Google or Microsoft | After the alpha (Phase 6f) |
 

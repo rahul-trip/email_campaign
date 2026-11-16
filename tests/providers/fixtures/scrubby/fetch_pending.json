@@ -1,4 +1,8 @@
 {
-  "email": "jane@acme.com",
-  "status": "pending"
+  "status": "processing",
+  "identifier": "2fbf182d25594091a2ab66a37bbe9f4d",
+  "retry_after_seconds": 86400,
+  "results": {
+    "jane@acme.com": { "result": "pending", "status": "PROCESSING", "quick_status": "PROCESSING" }
+  }
 }

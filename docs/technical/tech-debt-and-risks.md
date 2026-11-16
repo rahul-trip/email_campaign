@@ -96,7 +96,7 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
 
 ### R-09 · P1 · Vendors: the provider chain is unproven (E5, D5)
 
-- **What:** the finder chain in `outbound/config.py` is provisional until the Phase 0 bake-off runs on 30 known contacts. Scrubby, the default catch-all resolver, failed the live check: the connection opens, but no answer comes before the timeout. Its base URL is a guess from partial documentation.
+- **What:** the finder chain in `outbound/config.py` is provisional until the Phase 0 bake-off runs on 30 known contacts. Scrubby, the default catch-all resolver, was repaired on 2026-11-16 ([R-39](#r-39--p1--catch-all-resolver-every-scrubby-call-was-a-404-and-an-outage-held-leads-for-good--closed-2026-11-16)): the live check now submits a batch and polls it. Enrichley answers 403 to its key. The finders are still unproven.
 - **Links:** Phase 0 gate, Phase 3b E5 and D5, [integrations](integrations/README.md).
 
 ### R-10 · P1 · Budget: a running worker does not see budget changes (B4)
@@ -265,6 +265,20 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `.github/workflows/ci.yml` (job `security`), `.github/dependabot.yml`.
 
 ## Closed entries
+
+### R-40 · P3 · Copy: the reading-grade limit flagged plain technical emails — closed 2026-11-16
+
+- **Was:** `LintRules.max_reading_grade` was 10. On the VM, 3 of 7 drafts were flagged for grades 10.1 to 11.2 and every draft took two or three writing attempts, each a paid model call, to get under it. Plainly written copy about grid forecasting scores 10 to 11 on Flesch-Kincaid because its nouns are long ("forecasting", "utilities", "operators"). `docs/technical/lld/domain.md` also said 6.5, a limit dropped long ago.
+- **Fixed by:** `max_reading_grade` is 12. A text written for engineers in plain sentences passes; the dense, jargon-heavy text the rule exists for still fails (`test_a_dense_email_fails_the_reading_level`). The Review screen's checklist says 12.
+- **Evidence:** `tests/domain/test_copy_lint.py` (a plain technical email at grade 10.8 is not flagged; a dense one still is).
+- **Still open:** the grade is measured by vowel groups, not a dictionary, so it is approximate; whether 12 is the right number is a judgement to revisit with real "sent unedited" data from Reports.
+
+### R-39 · P1 · Catch-all resolver: every Scrubby call was a 404, and an outage held leads for good — closed 2026-11-16
+
+- **Was:** 13 of 20 addresses found were on catch-all domains, and 7 of the 14 leads that reached the email step were held. Every Scrubby `submit` in the production ledger had failed (13 of 13). Three causes: (1) the adapter was written from a partial reference and called `POST /add_email` and `GET /fetch_email/{email}`, which the API does not have (live: 404). Scrubby's published OpenAPI file (`https://docs.scrubby.io/scrubby-openapi.json`) has `POST /validate_email` (instant), and a bulk and a *deep* flow; (2) `Waterfall._resolve` recorded a failed resolver call as the verdict `catch_all_unverified`, so an outage looked like "the vendor could not prove it" and the hold was never retried; (3) found while repairing it: the shared `HttpClient` treats every 202 as "still processing" and retries, but Scrubby's bulk submit answers 202 Accepted as its success, so a single submit was sent, and billed, three times (one live check queued three batches).
+- **Fixed by:** `ScrubbyResolver` uses deep verification, the part of Scrubby that settles a catch-all address: `POST /validate_bulk_emails/deep/` returns an `identifier` (the ticket's ref), `POST /fetch_bulk_results/deep` says `processing` until `completed` (up to 24 hours), then `Valid`, `Invalid`, `Risky` or `Unknown` (the last two are `unresolved`); the base URL defaults to the documented `https://api.scrubby.io` and `SCRUBBY_BASE_URL` is optional; `HttpClient(accepted_is_final=True)` for Scrubby only; `Waterfall` sets `Outcome.resolver_down` when the resolver raises and records nothing, and `EmailStage` then fails the lead with "the catch-all resolver is not answering", which the tick retries (three attempts) instead of holding it as unproven.
+- **Evidence:** `tests/providers/test_scrubby.py` (documented routes, bodies and header; a 202 is billed once; case-insensitive result lookup; risky/unknown are unresolved), `tests/stages/test_waterfall.py` and `tests/db/test_email_stage.py` (a resolver outage is a retryable failure, no verdict recorded). Live, 2026-11-16: `scripts.live_check --only resolve:scrubby` submits a batch and polls it (pending, as a 24-hour job should be).
+- **Still open:** (a) the result of a *finished* deep batch has not been seen live (the first one finishes within a day), so the `Valid`/`Invalid`/`Risky` mapping is from the spec; (b) Enrichley, the real-time alternative, answered 403 to the key in Doppler `outbound/dev` (its adapter matches the published reference, so the account or key is at fault, not the request); (c) deep verification costs more credits per address than a plain check, and Scrubby's price is not public (`scrubby:resolve` is still recorded as 0); (d) the 7 held leads stay held until someone presses *Find email again* on each, after this is deployed.
 
 ### R-38 · P1 · People: engineers and nobody at all were the recipients — closed 2026-11-16 (includes R-21)
 

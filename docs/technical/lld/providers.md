@@ -77,7 +77,7 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | `build_mailbox_if_configured(settings)` | The IMAP mailbox, or `None` without a login | — |
 | `configured_finders`, `configured_verifiers`, `configured_resolvers` | Every adapter whose key is set (used by the bake-off) | Skipped |
 
-Registry names: finders `hunter`, `zerobounce`; verifiers `hunter`, `zerobounce`, `orbisearch`, `myemailverifier`; resolvers `scrubby` (needs `SCRUBBY_BASE_URL` too) and `enrichley`.
+Registry names: finders `hunter`, `zerobounce`; verifiers `hunter`, `zerobounce`, `orbisearch`, `myemailverifier`; resolvers `scrubby` and `enrichley`.
 
 ### Errors (`outbound/providers/errors.py`)
 
@@ -156,7 +156,7 @@ The fixtures are built from vendor documentation, not live recordings ([fixtures
 
 ## Known limitations
 
-- The finder chain is provisional, and Scrubby is unverified live ([R-09](../tech-debt-and-risks.md#r-09--p1--vendors-the-provider-chain-is-unproven-e5-d5)).
+- The finder chain is provisional ([R-09](../tech-debt-and-risks.md#r-09--p1--vendors-the-provider-chain-is-unproven-e5-d5)). `HttpClient(accepted_is_final=True)` makes a 202 a success instead of "still processing" (Scrubby's bulk submit; retrying it would bill twice, [R-39](../tech-debt-and-risks.md)).
 - No model has a default price ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5)).
 - IMAP has no retries.
 
