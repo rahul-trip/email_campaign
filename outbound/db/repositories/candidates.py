@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, delete, select
 
 from outbound.db.models import CompanyRow, DiscoveryCandidateRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
@@ -94,6 +95,25 @@ class CandidateRepository(ScopedRepository):
             .limit(limit)
         )
         return [snapshot(row, DiscoveryCandidate) for row in self._session.scalars(stmt)]
+
+    def discard_stale(self, campaign_id: str | None = None) -> int:
+        """Forget the companies still waiting for a decision: over a run's limit, no website yet,
+        or never judged. They were judged against a brief that has changed, so the next run must
+        not add them as leads; it may find them again and judge them against the new one."""
+        stmt = delete(DiscoveryCandidateRow).where(
+            DiscoveryCandidateRow.workspace_id == self._workspace_id,
+            DiscoveryCandidateRow.verdict.in_(
+                [
+                    CandidateVerdict.OVER_LIMIT,
+                    CandidateVerdict.UNRESOLVED,
+                    CandidateVerdict.UNSCREENED,
+                ]
+            ),
+        )
+        if campaign_id is not None:
+            stmt = stmt.where(DiscoveryCandidateRow.campaign_id == campaign_id)
+        result = cast("CursorResult[Any]", self._session.execute(stmt))
+        return int(result.rowcount or 0)
 
     def unscreened(self, campaign_id: str, limit: int) -> list[DiscoveryCandidate]:
         """Companies found but never judged against the brief (the model's reply failed),

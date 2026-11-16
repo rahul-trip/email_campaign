@@ -135,6 +135,9 @@ class SettingsService:
             }
             uow.own_workspace.set_sender_profile(merged)
             self._record_change(uow, "sender_profile_reviewed", {"fields": sorted(changes)})
+            if any(workspace.sender_profile.get(k) != v for k, v in changes.items()):
+                # Companies waiting to be added were judged for the sender as it was.
+                uow.candidates.discard_stale()
             uow.commit()
         return merged
 
@@ -196,7 +199,10 @@ class SettingsService:
             changes = {**changes, "icp_brief": Brief.from_json(changes["icp_brief"]).to_json()}
         try:
             with self._uow(self._workspace_id) as uow:
+                before = uow.campaigns.get(campaign_id)
                 updated = uow.campaigns.update(campaign_id, changes)
+                if updated.icp_brief != before.icp_brief:
+                    uow.candidates.discard_stale(campaign_id)
                 uow.commit()
                 return updated
         except ValueError as error:
@@ -231,6 +237,7 @@ class SettingsService:
         drafted = draft(self._llm, campaign=campaign, profile=profile)
         with self._uow(self._workspace_id) as uow:
             updated = uow.campaigns.update(campaign_id, {"icp_brief": drafted.brief.to_json()})
+            uow.candidates.discard_stale(campaign_id)
             self._record_change(
                 uow,
                 "campaign_brief_drafted",
