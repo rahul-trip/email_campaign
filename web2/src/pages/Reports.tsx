@@ -99,7 +99,7 @@ export function ReportsPage() {
           )}
         </Card>
 
-        <Card title="Cost per vendor" subtitle="The number the vendor bake-off decides on: what each vendor costs per call, and the outcome of every call." className="lg:col-span-2 p-0">
+        <Card collapsible title="Cost per vendor" subtitle="The number the vendor bake-off decides on: what each vendor costs per call, and the outcome of every call." className="lg:col-span-2 p-0">
           {cost.isPending ? (
             <div className="p-4">
               <Skeleton />

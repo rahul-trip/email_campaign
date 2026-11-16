@@ -30,7 +30,7 @@ export function DirectoryCard({ companyId }: { companyId: string }) {
   const data = badge.data;
   if (!data || (!data.in_directory && !data.can_skip)) return null;
   return (
-    <Card tour="lead-directory" title="Shared directory" subtitle="Addresses other customers' runs already verified are used first, at no cost.">
+    <Card collapsible tour="lead-directory" title="Shared directory" subtitle="Addresses other customers' runs already verified are used first, at no cost.">
       {data.in_directory && (
         <p className="text-xs text-muted">
           This person's address is in the directory, last verified in {data.verified_month}.

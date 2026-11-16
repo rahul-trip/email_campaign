@@ -140,7 +140,7 @@ export function RunDetailPage() {
       </Card>
 
       {(searches.data?.length ?? 0) > 0 && (
-        <Card tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
+        <Card collapsible tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
           <ul className="divide-y divide-line text-[13px]">
             {searches.data!.map((q, i) => (
               <li key={i} className="py-1.5">
@@ -172,7 +172,7 @@ export function RunDetailPage() {
       )}
 
       {(candidates.data?.length ?? 0) > 0 && (
-        <Card tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
+        <Card collapsible tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
           <Table>
             <thead>
               <tr>
@@ -192,7 +192,7 @@ export function RunDetailPage() {
         </Card>
       )}
 
-      <Card tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
+      <Card collapsible tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
         <QueryState query={calls}>
           {(rows) =>
             rows.length === 0 ? (

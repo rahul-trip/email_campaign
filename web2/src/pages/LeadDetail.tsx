@@ -99,6 +99,11 @@ export function LeadDetailPage() {
   const emailStepFailed = company.status === "failed" && company.failed_stage === "email";
   // The person the email waiting for review (or approved) is written to.
   const liveRecipient = messages.find((m) => m.state === "generated" || m.state === "approved")?.contact_id;
+  // Where the page expects the operator to act on people, the card is open for them.
+  const peopleNeeded = (company.status === "failed" && (company.failed_stage === "contacts" || company.failed_stage === "email")) || (company.status === "held" && hold?.action === "person");
+  const recipientName = contacts.find((c) => c.id === liveRecipient)?.full_name;
+  const calls = waterfall.data ?? [];
+  const spent = calls.reduce((n, c) => n + c.cost_micro_usd, 0);
 
   return (
     <>
@@ -204,7 +209,13 @@ export function LeadDetailPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-5">
-          <Card tour="lead-people" title={`People and addresses (${contacts.length})`} subtitle="In rank order: the first usable person gets the email.">
+          <Card
+            collapsible
+            forceOpen={peopleNeeded}
+            tour="lead-people"
+            title={`People and addresses (${contacts.length})`}
+            subtitle={`${recipientName ? `The email is to ${recipientName}. ` : ""}In rank order: the first usable person gets the email.`}
+          >
             {contacts.length === 0 ? (
               <Empty title="No people yet">Research finds people on the company's site; or add someone you know below.</Empty>
             ) : (
@@ -267,7 +278,7 @@ export function LeadDetailPage() {
 
           <Research company={company} />
 
-          <Card title="Vendor calls" subtitle="Every paid call made for this lead, in order. A cache hit reused a stored answer at no cost.">
+          <Card collapsible title="Vendor calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${usd(spent)} in all. Every paid call made for this lead, in order; a cache hit reused a stored answer at no cost.`}>
             <QueryState query={waterfall}>
               {(steps) =>
                 steps.length === 0 ? (
@@ -303,7 +314,7 @@ export function LeadDetailPage() {
           </Card>
 
           {changes.length > 0 && (
-            <Card title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
+            <Card collapsible title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
               <Table>
                 <thead>
                   <tr>
@@ -325,7 +336,7 @@ export function LeadDetailPage() {
             </Card>
           )}
 
-          <Card title="Timeline">
+          <Card collapsible title="Timeline" subtitle={`${timeline.data?.length ?? 0} events`}>
             <QueryState query={timeline}>
               {(events) => (
                 <ol className="relative space-y-3 border-l border-line pl-4">
@@ -734,6 +745,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   const [consented, setConsented] = useState(false);
   const [basis, setBasis] = useState<Basis>("express");
   const [evidence, setEvidence] = useState("");
+  const hash = useRouterState({ select: (state) => state.location.hash });
   const heldForConsent = company.status === "held" && (company.hold_reason === "consent_required" || company.hold_reason === "entity_unknown");
   // Decided when the person is added: the hold is released by then, so the page no longer says it was held.
   const [doneText, setDoneText] = useState("Person added.");
@@ -767,7 +779,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   const needsFullName = name.trim().split(/\s+/).length < 2 && email.trim() === "";
   const ready = name.trim() !== "" && !needsFullName && (!consented || evidence.trim() !== "");
   return (
-    <Card id="add-person" tour="lead-add-person" tone={heldForConsent ? "attention" : undefined} title="Add a person" subtitle={`Someone you know at ${company.name ?? company.domain}. They are tried first when an email is written${heldForConsent ? ", and their consent is what this lead is waiting for" : ""}.`}>
+    <Card id="add-person" collapsible forceOpen={heldForConsent || hash === "add-person"} tour="lead-add-person" tone={heldForConsent ? "attention" : undefined} title="Add a person" subtitle={`Someone you know at ${company.name ?? company.domain}. They are tried first when an email is written${heldForConsent ? ", and their consent is what this lead is waiting for" : ""}.`}>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Name" hint={needsFullName && name.trim() ? "First and last name, or give their work email, so the address can be found." : undefined}>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="First and last name" />
@@ -932,7 +944,12 @@ function Research({ company }: { company: Company }) {
   const empty = !research.summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
   if (empty) return null;
   return (
-    <Card tour="lead-research" title="Research" subtitle={company.updated_at ? `Last updated ${ago(company.updated_at)} (${when(company.updated_at)})` : undefined}>
+    <Card
+      collapsible
+      tour="lead-research"
+      title="Research"
+      subtitle={`${company.fit_score != null ? `Fit ${company.fit_score}/100. ` : ""}${hooks.length + newsItems.length} thing${hooks.length + newsItems.length === 1 ? "" : "s"} worth mentioning${company.updated_at ? `. Last updated ${ago(company.updated_at)}` : ""}`}
+    >
       <div className="space-y-3">
         {(Boolean(research.summary) || sector) && (
           <Section title="What they do">
@@ -1103,7 +1120,7 @@ function DangerZone({ company }: { company: Company }) {
     },
   });
   return (
-    <Card tour="lead-danger" tone="error" title={<span className="text-error">Danger zone</span>}>
+    <Card collapsible tour="lead-danger" tone="error" title={<span className="text-error">Danger zone</span>}>
       <div className="space-y-4 text-[13px]">
         <div>
           <div className="font-medium">Do not contact this company</div>

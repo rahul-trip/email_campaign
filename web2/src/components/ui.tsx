@@ -4,7 +4,7 @@
  * the same: one button family, one field style, one way to show loading, errors and saves.
  */
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import {
   useEffect,
   useId,
@@ -72,6 +72,9 @@ export function Card({
   tone,
   id,
   tour,
+  collapsible = false,
+  defaultOpen = false,
+  forceOpen = false,
 }: {
   title?: ReactNode;
   subtitle?: ReactNode;
@@ -82,7 +85,19 @@ export function Card({
   id?: string;
   /** Names the card for the guided tour (src/tour/steps.ts). */
   tour?: string;
+  /** The header opens and closes the body. The subtitle stays visible, so it can summarise. */
+  collapsible?: boolean;
+  /** A collapsible card starts open (it starts closed by default). */
+  defaultOpen?: boolean;
+  /** Turning this on opens the card (the reader can still close it afterwards). */
+  forceOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen || forceOpen);
+  const body = useId();
+  useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+  const shown = !collapsible || open;
   return (
     <section
       id={id}
@@ -94,15 +109,25 @@ export function Card({
       )}
     >
       {(title || actions) && (
-        <header className="mb-3 flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            {title && <h2 className="text-[15px] font-semibold leading-snug">{title}</h2>}
-            {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
-          </div>
+        <header className={cx("flex flex-wrap items-start justify-between gap-2", shown && "mb-3")}>
+          {collapsible ? (
+            <button type="button" aria-expanded={open} aria-controls={body} onClick={() => setOpen(!open)} className="flex min-w-0 flex-1 items-start gap-2 text-left">
+              <ChevronDown aria-hidden className={cx("mt-1 size-4 shrink-0 text-muted transition-transform", !open && "-rotate-90")} />
+              <span className="min-w-0">
+                {title && <h2 className="text-[15px] font-semibold leading-snug">{title}</h2>}
+                {subtitle && <p className="mt-0.5 text-xs font-normal text-muted">{subtitle}</p>}
+              </span>
+            </button>
+          ) : (
+            <div className="min-w-0">
+              {title && <h2 className="text-[15px] font-semibold leading-snug">{title}</h2>}
+              {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
+            </div>
+          )}
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </header>
       )}
-      {children}
+      {shown && <div id={body}>{children}</div>}
     </section>
   );
 }
