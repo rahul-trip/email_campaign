@@ -98,3 +98,11 @@ Gently rounded: 6px on buttons and inputs, 8px on cards, pill-shaped status badg
 - Money: a dollar amount with a thin budget meter against $0.50.
 - Banner: full width under the header; attention or error colours.
 - Legal footer in emails: shaded block with a lock icon; it cannot be edited.
+
+## Collapsible cards
+
+A long page keeps its detail behind collapsible cards (`Card collapsible`). The title row is one button with a chevron (down when open, right when closed) and `aria-expanded`; the subtitle stays visible when closed and carries a one-line summary (a count, a cost, the latest event). Cards the reader acts in stay open; reference cards (tables, history, research, danger actions) start closed. A card opens by itself when the page expects the reader to act there (`forceOpen`), and the reader can still close it.
+
+## Hot and cold
+
+A fit score above 80 is shown with the flame icon and the attention colours (`FitBadge`); any other score is muted. Never use an emoji for it.

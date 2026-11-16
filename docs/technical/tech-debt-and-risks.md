@@ -266,6 +266,23 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-44 · P3 · Changes of 2026-11-16 to watch after the first deploy (open note)
+
+- **Campaign gate:** a workspace whose active campaign has no job titles or no ideal customer now sees only the "Create your campaign" form (and Settings). On the deployed workspaces the three near-empty ones will show it to their admins. Migration 0022 pauses all but one active campaign per workspace (the one with the most leads is kept).
+- **Notifications** are written after every run and tick for every active member of a workspace; an unread line of a kind is updated, not repeated, and lines older than 90 days are removed. A failing notifier is logged as `notify_failed` and never fails a run.
+- **Vendor-call detail** (`provider_calls.detail`) is new personal data at rest of the same kind as `response`; forget and delete blank it. There is still no retention purge ([R-07](#r-07--p1--data-no-backups-no-retention-unsalted-suppression-hashes-a6-e3)).
+
+### R-43 · P2 · Cold drafts approved without a person reach the mailbox unread (accepted risk, off by default)
+
+- **What:** with the workspace setting `auto_approve_cold` on, the email of every lead scoring 80 or lower is approved by the engine and saved as a mailbox draft, even when the writing check flagged it. See [ADR 0033](adr/0033-cold-drafts-may-be-approved-without-a-person.md).
+- **Why accepted:** nothing is ever sent for the person; they read each draft in the mailbox. A hot lead, an unscored lead and an email relying on a skipped check never take this path. The suppression and country-rule gates apply as for any approval.
+- **Watch:** the share of automatically approved emails that are edited in the mailbox before they are sent (`SentSync` records `edit_distance` for every sent email, automatic or not).
+
+### R-42 · P3 · "Leads per stage" was a field nobody could reason about — closed 2026-11-16
+
+- **Was:** the Runs form asked how many leads each stage should take (default 50), a number the operator has no way to choose well.
+- **Fixed by:** the web app no longer sends `limit`; the server's default of 50 stays, and the form says so. The API field and the CLI `--limit` stay for scripts.
+
 ### R-41 · P3 · A queued run lost "find emails with the vendors" — closed 2026-11-16
 
 - **Was:** `RunRequest.to_params` wrote `skip_directory` into the queued run, but `RunRequest.from_params` (which the worker uses) did not read it, so a run started with that box ticked still used the shared directory.

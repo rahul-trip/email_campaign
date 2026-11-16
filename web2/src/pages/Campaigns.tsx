@@ -51,6 +51,7 @@ export function CampaignsPage() {
                   <div key={c.id} className="space-y-5">
                     <Card
                       collapsible
+                      tour={i === 0 ? "campaign-active" : undefined}
                       defaultOpen={c.status === "active"}
                       title={
                         <span className="flex flex-wrap items-center gap-2">

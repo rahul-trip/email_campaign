@@ -47,7 +47,7 @@ applies_to: Phase 3b
 | `src/app/Login.tsx`, `src/app/nav.ts` | Sign-in; the navigation as data ("Replies" and "Sending" shown as *Soon*) |
 | `src/api/client.ts` | The client, `ok()`, `ApiProblem`, `isConflict`, `multipart`, `asUpload` |
 | `src/pages/` | `Dashboard`, `Review`, `Attention`, `Leads`, `LeadDetail`, `LeadJourney`, `Targets`, `Runs`, `Campaigns`, `Mailboxes`, `Reports`, `Compliance`, `Settings` |
-| `src/components/ui.tsx` | `Button`, `Card`, `PageHeader`, `Field`, `Input`, `Select`, `Checkbox`, `Problem`, `Callout`, `QueryState`, `Skeleton`, `Empty`, `Table`, `Tabs`, `Segmented`, `Dialog`, `Confirm`, … |
+| `src/components/ui.tsx` | `Button`, `Card` (`collapsible`, `defaultOpen`, `forceOpen`: the header is a button, the subtitle stays visible as a summary, the section and its `data-tour` are always rendered and the body only while open), `PageHeader`, `Field`, `Input`, `Select`, `Checkbox`, `Problem`, `Callout`, `QueryState`, `Skeleton`, `Empty`, `Table`, `Tabs`, `Segmented`, `Dialog`, `Confirm`, … |
 | `src/components/PolicySkip.tsx`, `SkipCheck.tsx`, `StatusBadge.tsx` | The country-rule skip control, the verification-skip control, status pills |
 | `src/lib/status.ts` | **The one place for status words and colours**: a label and family (working, attention, good, stopped, error) for every lead, email, message, run, import-row and call status; hold reasons with why, fix and action; the stage list |
 | `src/tour/` | `steps.ts` (sections and steps as data), `Tour.tsx` (the overlay) |

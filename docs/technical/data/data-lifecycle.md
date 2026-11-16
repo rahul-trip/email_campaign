@@ -43,7 +43,7 @@ There is **no automatic retention or purge** today ([R-07](../tech-debt-and-risk
 
 | Data | Kept | Proposed (A6) |
 |---|---|---|
-| Vendor answers (`provider_calls.response`), which can hold names and addresses | For ever | Blank `response` after the cache lifetime (90 days); keep cost, outcome and timing |
+| Vendor answers (`provider_calls.response`) and what each call asked and got (`provider_calls.detail`), which can hold names and addresses | For ever | Blank `response` after the cache lifetime (90 days); keep cost, outcome and timing |
 | Events | For ever | Not decided |
 | Container logs | 10 MB × 5 files per container (Docker rotation) | — |
 | Leads, people, messages | Until deleted, forgotten or suppressed | — |

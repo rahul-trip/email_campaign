@@ -256,8 +256,10 @@ function AutoDiscoveryLine() {
   const text = d.reason == null || d.reason === "not_yet" ? `Automatic discovery is on, ${every}.${d.next_search ? ` Next search around ${clock(d.next_search)}.` : " The next search starts on the next pass."}` : why[d.reason];
   const paused = d.reason !== null && d.reason !== "not_yet" && d.reason !== "run_in_progress";
   return (
-    <Callout tone={paused ? "attention" : "info"} className="mb-5">
-      {text}
-    </Callout>
+    <div data-tour="auto-discovery">
+      <Callout tone={paused ? "attention" : "info"} className="mb-5">
+        {text}
+      </Callout>
+    </div>
   );
 }

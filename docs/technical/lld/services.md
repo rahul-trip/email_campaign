@@ -35,11 +35,13 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `leads.py` | `LeadService` (below), `LeadError` | API leads, targets and privacy routers; data-fix scripts |
 | `privacy.py` | `PrivacyService` (`forget`, `suppress_contact`, `suppress_company`, `suppress_value`, `delete_lead`) | CLI `forget`, `suppress`, `delete-lead`; API privacy router |
 | `forget.py` | `forget_email`, `stop_contact`, `suppress_if_nobody_left` | `PrivacyService` (runs inside the caller's unit of work) |
-| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns and `regenerate_brief`, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
+| `autoapprove.py` | `AutoApprover` (a tick job: approves the emails of cold leads, fit 80 or lower, through `ReviewService.approve` as the actor `auto`, when `auto_approve_cold` is on) | `pipeline.assemble` |
+| `activity_notices.py` | `ActivityNotifier` (after a run or tick, writes the bell's notifications for a workspace's active members: drafts ready, hot lead, needs attention, run finished or failed, auto-approved, discovery paused; prunes old ones) | the worker |
+| `settings.py` | `SettingsService` (sender profile, workspace settings, campaigns, `activate_campaign` and `pause_campaign` (one campaign is active per workspace) and `regenerate_brief`, policies, suppressions, mailboxes, `dns_check`), `SettingsError` | API settings router; CLI `sender-profile` |
 | `discovery.py` | `Discoverer`, `ArticleSource`, `plan_queries`, `merge`, `screen`, `rank_score`, `domain_resolver`, `Discovery` | `pipeline.discover_companies` |
 | `candidates.py` | `CandidateService` (`for_run`, `promote`) | API runs router |
 | `brief.py` | `draft` / `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*, saying whether it `fell_back`; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
-| `autodiscovery.py` | `AutoDiscovery.queue_due` (decides, and queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
+| `autodiscovery.py` | `AutoDiscovery.state` (everything that decides whether the active campaign is due a search, and the reason when not) and `queue_due` (queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
 | `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`, `requested_only`: the worker's `sync` runs and its timer pipeline runs, which have no `mode` in their params, are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
 | `reports.py` | `ReportService` (`status`, `quality`, `funnel`, `sources`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |

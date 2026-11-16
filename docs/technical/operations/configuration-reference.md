@@ -149,6 +149,10 @@ These are stored in `workspaces.settings` and edited in the app (Settings, and P
 | `timezone` | `UTC` | yes | For the Phase 5 send window |
 | `country_policy_enabled` | true | yes | Off skips every country rule (red banner); suppression still applies |
 | `footer_enabled` | true | yes | Add the legal footer to emails |
+| `auto_discovery` | true | yes | The worker searches for new companies by itself for the active campaign |
+| `auto_discovery_per_day` | 4 | yes (1–6) | Searches a day; the wait between two is 24 h divided by this |
+| `auto_discovery_review_limit` | 50 | yes (1–500) | No automatic search while this many emails wait in Review |
+| `auto_approve_cold` | false | yes | Approve the emails of cold leads (fit 80 or lower) without a person; hot and unscored leads and emails relying on a skipped check still wait. Saves drafts only; nothing is sent |
 | `send_enabled` | false | **no**: refused before Phase 5 | Automatic sending |
 | `breaker` | `{hard_per_100: 3, hard_per_24h: 2}` | no | Phase 5 bounce circuit breaker |
 | `catch_all_resolver` | `scrubby` | no | **Unused**: the environment's `CATCH_ALL_RESOLVER` decides (Phase 3b B9) |
