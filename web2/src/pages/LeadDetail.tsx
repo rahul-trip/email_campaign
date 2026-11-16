@@ -10,12 +10,13 @@ import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
 import {
   Button,
+  buttonClass,
   Callout,
   Card,
   Checkbox,
   Confirm,
-  Empty,
   Dialog,
+  Empty,
   Field,
   Input,
   Label,
@@ -23,14 +24,14 @@ import {
   Problem,
   QueryState,
   SaveNote,
+  Sections,
   Select,
   Skeleton,
+  StartNow,
   Table,
   Td,
   Textarea,
   Th,
-  buttonClass,
-  StartNow,
 } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
@@ -113,294 +114,294 @@ export function LeadDetailPage() {
   const spent = calls.reduce((n, c) => n + c.cost_micro_usd, 0);
 
   return (
-    <>
-      <PageHeader
-        crumbs={
-          <>
-            <Link to="/leads" className="hover:text-ink hover:underline">
-              Leads
-            </Link>{" "}
-            / <span className="text-ink">{company.name ?? company.domain}</span>
-          </>
-        }
-        title={company.name ?? company.domain}
-        subtitle={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <a href={`https://${company.domain}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs hover:text-primary">
-              {company.domain} <ExternalLink className="size-3" aria-hidden />
-            </a>
-            <span className="text-xs">Country {company.country_code ?? "unknown"}</span>
-            <span className="inline-flex items-center gap-1 text-xs">
-              Fit <FitBadge score={company.fit_score} hot={company.hot} />
-              {company.fit_score == null && "?"}
+    <Sections>
+        <PageHeader
+          crumbs={
+            <>
+              <Link to="/leads" className="hover:text-ink hover:underline">
+                Leads
+              </Link>{" "}
+              / <span className="text-ink">{company.name ?? company.domain}</span>
+            </>
+          }
+          title={company.name ?? company.domain}
+          subtitle={
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <a href={`https://${company.domain}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-xs hover:text-primary">
+                {company.domain} <ExternalLink className="size-3" aria-hidden />
+              </a>
+              <span className="text-xs">Country {company.country_code ?? "unknown"}</span>
+              <span className="inline-flex items-center gap-1 text-xs">
+                Fit <FitBadge score={company.fit_score} hot={company.hot} />
+                {company.fit_score == null && "?"}
+              </span>
+              <span className="text-xs">Priority {company.priority}</span>
+              <span className="text-xs">Added {ago(company.created_at)}</span>
             </span>
-            <span className="text-xs">Priority {company.priority}</span>
-            <span className="text-xs">Added {ago(company.created_at)}</span>
-          </span>
-        }
-        actions={
-          <>
-            <Link to="/leads/$companyId/journey" params={{ companyId }} className={buttonClass("secondary")}>
-              <GitFork className="size-3.5" aria-hidden /> Journey
-            </Link>
-            {!NOT_RESEARCHABLE.has(company.status) && (
-              <Button data-tour="lead-research-again" variant="secondary" onClick={() => setResearching(true)}>
-                <RefreshCw className="size-3.5" aria-hidden /> Research again
-              </Button>
-            )}
-            {company.status === "failed" && (
-              <Button busy={retry.isPending} onClick={() => retry.mutate()}>
-                <RefreshCw className="size-3.5" aria-hidden /> Retry
-              </Button>
-            )}
-            {company.status === "disqualified" && !countryBlocked && (
-              <Button variant="secondary" busy={requalify.isPending} onClick={() => requalify.mutate()}>
-                Override and qualify
-              </Button>
-            )}
-          </>
-        }
-      />
+          }
+          actions={
+            <>
+              <Link to="/leads/$companyId/journey" params={{ companyId }} className={buttonClass("secondary")}>
+                <GitFork className="size-3.5" aria-hidden /> Journey
+              </Link>
+              {!NOT_RESEARCHABLE.has(company.status) && (
+                <Button data-tour="lead-research-again" variant="secondary" onClick={() => setResearching(true)}>
+                  <RefreshCw className="size-3.5" aria-hidden /> Research again
+                </Button>
+              )}
+              {company.status === "failed" && (
+                <Button busy={retry.isPending} onClick={() => retry.mutate()}>
+                  <RefreshCw className="size-3.5" aria-hidden /> Retry
+                </Button>
+              )}
+              {company.status === "disqualified" && !countryBlocked && (
+                <Button variant="secondary" busy={requalify.isPending} onClick={() => requalify.mutate()}>
+                  Override and qualify
+                </Button>
+              )}
+            </>
+          }
+        />
 
-      {researching && (
-        <Confirm
-          title={`Research ${company.name ?? company.domain} again?`}
-          confirmLabel="Research again"
-          busy={researchAgain.isPending}
-          error={researchAgain.error}
-          onClose={() => setResearching(false)}
-          onConfirm={() => researchAgain.mutate()}
-        >
-          <p>The next run, within 15 minutes or when you start one, reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
-          <p className="mt-2">
-            An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
-          </p>
-        </Confirm>
-      )}
-
-      <div data-tour="lead-header" className="mb-5 flex flex-wrap items-center gap-2">
-        <StatusBadge status={describe(leadStatus, company.status)} />
-        {hold && <span className="rounded-full bg-attention-container px-2 py-0.5 text-xs font-medium text-on-attention-container">{hold.label}</span>}
-        <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs">company type: {words(company.legal_entity_type)}</span>
-        {company.created_at && (
-          <span className="text-xs text-muted" title={when(company.created_at)}>
-            Added {ago(company.created_at)} ({words(company.source)})
-          </span>
-        )}
-        {company.updated_at && (
-          <span className="text-xs text-muted" title={when(company.updated_at)}>
-            · last changed {ago(company.updated_at)}
-          </span>
-        )}
-        {company.manual_fields.length > 0 && <span className="text-xs text-muted">Set by you, kept as you set it: {company.manual_fields.map(words).join(", ")}</span>}
-      </div>
-
-      <div className="mb-5 space-y-3">
-        {researchQueued && company.status === "new" && (
-          <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
-            Queued for research again, within 15 minutes, or now: <StartNow />
-          </p>
-        )}
-        <Problem error={retry.error ?? requalify.error} />
-        {company.status === "failed" && (
-          <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
-            {company.last_error}
-            {emailStepFailed &&
-              " Edit a person below to complete their name or give their work email, and the step is retried. If you know an address works even though the check could not prove it, press Skip the check next to it."}
-          </Callout>
-        )}
-        {company.status === "disqualified" && countryBlocked && (
-          <Callout tone="attention" title="This country's rule blocks contact">
-            To go ahead, add a person who has given consent, skip the country rule for this lead under <em>Country rule</em>, or change the rule under Policies and privacy.
-          </Callout>
-        )}
-        {company.status === "disqualified" && !countryBlocked && company.fit_reason && (
-          <Callout tone="info" title="Fit too low for the campaign">
-            {company.fit_reason}
-          </Callout>
-        )}
-        {company.status === "held" && <HoldPanel company={company} onDone={refresh} />}
-        {pausedCampaign && (
-          <Callout tone="attention" title={`Its campaign, ${pausedCampaign.name}, is paused`}>
-            This lead waits where it is until that campaign is switched on again under Campaigns.
-          </Callout>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="flex min-w-0 flex-col gap-5">
-          <Card
-            collapsible
-            forceOpen={peopleNeeded}
-            tour="lead-people"
-            title={`People and addresses (${contacts.length})`}
-            subtitle={`${recipientName ? `The email is to ${recipientName}. ` : ""}In rank order: the first usable person gets the email.`}
+        {researching && (
+          <Confirm
+            title={`Research ${company.name ?? company.domain} again?`}
+            confirmLabel="Research again"
+            busy={researchAgain.isPending}
+            error={researchAgain.error}
+            onClose={() => setResearching(false)}
+            onConfirm={() => researchAgain.mutate()}
           >
-            {contacts.length === 0 ? (
-              <Empty title="No people yet">Research finds people on the company's site; or add someone you know below.</Empty>
-            ) : (
-              <ul className="divide-y divide-line">
-                {contacts.map((contact) => (
-                  <Person
-                    key={contact.id}
-                    contact={contact}
-                    onChanged={refresh}
-                    retryAfterEdit={emailStepFailed}
-                    company={company}
-                    recipient={liveRecipient === contact.id}
-                    writtenTo={messages.some((m) => m.contact_id === contact.id)}
-                  />
-                ))}
-              </ul>
-            )}
-          </Card>
+            <p>The next run, within 15 minutes or when you start one, reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
+            <p className="mt-2">
+              An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
+            </p>
+          </Confirm>
+        )}
 
-          <DirectoryCard companyId={company.id} />
+        <div data-tour="lead-header" className="mb-5 flex flex-wrap items-center gap-2">
+          <StatusBadge status={describe(leadStatus, company.status)} />
+          {hold && <span className="rounded-full bg-attention-container px-2 py-0.5 text-xs font-medium text-on-attention-container">{hold.label}</span>}
+          <span className="rounded-full bg-surface-container px-2 py-0.5 text-xs">company type: {words(company.legal_entity_type)}</span>
+          {company.created_at && (
+            <span className="text-xs text-muted" title={when(company.created_at)}>
+              Added {ago(company.created_at)} ({words(company.source)})
+            </span>
+          )}
+          {company.updated_at && (
+            <span className="text-xs text-muted" title={when(company.updated_at)}>
+              · last changed {ago(company.updated_at)}
+            </span>
+          )}
+          {company.manual_fields.length > 0 && <span className="text-xs text-muted">Set by you, kept as you set it: {company.manual_fields.map(words).join(", ")}</span>}
+        </div>
 
-          <AddPerson company={company} onAdded={refresh} />
+        <div className="mb-5 space-y-3">
+          {researchQueued && company.status === "new" && (
+            <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+              Queued for research again, within 15 minutes, or now: <StartNow />
+            </p>
+          )}
+          <Problem error={retry.error ?? requalify.error} />
+          {company.status === "failed" && (
+            <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
+              {company.last_error}
+              {emailStepFailed &&
+                " Edit a person below to complete their name or give their work email, and the step is retried. If you know an address works even though the check could not prove it, press Skip the check next to it."}
+            </Callout>
+          )}
+          {company.status === "disqualified" && countryBlocked && (
+            <Callout tone="attention" title="This country's rule blocks contact">
+              To go ahead, add a person who has given consent, skip the country rule for this lead under <em>Country rule</em>, or change the rule under Policies and privacy.
+            </Callout>
+          )}
+          {company.status === "disqualified" && !countryBlocked && company.fit_reason && (
+            <Callout tone="info" title="Fit too low for the campaign">
+              {company.fit_reason}
+            </Callout>
+          )}
+          {company.status === "held" && <HoldPanel company={company} onDone={refresh} />}
+          {pausedCampaign && (
+            <Callout tone="attention" title={`Its campaign, ${pausedCampaign.name}, is paused`}>
+              This lead waits where it is until that campaign is switched on again under Campaigns.
+            </Callout>
+          )}
+        </div>
 
-          <Card title={`Emails (${messages.length})`}>
-            {messages.length === 0 ? (
-              <p className="text-xs text-muted">Nothing written yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {messages.map((m) => (
-                  <details key={m.id} className="group rounded-lg border border-line">
-                    <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2.5 hover:bg-surface-low">
-                      <span className="font-mono text-xs font-semibold">Email {m.step + 1}</span>
-                      <span className="min-w-0 flex-1 truncate text-body">{m.subject}</span>
-                      <StatusBadge status={describe(messageState, m.state)} />
-                      {m.edit_distance != null && <span className="text-caption text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
-                      {m.created_at && (
-                        <span className="text-caption text-muted" title={when(m.created_at)}>
-                          written {ago(m.created_at)}
-                        </span>
-                      )}
-                      {m.sent_at && <span className="text-caption text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
-                      {m.state === "generated" && (
-                        <Link
-                          data-tour="lead-open-review"
-                          to="/review"
-                          search={{ message: m.id }}
-                          onClick={(e) => e.stopPropagation()}
-                          className={buttonClass("primary", "sm")}
-                        >
-                          Open in Review
-                        </Link>
-                      )}
-                    </summary>
-                    <pre className="whitespace-pre-wrap border-t border-line bg-surface-low p-3 font-sans text-body leading-relaxed">{m.final_body ?? m.generated_body}</pre>
-                  </details>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Research company={company} />
-
-          <Card collapsible title="Vendor calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${usd(spent)} in all. Every paid call made for this lead, in order; a cache hit reused a stored answer at no cost.`}>
-            <QueryState query={waterfall}>
-              {(steps) =>
-                steps.length === 0 ? (
-                  <p className="text-xs text-muted">No vendor calls yet.</p>
-                ) : (
-                  <Table>
-                    <thead>
-                      <tr>
-                        <Th>When</Th>
-                        <Th>Vendor</Th>
-                        <Th>Call</Th>
-                        <Th>What was asked</Th>
-                        <Th>Result</Th>
-                        <Th className="text-right">Cost</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {steps.map((step, i) => (
-                        <tr key={i}>
-                          <Td className="whitespace-nowrap text-xs text-muted">{when(step.at)}</Td>
-                          <Td className="font-medium">{step.provider}</Td>
-                          <Td className="text-xs">{words(step.operation)}</Td>
-                          <Td className="max-w-xs break-words text-xs">
-                            {step.asked ? (
-                              <>
-                                {step.asked}
-                                {step.contact_id && contacts.find((c) => c.id === step.contact_id)?.full_name && <span className="text-muted"> · for {contacts.find((c) => c.id === step.contact_id)?.full_name}</span>}
-                              </>
-                            ) : (
-                              <span className="text-muted">not recorded</span>
-                            )}
-                          </Td>
-                          <Td>
-                            <StatusBadge status={describe(callOutcome, step.outcome)} />
-                            {step.got && <div className="mt-0.5 text-caption text-muted">{step.got}</div>}
-                          </Td>
-                          <Td className="text-right font-mono text-xs">{usd(step.cost_micro_usd)}</Td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                )
-              }
-            </QueryState>
-          </Card>
-
-          {changes.length > 0 && (
-            <Card collapsible title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Field</Th>
-                    <Th>Engine's value, not applied</Th>
-                    <Th>When</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {changes.map((e, i) => (
-                    <tr key={i}>
-                      <Td>{words(String(e.data.field ?? ""))}</Td>
-                      <Td className="max-w-md truncate font-mono text-xs">{JSON.stringify(e.data.new ?? e.data.attempted)}</Td>
-                      <Td className="whitespace-nowrap text-xs text-muted">{when(e.at)}</Td>
-                    </tr>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <Card
+              collapsible
+              forceOpen={peopleNeeded}
+              tour="lead-people"
+              title={`People and addresses (${contacts.length})`}
+              subtitle={`${recipientName ? `The email is to ${recipientName}. ` : ""}In rank order: the first usable person gets the email.`}
+            >
+              {contacts.length === 0 ? (
+                <Empty title="No people yet">Research finds people on the company's site; or add someone you know below.</Empty>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {contacts.map((contact) => (
+                    <Person
+                      key={contact.id}
+                      contact={contact}
+                      onChanged={refresh}
+                      retryAfterEdit={emailStepFailed}
+                      company={company}
+                      recipient={liveRecipient === contact.id}
+                      writtenTo={messages.some((m) => m.contact_id === contact.id)}
+                    />
                   ))}
-                </tbody>
-              </Table>
+                </ul>
+              )}
             </Card>
-          )}
 
-          <Activity
-            events={timeline.data ?? []}
-            pending={timeline.isPending}
-            error={timeline.error}
-            names={Object.fromEntries(contacts.map((c) => [c.id, c.full_name ?? "A person"]))}
-            fit={company.fit_score ?? null}
-          />
-        </div>
+            <DirectoryCard companyId={company.id} />
 
-        <div className="flex flex-col gap-5">
-          <Card tour="lead-policy" title="Country rule" subtitle={`Rule for ${company.country_code ?? "an unknown country"}. You can skip it for this lead.`}>
-            <PolicySkip key={`${company.row_version}`} company={company} heldAt={lead.data.held_at} />
-          </Card>
-          <EditLead key={company.row_version} company={company} campaigns={campaigns.data ?? []} onSaved={refresh} />
-          {notes.length > 0 && (
-            <Card title="Notes">
-              <ul className="space-y-2">
-                {notes.map((note) => (
-                  <li key={note.id} className="rounded-lg bg-surface-low p-2.5 text-body">
-                    {note.body}
-                    <div className="mt-1 text-caption text-muted">
-                      {words(note.source)}
-                      {note.created_at && ` · ${ago(note.created_at)}`}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+            <AddPerson company={company} onAdded={refresh} />
+
+            <Card title={`Emails (${messages.length})`}>
+              {messages.length === 0 ? (
+                <p className="text-xs text-muted">Nothing written yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {messages.map((m) => (
+                    <details key={m.id} className="group rounded-lg border border-line">
+                      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2.5 hover:bg-surface-low">
+                        <span className="font-mono text-xs font-semibold">Email {m.step + 1}</span>
+                        <span className="min-w-0 flex-1 truncate text-body">{m.subject}</span>
+                        <StatusBadge status={describe(messageState, m.state)} />
+                        {m.edit_distance != null && <span className="text-caption text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
+                        {m.created_at && (
+                          <span className="text-caption text-muted" title={when(m.created_at)}>
+                            written {ago(m.created_at)}
+                          </span>
+                        )}
+                        {m.sent_at && <span className="text-caption text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
+                        {m.state === "generated" && (
+                          <Link
+                            data-tour="lead-open-review"
+                            to="/review"
+                            search={{ message: m.id }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={buttonClass("primary", "sm")}
+                          >
+                            Open in Review
+                          </Link>
+                        )}
+                      </summary>
+                      <pre className="whitespace-pre-wrap border-t border-line bg-surface-low p-3 font-sans text-body leading-relaxed">{m.final_body ?? m.generated_body}</pre>
+                    </details>
+                  ))}
+                </div>
+              )}
             </Card>
-          )}
-          <DangerZone company={company} />
+
+            <Research company={company} />
+
+            <Card collapsible title="Vendor calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${usd(spent)} in all. Every paid call made for this lead, in order; a cache hit reused a stored answer at no cost.`}>
+              <QueryState query={waterfall}>
+                {(steps) =>
+                  steps.length === 0 ? (
+                    <p className="text-xs text-muted">No vendor calls yet.</p>
+                  ) : (
+                    <Table>
+                      <thead>
+                        <tr>
+                          <Th>When</Th>
+                          <Th>Vendor</Th>
+                          <Th>Call</Th>
+                          <Th>What was asked</Th>
+                          <Th>Result</Th>
+                          <Th className="text-right">Cost</Th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {steps.map((step, i) => (
+                          <tr key={i}>
+                            <Td className="whitespace-nowrap text-xs text-muted">{when(step.at)}</Td>
+                            <Td className="font-medium">{step.provider}</Td>
+                            <Td className="text-xs">{words(step.operation)}</Td>
+                            <Td className="max-w-xs break-words text-xs">
+                              {step.asked ? (
+                                <>
+                                  {step.asked}
+                                  {step.contact_id && contacts.find((c) => c.id === step.contact_id)?.full_name && <span className="text-muted"> · for {contacts.find((c) => c.id === step.contact_id)?.full_name}</span>}
+                                </>
+                              ) : (
+                                <span className="text-muted">not recorded</span>
+                              )}
+                            </Td>
+                            <Td>
+                              <StatusBadge status={describe(callOutcome, step.outcome)} />
+                              {step.got && <div className="mt-0.5 text-caption text-muted">{step.got}</div>}
+                            </Td>
+                            <Td className="text-right font-mono text-xs">{usd(step.cost_micro_usd)}</Td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </Table>
+                  )
+                }
+              </QueryState>
+            </Card>
+
+            {changes.length > 0 && (
+              <Card collapsible title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Field</Th>
+                      <Th>Engine's value, not applied</Th>
+                      <Th>When</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {changes.map((e, i) => (
+                      <tr key={i}>
+                        <Td>{words(String(e.data.field ?? ""))}</Td>
+                        <Td className="max-w-md truncate font-mono text-xs">{JSON.stringify(e.data.new ?? e.data.attempted)}</Td>
+                        <Td className="whitespace-nowrap text-xs text-muted">{when(e.at)}</Td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card>
+            )}
+
+            <Activity
+              events={timeline.data ?? []}
+              pending={timeline.isPending}
+              error={timeline.error}
+              names={Object.fromEntries(contacts.map((c) => [c.id, c.full_name ?? "A person"]))}
+              fit={company.fit_score ?? null}
+            />
+          </div>
+
+          <div className="flex flex-col gap-5">
+            <Card tour="lead-policy" title="Country rule" subtitle={`Rule for ${company.country_code ?? "an unknown country"}. You can skip it for this lead.`}>
+              <PolicySkip key={`${company.row_version}`} company={company} heldAt={lead.data.held_at} />
+            </Card>
+            <EditLead key={company.row_version} company={company} campaigns={campaigns.data ?? []} onSaved={refresh} />
+            {notes.length > 0 && (
+              <Card title="Notes">
+                <ul className="space-y-2">
+                  {notes.map((note) => (
+                    <li key={note.id} className="rounded-lg bg-surface-low p-2.5 text-body">
+                      {note.body}
+                      <div className="mt-1 text-caption text-muted">
+                        {words(note.source)}
+                        {note.created_at && ` · ${ago(note.created_at)}`}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
+            <DangerZone company={company} />
+          </div>
         </div>
-      </div>
-    </>
+    </Sections>
   );
 }
 

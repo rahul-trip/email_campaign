@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Megaphone, Plus, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { Button, Callout, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
+import { Button, Callout, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, SaveNote, Sections, Segmented, Textarea } from "../components/ui";
 import { useCurrent } from "../app/session";
 import { lines } from "../lib/format";
 
@@ -48,13 +48,13 @@ export function CampaignsPage() {
                 </Empty>
               </Card>
             ) : (
-              <>
+              <Sections>
                 {all.map((c, i) => (
                   <div key={c.id} className="space-y-5">
                     <Card
                       collapsible
                       tour={i === 0 ? "campaign-active" : undefined}
-                      defaultOpen={c.status === "active"}
+                      defaultOpen={c.id === (all.find((x) => x.status === "active") ?? all[0])?.id}
                       title={
                         <span className="flex flex-wrap items-center gap-2">
                           {c.name}
@@ -80,7 +80,7 @@ export function CampaignsPage() {
                     <BriefCard key={JSON.stringify(c.icp_brief)} campaign={c} onSaved={saved} tour={i === 0 ? "campaign-brief" : undefined} />
                   </div>
                 ))}
-              </>
+              </Sections>
             )
           }
         </QueryState>
@@ -308,63 +308,65 @@ function BriefCard({ campaign, onSaved, tour }: { campaign: Campaign; onSaved: (
   });
   const empty = !campaign.icp_brief;
   return (
-    <Card
-      collapsible
-      defaultOpen={campaign.status === "active"}
-      tour={tour}
-      title="Who we look for"
-      subtitle="Discovery searches from this, drops companies that do not fit it, and research checks each lead against it."
-      actions={
-        <Button variant="secondary" busy={draft.isPending} onClick={() => draft.mutate()}>
-          <Sparkles className="size-4" aria-hidden /> {empty ? "Draft from the campaign" : "Draft again"}
-        </Button>
-      }
-    >
-      {empty ? (
-        <p className="text-sm text-muted">
-          Not drafted yet. Draft it from the ideal customer above and your sender profile, then check it; the first discovery run drafts it if you have not.
-        </p>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {(campaign.brief_gaps ?? []).length > 0 && (
-            <Callout tone="attention" title="This brief is thin, so leads are judged loosely" className="md:col-span-2">
-              <ul className="list-disc pl-4">
-                {(campaign.brief_gaps ?? []).map((g) => (
-                  <li key={g}>{g}</li>
-                ))}
-              </ul>
-            </Callout>
-          )}
-          <Field label="In short" className="md:col-span-2">
-            <Textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
-          </Field>
-          <Field label="Kind of company" hint="Start-ups also search start-up directories such as Y Combinator." className="md:col-span-2">
-            <Segmented label="Kind of company" value={kind} options={COMPANY_TYPES} onChange={setKind} />
-          </Field>
-          <Field label="Must have" hint="One per line. Add (3) after one that is essential, (2) after one that matters; no number means it only helps." className="md:col-span-2">
-            <Textarea rows={4} value={mustHaves} onChange={(e) => setMustHaves(e.target.value)} />
-          </Field>
-          {BRIEF_LISTS.map(([key, label, hint]) => (
-            <Field key={key} label={label} hint={hint}>
-              <Textarea rows={3} value={typed[key] ?? ""} onChange={(e) => setTyped({ ...typed, [key]: e.target.value })} />
+    <Sections>
+      <Card
+        collapsible
+        defaultOpen={campaign.status === "active"}
+        tour={tour}
+        title="Who we look for"
+        subtitle="Discovery searches from this, drops companies that do not fit it, and research checks each lead against it."
+        actions={
+          <Button variant="secondary" busy={draft.isPending} onClick={() => draft.mutate()}>
+            <Sparkles className="size-4" aria-hidden /> {empty ? "Draft from the campaign" : "Draft again"}
+          </Button>
+        }
+      >
+        {empty ? (
+          <p className="text-sm text-muted">
+            Not drafted yet. Draft it from the ideal customer above and your sender profile, then check it; the first discovery run drafts it if you have not.
+          </p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {(campaign.brief_gaps ?? []).length > 0 && (
+              <Callout tone="attention" title="This brief is thin, so leads are judged loosely" className="md:col-span-2">
+                <ul className="list-disc pl-4">
+                  {(campaign.brief_gaps ?? []).map((g) => (
+                    <li key={g}>{g}</li>
+                  ))}
+                </ul>
+              </Callout>
+            )}
+            <Field label="In short" className="md:col-span-2">
+              <Textarea rows={3} value={summary} onChange={(e) => setSummary(e.target.value)} />
             </Field>
-          ))}
-          <Field label="Size">
-            <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="10-200 employees" />
-          </Field>
-          <Field label="Founded after">
-            <Input type="number" value={founded} onChange={(e) => setFounded(e.target.value)} className="w-28" />
-          </Field>
-          <div className="flex flex-wrap items-end gap-3 md:col-span-2">
-            <Button busy={save.isPending} onClick={() => save.mutate()}>
-              Save brief
-            </Button>
-            <SaveNote mutation={save} done="Brief saved." />
+            <Field label="Kind of company" hint="Start-ups also search start-up directories such as Y Combinator." className="md:col-span-2">
+              <Segmented label="Kind of company" value={kind} options={COMPANY_TYPES} onChange={setKind} />
+            </Field>
+            <Field label="Must have" hint="One per line. Add (3) after one that is essential, (2) after one that matters; no number means it only helps." className="md:col-span-2">
+              <Textarea rows={4} value={mustHaves} onChange={(e) => setMustHaves(e.target.value)} />
+            </Field>
+            {BRIEF_LISTS.map(([key, label, hint]) => (
+              <Field key={key} label={label} hint={hint}>
+                <Textarea rows={3} value={typed[key] ?? ""} onChange={(e) => setTyped({ ...typed, [key]: e.target.value })} />
+              </Field>
+            ))}
+            <Field label="Size">
+              <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="10-200 employees" />
+            </Field>
+            <Field label="Founded after">
+              <Input type="number" value={founded} onChange={(e) => setFounded(e.target.value)} className="w-28" />
+            </Field>
+            <div className="flex flex-wrap items-end gap-3 md:col-span-2">
+              <Button busy={save.isPending} onClick={() => save.mutate()}>
+                Save brief
+              </Button>
+              <SaveNote mutation={save} done="Brief saved." />
+            </div>
           </div>
-        </div>
-      )}
-      <SaveNote mutation={draft} done="Brief drafted. Check it, then save any change." />
-    </Card>
+        )}
+        <SaveNote mutation={draft} done="Brief drafted. Check it, then save any change." />
+      </Card>
+    </Sections>
   );
 }
 
