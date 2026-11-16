@@ -3,7 +3,7 @@ import { CheckCircle2, FileSpreadsheet, Info, Plus, Upload } from "lucide-react"
 import { useState } from "react";
 import { asUpload, client, multipart, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Checkbox, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Empty, Field, StartNow, Input, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../components/ui";
 import { describe, importRowStatus } from "../lib/status";
 import { useUsage } from "../lib/usage";
 import { ConfirmRow } from "./Attention";
@@ -18,7 +18,7 @@ export function TargetsPage() {
   const list = campaigns.data ?? [];
   return (
     <>
-      <PageHeader title="Add leads" subtitle="One company at a time from whatever you know, or a whole spreadsheet. The next run researches them." />
+      <PageHeader title="Add leads" subtitle="One company at a time from whatever you know, or a whole spreadsheet. They are researched within 15 minutes, or press Start now after adding." />
       <WaitingRows />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
@@ -199,6 +199,11 @@ function QuickAdd({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
         </div>
       </form>
       <Problem error={add.error} className="mt-3" />
+      {add.data && !add.data.validate_only && (
+        <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted">
+          Added. It is researched within 15 minutes, or now: <StartNow />
+        </p>
+      )}
       {add.data && <ReportTable report={add.data} />}
     </Card>
   );
@@ -262,7 +267,8 @@ function UploadFile({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
       <Problem error={send.error} className="mt-3" />
       {send.data && !send.data.preview && (
         <Callout tone="good" className="mt-4">
-          Imported. The next run researches the accepted rows.
+          Imported. The accepted rows are researched within 15 minutes, or now:{" "}
+          <StartNow />
         </Callout>
       )}
       {send.data && <ReportTable report={send.data.report} />}

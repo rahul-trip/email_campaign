@@ -29,6 +29,7 @@ import {
   Textarea,
   Th,
   buttonClass,
+  StartNow,
 } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
@@ -167,7 +168,7 @@ export function LeadDetailPage() {
           onClose={() => setResearching(false)}
           onConfirm={() => researchAgain.mutate()}
         >
-          <p>The next run reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
+          <p>The next run, within 15 minutes or when you start one, reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
           <p className="mt-2">
             An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
           </p>
@@ -447,8 +448,11 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
       </div>
       {suggestion && hold.action === "country" && <p className="mt-2 text-xs text-muted">Suggested from the research: {suggestion.evidence}. It is a suggestion, not proof.</p>}
       <p className="mt-2 text-[11px] text-muted">
-        The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
+        The stage that held it runs again within 15 minutes. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
       </p>
+      <div className="mt-2 flex items-center gap-2">
+        <StartNow />
+      </div>
       <Problem error={release.error ?? setCountry.error} className="mt-2" />
     </Card>
   );
@@ -581,7 +585,7 @@ function Person({
               </li>
             ))}
             {contact.emails.length === 0 && <li className="text-xs text-muted">No address yet.</li>}
-            {contact.refresh_email && <li className="text-xs font-medium text-primary">Email search queued: it runs on the next run.</li>}
+            {contact.refresh_email && <li className="text-xs font-medium text-primary">Email search queued: it runs within 15 minutes.</li>}
           </ul>
         </div>
         {!gone && (
@@ -760,7 +764,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   // Decided when the person is added: the hold is released by then, so the page no longer says it was held.
   const [doneText, setDoneText] = useState("Person added.");
   const add = useMutation({
-    onMutate: () => setDoneText(consented && heldForConsent ? "Added, and the hold is released. The lead carries on at the next run." : "Person added."),
+    onMutate: () => setDoneText(consented && heldForConsent ? "Added, and the hold is released. The lead carries on within 15 minutes." : "Person added."),
     mutationFn: async () => {
       await ok(
         client.POST("/api/companies/{company_id}/people", {

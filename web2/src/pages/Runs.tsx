@@ -12,9 +12,9 @@ import { STAGES, STAGE_LABEL, countsOf, discoveryLine, stagesDone, totalsOf } fr
 
 type Mode = "manual" | "discovery" | "mixed";
 const MODES: [Mode, string, string][] = [
-  ["manual", "Only my targets", "Moves the companies you added as far as each can go."],
+  ["manual", "Only the leads I added", "Moves the companies you added as far as each can go."],
   ["discovery", "Discover new companies", "Searches the web for companies matching the campaign's ideal customer, then moves them on."],
-  ["mixed", "My targets and discovery", "Both of the above in one run."],
+  ["mixed", "My leads and discovery", "Both of the above in one run."],
 ];
 const WORKER_SILENT_MS = 45_000;
 
@@ -109,7 +109,7 @@ export function RunsPage() {
         <QueryState query={runs}>
           {(rows) =>
             rows.length === 0 ? (
-              <Empty title="No runs yet">Start a run above once you have added targets.</Empty>
+              <Empty title="No runs yet">Start a run above once you have added leads.</Empty>
             ) : (
               <Table>
                 <thead>

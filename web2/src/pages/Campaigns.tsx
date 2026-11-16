@@ -118,7 +118,7 @@ function CampaignSwitch({ campaign, active, onDone }: { campaign: Campaign; acti
       {asking && (
         <Confirm title={`Switch on ${campaign.name}?`} confirmLabel="Switch on" busy={on.isPending} error={on.error} onClose={() => setAsking(false)} onConfirm={() => on.mutate()}>
           <p>
-            <strong>{active?.name}</strong> is paused. Its leads wait where they are, and lose nothing, until it is switched on again. Discovery, new targets and runs follow {campaign.name}.
+            <strong>{active?.name}</strong> is paused. Its leads wait where they are, and lose nothing, until it is switched on again. Discovery, new leads and runs follow {campaign.name}.
           </p>
         </Confirm>
       )}

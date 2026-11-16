@@ -3,7 +3,8 @@
  * Pages compose these instead of repeating long class lists, so every screen looks and behaves
  * the same: one button family, one field style, one way to show loading, errors and saves.
  */
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseMutationResult, type UseQueryResult } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import {
   useEffect,
@@ -17,7 +18,8 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
-import { ApiProblem } from "../api/client";
+import { ApiProblem, client, ok } from "../api/client";
+import { isViewing, useCurrent } from "../app/session";
 import { cx } from "../lib/cx";
 
 // ------------------------------------------------------------------ buttons
@@ -589,5 +591,43 @@ export function Menu({ label, button, items, header, align = "right", tour, butt
         </div>
       )}
     </div>
+  );
+}
+
+/** "Start now" for work that waits for the next run. The worker also moves everything due every
+ * 15 minutes, so this only saves the wait. It says so when a run is already working. */
+export function StartNow({ label = "Start now" }: { label?: string }) {
+  const { workspace } = useCurrent();
+  const queryClient = useQueryClient();
+  const runs = useQuery({
+    queryKey: ["runs"],
+    queryFn: () => ok(client.GET("/api/runs")),
+    refetchInterval: (query) => (query.state.data?.some((r) => r.status === "queued" || r.status === "running") ? 2000 : 10000),
+  });
+  const start = useMutation({
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode: "manual" } })),
+    onSuccess: () => {
+      for (const key of ["runs", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  if (isViewing(workspace)) return null;
+  if (start.data)
+    return (
+      <span className="text-xs text-good" role="status">
+        Started.{" "}
+        <Link to="/runs/$runId" params={{ runId: start.data.id }} className="font-semibold underline">
+          Follow it
+        </Link>
+      </span>
+    );
+  if (runs.data?.some((r) => r.status === "queued" || r.status === "running"))
+    return <span className="text-xs text-muted">A run is already working; it, or the next one, picks this up.</span>;
+  return (
+    <>
+      <Button size="sm" variant="secondary" busy={start.isPending} onClick={() => start.mutate()}>
+        {label}
+      </Button>
+      <Problem error={start.error} />
+    </>
   );
 }

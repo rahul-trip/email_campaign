@@ -22,7 +22,8 @@ test("the tour opens on a first visit, and End tour closes it for good", async (
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(tour(page)).toBeHidden();
   // It can be started again by hand.
-  await page.getByRole("button", { name: "Tour" }).click();
+  await page.getByRole("button", { name: "Your account" }).click();
+  await page.getByRole("menuitem", { name: "Take the guided tour" }).click();
   await expect(tour(page)).toContainText("Welcome to Outbound");
 });
 
@@ -52,7 +53,8 @@ test("every step of the tour points at something that exists", async ({ page }) 
   await addTarget(page, { website: unique("tour-test"), country: "US" });
   await runEngine(page);
   await page.reload();
-  await page.getByRole("button", { name: "Tour" }).click();
+  await page.getByRole("button", { name: "Your account" }).click();
+  await page.getByRole("menuitem", { name: "Take the guided tour" }).click();
   for (let guard = 0; guard < 80 && (await tour(page).isVisible()); guard++) {
     // "none" is a centred message with nothing to point at; anything else must be found.
     await expect(tour(page), await tour(page).locator("h2").textContent() ?? "").toHaveAttribute("data-target-found", /true|none/);

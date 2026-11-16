@@ -15,7 +15,9 @@ test("add leads: check only saves nothing; upload is previewed before import", a
   await page.getByRole("button", { name: "1. Preview" }).click();
   await expect(page.getByText("Preview only: nothing has been saved.")).toBeVisible();
   await page.getByRole("button", { name: "2. Import" }).click();
-  await expect(page.getByText("Imported. The next run researches the accepted rows.")).toBeVisible();
+  await expect(page.getByText("Imported. The accepted rows are researched within 15 minutes")).toBeVisible();
+  await page.getByRole("button", { name: "Start now" }).click();
+  await expect(page.getByRole("link", { name: "Follow it" })).toBeVisible();
 });
 
 test("a company added by name waits for its website, and confirming it adds the lead", async ({ page }) => {

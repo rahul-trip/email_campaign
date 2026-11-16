@@ -115,7 +115,7 @@ export function LeadsPage() {
             action={
               filtered ? undefined : (
                 <Link to="/targets" className={buttonClass("primary")}>
-                  Add your first target
+                  Add your first lead
                 </Link>
               )
             }

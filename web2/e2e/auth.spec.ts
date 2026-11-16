@@ -68,7 +68,7 @@ test("a superadmin reads a workspace behind a banner and cannot change anything"
   await page.getByRole("link", { name: /default/ }).click();
   await expect(page.getByText("Superadmin view of default, read-only")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Add target" })).toHaveCount(0);
+  await expect(page.getByRole("banner").getByRole("link", { name: "Add leads" })).toHaveCount(0);
 
   const me = await (await page.request.get("/api/auth/me")).json();
   const workspace = me.workspaces.find((w: { slug: string }) => w.slug === "default").id;

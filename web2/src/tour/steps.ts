@@ -32,12 +32,12 @@ export const SECTIONS: Section[] = [
     steps: [
       {
         title: "Welcome to Outbound",
-        body: "This short tour shows each screen. Move on with Next, jump to the next screen with Skip section, or end it at any time. Start it again from Tour at the top right.",
+        body: "This short tour shows each screen. Move on with Next, jump to the next screen with Skip section, or end it at any time. Start it again from your account menu at the top right.",
       },
       {
         target: "nav",
         title: "The main menu",
-        body: "Work is what waits for you: emails to review and leads that need a decision. Pipeline is where companies go in and the engine runs. Items marked Soon arrive in later phases.",
+        body: "Work is the dashboard and what waits for you: emails to review and leads that need a decision. Leads is where companies go in, the engine runs, and your campaigns say who to reach. Workspace holds reports, policies and settings.",
       },
       {
         target: "workspace-switcher",
@@ -47,7 +47,7 @@ export const SECTIONS: Section[] = [
       {
         target: "user-menu",
         title: "Your account",
-        body: "Change your password, sign out other devices, or sign out.",
+        body: "Take the tour again, switch between light and dark, change your password, sign out other devices, or sign out.",
       },
       {
         target: "notifications",
@@ -96,7 +96,7 @@ export const SECTIONS: Section[] = [
       {
         target: "campaign-active",
         title: "One campaign is active",
-        body: "A workspace keeps several campaigns but one is active: discovery, new targets and runs follow it. Switch on makes another campaign the active one and pauses this one, whose leads wait where they are until it is switched on again. Until a workspace has an active campaign with job titles and an ideal customer, the app asks for one first.",
+        body: "A workspace keeps several campaigns but one is active: discovery, new leads and runs follow it. Switch on makes another campaign the active one and pauses this one, whose leads wait where they are until it is switched on again. Until a workspace has an active campaign with job titles and an ideal customer, the app asks for one first.",
       },
       {
         target: "campaign-brief",

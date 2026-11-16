@@ -166,7 +166,7 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
             <h2 className="mt-3 text-[15px] font-semibold">{step.title}</h2>
             <p className="mt-1 text-[13px] leading-relaxed text-ink">{step.body}</p>
             {leadNeeded(section.place) && firstLead.isSuccess && !leadId && (
-              <p className="mt-2 rounded-lg bg-attention-container p-2 text-xs text-on-attention-container">There is no lead yet, so there is nothing to point at. Add a target and start a run, then take the tour again.</p>
+              <p className="mt-2 rounded-lg bg-attention-container p-2 text-xs text-on-attention-container">There is no lead yet, so there is nothing to point at. Add a lead and start a run, then take the tour again.</p>
             )}
             {step.target && !box && !(leadNeeded(section.place) && firstLead.isSuccess && !leadId) && (
               <p className="mt-2 text-[11px] text-muted">This part of the screen appears once there is something to show.</p>

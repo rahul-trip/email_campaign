@@ -100,7 +100,7 @@ export function ReviewPage() {
       {queue.isSuccess && items.length === 0 && (
         <Card>
           <Empty icon={<CheckCircle2 className="size-8 text-good" />} title="The queue is clear" action={<Link to="/runs" className="text-xs font-semibold text-primary hover:underline">Start a run</Link>}>
-            New emails appear here when a run writes them. Add targets and start a run to fill the queue.
+            New emails appear here when a run writes them. Add leads and start a run to fill the queue.
           </Empty>
         </Card>
       )}
@@ -411,7 +411,7 @@ function Reader({ item, onDone }: { item: Item; onDone: () => void }) {
               </Button>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-muted">Approving does not send anything: the next run saves it as a draft in your mailbox.</p>
+          <p className="mt-2 text-[11px] text-muted">Approving does not send anything: within 15 minutes it is saved as a draft in your mailbox.</p>
           <Problem error={approve.error ?? rewrite.error} className="mt-3" />
         </Card>
 

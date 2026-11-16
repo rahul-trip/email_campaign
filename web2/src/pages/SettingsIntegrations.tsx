@@ -1,4 +1,4 @@
-/** Settings → Integrations: the address and secret other systems use to push targets in. */
+/** Settings → Integrations: the address and secret other systems use to push leads in. */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
@@ -133,7 +133,7 @@ const FIELDS: [string, string, string][] = [
   ["country", "Optional", "Name or code, for example UK, GB or Germany. Decides the country rule."],
   ["notes", "Optional", "Context the writer may use."],
   ["priority", "Optional", "A number; higher goes first."],
-  ["targets", "Instead of the fields above", "A list of up to 200 targets, each with the same fields. One event_id covers the whole list."],
+  ["targets", "Instead of the fields above", "A list of up to 200 leads, each with the same fields. One event_id covers the whole list."],
 ];
 
 function BodyFormat() {
@@ -145,7 +145,7 @@ function BodyFormat() {
           <CodeBlock label="one-target body" text={SINGLE} />
         </div>
         <div>
-          <div className="mb-1 text-xs font-medium">Several targets in one request</div>
+          <div className="mb-1 text-xs font-medium">Several leads in one request</div>
           <CodeBlock label="several-targets body" text={MANY} />
         </div>
         <div className="overflow-x-auto rounded-lg border border-line">
@@ -168,7 +168,7 @@ function BodyFormat() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted">The answer lists each target as accepted, merged into a lead you already have, or refused, with the reason.</p>
+        <p className="text-xs text-muted">The answer lists each lead as accepted, merged into a lead you already have, or refused, with the reason.</p>
       </div>
     </Card>
   );
