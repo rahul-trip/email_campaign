@@ -67,6 +67,9 @@ class Outcome:
     chosen: Record | None = None
     problems: list[str] = field(default_factory=list)
     catch_all_unverified: bool = False
+    # The resolver did not answer (an outage or a refused key), as distinct from answering
+    # "cannot prove it": nothing is recorded, so the lead can be tried again.
+    resolver_down: bool = False
 
     @property
     def pending(self) -> bool:
@@ -140,7 +143,7 @@ class Waterfall:
             tried.add(address)
             if self._check(address, provenance, found_by, contact, outcome):
                 return outcome
-            if outcome.pending or outcome.catch_all_unverified:
+            if outcome.pending or outcome.catch_all_unverified or outcome.resolver_down:
                 return outcome
 
         query = PersonQuery(
@@ -170,7 +173,7 @@ class Waterfall:
             )
             if self._check(address, provenance, finder.name, contact, outcome):
                 return outcome
-            if outcome.pending or outcome.catch_all_unverified:
+            if outcome.pending or outcome.catch_all_unverified or outcome.resolver_down:
                 return outcome
         return outcome
 
@@ -271,8 +274,7 @@ class Waterfall:
             ticket = self._resolver.submit(address)
         except ProviderError as error:
             out.problems.append(f"{self._resolver.name}: {error}")
-            record(EmailStatus.CATCH_ALL_UNVERIFIED)
-            out.catch_all_unverified = True
+            out.resolver_down = True
             return False
         if ticket.result is None:
             record(EmailStatus.CATCH_ALL_PENDING, ticket.ref)

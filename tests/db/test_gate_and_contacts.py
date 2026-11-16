@@ -291,3 +291,25 @@ def test_any_number_of_candidates_is_ranked(
     run_contacts(factory, ws)
     with factory(ws) as uow:
         assert [c.rank for c in uow.contacts.for_company(cid)] == list(range(1, count + 1))
+
+
+def test_a_lead_whose_people_cannot_decide_fails_and_says_what_to_do(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = qualified(factory, ws, ["Power System Engineer", "Lead Engineer", None])
+    run_contacts(factory, ws)
+    after = company(factory, ws, cid)
+    assert (after.status, after.failed_stage) == (C.FAILED, "contacts")
+    assert "none is a decision-maker" in (after.last_error or "")
+    assert "add the person you want to write to" in (after.last_error or "")
+
+
+def test_one_decision_maker_among_engineers_is_enough_and_comes_first(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = qualified(factory, ws, ["Power System Engineer", "Head of Operations", "Lead Engineer"])
+    run_contacts(factory, ws)
+    assert company(factory, ws, cid).status is C.CONTACTS_FOUND
+    with factory(ws) as uow:
+        first = min(uow.contacts.for_company(cid), key=lambda c: c.rank)
+    assert first.title == "Head of Operations"

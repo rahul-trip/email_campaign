@@ -421,6 +421,7 @@ A failed lead shows the step and the reason. The application retries automatical
 |---|---|---|
 | no valid email found for N contact(s) | Every address tried was invalid or unknown. Nothing is wrong with the system | If you know the right address, **Edit** the person and give it (the step is retried), or **Add a person** with their work email. If you know an address the check could not prove does work, press **Skip the check** next to it. A person with only a first name cannot be looked up by the finders (they need a full name), but an address you give is used as it is |
 | no decision-maker was found | The site named nobody and the search found nobody | Add a person yourself |
+| people were found, but none is a decision-maker | The site and the search named only people who cannot decide to buy (engineers, managers, or no title at all). Emails are written only to a founder, owner, C-level, vice president, director, head of, one of the campaign's job titles, or a person you add or choose | **Add a person** you want to write to (a person you add counts as chosen), then **Retry** |
 | the sender profile needs: legal_name, postal_address … | The footer cannot be filled | Fill in those fields in Settings → Sender profile, then Retry |
 | the sender profile needs signature_name | Still the placeholder signature | Set your signature, then Retry |
 | no contact has an address that is safe to send to | The chosen address is no longer usable | Check the lead's People section |

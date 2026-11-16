@@ -9,7 +9,7 @@ import pytest
 from outbound.domain.brief import Brief
 from outbound.domain.enums import LegalEntityType
 from outbound.providers.errors import BudgetExceeded, ProviderError
-from outbound.providers.ports import RegistryEntry, SearchHit
+from outbound.providers.ports import PageLink, PageText, RegistryEntry, SearchHit
 from outbound.stages.research.facts import (
     CORPORATE_TYPES,
     IncorporationMarkers,
@@ -34,6 +34,7 @@ from outbound.stages.research.graph import (
     published_addresses,
     run_research,
     search_people,
+    team_links,
 )
 from tests.stages.fakes import PAGES, TEAM_PAGE, FakeLlm, FakeRegistry, FakeSearch
 
@@ -721,3 +722,69 @@ def test_titles_that_are_kinds_of_company_are_not_searched_for() -> None:
     assert search.searches == []  # nothing to ask for: no search was made
     search_people(search, "Volue", "volue.com", ["BESS integrators", "CTO"])
     assert "BESS" not in search.searches[0] and '"CTO"' in search.searches[0]
+
+
+def test_the_sites_own_links_lead_to_the_team_page_the_fixed_paths_missed() -> None:
+    home = "https://acme.co.uk"
+    leadership = "https://acme.co.uk/company/leadership"
+    pages = {
+        home: "Acme builds forecasting software. " * 4,
+        leadership: "Our leadership team. Jane Doe is our Chief Technology Officer. " * 3,
+        "https://acme.co.uk/blog/post": "A post.",
+    }
+    links = {
+        home: [
+            PageLink(text="Leadership", url=leadership),
+            PageLink(text="Our blog", url="https://acme.co.uk/blog/post"),
+            PageLink(text="Leadership", url="https://other.com/leadership"),  # another website
+            PageLink(text="Report", url="https://acme.co.uk/about/report.pdf"),
+        ]
+    }
+    search = FakeSearch(pages, links=links)
+    _, llm, _ = run(base(), search=search)
+    assert search.extracted[1] == [leadership]  # one more request, for the one useful link
+    assert "Jane Doe" in llm.users["persona"]
+    assert len(search.extracted) == 2
+
+
+def test_links_to_other_sites_files_and_pages_already_read_are_not_followed() -> None:
+    page = PageText(
+        url="https://acme.co.uk",
+        text="x",
+        links=(
+            PageLink(text="Team", url="https://acme.co.uk/team"),  # already read
+            PageLink(text="Team", url="https://x.com/team"),
+            PageLink(text="Board report", url="https://acme.co.uk/board.pdf"),
+            PageLink(text="Management", url="https://www.acme.co.uk/management/"),
+            PageLink(text="Contact", url="https://acme.co.uk/contact"),
+        ),
+    )
+    assert team_links([page], "acme.co.uk", read={"https://acme.co.uk/team"}) == [
+        "https://www.acme.co.uk/management"
+    ]
+
+
+def test_when_the_site_names_only_engineers_the_public_search_finds_who_decides() -> None:
+    team = "Our team: Eve Engineer, Software Engineer, builds the forecasting models. " * 3
+    pages = {
+        "https://acme.co.uk": "Acme builds forecasting software.",
+        "https://acme.co.uk/team": team,
+    }
+    llm = FakeLlm({"persona": {"people": [{"name": "Eve Engineer", "title": "Software Engineer"}]}})
+    hits = [
+        SearchHit(
+            url="https://uk.linkedin.com/in/jane-doe-1",
+            title="Jane Doe - CTO - Acme Energy | LinkedIn",
+        )
+    ]
+    out, _, search = run(base(), llm=llm, search=FakeSearch(pages, hits))
+    assert {p.name for p in out.people} == {"Eve Engineer", "Jane Doe"}  # both kept
+    assert any(q.startswith('site:linkedin.com/in "Acme Energy"') for q in search.searches)
+
+
+def test_when_the_site_already_names_a_decision_maker_no_people_search_is_made() -> None:
+    llm = FakeLlm(
+        {"persona": {"people": [{"name": "Jane Doe", "title": "Chief Technology Officer"}]}}
+    )
+    _, _, search = run(base(), llm=llm)
+    assert not any("site:linkedin.com/in" in q and "VP of Sales" in q for q in search.searches)

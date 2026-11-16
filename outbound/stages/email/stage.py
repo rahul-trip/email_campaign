@@ -25,9 +25,11 @@ from outbound.domain.enums import (
 )
 from outbound.domain.names import display_name
 from outbound.domain.policies import PolicyOutcome
+from outbound.domain.ranking import can_be_written_to
 from outbound.metering.metered import call_scope
 from outbound.providers.ports import CatchAllResolver, EmailFinder, EmailVerifier
 from outbound.stages.base import StageContext, StageFailure, StageResult
+from outbound.stages.contacts import operator_chosen
 from outbound.stages.email.patterns import infer_pattern
 from outbound.stages.email.waterfall import Record, Target, Verdict, Waterfall
 from outbound.stages.policy import policy_decision_for
@@ -72,6 +74,19 @@ class EmailStage:
         )
         # "Find email again" on a person: only they are tried, with fresh vendor answers.
         asked = [(c, e) for c, e in people if c.refresh_email]
+        if not asked:
+            # Only people who can decide are written to: a decision-maker, or someone the
+            # operator chose. The first three of a team page are not enough reason to spend money.
+            wanted = ctx.campaign.target_titles if ctx.campaign else ()
+            picked = ctx.read(lambda uow: operator_chosen(uow, [c for c, _ in people]))
+            people = [
+                (c, e) for c, e in people if can_be_written_to(c, wanted, picked, first_counts=True)
+            ]
+        if not (asked or people):
+            raise StageFailure(
+                "nobody at this lead is a decision-maker or was chosen: add the person you want"
+                " to write to on the lead page, then retry"
+            )
         people = (asked or people)[:MAX_CONTACTS]
         target = Target(
             domain=company.domain,
@@ -86,6 +101,7 @@ class EmailStage:
         records: list[Record] = []
         problems: list[str] = []
         unverified = False
+        resolver_down = False
         chosen: Record | None = None
         chosen_contact: Contact | None = None
         pending = False
@@ -97,6 +113,7 @@ class EmailStage:
             records.extend(outcome.records)
             problems.extend(outcome.problems)
             unverified = unverified or outcome.catch_all_unverified
+            resolver_down = resolver_down or outcome.resolver_down
             if outcome.verdict is Verdict.READY:
                 chosen, chosen_contact = outcome.chosen, contact
                 break
@@ -151,6 +168,14 @@ class EmailStage:
                 hold_reason=HoldReason.CATCH_ALL_RESOLVING,
                 next_action_at=ctx.now + self._poll_delay,
                 write=write,
+            )
+        if resolver_down and chosen is None:
+            # Not "could not be proven": the check never happened. Failing sends the lead back
+            # for another try on the next pass (up to the attempt limit), where holding it
+            # would leave it for good.
+            raise StageFailure(
+                "a catch-all address was found but the catch-all resolver is not answering"
+                f" ({'; '.join(problems[:2])}): it is tried again on the next pass"
             )
         if unverified and target.safe_to_send_only:
             return StageResult(

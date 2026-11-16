@@ -16,6 +16,7 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
+from outbound.providers.errors import ProviderError
 from outbound.providers.ports import (
     FinderResult,
     PersonQuery,
@@ -97,8 +98,10 @@ def lead(
     country: str = "US",
     domain: str = "acme.com",
     site_emails: list[str] | None = None,
+    title: str | None = "Chief Executive Officer",
 ) -> str:
-    """A company at ``contacts_found`` with ranked contacts given as (first, last)."""
+    """A company at ``contacts_found`` with ranked contacts given as (first, last), each a
+    decision-maker unless ``title`` says otherwise."""
     seed(factory, ws)
     with factory(ws) as uow:
         company = uow.companies.create(
@@ -123,6 +126,7 @@ def lead(
                 full_name=f"{first} {last}",
                 first_name=first,
                 last_name=last,
+                title=title,
             )
         uow.commit()
         return company.id
@@ -300,6 +304,35 @@ def test_a_catch_all_without_a_resolver_holds_the_lead_as_unverified(
     assert (after.status, after.hold_reason) == (C.HELD, HoldReason.CATCH_ALL_UNVERIFIED)
 
 
+class BrokenResolver:
+    name = "scrubby"
+
+    def submit(self, email: str) -> ResolutionTicket:
+        raise ProviderError(self.name, "503 after retries")
+
+    def poll(self, ticket: ResolutionTicket) -> ResolutionResult | None:
+        return None
+
+
+def test_a_resolver_outage_fails_the_lead_to_be_tried_again_and_does_not_hold_it_for_good(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    run_stage(
+        factory,
+        ws,
+        [Finder("hunter", {"Doe": "jane.doe@acme.com"})],
+        Verifier({"jane.doe@acme.com": V.CATCH_ALL}),
+        BrokenResolver(),  # type: ignore[arg-type]
+    )
+    after = company(factory, ws, cid)
+    assert (after.status, after.failed_stage) == (C.FAILED, "email")
+    assert "resolver is not answering" in (after.last_error or "")
+    assert addresses(factory, ws, cid) == {}  # no "unverified" verdict was recorded
+    with factory(ws) as uow:
+        assert uow.companies.get(cid).attempts < 3  # the tick can still retry it
+
+
 # ------------------------------------------------------------------ asynchronous catch-all
 
 
@@ -403,3 +436,45 @@ def test_a_company_released_by_hand_is_not_touched_by_the_poller(
         uow.commit()
     counts = poller(factory, ws, resolver, NOW + timedelta(hours=7)).run()
     assert counts["checked"] == 0
+
+
+def test_only_a_decision_maker_is_written_to_not_the_first_names_on_a_team_page(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Eve", "Engineer"), ("Sam", "Lee")], title="Power System Engineer")
+    with factory(ws) as uow:
+        eve, sam = uow.contacts.for_company(cid)
+        uow.contacts.update_fields(sam.id, {"title": "Chief Technology Officer", "rank": 2},
+                                   actor="system")  # fmt: skip
+        uow.contacts.update_fields(eve.id, {"rank": 3}, actor="system")
+        uow.commit()
+    finder = Finder("hunter", {"Lee": "sam.lee@acme.com"})
+    run_stage(factory, ws, [finder], Verifier({"sam.lee@acme.com": V.VALID}))
+    assert finder.calls == ["Lee"]  # the engineer was never looked up
+    assert company(factory, ws, cid).status is C.EMAIL_READY
+
+
+def test_a_lead_with_nobody_who_can_decide_fails_with_what_to_do(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Eve", "Engineer"), ("Tom", "Tech")], title="Software Engineer")
+    with factory(ws) as uow:
+        eve, tom = uow.contacts.for_company(cid)
+        uow.contacts.update_fields(eve.id, {"rank": 2}, actor="system")
+        uow.contacts.update_fields(tom.id, {"rank": 3}, actor="system")
+        uow.commit()
+    finder = Finder("hunter", {})
+    run_stage(factory, ws, [finder], Verifier({}))
+    assert finder.calls == []
+    failed = company(factory, ws, cid)
+    assert failed.status is C.FAILED and "decision-maker" in (failed.last_error or "")
+
+
+def test_a_person_the_operator_moved_to_the_front_is_written_to_whatever_their_title(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Eve", "Engineer")], title="Software Engineer")
+    finder = Finder("hunter", {"Engineer": "eve.engineer@acme.com"})
+    run_stage(factory, ws, [finder], Verifier({"eve.engineer@acme.com": V.VALID}))
+    assert finder.calls == ["Engineer"]  # rank 1: chosen, as "write to someone else" leaves it
+    assert company(factory, ws, cid).status is C.EMAIL_READY

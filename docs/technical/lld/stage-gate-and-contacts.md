@@ -84,12 +84,13 @@ flowchart TD
 1. Read the lead's contacts and keep the workable ones (`candidate`, `active`).
 2. If none are workable, raise `StageFailure`, so the lead fails at `contacts` with a reason that tells the operator what to do:
    - "the only people found could not be confirmed to work here: confirm one on the lead page, or add a person you know", when there are only `unconfirmed` people;
-   - "no decision-maker was found on the site or in a public search", otherwise.
+   - "no decision-maker was found on the site or in a public search", otherwise;
+   - "people were found, but none is a decision-maker … add the person you want to write to on the lead page, then retry", when people exist but none can decide (`ranking.can_be_written_to`: a decision-maker, or someone the operator added or chose).
 3. Work out who the operator chose (`operator_chosen`: an active consent, or an `operator_given` address).
 4. `rank_contacts(usable, campaign.target_titles, chosen)`. The rules are in [domain: ranking](domain.md#ranking).
 5. Return `contacts_found`. The write saves each person's rank and seniority.
 
-Only the top three ranked people are tried by the email stage.
+Only the top three ranked people who can be written to are tried by the email stage (`ranking.can_be_written_to`, with the person ranked first always counting: a lead ranked here has a decision-maker or an operator's choice first, and *Write to someone else* puts the chosen person there).
 
 ## Invariants
 
@@ -133,7 +134,7 @@ Neither stage logs events of its own. The runner logs `stage_done`, `stage_faile
 
 ## Known limitations
 
-- On a seniority tie a VP outranks a C-level person ([R-21](../tech-debt-and-risks.md#r-21--p3--ranking-a-vp-outranks-a-c-level-person-on-a-seniority-tie)).
+- A person without a title cannot be known to be a decision-maker ([R-38](../tech-debt-and-risks.md)).
 - People without titles rank last among the engine's finds (Phase 3b D1).
 
 ## Planned

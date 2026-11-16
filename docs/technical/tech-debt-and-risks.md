@@ -192,13 +192,6 @@ Read in `outbound/api/auth.py` and `deploy/`:
   - `messages.mailbox_id` is never set.
 - **Links:** Phase 3b B8, Phase 4, [deliver and sync LLD](lld/stage-deliver-and-sync.md).
 
-### R-21 · P3 · Ranking: a VP outranks a C-level person on a seniority tie
-
-- **What:** `outbound/domain/ranking.py::_LEVELS` lists `vp` before `c_level`, so that "vice president" is matched before the `president` pattern. `_level_index` uses the same order for ranking. When neither person holds a wanted title, a "VP Marketing" is ranked above a "Chief Executive Officer".
-- **Verified 2026-10-21:** `seniority_of` and `_level_index` give `vp` 0 and `c_level` 1.
-- **Effect:** small. Wanted titles and operator choices come first, and this only decides ties. No test or document says whether it is intended.
-- **Fix:** decide the intended order. If C-level should come first, keep the matching order and rank by a separate list. Then add a test.
-
 ### R-23 · P2 · Privacy: no way to answer a subject-access request
 
 - **What:** GDPR Art. 15 (and the UK GDPR) gives a person the right to a copy of the data held about them. The system can erase a person (`PrivacyService.forget`), but it has no command, endpoint or screen that gathers what is held about one address or name across `contacts`, `contact_emails`, `consents`, `notes`, `messages`, `provider_calls`, `import_rows` and `events`.
@@ -272,6 +265,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Read:** `.github/workflows/ci.yml` (job `security`), `.github/dependabot.yml`.
 
 ## Closed entries
+
+### R-38 · P1 · People: engineers and nobody at all were the recipients — closed 2026-11-16 (includes R-21)
+
+- **Was:** of 33 researched leads, 8 had no person and 5 failed at contacts; of those that reached the email step, the top-ranked people included a "Power System Engineer", a "Lead Engineer", a "Bachelor of Commerce" and an insurance agent at another company, and one draft was addressed to a person whose title was "Renewable Energy Sources". Four causes: (1) research read five fixed paths (`/`, `/about`, `/team`, `/news`, `/contact`), so a team page at `/company/leadership` was never read (only 8 of 33 leads had all five read, 6 had one); (2) `persona_node` searched LinkedIn only when the site named nobody, so a site that named one engineer ended the search; (3) `EmailStage` tried the top three people whoever they were, and the finders were paid for each; (4) R-21: `_LEVELS` listed `vp` before `c_level`, so a VP outranked a CEO.
+- **Fixed by:** `pages_node` asks for the home pages' links (`extract(..., links=True)`) and reads up to three more pages of the company's own site whose path or link text says leadership, management, team, board, founders, people or about (`team_links`; one more extract request, at most); `persona_node` also runs `search_people` when none of the site's people is a decision-maker (`domain/ranking.py::is_decision_maker`: a campaign's wanted title, or founder, owner, C-level, vice president, director or head of), and `search_people` makes two searches of two titles each, ten results each; `ContactsStage` fails a lead whose people include no decision-maker, with what to do ("add the person you want to write to on the lead page, then retry"); `EmailStage` looks up only decision-makers, people the operator added or chose, or the person ranked first (what *Write to someone else* leaves); `_LEVELS` puts `c_level` before `vp` (R-21 closed).
+- **Evidence:** `tests/domain/test_ranking.py`, `tests/stages/test_research_graph.py`, `tests/db/test_gate_and_contacts.py`, `tests/db/test_email_stage.py`.
+- **Still open:** `is_decision_maker` goes by words in a title, so "Assistant to the Chief Executive" counts and a title in another language does not. A person without a title cannot be known to decide, so a lead whose site lists only names with no titles waits for the operator. The extra people search costs up to two searches a lead (cached per company).
 
 ### R-37 · P2 · Scoring: a brief with no must-haves scored every company 60, and job titles that were kinds of company — closed 2026-11-16
 

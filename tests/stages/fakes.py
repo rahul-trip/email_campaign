@@ -10,6 +10,7 @@ from typing import Any, ClassVar
 from outbound.providers.ports import (
     CompanyMention,
     LlmResult,
+    PageLink,
     PageText,
     RegistryEntry,
     SearchHit,
@@ -172,7 +173,9 @@ class FakeSearch:
         hits: list[SearchHit] | None = None,
         news: list[SearchHit] | None = None,
         market_news: list[SearchHit] | None = None,
+        links: dict[str, list[PageLink]] | None = None,
     ) -> None:
+        self.links = links or {}  # the links a page holds, given when asked for
         self.pages = {} if pages is None else pages
         self.hits = hits or []
         self.news = news or []  # answers the search for the company's own news
@@ -192,7 +195,11 @@ class FakeSearch:
 
     def extract(self, urls: list[str], *, links: bool = False) -> list[PageText]:
         self.extracted.append(urls)
-        return [PageText(url=u, text=self.pages[u]) for u in urls if u in self.pages]
+        return [
+            PageText(url=u, text=self.pages[u], links=tuple(self.links.get(u, ())) if links else ())
+            for u in urls
+            if u in self.pages
+        ]
 
 
 class FakeRegistry:
