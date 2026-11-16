@@ -258,6 +258,11 @@ export const SECTIONS: Section[] = [
         body: "The share of first emails sent without an edit (the target is 8 of 10), how many were flagged, and spend per prospect against the budget.",
       },
       {
+        target: "reports-funnel",
+        title: "From a company found to a draft",
+        body: "Follow what discovery found: how many companies it named, how many the model actually read, how many became leads, and where those leads are now (waiting, disqualified, failed at a step, held, or a draft ready). The last column shows each vendor's failure rate: a vendor that fails most calls explains leads that stall.",
+      },
+      {
         target: "reports-sources",
         title: "Where good leads come from",
         body: "For each place discovery looks (the Y Combinator directory, Companies House, Exa, lists and articles): how many companies it named, how many became leads and how many passed the fit check. Discovery asks the sources whose leads pass most often first, and for more of them.",

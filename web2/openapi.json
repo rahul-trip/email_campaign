@@ -2700,6 +2700,82 @@
         "title": "ForgotIn",
         "type": "object"
       },
+      "FunnelOut": {
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "judged": {
+            "title": "Judged",
+            "type": "integer"
+          },
+          "judged_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judged Share"
+          },
+          "lead_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Share"
+          },
+          "leads": {
+            "title": "Leads",
+            "type": "integer"
+          },
+          "named": {
+            "title": "Named",
+            "type": "integer"
+          },
+          "outcomes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Outcomes",
+            "type": "object"
+          },
+          "vendors": {
+            "items": {
+              "$ref": "#/components/schemas/VendorErrorsOut"
+            },
+            "title": "Vendors",
+            "type": "array"
+          },
+          "verdicts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Verdicts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "days",
+          "named",
+          "judged",
+          "judged_share",
+          "lead_share",
+          "verdicts",
+          "leads",
+          "outcomes",
+          "vendors"
+        ],
+        "title": "FunnelOut",
+        "type": "object"
+      },
       "GrantIn": {
         "additionalProperties": false,
         "properties": {
@@ -6985,6 +7061,34 @@
           "cap_micro_usd"
         ],
         "title": "VendorCapIn",
+        "type": "object"
+      },
+      "VendorErrorsOut": {
+        "properties": {
+          "calls": {
+            "title": "Calls",
+            "type": "integer"
+          },
+          "error_rate": {
+            "title": "Error Rate",
+            "type": "number"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "calls",
+          "errors",
+          "error_rate"
+        ],
+        "title": "VendorErrorsOut",
         "type": "object"
       },
       "VendorKeyIn": {
@@ -12464,6 +12568,52 @@
           }
         },
         "summary": "Cost",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/reports/funnel": {
+      "get": {
+        "description": "From a company found to a draft in Review: what became of each, and which vendors fail.",
+        "operationId": "funnel_api_reports_funnel_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 30,
+              "maximum": 365,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunnelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Funnel",
         "tags": [
           "runs"
         ]

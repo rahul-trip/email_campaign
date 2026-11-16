@@ -41,7 +41,7 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `brief.py` | `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
 | `autodiscovery.py` | `AutoDiscovery.queue_due` (decides, and queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
 | `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`, `requested_only`: the worker's `sync` runs and its timer pipeline runs, which have no `mode` in their params, are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
-| `reports.py` | `ReportService` (`status`, `quality`, `cost`) | CLI `status`, `report`; API runs router |
+| `reports.py` | `ReportService` (`status`, `quality`, `funnel`, `sources`, `cost`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
 | `webhook.py` | `WebhookService.receive`, `sign`, `verify` | API webhook router |
 | `seed.py` | `seed_defaults` | CLI `seed` (and the `migrate` service on every deploy) |
@@ -160,6 +160,7 @@ Details: [data lifecycle](../data/data-lifecycle.md#the-three-ways-out).
 - **Reports** (`ReportService`, over `ReportRepository`):
   - `status`: counts by status, the review queue, holds;
   - `quality`: unedited share of sent touch-1 emails against the 80 % target, flag rate, holds by reason, catch-all share;
+  - `funnel(days)`: what discovery named (and how many the model scored), the screening verdicts, where the leads added in the period are now (`outcome`: `waiting`, `failed:<stage>`, `held:<reason>` or the status) and each vendor's calls and failures, cache hits not counted;
   - `cost`: spend by vendor and per prospect over a window.
 
 ## Webhook

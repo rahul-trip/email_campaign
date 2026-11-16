@@ -157,6 +157,14 @@ export function describeHold(reason: string): HoldInfo {
   return holdReason[reason] ?? { label: humanize(reason), why: "", fix: "", action: "decide" };
 }
 
+/** Where a lead is, from the funnel report's key (``waiting``, ``failed:<stage>``, ``held:<reason>``, a status). */
+export function leadOutcome(key: string): string {
+  if (key === "waiting") return "Waiting to start";
+  if (key.startsWith("failed:")) return `Failed at ${humanize(key.slice(7)).toLowerCase()}`;
+  if (key.startsWith("held:")) return `Held: ${describeHold(key.slice(5)).label.toLowerCase()}`;
+  return humanize(key);
+}
+
 /** The eight stages a lead passes through, as the journey page names them. */
 export const STAGES = ["Intake", "Research", "Qualification", "People", "Email address", "Copy", "Review", "Draft and outreach"] as const;
 

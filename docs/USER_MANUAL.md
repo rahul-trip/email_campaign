@@ -297,7 +297,7 @@ Run states: *Queued* (waiting for the worker), *Running*, *Succeeded*, *Failed* 
 
 ### 5.7 Reports
 
-Quality since the start (sent without an edit against the 80% target, flagged share, catch-all share), spend for the period you choose (7, 30 or 90 days, or a year: total, per prospect against your budget, and how many calls were answered from the cache), where leads are held, and cost per vendor: calls, spend and average cost per call, which is what the vendor bake-off decides on. **Where good leads come from** lists each place discovery looks (Y Combinator, Companies House, Exa, lists and articles) with how many companies it named over the last 90 days, how many became leads and how many passed the fit check; discovery asks the best ones first.
+Quality since the start (sent without an edit against the 80% target, flagged share, catch-all share), spend for the period you choose (7, 30 or 90 days, or a year: total, per prospect against your budget, and how many calls were answered from the cache), where leads are held, and cost per vendor: calls, spend and average cost per call, which is what the vendor bake-off decides on. **From a company found to a draft** follows the period you chose: the companies discovery named (and how many of them the model read), what screening decided, where the leads added in that time are now (waiting, disqualified at the fit check, failed at a step, held and why, or ready for review) and how often each vendor failed. The same table is `outbound report funnel --days 30`. **Where good leads come from** lists each place discovery looks (Y Combinator, Companies House, Exa, lists and articles) with how many companies it named over the last 90 days, how many became leads and how many passed the fit check; discovery asks the best ones first.
 
 ### 5.7a What the lead page shows from research
 
@@ -494,6 +494,7 @@ Everything in the browser can also be done from the terminal. Run from the proje
 | `uv run outbound retry` | Sends failed leads back to the step that failed |
 | `uv run outbound status` | Counts by status, holds and their reasons, failures |
 | `uv run outbound report quality` | How many sent emails went out unedited, how many were flagged, holds by reason |
+| `uv run outbound report funnel --days 30` | From companies found to drafts: what discovery named, where the leads are now, which vendors fail |
 | `uv run outbound report cost --days 30` | Spend per vendor and per company |
 | `uv run outbound delete-lead acme.com [--suppress] [--yes]` | Permanently deletes a lead (asks you to type the domain; `--suppress` also blocks the domain) |
 | `uv run outbound forget EMAIL` / `suppress VALUE` | Erases a person on request / stops all contact with an address or domain |
