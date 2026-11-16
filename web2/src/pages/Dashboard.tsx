@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, CheckCircle2, Play, Plus, Workflow } from "lucide-react";
+import { ArrowRight, CheckCircle2, Play, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { useCurrent } from "../app/session";
@@ -67,14 +67,9 @@ export function DashboardPage() {
         title="Dashboard"
         subtitle={status.isSuccess ? `${total} companies · ${inPipeline} on the main path · ${toReview + heldTotal + failed + toConfirm} items need you` : "Loading…"}
         actions={
-          <>
-            <Link to="/targets" className={buttonClass("primary")}>
-              <Plus className="size-4" aria-hidden /> Add leads
-            </Link>
-            <Link to="/runs" className={buttonClass("secondary")}>
-              <Play className="size-3.5 fill-current" aria-hidden /> Runs
-            </Link>
-          </>
+          <Link to="/runs" className={buttonClass("secondary")}>
+            <Play className="size-3.5 fill-current" aria-hidden /> Runs
+          </Link>
         }
       />
 

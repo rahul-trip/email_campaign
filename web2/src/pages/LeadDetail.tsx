@@ -70,10 +70,12 @@ export function LeadDetailPage() {
   const retry = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/retry", path)), onSuccess: refresh });
   const requalify = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/requalify", path)), onSuccess: refresh });
   const [researching, setResearching] = useState(false);
+  const [researchQueued, setResearchQueued] = useState(false);
   const researchAgain = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/research-again", path)),
     onSuccess: () => {
       setResearching(false);
+      setResearchQueued(true);
       refresh();
     },
   });
@@ -194,6 +196,11 @@ export function LeadDetailPage() {
       </div>
 
       <div className="mb-5 space-y-3">
+        {researchQueued && company.status === "new" && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            Queued for research again, within 15 minutes, or now: <StartNow />
+          </p>
+        )}
         <Problem error={retry.error ?? requalify.error} />
         {company.status === "failed" && (
           <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
@@ -830,6 +837,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
           <UserPlus className="size-3.5" aria-hidden /> {consented && heldForConsent ? "Add person and release the hold" : "Add person"}
         </Button>
         <SaveNote mutation={add} done={doneText} />
+        {add.isSuccess && consented && heldForConsent && <StartNow />}
       </div>
     </Card>
   );

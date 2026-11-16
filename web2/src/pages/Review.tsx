@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { FitBadge } from "../components/FitBadge";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton, Textarea } from "../components/ui";
+import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton, StartNow, Textarea } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, when, words } from "../lib/format";
 import { describe, emailStatus, isSafeToSend } from "../lib/status";
@@ -44,6 +44,8 @@ export function ReviewPage() {
   const { message } = useSearch({ from: "/review" });
   const [selected, setSelected] = useState<string | null>(message ?? null);
   const [showKeys, setShowKeys] = useState(false);
+  const status = useQuery({ queryKey: ["status"], queryFn: () => ok(client.GET("/api/status")), refetchInterval: 5000 });
+  const approved = status.data?.by_status?.approved ?? 0;
   // Hot leads first, so the emails that always need you are not buried; the rest keep their order.
   const items = [...(queue.data ?? [])].sort((a, b) => Number(b.company.hot) - Number(a.company.hot));
   const index = Math.max(0, items.findIndex((item) => item.message.id === selected));
@@ -101,6 +103,11 @@ export function ReviewPage() {
         <Card>
           <Empty icon={<CheckCircle2 className="size-8 text-good" />} title="The queue is clear" action={<Link to="/runs" className="text-xs font-semibold text-primary hover:underline">Start a run</Link>}>
             New emails appear here when a run writes them. Add leads and start a run to fill the queue.
+            {approved > 0 && (
+              <span className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                {approved} approved email{approved === 1 ? " is" : "s are"} saved as drafts within 15 minutes, or now: <StartNow />
+              </span>
+            )}
           </Empty>
         </Card>
       )}
