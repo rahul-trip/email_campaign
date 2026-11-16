@@ -23,7 +23,7 @@ const SUGGESTIONS = ["More formal.", "Warmer and more personal.", "Shorter.", "M
 const checksFor = (low: number, high: number): [string, string][] => [
   ["length", `Length ${low}–${high} words, greeting, sign-off and footer excluded`],
   ["subject", "Subject 2–6 words, lower case"],
-  ["reading_level", "Reading grade 10 or lower"],
+  ["reading_level", "Reading grade 12 or lower"],
   ["call_to_action", "One or two questions, with a clear ask at the end"],
   ["bullets", "Paragraphs, no bullet lists"],
   ["dashes", "At most one em dash"],

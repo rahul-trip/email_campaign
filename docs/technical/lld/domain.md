@@ -111,7 +111,7 @@ The function knows nothing about skips or recipients. `outbound/stages/policy.py
 |---|---|
 | `length` | 50–85 words for step 0; 25–50 for follow-ups |
 | `subject` | 2–5 words, all lower case |
-| `reading_level` | Flesch–Kincaid grade ≤ 6.5 (computed in `reading_grade`, no external word list) |
+| `reading_level` | Flesch–Kincaid grade ≤ 12 (`LintRules.max_reading_grade`; computed in `reading_grade`, no external word list) |
 | `call_to_action` | Exactly one `?` |
 | `links` | No link in step 0 |
 | `address_in_body` | No email address in the body |
