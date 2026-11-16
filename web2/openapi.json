@@ -578,6 +578,16 @@
             "title": "Research Questions",
             "type": "array"
           },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
           "target_titles": {
             "items": {
               "type": "string"
@@ -13514,6 +13524,49 @@
         ]
       }
     },
+    "/api/settings/campaigns/{campaign_id}/activate": {
+      "post": {
+        "description": "Switch this campaign on; the active one is paused and its leads wait.",
+        "operationId": "activate_campaign_api_settings_campaigns__campaign_id__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Campaign",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
       "post": {
         "operationId": "regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post",
@@ -13551,6 +13604,48 @@
           }
         },
         "summary": "Regenerate Campaign Brief",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/campaigns/{campaign_id}/pause": {
+      "post": {
+        "operationId": "pause_campaign_api_settings_campaigns__campaign_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Campaign",
         "tags": [
           "settings"
         ]

@@ -8,13 +8,14 @@ from typing import Any
 
 from sqlalchemy import func, or_, select
 
-from outbound.db.models import CompanyRow
+from outbound.db.models import CampaignRow, CompanyRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
 from outbound.domain.discovery import QUALIFIED
 from outbound.domain.entities import Company
 from outbound.domain.enums import (
+    CampaignStatus,
     CompanySource,
     CompanyStatus,
     EntityType,
@@ -51,6 +52,15 @@ EDITABLE_FIELDS = frozenset(
 
 
 class CompanyRepository(ScopedRepository):
+    def _in_a_live_campaign(self) -> Any:
+        """A lead is worked on only while its campaign is the active one. A lead with no
+        campaign (added by hand) is not held back."""
+        active = select(CampaignRow.id).where(
+            CampaignRow.workspace_id == self._workspace_id,
+            CampaignRow.status == CampaignStatus.ACTIVE,
+        )
+        return or_(CompanyRow.campaign_id.is_(None), CompanyRow.campaign_id.in_(active))
+
     def create(
         self,
         *,
@@ -126,6 +136,7 @@ class CompanyRepository(ScopedRepository):
                     None
                 ),  # waiting for credits: not due until released
                 or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
+                self._in_a_live_campaign(),  # a paused campaign's leads wait
             )
             .order_by(CompanyRow.priority, CompanyRow.created_at, CompanyRow.id)
             .limit(limit)
@@ -140,6 +151,7 @@ class CompanyRepository(ScopedRepository):
             CompanyRow.status.in_(statuses),
             CompanyRow.credit_wait_step.is_(None),
             or_(CompanyRow.next_action_at.is_(None), CompanyRow.next_action_at <= moment),
+            self._in_a_live_campaign(),
         )
         return self._session.scalars(stmt.limit(1)).first() is not None
 

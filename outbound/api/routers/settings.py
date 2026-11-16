@@ -122,6 +122,25 @@ def update_campaign(
 
 
 @router.post(
+    "/campaigns/{campaign_id}/activate",
+    response_model=CampaignOut,
+    dependencies=[Depends(require(P.CAMPAIGNS_WRITE))],
+)
+def activate_campaign(campaign_id: str, svc: Annotated[Services, Depends(services)]) -> CampaignOut:
+    """Switch this campaign on; the active one is paused and its leads wait."""
+    return _campaign(svc.settings.activate_campaign(campaign_id))
+
+
+@router.post(
+    "/campaigns/{campaign_id}/pause",
+    response_model=CampaignOut,
+    dependencies=[Depends(require(P.CAMPAIGNS_WRITE))],
+)
+def pause_campaign(campaign_id: str, svc: Annotated[Services, Depends(services)]) -> CampaignOut:
+    return _campaign(svc.settings.pause_campaign(campaign_id))
+
+
+@router.post(
     "/campaigns/{campaign_id}/brief/regenerate",
     response_model=CampaignOut,
     dependencies=[Depends(require(P.CAMPAIGNS_WRITE))],

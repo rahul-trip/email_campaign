@@ -20,6 +20,7 @@ from outbound.db.repositories.base import EventRepository, ScopedRepository, sna
 from outbound.db.types import utcnow
 from outbound.domain.entities import Campaign, Workspace
 from outbound.domain.enums import (
+    CampaignStatus,
     CredentialPurpose,
     MailboxGateway,
     MailboxStatus,
@@ -198,6 +199,7 @@ class CampaignRepository(ScopedRepository):
         research_questions: list[str] | None = None,
         cadence_days: list[int] | None = None,
     ) -> Campaign:
+        # The first campaign is the active one; a later one waits to be switched on.
         row = CampaignRow(
             workspace_id=self._workspace_id,
             name=name,
@@ -206,6 +208,7 @@ class CampaignRepository(ScopedRepository):
             min_fit_score=min_fit_score,
             research_questions=research_questions or [],
             cadence_days=cadence_days or [0, 3, 8],
+            status=CampaignStatus.PAUSED if self.active() else CampaignStatus.ACTIVE,
         )
         self._session.add(row)
         self._session.flush()
@@ -220,6 +223,38 @@ class CampaignRepository(ScopedRepository):
 
     def get(self, campaign_id: str) -> Campaign:
         return snapshot(self._row(CampaignRow, campaign_id), Campaign)
+
+    def active(self) -> Campaign | None:
+        """The workspace's one active campaign, if it has one."""
+        stmt = select(CampaignRow).where(
+            CampaignRow.workspace_id == self._workspace_id,
+            CampaignRow.status == CampaignStatus.ACTIVE,
+        )
+        row = self._session.scalars(stmt).first()
+        return snapshot(row, Campaign) if row else None
+
+    def activate(self, campaign_id: str) -> Campaign:
+        """Switch this campaign on and every other one off, in one step."""
+        row = self._row(CampaignRow, campaign_id)
+        self._session.execute(
+            update(CampaignRow)
+            .where(
+                CampaignRow.workspace_id == self._workspace_id,
+                CampaignRow.status == CampaignStatus.ACTIVE,
+                CampaignRow.id != campaign_id,
+            )
+            .values(status=CampaignStatus.PAUSED)
+            .execution_options(synchronize_session="fetch")
+        )
+        row.status = CampaignStatus.ACTIVE
+        self._session.flush()
+        return snapshot(row, Campaign)
+
+    def pause(self, campaign_id: str) -> Campaign:
+        row = self._row(CampaignRow, campaign_id)
+        row.status = CampaignStatus.PAUSED
+        self._session.flush()
+        return snapshot(row, Campaign)
 
     def all(self) -> list[Campaign]:
         stmt = (

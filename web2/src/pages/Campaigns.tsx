@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Megaphone, Plus, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { Button, Callout, Card, Empty, Field, Input, PageHeader, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
+import { Button, Callout, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
 import { lines } from "../lib/format";
 
 type Campaign = Schemas["CampaignOut"];
@@ -27,7 +27,7 @@ export function CampaignsPage() {
       />
       <div className="space-y-5">
         {adding && (
-          <Card title="New campaign">
+          <Card title="New campaign" subtitle="It starts paused when another campaign is active; switch it on when it is ready.">
             <CampaignForm
               onSaved={() => {
                 setAdding(false);
@@ -49,7 +49,20 @@ export function CampaignsPage() {
               <>
                 {all.map((c, i) => (
                   <div key={c.id} className="space-y-5">
-                    <Card title={c.name} subtitle={`Minimum fit ${c.min_fit_score} · ${c.target_titles.length} job title${c.target_titles.length === 1 ? "" : "s"}`}>
+                    <Card
+                      collapsible
+                      defaultOpen={c.status === "active"}
+                      title={
+                        <span className="flex flex-wrap items-center gap-2">
+                          {c.name}
+                          <span className={c.status === "active" ? "rounded-full bg-good-container px-2 py-0.5 text-[11px] font-medium text-on-good-container" : "rounded-full bg-surface-container px-2 py-0.5 text-[11px] font-medium text-muted"}>
+                            {c.status === "active" ? "Active" : "Paused"}
+                          </span>
+                        </span>
+                      }
+                      subtitle={`Minimum fit ${c.min_fit_score} · ${c.target_titles.length} job title${c.target_titles.length === 1 ? "" : "s"}`}
+                      actions={<CampaignSwitch campaign={c} active={all.find((x) => x.status === "active")} onDone={saved} />}
+                    >
                       {(c.title_warnings ?? []).length > 0 && (
                         <Callout tone="attention" title="Check the job titles" className="mb-4">
                           <ul className="list-disc pl-4">
@@ -71,6 +84,55 @@ export function CampaignsPage() {
       </div>
     </>
   );
+}
+
+/** Switch a campaign on (pausing the active one, whose leads then wait) or pause the active one. */
+function CampaignSwitch({ campaign, active, onDone }: { campaign: Campaign; active?: Campaign; onDone: () => void }) {
+  const queryClient = useQueryClient();
+  const [asking, setAsking] = useState(false);
+  const path = { params: { path: { campaign_id: campaign.id } } };
+  const done = () => {
+    setAsking(false);
+    onDone();
+    for (const key of ["setup", "runs", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
+  const on = useMutation({ mutationFn: () => ok(client.POST("/api/settings/campaigns/{campaign_id}/activate", path)), onSuccess: done });
+  const off = useMutation({ mutationFn: () => ok(client.POST("/api/settings/campaigns/{campaign_id}/pause", path)), onSuccess: done });
+  if (campaign.status === "active")
+    return (
+      <>
+        <Button size="sm" variant="secondary" busy={off.isPending} onClick={() => off.mutate()}>
+          Pause
+        </Button>
+        <Problem error={off.error} />
+      </>
+    );
+  return (
+    <>
+      <Button size="sm" onClick={() => (active ? setAsking(true) : on.mutate())} busy={on.isPending && !asking}>
+        Switch on
+      </Button>
+      {asking && (
+        <Confirm title={`Switch on ${campaign.name}?`} confirmLabel="Switch on" busy={on.isPending} error={on.error} onClose={() => setAsking(false)} onConfirm={() => on.mutate()}>
+          <p>
+            <strong>{active?.name}</strong> is paused. Its leads wait where they are, and lose nothing, until it is switched on again. Discovery, new targets and runs follow {campaign.name}.
+          </p>
+        </Confirm>
+      )}
+    </>
+  );
+}
+
+/** The workspace starts with one empty campaign; this fills it in. */
+export function FirstCampaign({ onSaved }: { onSaved?: () => void }) {
+  const queryClient = useQueryClient();
+  const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
+  const saved = () => {
+    void campaigns.refetch();
+    void queryClient.invalidateQueries({ queryKey: ["setup"] });
+    onSaved?.();
+  };
+  return <QueryState query={campaigns}>{(all) => <CampaignForm campaign={all.find((c) => c.status === "active") ?? all[0]} onSaved={saved} />}</QueryState>;
 }
 
 export function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campaign; onSaved: () => void; onCancel?: () => void }) {
@@ -205,6 +267,8 @@ function BriefCard({ campaign, onSaved, tour }: { campaign: Campaign; onSaved: (
   const empty = !campaign.icp_brief;
   return (
     <Card
+      collapsible
+      defaultOpen={campaign.status === "active"}
       tour={tour}
       title="Who we look for"
       subtitle="Discovery searches from this, drops companies that do not fit it, and research checks each lead against it."

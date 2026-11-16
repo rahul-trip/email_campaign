@@ -728,6 +728,7 @@ class CampaignOut(Out):
     research_questions: list[str]
     cadence_days: list[int]
     icp_brief: dict[str, Any] | None = None
+    status: Literal["active", "paused", "archived"] = "active"
     brief_gaps: list[str] = []  # what the brief leaves out that weakens discovery and scoring
     title_warnings: list[str] = []  # wanted "job titles" that are not jobs
 

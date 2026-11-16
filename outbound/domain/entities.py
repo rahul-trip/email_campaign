@@ -13,6 +13,7 @@ from typing import Any
 from outbound.domain.enums import (
     AuthTokenPurpose,
     CallOutcome,
+    CampaignStatus,
     CandidateVerdict,
     CompanySource,
     CompanyStatus,
@@ -211,6 +212,7 @@ class Campaign:
     icp_description: str | None = None
     mailbox_id: str | None = None  # the sender; None means the workspace's default mailbox
     icp_brief: dict[str, Any] | None = None  # who it looks for (``domain.brief.Brief``)
+    status: CampaignStatus = CampaignStatus.ACTIVE  # one campaign per workspace is active
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "target_titles", tuple(self.target_titles))

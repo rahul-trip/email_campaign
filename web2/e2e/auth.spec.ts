@@ -112,7 +112,13 @@ test("a new customer's admin is taken to the guided setup, which starts empty", 
   await expect(boss.getByText("Quantra")).toHaveCount(0);
   await boss.getByRole("button", { name: /A mailbox/ }).click();
   await expect(boss.getByText("No mailbox connected")).toBeVisible();
+  // Nothing else opens until the workspace says who it reaches.
   await boss.getByRole("link", { name: "Dashboard" }).click();
+  await expect(boss.getByRole("heading", { name: "Create your campaign" })).toBeVisible();
+  await boss.getByLabel("Name").fill("Grid start-ups");
+  await boss.getByLabel("Wanted job titles").fill("Head of Operations");
+  await boss.getByLabel("Ideal customer").fill("Energy start-ups that forecast demand.");
+  await boss.getByRole("button", { name: "Save campaign" }).click();
   await expect(boss.getByText("Get started")).toBeVisible();
 });
 
@@ -131,6 +137,11 @@ test("a free customer reaches its limit, sees it everywhere, and what waits is k
   await owner.getByText("I accept the Terms of Service").click();
   await owner.getByRole("button", { name: "Create my account" }).click();
   await expect(owner).toHaveURL(/\/w\/limits-ltd\/onboarding$/);
+
+  // The workspace needs its campaign before any page but Settings opens.
+  const [first] = await (await owner.request.get("/api/settings/campaigns")).json();
+  const filled = await owner.request.patch(`/api/settings/campaigns/${first.id}`, { data: { target_titles: ["COO"], icp_description: "Energy traders." }, headers: WRITE });
+  expect(filled.ok()).toBeTruthy();
 
   for (let n = 0; n < 6; n++) {
     const added = await owner.request.post("/api/targets", { data: { website: `limit${n}-${Date.now().toString(36)}.com`, country: "UK" }, headers: WRITE });

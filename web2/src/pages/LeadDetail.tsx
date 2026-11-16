@@ -103,6 +103,7 @@ export function LeadDetailPage() {
   // Where the page expects the operator to act on people, the card is open for them.
   const peopleNeeded = (company.status === "failed" && (company.failed_stage === "contacts" || company.failed_stage === "email")) || (company.status === "held" && hold?.action === "person");
   const recipientName = contacts.find((c) => c.id === liveRecipient)?.full_name;
+  const pausedCampaign = (campaigns.data ?? []).find((c) => c.id === company.campaign_id && c.status !== "active");
   const calls = waterfall.data ?? [];
   const spent = calls.reduce((n, c) => n + c.cost_micro_usd, 0);
 
@@ -206,6 +207,11 @@ export function LeadDetailPage() {
           </Callout>
         )}
         {company.status === "held" && <HoldPanel company={company} onDone={refresh} />}
+        {pausedCampaign && (
+          <Callout tone="attention" title={`Its campaign, ${pausedCampaign.name}, is paused`}>
+            This lead waits where it is until that campaign is switched on again under Campaigns.
+          </Callout>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">

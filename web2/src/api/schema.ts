@@ -2162,6 +2162,26 @@ export interface paths {
         patch: operations["update_campaign_api_settings_campaigns__campaign_id__patch"];
         trace?: never;
     };
+    "/api/settings/campaigns/{campaign_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Campaign
+         * @description Switch this campaign on; the active one is paused and its leads wait.
+         */
+        post: operations["activate_campaign_api_settings_campaigns__campaign_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
         parameters: {
             query?: never;
@@ -2173,6 +2193,23 @@ export interface paths {
         put?: never;
         /** Regenerate Campaign Brief */
         post: operations["regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/campaigns/{campaign_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause Campaign */
+        post: operations["pause_campaign_api_settings_campaigns__campaign_id__pause_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2815,6 +2852,12 @@ export interface components {
             name: string;
             /** Research Questions */
             research_questions: string[];
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status?: "active" | "paused" | "archived";
             /** Target Titles */
             target_titles: string[];
             /**
@@ -9133,7 +9176,69 @@ export interface operations {
             };
         };
     };
+    activate_campaign_api_settings_campaigns__campaign_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_campaign_api_settings_campaigns__campaign_id__pause_post: {
         parameters: {
             query?: never;
             header?: never;

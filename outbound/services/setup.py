@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.enums import MailboxStatus, PolicyRule
+from outbound.domain.enums import CampaignStatus, MailboxStatus, PolicyRule
 from outbound.domain.sender import sender_for
 
 Status = Literal["ok", "warning", "missing"]
@@ -70,7 +70,9 @@ class SetupService:
 
         default = next((m for m in mailboxes if m.is_default), None) or next(iter(mailboxes), None)
         sender = sender_for(profile, default.sender if default else None)
-        ready = next((c for c in campaigns if c.target_titles and c.icp_description), None)
+        # The active campaign is the one the engine works for, so it is the one that must be ready.
+        active = next((c for c in campaigns if c.status is CampaignStatus.ACTIVE), None)
+        ready = active if active and active.target_titles and active.icp_description else None
         working = [m for m in mailboxes if m.status is MailboxStatus.ACTIVE]
         checked = [m.dns_check for m in working if m.dns_check]
         dns_ok = bool(checked) and all(report.get("ok") for report in checked)

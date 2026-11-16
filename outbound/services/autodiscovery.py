@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import Campaign
-from outbound.domain.enums import CompanyStatus, RunKind, RunStatus, UsageStep
+from outbound.domain.enums import CampaignStatus, CompanyStatus, RunKind, RunStatus, UsageStep
 from outbound.logging import get_logger
 from outbound.metering.quota import quota_in
 from outbound.services.runs import RunMode, RunRequest, RunService
@@ -54,7 +54,11 @@ class AutoDiscovery:
             quota, _ = quota_in(uow, moment)
             if not quota.engine or not quota.has_credit(UsageStep.DISCOVERY):
                 return None  # nothing could be added, so do not search
-            campaigns = [c for c in uow.campaigns.all() if _describes_customer(c)]
+            campaigns = [
+                c
+                for c in uow.campaigns.all()
+                if c.status is CampaignStatus.ACTIVE and _describes_customer(c)
+            ]
             recent = uow.runs.recent(100, kinds=(RunKind.PIPELINE,), requested_only=True)
             if any(r.status in (RunStatus.QUEUED, RunStatus.RUNNING) for r in recent):
                 return None  # a run is already on its way

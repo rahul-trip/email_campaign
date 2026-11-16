@@ -22,8 +22,7 @@ export function RunsPage() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<Mode>("manual");
   const [discover, setDiscover] = useState(10);
-  const [campaign, setCampaign] = useState("");
-  const [skipDirectory, setSkipDirectory] = useState(false);
+    const [skipDirectory, setSkipDirectory] = useState(false);
   const usage = useUsage();
   const canSkip = usage.data?.features.includes("directory_bypass") ?? false;
 
@@ -39,7 +38,7 @@ export function RunsPage() {
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const start = useMutation({
-    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(mode !== "manual" && campaign ? { campaign } : {}), ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
     onSuccess: refresh,
   });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
@@ -70,14 +69,7 @@ export function RunsPage() {
                 <Input type="number" min={1} max={50} value={discover} onChange={(e) => setDiscover(Number(e.target.value))} className="w-28" />
               </Field>
               <Field label="Campaign to search for">
-                <Select value={campaign} onChange={(e) => setCampaign(e.target.value)} className="w-48">
-                  <option value="">Default</option>
-                  {(campaigns.data ?? []).map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
+                <div className="flex h-8 items-center text-[13px] font-medium">{(campaigns.data ?? []).find((c) => c.status === "active")?.name ?? "None active"}</div>
               </Field>
             </>
           ) : (
