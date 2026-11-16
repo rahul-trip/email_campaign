@@ -7,15 +7,20 @@ import { useMutation, useQuery, useQueryClient, type UseMutationResult, type Use
 import { Link } from "@tanstack/react-router";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import {
+  createContext,
+  useContext,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type Dispatch,
   type InputHTMLAttributes,
   type KeyboardEvent,
   type ReactNode,
   type SelectHTMLAttributes,
+  type SetStateAction,
   type TextareaHTMLAttributes,
 } from "react";
 import { ApiProblem, client, ok } from "../api/client";
@@ -65,6 +70,20 @@ export function Button({
 
 // ------------------------------------------------------------------ layout
 
+type SectionsState = { openId: string | null | undefined; setOpenId: Dispatch<SetStateAction<string | null | undefined>> };
+const SectionsContext = createContext<SectionsState | null>(null);
+
+/**
+ * The collapsible cards inside it open one at a time: opening one closes the others. The first
+ * card marked `defaultOpen` starts open. Cards outside a Sections keep their own state.
+ */
+export function Sections({ children }: { children: ReactNode }) {
+  // undefined: nothing has been decided yet; null: every card is closed.
+  const [openId, setOpenId] = useState<string | null | undefined>(undefined);
+  const value = useMemo(() => ({ openId, setOpenId }), [openId]);
+  return <SectionsContext.Provider value={value}>{children}</SectionsContext.Provider>;
+}
+
 export function Card({
   title,
   subtitle,
@@ -94,10 +113,27 @@ export function Card({
   /** Turning this on opens the card (the reader can still close it afterwards). */
   forceOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(defaultOpen || forceOpen);
+  const sections = useContext(SectionsContext);
+  const self = useId();
+  const grouped = sections !== null && collapsible;
+  const [ownOpen, setOwnOpen] = useState(defaultOpen || forceOpen);
+  const open = grouped ? sections.openId === self : ownOpen;
+  const setOpen = (next: boolean) => {
+    if (!grouped) return setOwnOpen(next);
+    if (next) sections.setOpenId(self);
+    else sections.setOpenId((prev) => (prev === self ? null : prev));
+  };
   const body = useId();
+  // Only the first defaultOpen card in a group takes the open slot, and only if none was chosen.
   useEffect(() => {
-    if (forceOpen) setOpen(true);
+    if (grouped && defaultOpen) sections.setOpenId((prev) => (prev === undefined ? self : prev));
+    // Mount only: the group's first decision is the default.
+  }, []);
+  useEffect(() => {
+    if (!forceOpen) return;
+    if (grouped) sections.setOpenId(self);
+    else setOwnOpen(true);
+    // Runs when forceOpen turns on; the reader can still close it afterwards.
   }, [forceOpen]);
   const shown = !collapsible || open;
   return (
