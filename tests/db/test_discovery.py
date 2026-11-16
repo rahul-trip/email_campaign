@@ -473,6 +473,22 @@ def test_the_campaigns_qualified_leads_are_examples_to_find_more_like(
     assert "best.io" in world.directory.queries[0].seed_domains
 
 
+def test_websites_found_on_earlier_runs_are_left_out_of_the_next_search(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline, world, container = setup(engine, factory, platform)
+    with factory(ws) as uow:
+        uow.companies.create(domain="lead.io", source=CompanySource.MANUAL)
+        uow.commit()
+    world.directory.mentions = [yc("Gridcast", "gridcast.io")]
+    run(pipeline, container, ws, 5, "run-1")
+    run(pipeline, container, ws, 5, "run-2")
+    first, second = world.directory.queries[:2]
+    assert "lead.io" in first.exclude_domains  # a lead already
+    assert "gridcast.io" not in first.exclude_domains
+    assert "gridcast.io" in second.exclude_domains  # a candidate of the first run
+
+
 def test_a_failing_web_search_leaves_the_other_sources_and_the_run_standing(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:

@@ -35,6 +35,7 @@ from outbound.domain.discovery import (
     clean,
     name_key,
     plan_sources,
+    search_terms,
     share,
     website_from_links,
 )
@@ -188,17 +189,21 @@ def _planned(raw: Iterable[object], *, used: Sequence[str], limit: int) -> list[
     return [PlannedQuery(q, angles.get(q, "")) for q in clean(texts, used=used, limit=limit)]
 
 
-def source_query(brief: Brief, *, examples: Sequence[str] = ()) -> SourceQuery:
+def source_query(
+    brief: Brief, *, examples: Sequence[str] = (), known: Iterable[str] = ()
+) -> SourceQuery:
     """What a directory is asked, from the brief; ``examples`` are the websites of leads that
-    qualified, which lookalike sources find more like, after the brief's own examples."""
+    qualified, which lookalike sources find more like, after the brief's own examples, and
+    ``known`` the websites to leave out because they were found before."""
     return SourceQuery(
-        keywords=brief.keywords or brief.segments,
+        keywords=search_terms(brief),
         segments=brief.segments,
         regions=brief.regions,
         founded_after=brief.founded_after,
         industry_codes=brief.industry_codes,
         text=brief.summary,
         seed_domains=tuple(dict.fromkeys([*brief.seed_companies, *examples])),
+        exclude_domains=tuple(sorted(set(known))),
     )
 
 
@@ -423,6 +428,8 @@ class Discoverer:
             earlier = uow.events.latest(
                 EntityType.WORKSPACE, self.workspace_id, "discovery_query", HISTORY * 4
             )
+        # Websites seen before, as leads or as candidates (a key with a dot is a website).
+        known_sites = known_domains | {k for k in known_keys if "." in k}
         mine = [e.data for e in reversed(earlier) if e.data.get("campaign") == campaign.name]
         # Article searches already run, oldest first, and every page they read.
         used = [str(d.get("query", "")) for d in mine if d.get("source", ARTICLES) == ARTICLES]
@@ -461,7 +468,7 @@ class Discoverer:
                 calls += made
                 continue
             source = next(s for s in self.sources if s.name == name)
-            query = source_query(brief, examples=examples)
+            query = source_query(brief, examples=examples, known=known_sites)
             try:
                 got = source.find(query, limit=max(1, int(PER_SOURCE * weight)))
             except ProviderError as error:

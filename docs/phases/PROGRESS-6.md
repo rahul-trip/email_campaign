@@ -103,7 +103,7 @@ Built:
 
 ## Lead quality (2026-11-16)
 
-Found by reading the VM's worker log and database (read-only) and written up as a plan of small branches, each from `main`. Done: `phase-6/model-reply-budget` (migration 0020, R-35): discovery's model calls are no longer cut off, and a company the model could not judge is kept for the next run instead of rejected. Next, in order: the Y Combinator directory and Exa (the directory found nothing in every production run), a funnel report, the brief and scoring, decision-makers only, the catch-all resolver, the copy reading-grade limit.
+Found by reading the VM's worker log and database (read-only) and written up as a plan of small branches, each branched from the one before where they touch the same code. Done: `phase-6/model-reply-budget` (migration 0020, R-35): discovery's model calls are no longer cut off, and a company the model could not judge is kept for the next run instead of rejected. Done on `phase-6/directory-sources` (R-36, stacked on that branch): the Y Combinator directory matches by word and stem and no longer returns 0, and neither it nor Exa repeats companies found before. Next, in order: a funnel report, the brief and scoring, decision-makers only, the catch-all resolver, the copy reading-grade limit.
 
 ## After the alpha
 
