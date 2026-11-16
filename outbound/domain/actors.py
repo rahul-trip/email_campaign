@@ -4,6 +4,9 @@ from __future__ import annotations
 
 OPERATOR = "operator"
 SYSTEM = "system"
+AUTO = (
+    "auto"  # the engine approving a cold lead's email without a person (``services.autoapprove``)
+)
 INTEGRATION_WEBHOOK = "integration:webhook"  # the signed intake webhook, on the operator's behalf
 
 

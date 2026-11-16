@@ -59,6 +59,7 @@ from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
 from outbound.services import defaults
+from outbound.services.autoapprove import AutoApprover
 from outbound.services.discovery import Discoverer, Discovery, domain_resolver
 from outbound.services.inbox import InboxSync
 from outbound.services.intake import IntakeService
@@ -205,6 +206,8 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         if isinstance(mailboxes, StoredMailboxes):
             jobs.append(MailboxHealth(mailboxes))
 
+    review = ReviewService(uow, workspace_id, writer)
+    jobs.append(AutoApprover(uow, workspace_id, review))
     intake = IntakeService(uow, workspace_id, search)
     # First in the tick: credits that appeared (a new period, a grant) release waiting work
     # before this tick's pipeline looks for it.
@@ -213,7 +216,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),
-        review=ReviewService(uow, workspace_id, writer),
+        review=review,
         runs=RunService(uow, workspace_id),
         intake=intake,
         meter=meter,

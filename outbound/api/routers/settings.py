@@ -85,6 +85,7 @@ def update_workspace_settings(
         "email_min_words",
         "email_max_words",
         "auto_discovery",
+        "auto_approve_cold",
     ):
         if changes.get(name, "") is None:
             changes.pop(name)

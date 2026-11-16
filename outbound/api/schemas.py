@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from outbound.domain.enums import (
     CandidateVerdict,
@@ -18,6 +18,7 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.domain.qualification import is_hot
 from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
 
@@ -227,6 +228,12 @@ class CompanyOut(Out):
     row_version: int
     created_at: datetime | None
     updated_at: datetime | None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def hot(self) -> bool:
+        """A fit score above 80: shown with a flame, and never approved automatically."""
+        return is_hot(self.fit_score)
 
 
 class CompanyPage(Out):
@@ -520,6 +527,7 @@ class WorkspaceSettingsIn(In):
     email_min_words: int | None = Field(default=None, ge=40, le=500)
     email_max_words: int | None = Field(default=None, ge=40, le=600)
     auto_discovery: bool | None = None
+    auto_approve_cold: bool | None = None
 
 
 class SenderProfileIn(In):

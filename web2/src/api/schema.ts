@@ -2945,6 +2945,11 @@ export interface components {
             /** Fit Score */
             fit_score: number | null;
             hold_reason: components["schemas"]["HoldReason"] | null;
+            /**
+             * Hot
+             * @description A fit score above 80: shown with a flame, and never approved automatically.
+             */
+            readonly hot: boolean;
             /** Id */
             id: string;
             /** Last Error */
@@ -5027,6 +5032,8 @@ export interface components {
          * @description Only the settings an operator may change, each with its real type.
          */
         WorkspaceSettingsIn: {
+            /** Auto Approve Cold */
+            auto_approve_cold?: boolean | null;
             /** Auto Discovery */
             auto_discovery?: boolean | null;
             /** Budget Per Prospect Micro Usd */

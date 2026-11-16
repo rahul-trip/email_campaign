@@ -356,6 +356,7 @@ function Limits() {
   const [budget, setBudget] = useState("0.50");
   const [examples, setExamples] = useState(5);
   const [footer, setFooter] = useState(true);
+  const [autoCold, setAutoCold] = useState(false);
   const [minWords, setMinWords] = useState(120);
   const [maxWords, setMaxWords] = useState(200);
   useEffect(() => {
@@ -366,6 +367,7 @@ function Limits() {
     setBudget(s.budget_per_prospect_micro_usd == null ? "" : (Number(s.budget_per_prospect_micro_usd) / 1_000_000).toFixed(2));
     setExamples(Number(s.few_shot_examples ?? 5));
     setFooter(s.footer_enabled !== false);
+    setAutoCold(s.auto_approve_cold === true);
     setMinWords(Number(s.email_min_words ?? 120));
     setMaxWords(Number(s.email_max_words ?? 200));
   }, [settings.data]);
@@ -378,6 +380,7 @@ function Limits() {
             budget_per_prospect_micro_usd: budget.trim() === "" ? null : Math.round(Number(budget) * 1_000_000),
             few_shot_examples: examples,
             footer_enabled: footer,
+            auto_approve_cold: autoCold,
             email_min_words: minWords,
             email_max_words: maxWords,
           },
@@ -414,6 +417,14 @@ function Limits() {
               onChange={setFooter}
               label="Add a footer to every email (recommended)"
               hint="Your company, postal address and a plain way to say no: the country's footer, or a short default where it has none. Kept when a country rule is skipped. The US, UK, EU and Canada expect an address and an opt-out even when no consent is needed."
+            />
+          </div>
+          <div className="mt-3" data-tour="settings-auto-approve">
+            <Checkbox
+              checked={autoCold}
+              onChange={setAutoCold}
+              label="Approve cold leads' emails automatically"
+              hint="A lead with a fit score of 80 or lower is cold. With this on, its email skips Review and is saved as a draft in your mailbox on the next pass, even if the writing check flagged it. Hot leads (above 80), leads without a score, and emails that rely on a check you skipped still wait for you. It only saves drafts; nothing is sent."
             />
           </div>
           <p className="mt-4 text-xs text-muted">Automatic sending is off and cannot be switched on until the sending phase. Approved emails are saved as drafts.</p>

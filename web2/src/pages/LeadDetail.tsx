@@ -4,6 +4,7 @@ import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlo
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { DirectoryCard } from "../components/DirectoryCard";
+import { FitBadge } from "../components/FitBadge";
 import { PolicySkip } from "../components/PolicySkip";
 import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
@@ -125,7 +126,10 @@ export function LeadDetailPage() {
               {company.domain} <ExternalLink className="size-3" aria-hidden />
             </a>
             <span className="text-xs">Country {company.country_code ?? "unknown"}</span>
-            <span className="text-xs">Fit {company.fit_score ?? "?"}/100</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              Fit <FitBadge score={company.fit_score} hot={company.hot} />
+              {company.fit_score == null && "?"}
+            </span>
             <span className="text-xs">Priority {company.priority}</span>
             <span className="text-xs">Added {ago(company.created_at)}</span>
           </span>

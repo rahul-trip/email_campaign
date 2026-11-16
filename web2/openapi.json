@@ -970,6 +970,12 @@
               }
             ]
           },
+          "hot": {
+            "description": "A fit score above 80: shown with a flame, and never approved automatically.",
+            "readOnly": true,
+            "title": "Hot",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1116,7 +1122,8 @@
           "next_action_at",
           "row_version",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "hot"
         ],
         "title": "CompanyOut",
         "type": "object"
@@ -7515,6 +7522,17 @@
         "additionalProperties": false,
         "description": "Only the settings an operator may change, each with its real type.",
         "properties": {
+          "auto_approve_cold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Approve Cold"
+          },
           "auto_discovery": {
             "anyOf": [
               {
