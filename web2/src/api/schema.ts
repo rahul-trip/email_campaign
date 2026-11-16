@@ -2380,6 +2380,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup/campaign-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Campaign Draft
+         * @description Suggest job titles, an ideal customer and questions from the saved profile. Saves nothing.
+         */
+        post: operations["campaign_draft_api_setup_campaign_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/setup/profile-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Profile Draft
+         * @description Read the company's own website and suggest profile fields. Saves nothing.
+         */
+        post: operations["profile_draft_api_setup_profile_draft_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/status": {
         parameters: {
             query?: never;
@@ -2847,6 +2887,19 @@ export interface components {
             outcome: string;
             /** Provider */
             provider: string;
+        };
+        /** CampaignDraftOut */
+        CampaignDraftOut: {
+            /** Drafted */
+            drafted: boolean;
+            /** Icp Description */
+            icp_description: string;
+            /** Reason */
+            reason: ("no_model" | "profile_empty" | "model_failed") | null;
+            /** Research Questions */
+            research_questions: string[];
+            /** Target Titles */
+            target_titles: string[];
         };
         /** CampaignIn */
         CampaignIn: {
@@ -4324,6 +4377,27 @@ export interface components {
             found: boolean;
             /** Messages Cancelled */
             messages_cancelled: number;
+        };
+        /** ProfileDraftIn */
+        ProfileDraftIn: {
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
+        /** ProfileDraftOut */
+        ProfileDraftOut: {
+            /** Drafted */
+            drafted: boolean;
+            /** Fields */
+            fields: {
+                [key: string]: unknown;
+            };
+            /** Pages */
+            pages: string[];
+            /** Reason */
+            reason: ("no_model" | "no_search" | "bad_website" | "site_unreadable" | "model_failed" | "daily_limit") | null;
         };
         /** PromoteIn */
         PromoteIn: {
@@ -9670,6 +9744,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+        };
+    };
+    campaign_draft_api_setup_campaign_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignDraftOut"];
+                };
+            };
+        };
+    };
+    profile_draft_api_setup_profile_draft_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileDraftIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

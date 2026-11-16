@@ -40,7 +40,7 @@ Rules:
 - At most eight items in each list, each a few plain words.
 - Weight 3 for what is essential, 1 for what is merely good to have."""
 
-_PROFILE_FIELDS = (
+PROFILE_FIELDS = (
     ("Company", "company_name"),
     ("Industry", "industry"),
     ("Mission", "mission"),
@@ -61,7 +61,7 @@ def user_prompt(campaign: Campaign, profile: Mapping[str, Any]) -> str:
 
     seller = "\n".join(
         f"{label}: {field(profile.get(key))}"
-        for label, key in _PROFILE_FIELDS
+        for label, key in PROFILE_FIELDS
         if field(profile.get(key))
     )
     wanted = "\n".join(

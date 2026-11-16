@@ -58,6 +58,8 @@ class FakeLlm:
         "You decide which companies fit": "screen",
         "You pick a company's own website": "website",
         "You check one company against each criterion": "qualify",
+        "You read a seller's own website": "profile_draft",
+        "You suggest who a seller should write to": "campaign_draft",
     }
 
     def __init__(self, replies: dict[str, Any] | None = None) -> None:
@@ -97,6 +99,25 @@ class FakeLlm:
             },
             "fit": {"score": 82, "reason": "Utility forecasting is exactly the target."},
             "qualify": {"criteria": [], "why_now": "", "risks": []},
+            "profile_draft": {
+                "company_name": "Globex",
+                "industry": "industrial sensors",
+                "mission": "Make plants safer.",
+                "value_propositions": [
+                    "Sensors that predict failures",
+                    "Sensors that predict failures",
+                ],
+                "case_studies": [],
+                "narrative": "Globex builds industrial sensors for plant operators.",
+                "legal_name": "Globex Ltd",
+                "postal_address": "2 Dock Road, Hull",
+                "signature_name": "Mallory",  # a person's own field: must be dropped
+            },
+            "campaign_draft": {
+                "target_titles": ["Head of Maintenance", "Plant Manager"],
+                "icp_description": "Plant operators with ageing equipment.",
+                "research_questions": ["Do they run continuous processes?"],
+            },
             "news": {"company": [], "market": []},
             "extract": {"companies": []},
             "screen": screen_all(80),
