@@ -266,6 +266,12 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-41 · P3 · A queued run lost "find emails with the vendors" — closed 2026-11-16
+
+- **Was:** `RunRequest.to_params` wrote `skip_directory` into the queued run, but `RunRequest.from_params` (which the worker uses) did not read it, so a run started with that box ticked still used the shared directory.
+- **Fixed by:** `from_params` reads `skip_directory`.
+- **Evidence:** `tests/db/test_leads_and_settings.py::test_skipping_the_directory_survives_being_queued`.
+
 ### R-40 · P3 · Copy: the reading-grade limit flagged plain technical emails — closed 2026-11-16
 
 - **Was:** `LintRules.max_reading_grade` was 10. On the VM, 3 of 7 drafts were flagged for grades 10.1 to 11.2 and every draft took two or three writing attempts, each a paid model call, to get under it. Plainly written copy about grid forecasting scores 10 to 11 on Flesch-Kincaid because its nouns are long ("forecasting", "utilities", "operators"). `docs/technical/lld/domain.md` also said 6.5, a limit dropped long ago.

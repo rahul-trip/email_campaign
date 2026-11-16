@@ -21,7 +21,6 @@ const WORKER_SILENT_MS = 45_000;
 export function RunsPage() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<Mode>("manual");
-  const [limit, setLimit] = useState(50);
   const [discover, setDiscover] = useState(10);
   const [campaign, setCampaign] = useState("");
   const [skipDirectory, setSkipDirectory] = useState(false);
@@ -40,7 +39,7 @@ export function RunsPage() {
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const start = useMutation({
-    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, limit, discover, ...(mode !== "manual" && campaign ? { campaign } : {}), ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(mode !== "manual" && campaign ? { campaign } : {}), ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
     onSuccess: refresh,
   });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
@@ -55,7 +54,7 @@ export function RunsPage() {
       <RunStats runs={runs.data ?? []} />
 
       <Card tour="start-run" title="Start a run" className="mb-5">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
           <Field label="What to run" hint={MODES.find(([m]) => m === mode)?.[2]}>
             <Select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
               {MODES.map(([value, label]) => (
@@ -64,9 +63,6 @@ export function RunsPage() {
                 </option>
               ))}
             </Select>
-          </Field>
-          <Field label="Leads per stage" hint="At most this many per step.">
-            <Input type="number" min={1} max={500} value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-28" />
           </Field>
           {mode !== "manual" ? (
             <>
@@ -103,7 +99,7 @@ export function RunsPage() {
             <Play className="size-3.5 fill-current" aria-hidden /> Start run
           </Button>
           <span className="text-xs text-muted">
-            Runs are carried out by the worker process. Budget per prospect: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
+            A run works on up to 50 leads at each step; the rest wait for the next run. Runs are carried out by the worker process. Budget per prospect: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
           </span>
         </div>
         {busy && !queuedTooLong && <p className="mt-2 text-xs text-muted">A run is already queued or running; a new one waits for it.</p>}

@@ -57,6 +57,7 @@ class RunRequest:
             mode=RunMode(data.get("mode", RunMode.MANUAL.value)),
             discover=int(data.get("discover", 10)),
             campaign=str(data.get("campaign", defaults.DEFAULT_CAMPAIGN_NAME)),
+            skip_directory=bool(data.get("skip_directory", False)),
             automatic=bool(data.get("automatic", False)),
         )
 

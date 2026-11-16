@@ -689,6 +689,11 @@ def test_a_run_is_queued_then_claimed_once_then_cancelled_or_finished(
     assert runs.cancel(queued.id).status is RunStatus.CANCELLED
 
 
+def test_skipping_the_directory_survives_being_queued(factory: UnitOfWorkFactory, ws: str) -> None:
+    queued = RunService(factory, ws).queue(RunRequest(skip_directory=True))
+    assert RunRequest.from_params(queued.params).skip_directory is True
+
+
 def test_cancelling_a_queued_run_stops_it_before_it_starts(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
