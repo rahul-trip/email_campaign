@@ -1206,3 +1206,12 @@ def test_a_campaign_says_what_is_weak_in_its_brief_and_its_job_titles(api: Api) 
         },
     ).json()
     assert patched["title_warnings"] == [] and patched["brief_gaps"] == []
+
+
+def test_setup_drafts_answer_for_an_admin_and_save_nothing(api: Api, services: Services) -> None:
+    drafted = api.post("/api/setup/profile-draft", json={"website": "globex-sensors.com"})
+    assert drafted.status_code == 200
+    assert drafted.json()["drafted"] is False  # these tests have no search provider
+    assert drafted.json()["reason"] == "no_search"
+    campaign = api.post("/api/setup/campaign-draft", json={})
+    assert campaign.status_code == 200 and campaign.json()["drafted"] is False

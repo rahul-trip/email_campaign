@@ -144,6 +144,14 @@ Follow [add a screen or tour step](../guides/add-a-screen-or-tour-step.md): a la
 - Phase 4 turns on **Replies**; Phase 5 turns on **Sending**: [phase-4-close-the-loop.md](../../phases/phase-4-close-the-loop.md), [phase-5-automated-sending.md](../../phases/phase-5-automated-sending.md).
 - Phase 6 adds users and workspaces to the shell: [phase-6-saas-ready.md](../../phases/phase-6-saas-ready.md).
 
+## Screenshots
+
+`web2/e2e/shots.spec.ts` writes a PNG of every screen (desktop and phone, light and dark) to `web2/shots/`, which is not committed. It compares nothing: it is for looking at a change before and after. It is skipped unless `SHOTS` is set, so the normal test run is unchanged.
+
+```bash
+cd web2 && npm run build && SHOTS=1 npx playwright test shots
+```
+
 ## How to refresh this page
 
 ```bash

@@ -17,7 +17,7 @@ export function AuditPage() {
         title="Audit log"
         subtitle="Every change an admin makes, and every time a superadmin opens a workspace."
         actions={
-          <a href={`/api/admin/audit.csv${csv ? `?${csv}` : ""}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-outline px-3 text-[13px] font-semibold hover:bg-surface-low">
+          <a href={`/api/admin/audit.csv${csv ? `?${csv}` : ""}`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-outline px-3 text-body font-semibold hover:bg-surface-low">
             <Download className="size-3.5" aria-hidden /> Export CSV
           </a>
         }
@@ -62,7 +62,7 @@ export function AuditPage() {
                       <Td>{a.workspace || "—"}</Td>
                       <Td className="font-medium">{a.action.replaceAll("_", " ")}</Td>
                       <Td className="text-muted">{a.note}</Td>
-                      <Td className="max-w-xs truncate font-mono text-[11px] text-muted">
+                      <Td className="max-w-xs truncate font-mono text-caption text-muted">
                         <span title={JSON.stringify(a.data)}>{Object.keys(a.data).length ? JSON.stringify(a.data) : ""}</span>
                       </Td>
                     </tr>

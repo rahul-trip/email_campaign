@@ -542,6 +542,57 @@
         "title": "CallOut",
         "type": "object"
       },
+      "CampaignDraftOut": {
+        "properties": {
+          "drafted": {
+            "title": "Drafted",
+            "type": "boolean"
+          },
+          "icp_description": {
+            "title": "Icp Description",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_model",
+                  "profile_empty",
+                  "model_failed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "research_questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Research Questions",
+            "type": "array"
+          },
+          "target_titles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Titles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "drafted",
+          "reason",
+          "target_titles",
+          "icp_description",
+          "research_questions"
+        ],
+        "title": "CampaignDraftOut",
+        "type": "object"
+      },
       "CampaignIn": {
         "additionalProperties": false,
         "properties": {
@@ -5292,6 +5343,66 @@
           "drafts_left"
         ],
         "title": "PrivacyOut",
+        "type": "object"
+      },
+      "ProfileDraftIn": {
+        "additionalProperties": false,
+        "properties": {
+          "website": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "title": "ProfileDraftIn",
+        "type": "object"
+      },
+      "ProfileDraftOut": {
+        "properties": {
+          "drafted": {
+            "title": "Drafted",
+            "type": "boolean"
+          },
+          "fields": {
+            "additionalProperties": true,
+            "title": "Fields",
+            "type": "object"
+          },
+          "pages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_model",
+                  "no_search",
+                  "bad_website",
+                  "site_unreadable",
+                  "model_failed",
+                  "daily_limit"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "drafted",
+          "reason",
+          "fields",
+          "pages"
+        ],
+        "title": "ProfileDraftOut",
         "type": "object"
       },
       "PromoteIn": {
@@ -14215,6 +14326,70 @@
           }
         },
         "summary": "Setup",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/setup/campaign-draft": {
+      "post": {
+        "description": "Suggest job titles, an ideal customer and questions from the saved profile. Saves nothing.",
+        "operationId": "campaign_draft_api_setup_campaign_draft_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Campaign Draft",
+        "tags": [
+          "setup"
+        ]
+      }
+    },
+    "/api/setup/profile-draft": {
+      "post": {
+        "description": "Read the company's own website and suggest profile fields. Saves nothing.",
+        "operationId": "profile_draft_api_setup_profile_draft_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileDraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Profile Draft",
         "tags": [
           "setup"
         ]

@@ -36,7 +36,7 @@ export function Mailboxes() {
 
   return (
     <div className="space-y-4" data-tour="mailboxes-panel">
-      <Callout tone="info" className="text-[13px]">
+      <Callout tone="info" className="text-body">
         Approved emails are saved as <strong>drafts</strong> in a mailbox you connect here; you read them and press Send in your own mail program. Passwords and sign-in tokens are stored encrypted, and nothing is ever sent without you.
       </Callout>
 
@@ -109,7 +109,7 @@ function MailboxCard({ box, mine, admin, viewing, onChange }: { box: Box; mine: 
       title={
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-mono">{box.address}</span>
-          {box.is_default && <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-semibold text-primary"><Star className="size-3" aria-hidden /> Default</span>}
+          {box.is_default && <span className="inline-flex items-center gap-1 rounded-full bg-primary-fixed px-2 py-0.5 text-caption font-semibold text-primary"><Star className="size-3" aria-hidden /> Default</span>}
         </span>
       }
       subtitle={
@@ -167,7 +167,7 @@ function MailboxCard({ box, mine, admin, viewing, onChange }: { box: Box; mine: 
                     {record?.ok ? "Set up" : "Problem"}
                   </span>
                 </div>
-                <p className="mt-1.5 break-words font-mono text-[11px] text-muted">{record?.detail || "No details reported."}</p>
+                <p className="mt-1.5 break-words font-mono text-caption text-muted">{record?.detail || "No details reported."}</p>
               </div>
             );
           })}

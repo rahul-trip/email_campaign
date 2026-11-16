@@ -911,6 +911,30 @@ class SetupOut(Out):
     next: SetupItemOut | None
 
 
+class ProfileDraftIn(In):
+    website: str = Field(default="", max_length=300)
+
+
+class ProfileDraftOut(Out):
+    drafted: bool
+    reason: (
+        Literal[
+            "no_model", "no_search", "bad_website", "site_unreadable", "model_failed", "daily_limit"
+        ]
+        | None
+    )
+    fields: dict[str, Any]
+    pages: list[str]
+
+
+class CampaignDraftOut(Out):
+    drafted: bool
+    reason: Literal["no_model", "profile_empty", "model_failed"] | None
+    target_titles: list[str]
+    icp_description: str
+    research_questions: list[str]
+
+
 class StepUsageOut(Out):
     step: str
     limit: int | None  # None: unlimited

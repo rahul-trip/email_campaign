@@ -69,7 +69,7 @@ function Password({ id, label, value, onChange, autoComplete, hint, autoFocus }:
           {shown ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
-      {hint && <span className="mt-1 block text-[11px] leading-snug text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-caption leading-snug text-muted">{hint}</span>}
     </div>
   );
 }
@@ -168,7 +168,7 @@ function RemoveMyData({ token }: { token: string }) {
           </Callout>
         ) : (
           <>
-            <p className="text-[13px] text-muted">This removes the address this link was sent to, and any report or note about it, and blocks it from being added again.</p>
+            <p className="text-body text-muted">This removes the address this link was sent to, and any report or note about it, and blocks it from being added again.</p>
             <Problem error={confirm.error} />
             <Button busy={confirm.isPending} onClick={() => confirm.mutate()} className="h-9 w-full">
               Remove my details
@@ -299,7 +299,7 @@ function NewAccount({ token, email, title, subtitle, workspace }: { token: strin
       >
         <div>
           <div className="mb-1 text-xs font-medium text-ink">Email</div>
-          <div className="text-[13px] font-semibold">{email}</div>
+          <div className="text-body font-semibold">{email}</div>
         </div>
         <Field label="Your name">
           <Input id="name" autoFocus autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full" />
@@ -334,7 +334,7 @@ function SignInFirst({ token, email, signedInAs }: { token: string; email: strin
   const next = `/sign-in?next=${encodeURIComponent(`/invite/${token}`)}&email=${encodeURIComponent(email)}`;
   const signOut = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => go(next) });
   return (
-    <div className="space-y-4 text-[13px]">
+    <div className="space-y-4 text-body">
       <p>
         {email} already has an account. {signedInAs ? `You are signed in as ${signedInAs}; sign in as ${email} to accept.` : "Sign in with it to accept."}
       </p>
@@ -414,12 +414,12 @@ function Workspaces({ me }: { me: Me }) {
         <ul className="divide-y divide-line rounded-lg border border-line">
           {me.workspaces.map((w) => (
             <li key={w.id}>
-              <a href={inWorkspace(w.slug)} onClick={() => w.role && rememberWorkspace(w.slug)} className="flex items-center justify-between gap-3 px-3 py-2.5 text-[13px] hover:bg-surface-low">
+              <a href={inWorkspace(w.slug)} onClick={() => w.role && rememberWorkspace(w.slug)} className="flex items-center justify-between gap-3 px-3 py-2.5 text-body hover:bg-surface-low">
                 <span className="flex items-center gap-2">
                   <Building2 size={16} className="text-muted" aria-hidden />
                   <span className="font-semibold">{w.name}</span>
                 </span>
-                <span className="text-[11px] text-muted">{w.role ?? (staff ? "view only" : "")}</span>
+                <span className="text-caption text-muted">{w.role ?? (staff ? "view only" : "")}</span>
               </a>
             </li>
           ))}
@@ -427,7 +427,7 @@ function Workspaces({ me }: { me: Me }) {
       )}
       <GetStarted none={none} />
       {me.user.platform_role && (
-        <a href="/admin" className="flex h-9 w-full items-center justify-center rounded-lg border border-outline text-[13px] font-semibold hover:bg-surface-low">
+        <a href="/admin" className="flex h-9 w-full items-center justify-center rounded-lg border border-outline text-body font-semibold hover:bg-surface-low">
           Admin console
         </a>
       )}
@@ -470,7 +470,7 @@ function GetStarted({ none }: { none: boolean }) {
   }, [requests.data, none]);
   return (
     <div className="space-y-4" data-tour="get-started">
-      {none && <p className="text-[13px] text-muted">You are not in a workspace yet. Start your own, or ask to join your team's.</p>}
+      {none && <p className="text-body text-muted">You are not in a workspace yet. Start your own, or ask to join your team's.</p>}
       <form
         className="space-y-2 rounded-lg border border-line p-3"
         onSubmit={(event) => {
@@ -478,18 +478,18 @@ function GetStarted({ none }: { none: boolean }) {
           create.mutate();
         }}
       >
-        <div className="text-[13px] font-semibold">Start a workspace</div>
+        <div className="text-body font-semibold">Start a workspace</div>
         <Field label="Company name">
           <Input aria-label="Company name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full" />
         </Field>
-        <Field label="Website (optional)">
+        <Field label="Website" hint="We read it to draft your profile, so you do not start from a blank page. Optional.">
           <Input aria-label="Website" value={website} onChange={(e) => setWebsite(e.target.value)} className="h-9 w-full" />
         </Field>
         <Problem error={create.error} />
         <Button type="submit" busy={create.isPending} disabled={!name.trim()} className="h-9 w-full">
           Create workspace
         </Button>
-        <p className="text-[11px] text-muted">You become its admin and can invite your team and approve requests to join.</p>
+        <p className="text-caption text-muted">You become its admin and can invite your team and approve requests to join.</p>
       </form>
       <form
         className="space-y-2 rounded-lg border border-line p-3"
@@ -498,7 +498,7 @@ function GetStarted({ none }: { none: boolean }) {
           join.mutate();
         }}
       >
-        <div className="text-[13px] font-semibold">Join a workspace</div>
+        <div className="text-body font-semibold">Join a workspace</div>
         <Field label="Join code">
           <Input aria-label="Join code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Ask a workspace admin for it" className="h-9 w-full" />
         </Field>

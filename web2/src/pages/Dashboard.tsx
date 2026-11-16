@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Play, Workflow } from "lucide-react";
+import { ArrowRight, CheckCircle2, Play, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { useCurrent } from "../app/session";
@@ -19,7 +19,7 @@ const FUNNEL = [
   { key: "contacts_found", label: "People", note: "people ranked" },
   { key: "email_ready", label: "Email address", note: "safe address found" },
   { key: "copy_ready", label: "Review", note: "waiting for you", gate: true },
-  { key: "approved", label: "Approved", note: "drafted on the next run" },
+  { key: "approved", label: "Approved", note: "drafted within 15 minutes" },
   { key: "in_sequence", label: "Drafted", note: "in your mailbox" },
 ] as const;
 
@@ -44,6 +44,22 @@ export function DashboardPage() {
   const widest = Math.max(1, ...FUNNEL.map((stage) => by[stage.key] ?? 0));
   const latest = runs.data?.[0];
   const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
+  const empty = status.isSuccess && total === 0;
+  // Only what needs a decision is shown; a card at zero is noise.
+  const needs = [
+    { count: toReview, label: "Emails to review", detail: "Written and checked; nothing is drafted until you approve.", to: "/review", action: "Review emails", tone: "attention" as const },
+    {
+      count: heldTotal,
+      label: "Leads on hold",
+      detail: Object.entries(held).map(([reason, n]) => `${describeHold(reason).label} ${n}`).join(" · "),
+      to: "/attention",
+      action: "Resolve holds",
+      tone: "attention" as const,
+    },
+    { count: failed, label: "Failed leads", detail: "A step failed; each lead shows the step and the reason.", to: "/attention", action: "See failures", tone: "error" as const },
+    { count: toConfirm, label: "Websites to confirm", detail: "Added by name; the website found is not certain.", to: "/attention", action: "Confirm websites", tone: "attention" as const },
+  ];
+  const needCards = needs.filter((n) => n.count > 0).map((n) => <NeedCard key={n.label} {...n} />);
 
   return (
     <>
@@ -51,97 +67,99 @@ export function DashboardPage() {
         title="Dashboard"
         subtitle={status.isSuccess ? `${total} companies · ${inPipeline} on the main path · ${toReview + heldTotal + failed + toConfirm} items need you` : "Loading…"}
         actions={
-          <Link to="/runs" className={buttonClass("primary")}>
-            <Play className="size-3.5 fill-current" aria-hidden /> Start a run
+          <Link to="/runs" className={buttonClass("secondary")}>
+            <Play className="size-3.5 fill-current" aria-hidden /> Runs
           </Link>
         }
       />
 
       <GetStarted />
 
-      <Label className="mb-2">Needs you</Label>
-      <div data-tour="needs-you" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <NeedCard count={toReview} label="Emails to review" detail="Written and checked; nothing is drafted until you approve." to="/review" action="Review emails" tone="attention" />
-        <NeedCard
-          count={heldTotal}
-          label="Leads on hold"
-          detail={heldTotal ? Object.entries(held).map(([reason, n]) => `${describeHold(reason).label} ${n}`).join(" · ") : "No lead is waiting on a decision."}
-          to="/attention"
-          action="Resolve holds"
-          tone="attention"
-        />
-        <NeedCard count={failed} label="Failed leads" detail="A step failed; each lead shows the step and the reason." to="/attention" action="See failures" tone="error" />
-        <NeedCard count={toConfirm} label="Websites to confirm" detail="Added by name; the website found is not certain." to="/attention" action="Confirm websites" tone="attention" />
-      </div>
-
-      <section data-tour="pipeline" className="relative mb-6 overflow-hidden rounded-xl border border-line bg-surface p-5">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary-container to-good" aria-hidden />
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-primary-fixed text-primary">
-              <Workflow className="size-4" aria-hidden />
-            </span>
-            <h2 className="text-lg font-semibold tracking-tight">Pipeline</h2>
-            <span className="rounded-full border border-line bg-surface-low px-2.5 py-0.5 font-mono text-xs">{inPipeline} on the main path</span>
-          </div>
-          <Link to="/leads" className="text-xs font-semibold text-primary hover:underline">
-            All leads
-          </Link>
-        </div>
-
-        {status.isPending ? (
-          <Skeleton rows={3} />
-        ) : (
-          <div className="overflow-x-auto pb-1">
-            <ol className="grid min-w-[880px] grid-cols-8 gap-2">
-              {FUNNEL.map((stage, index) => {
-                const count = by[stage.key] ?? 0;
-                const gate = "gate" in stage;
-                return (
-                  <li key={stage.key}>
-                    <Link
-                      to={gate ? "/review" : "/leads"}
-                      search={gate ? undefined : { status: stage.key }}
-                      className={cx(
-                        "flex h-full flex-col rounded-lg border p-3 transition-colors",
-                        gate && count > 0 ? "border-attention bg-attention-container/40 hover:bg-attention-container/70" : "border-line hover:border-primary-container/60 hover:bg-surface-low",
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-[11px] text-muted">{String(index + 1).padStart(2, "0")}</span>
-                        {gate && <span className="rounded bg-attention px-1 text-[9px] font-bold uppercase tracking-wider text-white">You</span>}
-                      </div>
-                      <div className="mt-1 truncate text-xs font-semibold">{stage.label}</div>
-                      <div className="mt-1 font-mono text-xl font-semibold">{count}</div>
-                      <div className="mt-0.5 truncate text-[11px] text-muted" title={stage.note}>
-                        {stage.note}
-                      </div>
-                      <div className="mt-2 h-1 rounded-full bg-surface-container">
-                        <div className={cx("h-1 rounded-full", gate ? "bg-attention" : "bg-primary-container")} style={{ width: `${(count / widest) * 100}%` }} />
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        )}
-
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-          <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Left the main path</span>
-          {SIDE_EXITS.map((key) => (
-            <Link key={key} to="/leads" search={{ status: key }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-1.5 py-1 hover:bg-surface-low">
-              <StatusBadge status={describe(leadStatus, key)} />
-              <span className="font-mono text-xs font-semibold">{by[key] ?? 0}</span>
-            </Link>
-          ))}
-          {(by.replied ?? 0) + (by.completed ?? 0) > 0 && (
-            <span className="text-xs text-muted">
-              · {by.replied ?? 0} replied, {by.completed ?? 0} completed
-            </span>
+      {empty ? (
+        <FirstSteps />
+      ) : (
+        <>
+          <Label className="mb-2">Needs you</Label>
+          {needCards.length === 0 ? (
+            <p data-tour="needs-you" className="mb-6 flex items-center gap-2 rounded-xl border border-line bg-surface px-4 py-3 text-body text-muted">
+              <CheckCircle2 className="size-4 text-good" aria-hidden /> Nothing needs you right now.
+            </p>
+          ) : (
+            <div data-tour="needs-you" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {needCards}
+            </div>
           )}
-        </div>
-      </section>
+      <section data-tour="pipeline" className="relative mb-6 overflow-hidden rounded-xl border border-line bg-surface p-5">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-primary-container to-good" aria-hidden />
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary-fixed text-primary">
+                <Workflow className="size-4" aria-hidden />
+              </span>
+              <h2 className="text-lg font-semibold tracking-tight">Pipeline</h2>
+              <span className="rounded-full border border-line bg-surface-low px-2.5 py-0.5 font-mono text-xs">{inPipeline} on the main path</span>
+            </div>
+            <Link to="/leads" className="text-xs font-semibold text-primary hover:underline">
+              All leads
+            </Link>
+          </div>
+  
+          {status.isPending ? (
+            <Skeleton rows={3} />
+          ) : (
+            <div className="pb-1">
+<ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+                {FUNNEL.map((stage, index) => {
+                  const count = by[stage.key] ?? 0;
+                  const gate = "gate" in stage;
+                  return (
+                    <li key={stage.key}>
+                      <Link
+                        to={gate ? "/review" : "/leads"}
+                        search={gate ? undefined : { status: stage.key }}
+                        className={cx(
+                          "flex h-full flex-col rounded-lg border p-3 transition-colors",
+                          gate && count > 0 ? "border-attention bg-attention-container/40 hover:bg-attention-container/70" : "border-line hover:border-primary-container/60 hover:bg-surface-low",
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-caption text-muted">{String(index + 1).padStart(2, "0")}</span>
+                          {gate && <span className="rounded bg-attention px-1 text-caption font-bold uppercase tracking-wider text-white">You</span>}
+                        </div>
+                        <div className="mt-1 truncate text-xs font-semibold">{stage.label}</div>
+                        <div className="mt-1 font-mono text-xl font-semibold">{count}</div>
+                        <div className="mt-0.5 truncate text-caption text-muted" title={stage.note}>
+                          {stage.note}
+                        </div>
+                        <div className="mt-2 h-1 rounded-full bg-surface-container">
+                          <div className={cx("h-1 rounded-full", gate ? "bg-attention" : "bg-primary-container")} style={{ width: `${(count / widest) * 100}%` }} />
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          )}
+  
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <span className="mr-1 text-caption font-semibold uppercase tracking-wider text-muted">Left the main path</span>
+            {SIDE_EXITS.map((key) => (
+              <Link key={key} to="/leads" search={{ status: key }} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-1.5 py-1 hover:bg-surface-low">
+                <StatusBadge status={describe(leadStatus, key)} />
+                <span className="font-mono text-xs font-semibold">{by[key] ?? 0}</span>
+              </Link>
+            ))}
+            {(by.replied ?? 0) + (by.completed ?? 0) > 0 && (
+              <span className="text-xs text-muted">
+                · {by.replied ?? 0} replied, {by.completed ?? 0} completed
+              </span>
+            )}
+          </div>
+        </section>
+  
+          </>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         <Card title="Spend" subtitle="Last 30 days" actions={<Link to="/reports" className="text-xs font-semibold text-primary hover:underline">Reports</Link>}>
@@ -202,7 +220,7 @@ export function DashboardPage() {
                 <RunCounts counts={latest.counts} />
               </div>
             ) : (
-              <p className="text-xs text-muted">No runs yet. Add a target, then start a run.</p>
+              <p className="text-xs text-muted">No runs yet. Add leads, then start a run.</p>
             )}
           </Card>
         </div>
@@ -211,12 +229,32 @@ export function DashboardPage() {
   );
 }
 
+/** A workspace with no leads: what to do first, instead of a page of zeros. */
+function FirstSteps() {
+  const { workspace } = useCurrent();
+  const setup = useSetup();
+  const admin = workspace.role === "admin";
+  const settingUp = admin && setup.data && !setup.data.done;
+  return (
+    <Card tour="needs-you" title="Nothing here yet" subtitle={settingUp ? `Next: ${setup.data?.next?.title ?? "finish setting up"}.` : "Add companies, or let the engine find some that fit your campaign."} className="mb-6">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link to={settingUp ? "/onboarding" : "/runs"} className={buttonClass("primary")}>
+          {settingUp ? "Continue setup" : "Find companies"}
+        </Link>
+        <Link to="/targets" className={buttonClass("secondary")}>
+          Add leads
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
 function NeedCard({ count, label, detail, to, action, tone }: { count: number; label: string; detail: string; to: string; action: string; tone: "attention" | "error" }) {
   const live = count > 0;
   return (
     <div className={cx("group flex flex-col rounded-xl border p-4 transition-colors", live ? (tone === "error" ? "border-error/40 bg-surface" : "border-attention/50 bg-attention-container/25") : "border-line bg-surface")}>
       <div className={cx("font-mono text-[28px] font-semibold leading-9", live ? (tone === "error" ? "text-error" : "text-attention") : "text-muted")}>{count}</div>
-      <div className="text-[13px] font-semibold">{label}</div>
+      <div className="text-body font-semibold">{label}</div>
       <p className="mt-0.5 line-clamp-2 min-h-8 text-xs text-muted" title={detail}>
         {detail}
       </p>
@@ -233,7 +271,7 @@ function Metric({ label, value, hint, tone }: { label: string; value: ReactNode;
     <div>
       <Label>{label}</Label>
       <div className={cx("mt-0.5 font-mono text-2xl font-semibold", tone === "primary" && "text-primary")}>{value}</div>
-      {hint && <div className="font-mono text-[11px] text-muted">{hint}</div>}
+      {hint && <div className="font-mono text-caption text-muted">{hint}</div>}
     </div>
   );
 }
@@ -252,7 +290,7 @@ export function BudgetMeter({ spent, ceiling }: { spent: number; ceiling: number
   const used = Math.min(100, Math.round((spent / ceiling) * 100));
   return (
     <div className="col-span-2">
-      <div className="mb-1 flex justify-between font-mono text-[11px] text-muted">
+      <div className="mb-1 flex justify-between font-mono text-caption text-muted">
         <span>Average spend against the ceiling</span>
         <span className={cx("font-semibold", used > 90 ? "text-error" : used > 70 ? "text-attention" : "text-good")}>{used}% used</span>
       </div>
@@ -296,7 +334,7 @@ export function RunCounts({ counts }: { counts: Record<string, unknown> | null |
   return (
     <ul className="flex flex-wrap gap-1.5">
       {stages.map(([stage, outcome]) => (
-        <li key={stage} className="rounded-md border border-line bg-surface-low px-2 py-0.5 text-[11px]">
+        <li key={stage} className="rounded-md border border-line bg-surface-low px-2 py-0.5 text-caption">
           <span className="font-semibold">{stage}</span>{" "}
           <span className="text-muted">
             {Object.entries(outcome)
@@ -318,7 +356,7 @@ function GetStarted() {
   const left = setup.data.items.filter((i) => i.status === "missing");
   return (
     <Card tour="get-started" className="mb-6" tone="attention" title="Get started" subtitle={`${left.length} thing${left.length === 1 ? "" : "s"} to do before the engine can draft your first email.`}>
-      <div className="flex flex-wrap items-center justify-between gap-3 text-[13px]">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-body">
         <span>
           Next: <strong>{setup.data.next?.title}</strong>
         </span>

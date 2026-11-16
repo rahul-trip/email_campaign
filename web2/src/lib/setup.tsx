@@ -38,7 +38,7 @@ export function SetupList({ items, onOpen }: { items: SetupItem[]; onOpen: (wher
             <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${item.status === "missing" ? "text-error" : "text-attention"}`} aria-label={item.status === "missing" ? "Missing" : "Worth a look"} />
           )}
           <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-medium">{item.title}</div>
+            <div className="text-body font-medium">{item.title}</div>
             <div className="text-xs text-muted">{item.detail}</div>
           </div>
           {item.status !== "ok" && (

@@ -71,7 +71,7 @@ export function LeadJourneyPage() {
       />
 
       <div data-tour="journey-header" className="mb-5">
-        <Callout tone={blocked ? "attention" : "info"} title={trail.headline} className="text-[13px]">
+        <Callout tone={blocked ? "attention" : "info"} title={trail.headline} className="text-body">
           <span className="font-semibold">What happens next: </span>
           {trail.next_step}
         </Callout>
@@ -89,7 +89,7 @@ export function LeadJourneyPage() {
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <StagePanel stage={selected} lead={lead.data} />
         <Card tour="journey-origin" title="How this lead arrived">
-          <p className="text-[13px] font-medium">{trail.origin.how}</p>
+          <p className="text-body font-medium">{trail.origin.how}</p>
           <p className="mt-0.5 text-xs text-muted">
             {when(trail.origin.at)}
             {trail.origin.by && ` · by ${trail.origin.by}`}
@@ -113,7 +113,7 @@ function Tile({ icon, label, value }: { icon: React.ReactNode; label: string; va
       </span>
       <div>
         <div className="font-mono text-lg font-semibold">{value}</div>
-        <div className="text-[11px] text-muted">{label}</div>
+        <div className="text-caption text-muted">{label}</div>
       </div>
     </div>
   );
@@ -153,7 +153,7 @@ function Stepper({ stages, selected, onPick }: { stages: Stage[]; selected: stri
                   <Icon className="size-4" aria-hidden />
                 </span>
                 <span className={cx("text-center text-xs", active ? "font-semibold" : "text-muted")}>{stage.label}</span>
-                <span className="text-[10px] text-muted">{look.label}</span>
+                <span className="text-caption text-muted">{look.label}</span>
               </button>
             </li>
           );
@@ -183,15 +183,15 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
         title={
           <span className="flex items-center gap-2">
             {stage.label}
-            <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-medium", stage.state === "done" ? "bg-good-container text-on-good-container" : stage.state === "pending" ? "bg-surface-container text-muted" : ["failed", "stopped"].includes(stage.state) ? "bg-error-container text-on-error-container" : "bg-attention-container text-on-attention-container")}>
+            <span className={cx("rounded-full px-2 py-0.5 text-caption font-medium", stage.state === "done" ? "bg-good-container text-on-good-container" : stage.state === "pending" ? "bg-surface-container text-muted" : ["failed", "stopped"].includes(stage.state) ? "bg-error-container text-on-error-container" : "bg-attention-container text-on-attention-container")}>
               {look.label}
             </span>
           </span>
         }
         actions={<span className="font-mono text-xs text-muted">{usd(stage.cost_micro_usd)}</span>}
       >
-        <p className="text-[13px] leading-relaxed">{stage.summary || "Nothing recorded for this stage yet."}</p>
-        {stage.reached_at && <p className="mt-1 text-[11px] text-muted">Reached {when(stage.reached_at)}</p>}
+        <p className="text-body leading-relaxed">{stage.summary || "Nothing recorded for this stage yet."}</p>
+        {stage.reached_at && <p className="mt-1 text-caption text-muted">Reached {when(stage.reached_at)}</p>}
 
         {stage.incidents.length > 0 && (
           <div className="mt-4 space-y-2">
@@ -199,7 +199,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
             {stage.incidents.map((incident, i) => (
               <Callout key={i} tone="attention">
                 {incident.text}
-                <div className="mt-0.5 text-[11px] opacity-80">{when(incident.at)}</div>
+                <div className="mt-0.5 text-caption opacity-80">{when(incident.at)}</div>
               </Callout>
             ))}
           </div>

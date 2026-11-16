@@ -12,9 +12,9 @@ import { STAGES, STAGE_LABEL, countsOf, discoveryLine, stagesDone, totalsOf } fr
 
 type Mode = "manual" | "discovery" | "mixed";
 const MODES: [Mode, string, string][] = [
-  ["manual", "Only my targets", "Moves the companies you added as far as each can go."],
+  ["manual", "Only the leads I added", "Moves the companies you added as far as each can go."],
   ["discovery", "Discover new companies", "Searches the web for companies matching the campaign's ideal customer, then moves them on."],
-  ["mixed", "My targets and discovery", "Both of the above in one run."],
+  ["mixed", "My leads and discovery", "Both of the above in one run."],
 ];
 const WORKER_SILENT_MS = 45_000;
 
@@ -70,7 +70,7 @@ export function RunsPage() {
                 <Input type="number" min={1} max={50} value={discover} onChange={(e) => setDiscover(Number(e.target.value))} className="w-28" />
               </Field>
               <Field label="Campaign to search for">
-                <div className="flex h-8 items-center text-[13px] font-medium">{(campaigns.data ?? []).find((c) => c.status === "active")?.name ?? "None active"}</div>
+                <div className="flex h-8 items-center text-body font-medium">{(campaigns.data ?? []).find((c) => c.status === "active")?.name ?? "None active"}</div>
               </Field>
             </>
           ) : (
@@ -109,7 +109,7 @@ export function RunsPage() {
         <QueryState query={runs}>
           {(rows) =>
             rows.length === 0 ? (
-              <Empty title="No runs yet">Start a run above once you have added targets.</Empty>
+              <Empty title="No runs yet">Start a run above once you have added leads.</Empty>
             ) : (
               <Table>
                 <thead>
@@ -131,10 +131,10 @@ export function RunsPage() {
                     return (
                       <tr key={run.id} className="align-top hover:bg-surface-low">
                         <Td className="whitespace-nowrap">
-                          <Link to="/runs/$runId" params={{ runId: run.id }} className="text-[13px] font-semibold text-primary hover:underline">
+                          <Link to="/runs/$runId" params={{ runId: run.id }} className="text-body font-semibold text-primary hover:underline">
                             {ago(run.started_at ?? run.created_at)}
                           </Link>
-                          <div className="text-[11px] text-muted" title={when(run.created_at)}>
+                          <div className="text-caption text-muted" title={when(run.created_at)}>
                             {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
                           </div>
                         </Td>
@@ -215,7 +215,7 @@ function RunSummary({ run }: { run: Run }) {
     <div className="space-y-1.5">
       {live && (
         <div>
-          <div className="text-[11px] text-muted">{run.status === "queued" ? "Waiting for the worker" : `Step ${Math.min(done + 1, STAGES.length)} of ${STAGES.length}: ${STAGE_LABEL[STAGES[Math.min(done, STAGES.length - 1)]!]}`}</div>
+          <div className="text-caption text-muted">{run.status === "queued" ? "Waiting for the worker" : `Step ${Math.min(done + 1, STAGES.length)} of ${STAGES.length}: ${STAGE_LABEL[STAGES[Math.min(done, STAGES.length - 1)]!]}`}</div>
           <div className="mt-1 h-1.5 w-40 overflow-hidden rounded-full bg-surface-container" role="progressbar" aria-valuenow={done} aria-valuemin={0} aria-valuemax={STAGES.length}>
             <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / STAGES.length) * 100}%` }} />
           </div>
@@ -224,7 +224,7 @@ function RunSummary({ run }: { run: Run }) {
       {shown.length > 0 ? (
         <ul className="flex flex-wrap gap-1">
           {shown.map(([label, n, tone]) => (
-            <li key={label} className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
+            <li key={label} className={`rounded-full px-2 py-0.5 text-caption font-medium ${tone}`}>
               {n} {label}
             </li>
           ))}
@@ -232,7 +232,7 @@ function RunSummary({ run }: { run: Run }) {
       ) : !live ? (
         <p className="text-xs text-muted">{run.status === "cancelled" ? "Cancelled before it moved anything." : Object.keys(counts).length ? "Nothing was due, so nothing moved." : "Nothing recorded."}</p>
       ) : null}
-      {line && <p className={`text-[11px] ${totals.newLeads === 0 ? "text-attention" : "text-muted"}`}>{line}</p>}
+      {line && <p className={`text-caption ${totals.newLeads === 0 ? "text-attention" : "text-muted"}`}>{line}</p>}
     </div>
   );
 }

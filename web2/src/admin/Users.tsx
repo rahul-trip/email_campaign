@@ -40,7 +40,7 @@ function InviteToOutbound() {
       </form>
       <Problem error={invite.error ?? revoke.error} className="mt-2" />
       {(pending.data ?? []).length > 0 && (
-        <ul className="mt-3 divide-y divide-line rounded-lg border border-line text-[13px]">
+        <ul className="mt-3 divide-y divide-line rounded-lg border border-line text-body">
           {pending.data!.map((i) => (
             <li key={i.id} className="flex items-center justify-between gap-3 px-3 py-2">
               <span>{i.email}</span>
@@ -107,7 +107,7 @@ export function UsersPage() {
                     <tr key={u.id}>
                       <Td>
                         <span className="font-medium">{u.name || u.email}</span>
-                        {u.name && <span className="block text-[11px] text-muted">{u.email}</span>}
+                        {u.name && <span className="block text-caption text-muted">{u.email}</span>}
                       </Td>
                       <Td className="text-xs">{u.workspaces.join(", ") || <span className="text-muted">none</span>}</Td>
                       <Td>

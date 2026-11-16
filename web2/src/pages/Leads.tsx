@@ -78,7 +78,7 @@ export function LeadsPage() {
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder="Search by company or domain"
-              className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-8 pr-3 text-[13px] outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
+              className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-8 pr-3 text-body outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
             />
           </div>
           <Select aria-label="Status" value={search.status ?? ""} onChange={(e) => set({ status: e.target.value || undefined, hold: e.target.value === "held" ? search.hold : undefined })} className="w-auto">
@@ -115,7 +115,7 @@ export function LeadsPage() {
             action={
               filtered ? undefined : (
                 <Link to="/targets" className={buttonClass("primary")}>
-                  Add your first target
+                  Add your first lead
                 </Link>
               )
             }
@@ -148,13 +148,13 @@ export function LeadsPage() {
                       <Link to="/leads/$companyId" params={{ companyId: company.id }} className="font-semibold hover:text-primary hover:underline">
                         {company.name ?? company.domain}
                       </Link>
-                      <div className="font-mono text-[11px] text-muted">{company.domain}</div>
+                      <div className="font-mono text-caption text-muted">{company.domain}</div>
                     </Td>
                     <Td>
                       <StatusBadge status={describe(leadStatus, company.status)} />
-                      {hold && <div className="mt-1 text-[11px] text-attention">{hold.label}</div>}
+                      {hold && <div className="mt-1 text-caption text-attention">{hold.label}</div>}
                       {company.status === "failed" && company.last_error && (
-                        <div className="mt-1 max-w-[16rem] truncate text-[11px] text-error" title={company.last_error}>
+                        <div className="mt-1 max-w-[16rem] truncate text-caption text-error" title={company.last_error}>
                           {company.last_error}
                         </div>
                       )}
@@ -210,7 +210,7 @@ export function LeadsPage() {
 
 /** Eight small segments: how far along the main path a lead is. Off-path leads show none. */
 export function StageBar({ done }: { done: number | null }) {
-  if (done === null) return <span className="text-[11px] text-muted">off the main path</span>;
+  if (done === null) return <span className="text-caption text-muted">off the main path</span>;
   return (
     <div className="flex items-center gap-2" aria-label={`${done} of ${STAGES.length} stages done`} title={done < STAGES.length ? `Next: ${STAGES[done]}` : "All stages done"}>
       <div className="flex gap-0.5" aria-hidden>
@@ -218,7 +218,7 @@ export function StageBar({ done }: { done: number | null }) {
           <span key={stage} className={cx("h-1.5 w-3 rounded-sm", i < done ? "bg-good" : i === done ? "bg-working" : "bg-surface-container")} />
         ))}
       </div>
-      <span className="text-[11px] text-muted">{done < STAGES.length ? STAGES[done] : "Done"}</span>
+      <span className="text-caption text-muted">{done < STAGES.length ? STAGES[done] : "Done"}</span>
     </div>
   );
 }

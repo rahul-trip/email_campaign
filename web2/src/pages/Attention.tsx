@@ -144,7 +144,7 @@ function CreditWait({ leads, rows, usage }: { leads: Company[]; rows: number; us
     >
       <Problem error={all.error ?? one.error} className="mb-3" />
       {rows > 0 && (
-        <p className="mb-2 text-[13px]">
+        <p className="mb-2 text-body">
           {rows} compan{rows === 1 ? "y" : "ies"} you added {rows === 1 ? "is" : "are"} waiting to become leads. See them under{" "}
           <Link to="/targets" className="font-semibold text-primary hover:underline">
             Add leads
@@ -191,8 +191,8 @@ function Row({ company, detail, children }: { company: Company; detail: ReactNod
           <Link to="/leads/$companyId" params={{ companyId: company.id }} className="truncate font-semibold hover:text-primary hover:underline">
             {company.name ?? company.domain}
           </Link>
-          <span className="font-mono text-[11px] text-muted">{company.domain}</span>
-          {company.country_code && <span className="rounded bg-surface-container px-1.5 font-mono text-[10px]">{company.country_code}</span>}
+          <span className="font-mono text-caption text-muted">{company.domain}</span>
+          {company.country_code && <span className="rounded bg-surface-container px-1.5 font-mono text-caption">{company.country_code}</span>}
         </div>
         <div className="mt-0.5 text-xs text-muted">{detail}</div>
       </div>

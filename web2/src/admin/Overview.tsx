@@ -36,7 +36,7 @@ export function OverviewPage() {
                   ) : (
                     <ul className="divide-y divide-line">
                       {o.attention.map((a, i) => (
-                        <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-[13px]">
+                        <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-body">
                           <span>
                             <strong>{a.workspace_name}</strong>
                             <span className="block text-xs text-muted">
@@ -53,9 +53,9 @@ export function OverviewPage() {
                 </Card>
                 <Card title="Spend by vendor" subtitle="This month, all customers.">
                   {providers.length === 0 ? (
-                    <p className="text-[13px] text-muted">No vendor calls yet this month.</p>
+                    <p className="text-body text-muted">No vendor calls yet this month.</p>
                   ) : (
-                    <ul className="space-y-2 text-[13px]">
+                    <ul className="space-y-2 text-body">
                       {providers.map(([name, micro]) => (
                         <li key={name}>
                           <div className="flex justify-between">
@@ -73,9 +73,9 @@ export function OverviewPage() {
               </div>
               <Card title="Recent admin activity" actions={<A to="/audit" className="text-xs font-semibold text-primary hover:underline">Audit log</A>}>
                 {o.activity.length === 0 ? (
-                  <p className="text-[13px] text-muted">Nothing yet.</p>
+                  <p className="text-body text-muted">Nothing yet.</p>
                 ) : (
-                  <ul className="divide-y divide-line text-[13px]">
+                  <ul className="divide-y divide-line text-body">
                     {o.activity.map((a) => (
                       <li key={a.id} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
                         <When iso={a.at} time />

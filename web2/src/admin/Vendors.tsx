@@ -55,7 +55,7 @@ export function VendorsPage() {
                       <Td className="text-muted">{v.role}</Td>
                       <Td className="font-mono text-xs">
                         {v.key}
-                        {v.source === "environment" && <span className="ml-2 text-[11px] text-muted">from the environment</span>}
+                        {v.source === "environment" && <span className="ml-2 text-caption text-muted">from the environment</span>}
                       </Td>
                       <Td className="text-muted">{v.set_at ? <When iso={v.set_at} time /> : "—"}</Td>
                       <Td className="whitespace-nowrap text-xs">
@@ -67,9 +67,9 @@ export function VendorsPage() {
                       </Td>
                       <Td>
                         {v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
-                        {v.key_refusals > 0 && <div className="mt-1 text-[11px] text-error">refused {v.key_refusals}× in the last day</div>}
+                        {v.key_refusals > 0 && <div className="mt-1 text-caption text-error">refused {v.key_refusals}× in the last day</div>}
                         {tested[v.code] && (
-                          <div role="status" className={`mt-1 max-w-56 text-[11px] ${tested[v.code]!.ok === false ? "text-error" : tested[v.code]!.ok ? "text-good" : "text-muted"}`}>
+                          <div role="status" className={`mt-1 max-w-56 text-caption ${tested[v.code]!.ok === false ? "text-error" : tested[v.code]!.ok ? "text-good" : "text-muted"}`}>
                             {tested[v.code]!.message}
                           </div>
                         )}

@@ -43,6 +43,7 @@ from outbound.services.review import ReviewService
 from outbound.services.runs import RunService
 from outbound.services.settings import SettingsService
 from outbound.services.setup import SetupService
+from outbound.services.setup_draft import SetupDrafts
 from outbound.services.usage import UsageService
 from outbound.services.webhook import WebhookService
 from outbound.stages.mailboxes import Mailboxes
@@ -66,6 +67,7 @@ class Services:
     privacy: PrivacyService
     mailboxes: MailboxService
     setup: SetupService
+    drafts: SetupDrafts
     quota: QuotaService
     resume: ResumeService
     usage: UsageService
@@ -101,6 +103,7 @@ def build_services(
         webhook=WebhookService(uow, workspace_id, intake),
         privacy=PrivacyService(uow, workspace_id, mailboxes, actor=actor),
         setup=SetupService(uow, workspace_id),
+        drafts=SetupDrafts(uow, workspace_id, search=search, llm=writer, actor=actor),
         quota=quota,
         resume=resume,
         usage=UsageService(uow, container.identity, workspace_id, quota, resume),

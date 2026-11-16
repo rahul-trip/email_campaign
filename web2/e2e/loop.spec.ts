@@ -7,7 +7,7 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
 
   // 1. Add two targets on the Add leads screen.
   for (const domain of [approved, waiting]) {
-    await page.getByRole("link", { name: "Add leads" }).click();
+    await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Add leads" }).click();
     await page.getByLabel("Website or domain").fill(domain);
     await page.getByLabel(/^Country/).fill("US");
     await page.getByRole("button", { name: "Add company" }).click();

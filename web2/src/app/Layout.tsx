@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { CampaignGate } from "../components/CampaignGate";
 import { NotificationBell } from "../components/Notifications";
-import { useNeedsCampaign } from "../lib/setup";
+import { useNeedsCampaign, useSetup } from "../lib/setup";
 import { Avatar, Menu, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
@@ -22,14 +22,18 @@ const WORKER_SILENT_MS = 45_000;
 export function Layout({ children }: { children: ReactNode }) {
   const current = useCurrent();
   const gated = useNeedsCampaign() && !isViewing(current.workspace);
+  // The tour waits until the setup is done, so it never opens on top of onboarding.
+  const setupDone = useSetup().data?.done === true;
   return (
-    <TourProvider autoStart={!gated}>
+    <TourProvider autoStart={!gated && setupDone}>
       <Shell gated={gated}>{children}</Shell>
     </TourProvider>
   );
 }
 
 // Pages that stay open while the campaign is missing: where it can also be made, and the setup.
+// The dashboard and the setup already say when the profile is not confirmed.
+const SAYS_UNCONFIRMED = /^(\/w\/[^/]+)?(\/|\/onboarding\/?)?$/;
 const OPEN_WITHOUT_CAMPAIGN = /(^|\/)(settings|onboarding)(\/|$)/;
 
 function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
@@ -58,7 +62,20 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
   };
   const active = runs.data?.find((r) => r.status === "running") ?? runs.data?.find((r) => r.status === "queued");
   const stuck = active?.status === "queued" && Date.now() - new Date(active.created_at).getTime() > WORKER_SILENT_MS;
-  const unconfirmed = profile.isSuccess && !(profile.data as Record<string, unknown>).reviewed_at;
+  // On the dashboard and in the setup the page already says the profile is not confirmed.
+  const unconfirmed = profile.isSuccess && !(profile.data as Record<string, unknown>).reviewed_at && !SAYS_UNCONFIRMED.test(pathname);
+  const banners: BannerItem[] = [
+    ...usageBanners(usage.data),
+    ...(stuck
+      ? [{ key: "stuck", tone: "error" as const, node: <>A run has been waiting {ago(active?.created_at)} and nothing has picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.</> }]
+      : []),
+    ...(rulesOff
+      ? [{ key: "rules", tone: "error" as const, node: <>Country rules are switched off for this workspace: no lead is held or blocked by its country. The do-not-contact list still applies.{" "}<Link to="/compliance" className="font-semibold underline">Switch them back on</Link>.</> }]
+      : []),
+    ...(unconfirmed
+      ? [{ key: "unconfirmed", tone: "attention" as const, node: <>Your sender profile is not confirmed, so no emails are written yet.{" "}<Link to="/settings" className="font-semibold underline">Review and confirm it</Link>.</> }]
+      : []),
+  ].sort((a, b) => Number(b.tone === "error") - Number(a.tone === "error")); // errors first, otherwise in the order above
 
   return (
     <div className="min-h-screen">
@@ -82,12 +99,10 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
           <EngineChip run={active} stuck={stuck} />
           {!viewing && (
             <Link to="/targets" className={buttonClass("primary", "md", "hidden sm:inline-flex")}>
-              <Plus size={16} aria-hidden /> Add target
+              <Plus size={16} aria-hidden /> Add leads
             </Link>
           )}
-          <TourButton />
           <NotificationBell />
-          <ThemeSwitch />
           <UserMenu />
         </div>
       </header>
@@ -97,18 +112,18 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
         <nav aria-label="Main" data-tour="nav" className="flex flex-col gap-4 px-2 py-3">
           {NAV.map((group) => (
             <div key={group.label} className="flex flex-col gap-0.5">
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">{group.label}</div>
+              <div className="px-3 pb-1 text-caption font-semibold uppercase tracking-wider text-muted">{group.label}</div>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const count = item.badge ? counts[item.badge] : 0;
                 if (item.soon)
                   return (
-                    <div key={item.to} title={item.soonNote} className="flex cursor-not-allowed select-none items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-muted/60">
+                    <div key={item.to} title={item.soonNote} className="flex cursor-not-allowed select-none items-center justify-between rounded-lg px-3 py-1.5 text-body text-muted/60">
                       <span className="flex items-center gap-2">
                         <Icon size={18} aria-hidden />
                         {item.label}
                       </span>
-                      <span className="rounded bg-surface-container px-1.5 text-[10px] font-semibold uppercase">Soon</span>
+                      <span className="rounded bg-surface-container px-1.5 text-caption font-semibold uppercase">Soon</span>
                     </div>
                   );
                 return (
@@ -116,7 +131,7 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
                     key={item.to}
                     to={item.to}
                     activeOptions={{ exact: item.to === "/" }}
-                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface-low hover:text-ink"
+                    className="flex items-center justify-between rounded-lg px-3 py-1.5 text-body text-muted transition-colors hover:bg-surface-low hover:text-ink"
                     activeProps={{ className: "bg-primary-fixed font-semibold !text-primary hover:bg-primary-fixed" }}
                   >
                     <span className="flex items-center gap-2">
@@ -126,7 +141,7 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
                     {count > 0 && (
                       <span
                         aria-label={`${count} waiting`}
-                        className={cx("rounded-full px-1.5 font-mono text-[11px] font-semibold", item.badge === "review" ? "bg-attention-container text-on-attention-container" : "bg-error-container text-on-error-container")}
+                        className={cx("rounded-full px-1.5 font-mono text-caption font-semibold", item.badge === "review" ? "bg-attention-container text-on-attention-container" : "bg-error-container text-on-error-container")}
                       >
                         {count}
                       </span>
@@ -142,30 +157,7 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
       <main id="main" className="px-4 pb-12 pt-[72px] sm:px-6 lg:ml-60">
         <div className="mx-auto max-w-[1440px]">
           {viewing && <ViewingBanner name={current.workspace.name} />}
-          <UsageBanners usage={usage.data} />
-          {stuck && (
-            <Banner tone="error">
-              A run has been waiting {ago(active?.created_at)} and nothing has picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.
-            </Banner>
-          )}
-          {rulesOff && (
-            <Banner tone="error">
-              Country rules are switched off for this workspace: no lead is held or blocked by its country. The do-not-contact list still applies.{" "}
-              <Link to="/compliance" className="font-semibold underline">
-                Switch them back on
-              </Link>
-              .
-            </Banner>
-          )}
-          {unconfirmed && (
-            <Banner tone="attention">
-              Your sender profile is not confirmed, so no emails are written yet.{" "}
-              <Link to="/settings" className="font-semibold underline">
-                Review and confirm it
-              </Link>
-              .
-            </Banner>
-          )}
+          <Banners key={pathname} items={banners} />
           {gated && !OPEN_WITHOUT_CAMPAIGN.test(pathname) ? <CampaignGate /> : children}
         </div>
       </main>
@@ -173,9 +165,32 @@ function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
   );
 }
 
+type BannerItem = { key: string; tone: "attention" | "error"; node: ReactNode };
+
+/** One banner at a time: the most serious first, the rest behind "and n more". */
+function Banners({ items }: { items: BannerItem[] }) {
+  const [all, setAll] = useState(false);
+  if (items.length === 0) return null;
+  const shown = all ? items : items.slice(0, 1);
+  return (
+    <>
+      {shown.map((item) => (
+        <Banner key={item.key} tone={item.tone}>
+          {item.node}
+        </Banner>
+      ))}
+      {!all && items.length > 1 && (
+        <button type="button" onClick={() => setAll(true)} className="-mt-2 mb-4 text-xs font-semibold text-primary hover:underline">
+          and {items.length - 1} more
+        </button>
+      )}
+    </>
+  );
+}
+
 function Banner({ tone, children }: { tone: "attention" | "error"; children: ReactNode }) {
   return (
-    <div role="alert" className={cx("mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[13px]", tone === "error" ? "border-error/30 bg-error-container text-on-error-container" : "border-attention/40 bg-attention-container text-on-attention-container")}>
+    <div role="alert" className={cx("mb-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-body", tone === "error" ? "border-error/30 bg-error-container text-on-error-container" : "border-attention/40 bg-attention-container text-on-attention-container")}>
       <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
       <div>{children}</div>
     </div>
@@ -215,9 +230,9 @@ function SearchBox() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Search leads by company or domain"
-        className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-9 pr-16 text-[13px] outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
+        className="h-8 w-full rounded-lg border border-outline bg-surface-low pl-9 pr-16 text-body outline-none focus:border-primary-container focus:ring-2 focus:ring-primary-container/20"
       />
-      <kbd className="absolute right-2 top-1.5 rounded border border-line bg-surface px-1.5 font-mono text-[10px] text-muted">Ctrl K</kbd>
+      <kbd className="absolute right-2 top-1.5 rounded border border-line bg-surface px-1.5 font-mono text-caption text-muted">Ctrl K</kbd>
     </form>
   );
 }
@@ -229,7 +244,7 @@ function EngineChip({ run, stuck }: { run?: { status: string; created_at: string
     <Link
       to="/runs"
       className={cx(
-        "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold xl:inline-flex",
+        "hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-caption font-semibold xl:inline-flex",
         stuck ? "bg-error-container text-on-error-container" : "bg-working-container text-on-working-container",
       )}
     >
@@ -239,31 +254,10 @@ function EngineChip({ run, stuck }: { run?: { status: string; created_at: string
   );
 }
 
-function TourButton() {
-  const { start } = useTour();
-  return (
-    <button type="button" onClick={start} title="Take the guided tour" className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[13px] text-muted hover:bg-surface-low hover:text-ink">
-      <Compass size={16} aria-hidden /> <span className="hidden md:inline">Tour</span>
-    </button>
-  );
-}
-
-function ThemeSwitch() {
-  const [theme, setTheme] = useTheme();
-  const next: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
-  const Icon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
-  const label = { system: "Theme: follows the system", light: "Theme: light", dark: "Theme: dark" }[theme];
-  return (
-    <button type="button" title={label} aria-label={`${label}. Change theme`} onClick={() => setTheme(next[theme])} className="rounded-lg p-1.5 text-muted hover:bg-surface-low hover:text-ink">
-      <Icon size={18} />
-    </button>
-  );
-}
-
 /** A superadmin reading a workspace they are not in. Stays in view; every write is refused. */
 function ViewingBanner({ name }: { name: string }) {
   return (
-    <div role="status" data-tour="viewing" className="sticky top-[60px] z-20 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error px-3 py-2 text-[13px] font-semibold text-white shadow">
+    <div role="status" data-tour="viewing" className="sticky top-[60px] z-20 mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error px-3 py-2 text-body font-semibold text-white shadow">
       <span className="flex items-center gap-2">
         <Eye size={16} aria-hidden /> Superadmin view of {name}, read-only
       </span>
@@ -289,7 +283,7 @@ function WorkspaceSwitcher() {
       label="Switch workspace"
       tour="workspace-switcher"
       align="left"
-      buttonClassName="flex items-center gap-1 rounded-lg px-1.5 py-1 text-[13px] font-semibold text-muted hover:bg-surface-low hover:text-ink"
+      buttonClassName="flex items-center gap-1 rounded-lg px-1.5 py-1 text-body font-semibold text-muted hover:bg-surface-low hover:text-ink"
       button={
         <>
           <span className="max-w-[180px] truncate">{workspace.name}</span>
@@ -318,6 +312,11 @@ function UserMenu() {
   const signOut = useMutation({ mutationFn: () => client.POST("/api/auth/logout"), onSuccess: () => go("/sign-in") });
   const others = useMutation({ mutationFn: () => ok(client.POST("/api/auth/logout-others")) });
   const navigate = useNavigate();
+  const { start } = useTour();
+  const [theme, setTheme] = useTheme();
+  const nextTheme: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
+  const ThemeIcon = theme === "light" ? Sun : theme === "dark" ? Moon : Monitor;
+  const themeLabel = { system: "follows the system", light: "light", dark: "dark" }[theme];
   const name = me.user.name || me.user.email;
   return (
     <Menu
@@ -329,12 +328,14 @@ function UserMenu() {
         <>
           <div className="font-semibold">{name}</div>
           <div className="text-muted">{me.user.email}</div>
-          {me.user.platform_role && <div className="mt-1 text-[11px] font-semibold uppercase text-primary">Platform {me.user.platform_role}</div>}
-          {others.isSuccess && <div className="mt-1 text-[11px] text-muted">Signed out of {others.data.signed_out} other session(s).</div>}
+          {me.user.platform_role && <div className="mt-1 text-caption font-semibold uppercase text-primary">Platform {me.user.platform_role}</div>}
+          {others.isSuccess && <div className="mt-1 text-caption text-muted">Signed out of {others.data.signed_out} other session(s).</div>}
         </>
       }
       items={[
         ...(me.user.platform_role ? [{ label: <><Shield size={14} aria-hidden /> Admin console</>, onSelect: () => window.location.assign("/admin") }] : []),
+        { label: <><Compass size={14} aria-hidden /> Take the guided tour</>, onSelect: start },
+        { label: <><ThemeIcon size={14} aria-hidden /> Theme: {themeLabel}</>, hint: "change", onSelect: () => setTheme(nextTheme[theme]) },
         { label: <><KeyRound size={14} aria-hidden /> Account and password</>, onSelect: () => void navigate({ to: "/settings", search: { tab: "account" } }) },
         { label: <><LogOut size={14} aria-hidden /> Sign out everywhere else</>, onSelect: () => others.mutate() },
         { label: <><LogOut size={14} aria-hidden /> Sign out</>, onSelect: () => signOut.mutate(), tone: "danger" },
@@ -347,43 +348,29 @@ const WEEK_MS = 7 * 24 * 3600 * 1000;
 
 /** What the plan says about the workspace: an announcement, access ending or ended, an engine
  * that is stopped, and steps close to (or at) their allowance. Shown to everyone in it. */
-function UsageBanners({ usage }: { usage?: Usage }) {
-  if (!usage) return null;
+function usageBanners(usage?: Usage): BannerItem[] {
+  if (!usage) return [];
   const ending = usage.access_until ? new Date(usage.access_until).getTime() - Date.now() : null;
-  const near = nearLimit(usage);
-  return (
-    <>
-      {usage.announcement && <Banner tone="attention">{usage.announcement}</Banner>}
-      {usage.access === "read_only" && (
-        <Banner tone="error">
-          Access to this workspace ended on {day(usage.access_until)}, so it is read-only: nothing is lost, but nothing can be added or run.{" "}
-          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
-            Ask for an extension
-          </Link>
-          .
-        </Banner>
-      )}
-      {usage.access === "full" && ending !== null && ending > 0 && ending < WEEK_MS && (
-        <Banner tone="attention">
-          Your access ends on {day(usage.access_until)}.{" "}
-          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
-            Ask for more time
-          </Link>
-          .
-        </Banner>
-      )}
-      {usage.access === "full" && !usage.engine && (
-        <Banner tone="error">The engine is stopped for this workspace, so nothing runs. You can still read everything. Ask the team who runs the service.</Banner>
-      )}
-      {near.map((s) => (
-        <Banner key={s.step} tone={s.out ? "error" : "attention"}>
-          {s.out ? `No credits left for ${(STEP_LABEL[s.step] ?? s.step).toLowerCase()}` : `${s.remaining} credit${s.remaining === 1 ? "" : "s"} left for ${(STEP_LABEL[s.step] ?? s.step).toLowerCase()}`}; they renew on {day(usage.period_end)}.{" "}
-          <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
-            See your plan
-          </Link>
-          .
-        </Banner>
-      ))}
-    </>
+  const plan = (text: string) => (
+    <Link to="/settings" search={{ tab: "plan" }} className="font-semibold underline">
+      {text}
+    </Link>
   );
+  const items: BannerItem[] = [];
+  if (usage.announcement) items.push({ key: "announcement", tone: "attention", node: usage.announcement });
+  if (usage.access === "read_only")
+    items.push({ key: "read-only", tone: "error", node: <>Access to this workspace ended on {day(usage.access_until)}, so it is read-only: nothing is lost, but nothing can be added or run. {plan("Ask for an extension")}.</> });
+  if (usage.access === "full" && ending !== null && ending > 0 && ending < WEEK_MS)
+    items.push({ key: "ending", tone: "attention", node: <>Your access ends on {day(usage.access_until)}. {plan("Ask for more time")}.</> });
+  if (usage.access === "full" && !usage.engine)
+    items.push({ key: "engine", tone: "error", node: "The engine is stopped for this workspace, so nothing runs. You can still read everything. Ask the team who runs the service." });
+  for (const s of nearLimit(usage)) {
+    const what = (STEP_LABEL[s.step] ?? s.step).toLowerCase();
+    items.push({
+      key: `credit-${s.step}`,
+      tone: s.out ? "error" : "attention",
+      node: <>{s.out ? `No credits left for ${what}` : `${s.remaining} credit${s.remaining === 1 ? "" : "s"} left for ${what}`}; they renew on {day(usage.period_end)}. {plan("See your plan")}.</>,
+    });
+  }
+  return items;
 }

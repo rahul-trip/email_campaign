@@ -54,7 +54,7 @@ function JoinRequests({ team, onChange }: { team: TeamOut; onChange: (team: Team
   });
   return (
     <Card tour="team-requests" title="Join requests" subtitle="Someone with an account asks to join with your workspace's code. You decide, and choose the role they get.">
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-body">
         <span className="text-muted">Join code</span>
         <code className="rounded bg-surface-low px-2 py-1 text-[14px] font-semibold tracking-widest">{team.join_code ?? "—"}</code>
         <Button variant="secondary" size="sm" onClick={() => void navigator.clipboard?.writeText(team.join_code ?? "")} aria-label="Copy the join code">
@@ -66,15 +66,15 @@ function JoinRequests({ team, onChange }: { team: TeamOut; onChange: (team: Team
       </div>
       <Problem error={approve.error ?? reject.error} className="mb-2" />
       {team.requests.length === 0 ? (
-        <p className="text-[13px] text-muted">No one is waiting.</p>
+        <p className="text-body text-muted">No one is waiting.</p>
       ) : (
         <ul className="divide-y divide-line rounded-lg border border-line">
           {team.requests.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-[13px]">
+            <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-body">
               <span>
                 <span className="font-semibold">{r.name || r.email}</span>
                 {r.name && <span className="ml-2 text-muted">{r.email}</span>}
-                <span className="ml-2 text-[11px] text-muted">asked {ago(r.requested_at)}</span>
+                <span className="ml-2 text-caption text-muted">asked {ago(r.requested_at)}</span>
               </span>
               <span className="flex items-center gap-2">
                 <Select aria-label={`Role for ${r.email}`} value={roles[r.id] ?? "member"} onChange={(e) => setRoles({ ...roles, [r.id]: e.target.value as Role })}>
@@ -186,9 +186,9 @@ function Members({ team, admin, onChange }: { team: TeamOut; admin: boolean; onC
                       <span>
                         <span className="block font-medium">
                           {member.name || member.email}
-                          {you && <span className="ml-1 text-[11px] text-muted">(you)</span>}
+                          {you && <span className="ml-1 text-caption text-muted">(you)</span>}
                         </span>
-                        {member.name && <span className="block text-[11px] text-muted">{member.email}</span>}
+                        {member.name && <span className="block text-caption text-muted">{member.email}</span>}
                       </span>
                     </span>
                   </Td>

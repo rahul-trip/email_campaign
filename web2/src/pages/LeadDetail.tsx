@@ -15,6 +15,7 @@ import {
   Checkbox,
   Confirm,
   Empty,
+  Dialog,
   Field,
   Input,
   Label,
@@ -29,6 +30,7 @@ import {
   Textarea,
   Th,
   buttonClass,
+  StartNow,
 } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
@@ -68,10 +70,12 @@ export function LeadDetailPage() {
   const retry = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/retry", path)), onSuccess: refresh });
   const requalify = useMutation({ mutationFn: () => ok(client.POST("/api/companies/{company_id}/requalify", path)), onSuccess: refresh });
   const [researching, setResearching] = useState(false);
+  const [researchQueued, setResearchQueued] = useState(false);
   const researchAgain = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/research-again", path)),
     onSuccess: () => {
       setResearching(false);
+      setResearchQueued(true);
       refresh();
     },
   });
@@ -167,7 +171,7 @@ export function LeadDetailPage() {
           onClose={() => setResearching(false)}
           onConfirm={() => researchAgain.mutate()}
         >
-          <p>The next run reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
+          <p>The next run, within 15 minutes or when you start one, reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
           <p className="mt-2">
             An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
           </p>
@@ -192,6 +196,11 @@ export function LeadDetailPage() {
       </div>
 
       <div className="mb-5 space-y-3">
+        {researchQueued && company.status === "new" && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            Queued for research again, within 15 minutes, or now: <StartNow />
+          </p>
+        )}
         <Problem error={retry.error ?? requalify.error} />
         {company.status === "failed" && (
           <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
@@ -259,15 +268,15 @@ export function LeadDetailPage() {
                   <details key={m.id} className="group rounded-lg border border-line">
                     <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2.5 hover:bg-surface-low">
                       <span className="font-mono text-xs font-semibold">Email {m.step + 1}</span>
-                      <span className="min-w-0 flex-1 truncate text-[13px]">{m.subject}</span>
+                      <span className="min-w-0 flex-1 truncate text-body">{m.subject}</span>
                       <StatusBadge status={describe(messageState, m.state)} />
-                      {m.edit_distance != null && <span className="text-[11px] text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
+                      {m.edit_distance != null && <span className="text-caption text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
                       {m.created_at && (
-                        <span className="text-[11px] text-muted" title={when(m.created_at)}>
+                        <span className="text-caption text-muted" title={when(m.created_at)}>
                           written {ago(m.created_at)}
                         </span>
                       )}
-                      {m.sent_at && <span className="text-[11px] text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
+                      {m.sent_at && <span className="text-caption text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
                       {m.state === "generated" && (
                         <Link
                           data-tour="lead-open-review"
@@ -280,7 +289,7 @@ export function LeadDetailPage() {
                         </Link>
                       )}
                     </summary>
-                    <pre className="whitespace-pre-wrap border-t border-line bg-surface-low p-3 font-sans text-[13px] leading-relaxed">{m.final_body ?? m.generated_body}</pre>
+                    <pre className="whitespace-pre-wrap border-t border-line bg-surface-low p-3 font-sans text-body leading-relaxed">{m.final_body ?? m.generated_body}</pre>
                   </details>
                 ))}
               </div>
@@ -324,7 +333,7 @@ export function LeadDetailPage() {
                           </Td>
                           <Td>
                             <StatusBadge status={describe(callOutcome, step.outcome)} />
-                            {step.got && <div className="mt-0.5 text-[11px] text-muted">{step.got}</div>}
+                            {step.got && <div className="mt-0.5 text-caption text-muted">{step.got}</div>}
                           </Td>
                           <Td className="text-right font-mono text-xs">{usd(step.cost_micro_usd)}</Td>
                         </tr>
@@ -377,9 +386,9 @@ export function LeadDetailPage() {
             <Card title="Notes">
               <ul className="space-y-2">
                 {notes.map((note) => (
-                  <li key={note.id} className="rounded-lg bg-surface-low p-2.5 text-[13px]">
+                  <li key={note.id} className="rounded-lg bg-surface-low p-2.5 text-body">
                     {note.body}
-                    <div className="mt-1 text-[11px] text-muted">
+                    <div className="mt-1 text-caption text-muted">
                       {words(note.source)}
                       {note.created_at && ` · ${ago(note.created_at)}`}
                     </div>
@@ -414,8 +423,8 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
   });
   return (
     <Card tone="attention" title={<span className="text-on-attention-container">Held: {hold.label}</span>}>
-      <p className="text-[13px]">{hold.why}</p>
-      <p className="mt-1 text-[13px] font-medium">{hold.fix}</p>
+      <p className="text-body">{hold.why}</p>
+      <p className="mt-1 text-body font-medium">{hold.fix}</p>
       {hold.action === "person" && (
         <p className="mt-1 text-xs text-muted">Releasing the hold does not give consent, so it would only be held again. Consent belongs to a person and is recorded with them.</p>
       )}
@@ -446,9 +455,12 @@ function HoldPanel({ company, onDone }: { company: Company; onDone: () => void }
         )}
       </div>
       {suggestion && hold.action === "country" && <p className="mt-2 text-xs text-muted">Suggested from the research: {suggestion.evidence}. It is a suggestion, not proof.</p>}
-      <p className="mt-2 text-[11px] text-muted">
-        The stage that held it runs again on the next run. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
+      <p className="mt-2 text-caption text-muted">
+        The stage that held it runs again within 15 minutes. A country-rule hold is refused while nothing has changed; you can also skip the country rule for this lead under <em>Country rule</em>.
       </p>
+      <div className="mt-2 flex items-center gap-2">
+        <StartNow />
+      </div>
       <Problem error={release.error ?? setCountry.error} className="mt-2" />
     </Card>
   );
@@ -531,18 +543,18 @@ function Person({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-full bg-primary-fixed font-mono text-[11px] font-semibold text-primary">{contact.rank}</span>
+            <span className="flex size-6 items-center justify-center rounded-full bg-primary-fixed font-mono text-caption font-semibold text-primary">{contact.rank}</span>
             <span className="font-semibold">{contact.full_name ?? "(no name)"}</span>
             {contact.title && <span className="text-xs text-muted">{contact.title}</span>}
             {unconfirmed && (
-              <span className="rounded-full bg-attention-container px-2 py-0.5 text-[11px] font-medium text-on-attention-container" title="A search found this person, but their profile does not clearly say they work here.">
+              <span className="rounded-full bg-attention-container px-2 py-0.5 text-caption font-medium text-on-attention-container" title="A search found this person, but their profile does not clearly say they work here.">
                 Unconfirmed: check they work here
               </span>
             )}
-            {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-[11px]">{words(contact.status)}</span>}
-            {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">The email is to this person</span>}
+            {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-caption">{words(contact.status)}</span>}
+            {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-caption font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url ? (
-              <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline">
+              <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-caption font-medium text-primary hover:underline">
                 LinkedIn <ExternalLink className="size-3" aria-hidden />
               </a>
             ) : (
@@ -551,16 +563,16 @@ function Person({
                   type="button"
                   onClick={() => findLinkedin.mutate()}
                   disabled={findLinkedin.isPending || !contact.full_name}
-                  className="text-[11px] font-medium text-primary hover:underline disabled:opacity-60"
+                  className="text-caption font-medium text-primary hover:underline disabled:opacity-60"
                   title="One search for this person's LinkedIn profile"
                 >
                   {findLinkedin.isPending ? "Searching…" : "Find LinkedIn"}
                 </button>
               )
             )}
-            {findLinkedin.isSuccess && !findLinkedin.data.url && <span className="text-[11px] text-muted">No clear match found</span>}
+            {findLinkedin.isSuccess && !findLinkedin.data.url && <span className="text-caption text-muted">No clear match found</span>}
             {contact.created_at && (
-              <span className="text-[11px] text-muted" title={when(contact.created_at)}>
+              <span className="text-caption text-muted" title={when(contact.created_at)}>
                 found {ago(contact.created_at)}
               </span>
             )}
@@ -581,7 +593,7 @@ function Person({
               </li>
             ))}
             {contact.emails.length === 0 && <li className="text-xs text-muted">No address yet.</li>}
-            {contact.refresh_email && <li className="text-xs font-medium text-primary">Email search queued: it runs on the next run.</li>}
+            {contact.refresh_email && <li className="text-xs font-medium text-primary">Email search queued: it runs within 15 minutes.</li>}
           </ul>
         </div>
         {!gone && (
@@ -760,7 +772,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   // Decided when the person is added: the hold is released by then, so the page no longer says it was held.
   const [doneText, setDoneText] = useState("Person added.");
   const add = useMutation({
-    onMutate: () => setDoneText(consented && heldForConsent ? "Added, and the hold is released. The lead carries on at the next run." : "Person added."),
+    onMutate: () => setDoneText(consented && heldForConsent ? "Added, and the hold is released. The lead carries on within 15 minutes." : "Person added."),
     mutationFn: async () => {
       await ok(
         client.POST("/api/companies/{company_id}/people", {
@@ -825,6 +837,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
           <UserPlus className="size-3.5" aria-hidden /> {consented && heldForConsent ? "Add person and release the hold" : "Add person"}
         </Button>
         <SaveNote mutation={add} done={doneText} />
+        {add.isSuccess && consented && heldForConsent && <StartNow />}
       </div>
     </Card>
   );
@@ -837,13 +850,13 @@ function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
   return (
     <>
       {title && <Label className="mb-1 mt-3">{title}</Label>}
-      <ul className="space-y-2 text-[13px]">
+      <ul className="space-y-2 text-body">
         {items.map((item) => (
           <li key={item.url}>
             <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
               {item.headline}
             </a>
-            {item.date && <span className="ml-2 font-mono text-[11px] text-muted">{item.date}</span>}
+            {item.date && <span className="ml-2 font-mono text-caption text-muted">{item.date}</span>}
             {item.detail && <div className="text-xs text-muted">{item.detail}</div>}
             {item.matters && <div className="text-xs text-muted">Why it matters: {item.matters}</div>}
           </li>
@@ -870,7 +883,7 @@ function Qualification({ data }: { data: QualificationData }) {
   return (
     <div className="mt-2 space-y-2">
       {criteria.length > 0 && (
-        <ul className="space-y-1.5 text-[13px]">
+        <ul className="space-y-1.5 text-body">
           {criteria.map((c) => {
             const verdict = VERDICT[c.verdict] ?? VERDICT.unknown;
             return (
@@ -879,7 +892,7 @@ function Qualification({ data }: { data: QualificationData }) {
                 <div className="min-w-0">
                   <div>
                     {c.criterion}
-                    <span className="ml-1.5 text-[11px] text-muted">
+                    <span className="ml-1.5 text-caption text-muted">
                       {KIND[c.kind] ?? c.kind}
                       {c.weight > 1 ? ` · counts ${c.weight}` : ""}
                     </span>
@@ -901,13 +914,13 @@ function Qualification({ data }: { data: QualificationData }) {
         </ul>
       )}
       {data.why_now && (
-        <p className="text-[13px]">
+        <p className="text-body">
           <span className="font-medium">Why now: </span>
           {data.why_now}
         </p>
       )}
       {risks.length > 0 && (
-        <div className="text-[13px]">
+        <div className="text-body">
           <span className="font-medium">Risks: </span>
           {risks.join("; ")}
         </div>
@@ -928,7 +941,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Bullets({ items }: { items: string[] }) {
   return (
-    <ul className="list-disc space-y-1 pl-4 text-[13px] leading-relaxed">
+    <ul className="list-disc space-y-1 pl-4 text-body leading-relaxed">
       {items.map((item, i) => (
         <li key={i}>{item}</li>
       ))}
@@ -963,13 +976,13 @@ function Research({ company }: { company: Company }) {
       <div className="space-y-3">
         {(Boolean(research.summary) || sector) && (
           <Section title="What they do">
-            {sector && <span className="mb-1.5 inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-[11px] font-medium text-primary">{sector}</span>}
-            {Boolean(research.summary) && <p className="whitespace-pre-line text-[13px] leading-relaxed">{String(research.summary)}</p>}
+            {sector && <span className="mb-1.5 inline-block rounded-full bg-primary-fixed px-2 py-0.5 text-caption font-medium text-primary">{sector}</span>}
+            {Boolean(research.summary) && <p className="whitespace-pre-line text-body leading-relaxed">{String(research.summary)}</p>}
           </Section>
         )}
         {company.fit_reason && (
           <Section title="How well they fit">
-            <p className="text-[13px] leading-relaxed">
+            <p className="text-body leading-relaxed">
               <strong>{company.fit_score}/100.</strong> {company.fit_reason}
             </p>
             {qualification && <Qualification data={qualification} />}
@@ -1002,7 +1015,7 @@ function Research({ company }: { company: Company }) {
         )}
         {hiring && (
           <Section title="Hiring">
-            <p className="whitespace-pre-line text-[13px] leading-relaxed">{hiring}</p>
+            <p className="whitespace-pre-line text-body leading-relaxed">{hiring}</p>
           </Section>
         )}
         {tech.length > 0 && (
@@ -1018,7 +1031,7 @@ function Research({ company }: { company: Company }) {
         )}
         {answers.length > 0 && (
           <Section title="Your research questions">
-            <dl className="space-y-2.5 text-[13px]">
+            <dl className="space-y-2.5 text-body">
               {answers.map(([q, a]) => (
                 <div key={q}>
                   <dt className="text-xs font-medium text-muted">{q}</dt>
@@ -1119,19 +1132,32 @@ function DangerZone({ company }: { company: Company }) {
       refreshAll();
     },
   });
+  const [draftsLeft, setDraftsLeft] = useState<number | null>(null);
   const remove = useMutation({
     mutationFn: (typed: string) => ok(client.POST("/api/companies/{company_id}/delete", { ...path, body: { confirm_domain: typed, also_suppress_domain: block } })),
     onSuccess: async (result) => {
-      if (result.drafts_left.length > 0) window.alert(`The lead is deleted, but ${result.drafts_left.length} draft(s) could not be removed from your mailbox. Delete them from the Drafts folder.`);
-      // Leave first, then forget this lead's data: asking the server for it again would only 404.
-      await navigate({ to: "/leads" });
-      for (const key of ["lead", "timeline", "waterfall", "journey"]) queryClient.removeQueries({ queryKey: [key, company.id] });
-      for (const key of ["companies", "status", "review", "suppressions"]) void queryClient.invalidateQueries({ queryKey: [key] });
+      // Drafts that could not be removed are said first; leaving the page waits for the person to read it.
+      if (result.drafts_left.length > 0) {
+        setDraftsLeft(result.drafts_left.length);
+        return;
+      }
+      await leave();
     },
   });
+  // Leave first, then forget this lead's data: asking the server for it again would only 404.
+  const leave = async () => {
+    await navigate({ to: "/leads" });
+    for (const key of ["lead", "timeline", "waterfall", "journey"]) queryClient.removeQueries({ queryKey: [key, company.id] });
+    for (const key of ["companies", "status", "review", "suppressions"]) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
   return (
     <Card collapsible tour="lead-danger" tone="error" title={<span className="text-error">Danger zone</span>}>
-      <div className="space-y-4 text-[13px]">
+      {draftsLeft !== null && (
+        <Dialog title="The lead is deleted" onClose={() => void leave()} footer={<Button onClick={() => void leave()}>OK</Button>}>
+          <p>{draftsLeft} draft{draftsLeft === 1 ? "" : "s"} could not be removed from your mailbox. Delete {draftsLeft === 1 ? "it" : "them"} from the Drafts folder.</p>
+        </Dialog>
+      )}
+      <div className="space-y-4 text-body">
         <div>
           <div className="font-medium">Do not contact this company</div>
           <p className="mt-0.5 text-xs text-muted">Everyone at {company.domain} goes on the do-not-contact list; unsent emails are cancelled.</p>
@@ -1184,17 +1210,17 @@ function Activity({ events, pending, error, names, fit }: { events: Schemas["Tim
           <div className="space-y-4">
             {days.map((day) => (
               <section key={day.label}>
-                <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{day.label}</h3>
+                <h3 className="mb-1.5 text-caption font-semibold uppercase tracking-wider text-muted">{day.label}</h3>
                 <ol className="relative space-y-2.5 border-l border-line pl-4">
                   {day.lines.map((row, i) => (
                     <li key={i} className="relative">
                       <span className={cx("absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-surface", row.line.tone === "good" ? "bg-good" : row.line.tone === "error" ? "bg-error" : row.line.tone === "attention" ? "bg-attention" : "bg-outline")} aria-hidden />
-                      <div className="text-[13px]">
+                      <div className="text-body">
                         {row.line.text}
                         {row.count > 1 && <span className="text-muted"> ×{row.count}</span>}
                         {row.by && <span className="text-xs text-muted"> · by {row.by}</span>}
                       </div>
-                      <div className="text-[11px] text-muted" title={when(row.at)}>
+                      <div className="text-caption text-muted" title={when(row.at)}>
                         {new Date(row.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </div>
                     </li>

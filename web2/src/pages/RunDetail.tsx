@@ -141,7 +141,7 @@ export function RunDetailPage() {
 
       {(searches.data?.length ?? 0) > 0 && (
         <Card collapsible tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
-          <ul className="divide-y divide-line text-[13px]">
+          <ul className="divide-y divide-line text-body">
             {searches.data!.map((q, i) => (
               <li key={i} className="py-1.5">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -277,10 +277,10 @@ function LeadRow({ lead }: { lead: Lead }) {
         <Link to="/leads/$companyId" params={{ companyId: lead.company_id }} className="font-semibold text-primary hover:underline">
           {lead.name ?? lead.domain}
         </Link>
-        <div className="font-mono text-[11px] text-muted">{lead.domain}</div>
+        <div className="font-mono text-caption text-muted">{lead.domain}</div>
       </Td>
       <Td>
-        <span className={cx("rounded-full px-2 py-0.5 text-[11px] font-medium", outcome.tone)}>{outcome.label}</span>
+        <span className={cx("rounded-full px-2 py-0.5 text-caption font-medium", outcome.tone)}>{outcome.label}</span>
       </Td>
       <Td>
         <ol className="space-y-0.5 text-xs">

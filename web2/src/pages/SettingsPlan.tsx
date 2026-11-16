@@ -65,7 +65,7 @@ function Plan({ usage }: { usage: Usage }) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Also in your plan">
-          <dl className="space-y-1.5 text-[13px]">
+          <dl className="space-y-1.5 text-body">
             <Line label="People" value={usage.seats} />
             <Line label="Mailboxes" value={usage.mailboxes} />
             <Line label="Active campaigns" value={usage.active_campaigns} />
@@ -131,9 +131,9 @@ function Waiting({ usage }: { usage: Usage }) {
   return (
     <Card title="Waiting for credits" subtitle={total ? "These continue by themselves as soon as credits exist." : undefined}>
       {total === 0 ? (
-        <p className="text-[13px] text-muted">Nothing is waiting.</p>
+        <p className="text-body text-muted">Nothing is waiting.</p>
       ) : (
-        <ul className="space-y-1 text-[13px]">
+        <ul className="space-y-1 text-body">
           {Object.entries(usage.waiting_leads).map(([step, n]) => (
             <li key={step}>
               {n} lead{n === 1 ? "" : "s"} waiting at <strong>{STEP_LABEL[step] ?? step}</strong>
