@@ -45,3 +45,6 @@ web2/playwright-report/
 
 # Local deploy rehearsal (deploy/local-test.sh): releases and the Doppler dev token
 .deploy-local/
+
+# Screenshots written on demand by e2e/shots.spec.ts
+web2/shots/
