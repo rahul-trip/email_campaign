@@ -186,6 +186,27 @@ def test_a_lead_has_detail_a_timeline_and_a_waterfall(
     assert (step["provider"], step["outcome"], step["cost_micro_usd"]) == ("hunter", "hit", 24_500)
 
 
+def test_find_email_again_for_several_leads_queues_one_run(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    ids = []
+    for domain in ("a.com", "b.com"):
+        cid = seed_company(
+            factory, ws, domain, C.RESEARCHED, C.HELD, hold=HoldReason.CATCH_ALL_UNVERIFIED
+        )
+        with factory(ws) as uow:
+            uow.contacts.add(cid, rank=1, source=ContactSource.SITE, full_name="Jane Doe")
+            uow.commit()
+        ids.append(cid)
+    sent = api.post("/api/companies/find-email-again", json={"company_ids": [*ids, "nope"]})
+    body = sent.json()
+    assert (sent.status_code, body["asked"], body["skipped"]) == (200, 2, 1)
+    assert body["queued_run_id"]
+    assert len(api.get("/api/runs").json()) == 1
+    nothing = api.post("/api/companies/find-email-again", json={"company_ids": ["nope"]}).json()
+    assert nothing["queued_run_id"] is None
+
+
 def test_retry_release_and_requalify(api: Api, factory: UnitOfWorkFactory, ws: str) -> None:
     failed = seed_company(factory, ws, "a.com", C.FAILED, failed_stage="research")
     held = seed_company(factory, ws, "b.com", C.RESEARCHED, C.HELD, hold=HoldReason.COUNTRY_UNKNOWN)

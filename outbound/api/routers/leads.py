@@ -15,6 +15,8 @@ from outbound.api.schemas import (
     DirectoryReportIn,
     DirectorySkipIn,
     EmailOut,
+    FindEmailAgainIn,
+    FindEmailAgainOut,
     JourneyOut,
     LeadOut,
     LinkedInOut,
@@ -168,6 +170,20 @@ def skip_policy(
 )
 def revoke_policy_skip(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     return CompanyOut.model_validate(svc.leads.revoke_policy_skip(company_id))
+
+
+@router.post(
+    "/companies/find-email-again",
+    response_model=FindEmailAgainOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def find_email_again(
+    body: FindEmailAgainIn, svc: Annotated[Services, Depends(services)]
+) -> FindEmailAgainOut:
+    """Look again for the email of each lead held on a catch-all address, in one run."""
+    asked, skipped = svc.leads.retry_email_for_companies(body.company_ids)
+    run = svc.runs.queue(RunRequest()) if asked else None
+    return FindEmailAgainOut(queued_run_id=run.id if run else None, asked=asked, skipped=skipped)
 
 
 @router.post("/companies/release-policy-holds", dependencies=[Depends(require(P.COMPLIANCE_WRITE))])

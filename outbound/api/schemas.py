@@ -1233,6 +1233,16 @@ class RetryEmailOut(Out):
     queued_run_id: str
 
 
+class FindEmailAgainIn(In):
+    company_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class FindEmailAgainOut(Out):
+    queued_run_id: str | None  # None: nothing was asked for, so no run was queued
+    asked: int
+    skipped: int
+
+
 class DirectoryEntryOut(Out):
     id: str
     email: str

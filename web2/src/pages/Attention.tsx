@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle2, Clock, Globe2, RefreshCw, UserPlus } from "lu
 import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Card, Empty, Input, PageHeader, Problem, Segmented, Skeleton, buttonClass } from "../components/ui";
+import { Button, Card, Confirm, Empty, Input, PageHeader, Problem, Segmented, Skeleton, buttonClass } from "../components/ui";
 import { ago, words } from "../lib/format";
 import { HOLD_REASONS, describe, describeHold, leadStatus } from "../lib/status";
 import { STEP_LABEL, day, useUsage, type Usage } from "../lib/usage";
@@ -78,7 +78,13 @@ export function AttentionPage() {
           groups.map(([reason, rows]) => {
             const hold = describeHold(reason);
             return (
-              <Group key={reason} title={hold.label} count={rows.length} explain={`${hold.why} ${hold.fix}`}>
+              <Group
+                key={reason}
+                title={hold.label}
+                count={rows.length}
+                explain={`${hold.why} ${hold.fix}`}
+                actions={reason === "catch_all_unverified" ? <FindAgainAll ids={rows.map((c) => c.id)} /> : undefined}
+              >
                 {rows.map((company) => (
                   <HeldRow key={company.id} company={company} />
                 ))}
@@ -160,7 +166,7 @@ function CreditWait({ leads, rows, usage }: { leads: Company[]; rows: number; us
   );
 }
 
-function Group({ title, count, explain, children }: { title: string; count: number; explain: string; children: ReactNode }) {
+function Group({ title, count, explain, actions, children }: { title: string; count: number; explain: string; actions?: ReactNode; children: ReactNode }) {
   return (
     <Card
       title={
@@ -170,6 +176,7 @@ function Group({ title, count, explain, children }: { title: string; count: numb
         </span>
       }
       subtitle={explain}
+      actions={actions}
     >
       <ul className="divide-y divide-line">{children}</ul>
     </Card>
@@ -213,6 +220,10 @@ function HeldRow({ company }: { company: Company }) {
     },
     onSuccess: refresh,
   });
+  const findAgain = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/find-email-again", { body: { company_ids: [company.id] } })),
+    onSuccess: refresh,
+  });
   const open = (
     <Link to="/leads/$companyId" params={{ companyId: company.id }} className={buttonClass("secondary", "sm")}>
       Open lead <ArrowRight className="size-3" aria-hidden />
@@ -235,9 +246,40 @@ function HeldRow({ company }: { company: Company }) {
           <Clock className="size-3.5" aria-hidden /> Waiting for the resolver
         </span>
       )}
+      {company.hold_reason === "catch_all_unverified" && (
+        <Button size="sm" busy={findAgain.isPending} onClick={() => findAgain.mutate()} title="Search for this person's email again, with fresh answers from the vendors">
+          <RefreshCw className="size-3.5" aria-hidden /> Find email again
+        </Button>
+      )}
       {open}
-      {setCountry.error != null && <Problem error={setCountry.error} className="w-full" />}
+      {findAgain.isSuccess && <span className="text-xs text-good">Queued: it runs now</span>}
+      {(setCountry.error ?? findAgain.error) != null && <Problem error={setCountry.error ?? findAgain.error} className="w-full" />}
     </Row>
+  );
+}
+
+/** One press for every lead held on an unproven catch-all address. Each lookup costs vendor credits. */
+function FindAgainAll({ ids }: { ids: string[] }) {
+  const refresh = useRefresh();
+  const [confirming, setConfirming] = useState(false);
+  const run = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/find-email-again", { body: { company_ids: ids.slice(0, 200) } })),
+    onSuccess: () => {
+      setConfirming(false);
+      refresh();
+    },
+  });
+  return (
+    <>
+      <Button size="sm" onClick={() => setConfirming(true)}>
+        <RefreshCw className="size-3.5" aria-hidden /> Find again for all ({ids.length})
+      </Button>
+      {confirming && (
+        <Confirm title={`Look for ${ids.length} email${ids.length === 1 ? "" : "s"} again?`} confirmLabel="Find again" busy={run.isPending} error={run.error} onClose={() => setConfirming(false)} onConfirm={() => run.mutate()}>
+          <p>Each lead is checked once more with fresh answers from the vendors. This costs credits at the vendors for every lead. They run in one run, started now.</p>
+        </Confirm>
+      )}
+    </>
   );
 }
 

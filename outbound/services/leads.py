@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from outbound.db.errors import NotFound
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
@@ -26,6 +27,7 @@ from outbound.domain.enums import (
     ConsentBasis,
     ContactSource,
     ContactStatus,
+    EmailStatus,
     EntityType,
     HoldReason,
     MessageState,
@@ -295,34 +297,86 @@ class LeadService:
             contact = uow.contacts.get(contact_id)
             if contact.status not in WORKABLE_CONTACT_STATUSES:
                 raise LeadError("this person cannot be worked on any more")
-            company = uow.companies.get(contact.company_id)
-            if (
-                (company.status is CompanyStatus.FAILED and company.failed_stage == "email")
-                or company.status is CompanyStatus.EMAIL_READY
-                or (
-                    company.status is CompanyStatus.HELD
-                    and company.hold_reason
-                    in (HoldReason.CATCH_ALL_UNVERIFIED, HoldReason.CATCH_ALL_RESOLVING)
-                )
-            ):
-                updated = uow.companies.transition(
-                    company.id,
-                    CompanyStatus.CONTACTS_FOUND,
-                    expected_version=company.row_version,
-                    actor=actor,
-                    reason="email search asked for again",
-                    next_action_at=None,
-                )
-            elif company.status is CompanyStatus.CONTACTS_FOUND:
-                updated = company
-            else:
-                raise LeadError(
-                    f"the lead is {company.status.value}: its email is past the search. "
-                    "Use Write to this person instead."
-                )
-            uow.contacts.set_refresh_email(contact_id, True)
+            updated = self._ask_again(uow, contact, actor)
             uow.commit()
             return updated
+
+    def retry_email_for_companies(
+        self, company_ids: list[str], *, actor: str | None = None
+    ) -> tuple[int, int]:
+        """Look again for the email of each lead held on a catch-all address.
+
+        For each lead the people whose address is a catch-all are asked again (else the
+        first-ranked workable person). A lead in any other state is skipped, not refused, so one
+        stale row on a screen does not stop the rest. Returns (asked, skipped)."""
+        actor = actor or self._actor
+        asked = skipped = 0
+        with self._uow(self._workspace_id) as uow:
+            for company_id in dict.fromkeys(company_ids):
+                try:
+                    company = uow.companies.get(company_id)
+                except NotFound:
+                    skipped += 1
+                    continue
+                if company.status is not CompanyStatus.HELD or company.hold_reason not in (
+                    HoldReason.CATCH_ALL_UNVERIFIED,
+                    HoldReason.CATCH_ALL_RESOLVING,
+                ):
+                    skipped += 1
+                    continue
+                people = [
+                    c
+                    for c in uow.contacts.for_company(company_id)
+                    if c.status in WORKABLE_CONTACT_STATUSES
+                ]
+                catch_all = {
+                    EmailStatus.CATCH_ALL_PENDING,
+                    EmailStatus.CATCH_ALL_UNVERIFIED,
+                }
+                chosen = [
+                    c
+                    for c in people
+                    if any(e.status in catch_all for e in uow.emails.for_contact(c.id))
+                ] or people[:1]
+                if not chosen:
+                    skipped += 1
+                    continue
+                for contact in chosen:
+                    self._ask_again(uow, contact, actor)
+                asked += 1
+            uow.commit()
+        return asked, skipped
+
+    @staticmethod
+    def _ask_again(uow: UnitOfWork, contact: Contact, actor: str) -> Company:
+        """Mark one person for a fresh email search and move their lead back to that step."""
+        company = uow.companies.get(contact.company_id)
+        if (
+            (company.status is CompanyStatus.FAILED and company.failed_stage == "email")
+            or company.status is CompanyStatus.EMAIL_READY
+            or (
+                company.status is CompanyStatus.HELD
+                and company.hold_reason
+                in (HoldReason.CATCH_ALL_UNVERIFIED, HoldReason.CATCH_ALL_RESOLVING)
+            )
+        ):
+            updated = uow.companies.transition(
+                company.id,
+                CompanyStatus.CONTACTS_FOUND,
+                expected_version=company.row_version,
+                actor=actor,
+                reason="email search asked for again",
+                next_action_at=None,
+            )
+        elif company.status is CompanyStatus.CONTACTS_FOUND:
+            updated = company
+        else:
+            raise LeadError(
+                f"the lead is {company.status.value}: its email is past the search. "
+                "Use Write to this person instead."
+            )
+        uow.contacts.set_refresh_email(contact.id, True)
+        return updated
 
     def retry(self, company_id: str, *, actor: str | None = None) -> Company:
         """Send a failed lead back to the stage that failed, without waiting out the back-off."""

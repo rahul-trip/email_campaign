@@ -961,6 +961,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/find-email-again": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find Email Again
+         * @description Look again for the email of each lead held on a catch-all address, in one run.
+         */
+        post: operations["find_email_again_api_companies_find_email_again_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/release-policy-holds": {
         parameters: {
             query?: never;
@@ -3419,6 +3439,20 @@ export interface components {
             label: string;
             /** Value */
             value: string;
+        };
+        /** FindEmailAgainIn */
+        FindEmailAgainIn: {
+            /** Company Ids */
+            company_ids: string[];
+        };
+        /** FindEmailAgainOut */
+        FindEmailAgainOut: {
+            /** Asked */
+            asked: number;
+            /** Queued Run Id */
+            queued_run_id: string | null;
+            /** Skipped */
+            skipped: number;
         };
         /** ForgetIn */
         ForgetIn: {
@@ -6875,6 +6909,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_email_again_api_companies_find_email_again_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindEmailAgainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindEmailAgainOut"];
                 };
             };
             /** @description Validation Error */

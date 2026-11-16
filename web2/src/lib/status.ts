@@ -132,7 +132,7 @@ export const holdReason: Record<string, HoldInfo> = {
   catch_all_unverified: {
     label: "Catch-all unverified",
     why: "The resolver could not prove the address, and an unproven address risks a bounce.",
-    fix: "Usually leave it held.",
+    fix: "Find email again checks it once more with fresh answers from the vendors; otherwise leave it held.",
     action: "decide",
   },
   needs_operator: {
