@@ -27,7 +27,7 @@ from typing import Any
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
-from outbound.domain.brief import Brief
+from outbound.domain.brief import Brief, fill_gaps, lacks_substance
 from outbound.domain.discovery import (
     ARTICLES,
     YIELD_DAYS,
@@ -68,7 +68,7 @@ from outbound.providers.ports import (
     SearchProvider,
     SourceQuery,
 )
-from outbound.services.brief import draft_brief
+from outbound.services.brief import draft
 from outbound.services.intake import DomainResolver, IntakeService, SiteCandidate
 
 log = get_logger(__name__)
@@ -492,15 +492,31 @@ class Discoverer:
 
     def _brief(self, campaign: Campaign, profile: Mapping[str, Any]) -> Brief:
         brief = Brief.from_json(campaign.icp_brief)
+        redraft = False
         if not brief.is_empty:
-            return brief
-        brief = draft_brief(self.llm, campaign=campaign, profile=profile)
+            if not (lacks_substance(brief) and self._may_redraft(campaign)):
+                return brief
+            redraft = True  # thin, and not yet tried again: a failed first drafting leaves this
+        drafted = draft(self.llm, campaign=campaign, profile=profile)
+        # A redraft fills what is empty and never replaces what a person wrote.
+        brief = fill_gaps(brief, drafted.brief) if redraft else drafted.brief
         with self.uow(self.workspace_id) as uow:
             uow.campaigns.update(campaign.id, {"icp_brief": brief.to_json()})
             uow.events.append(EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted",
-                              SYSTEM, {"campaign_id": campaign.id})  # fmt: skip
+                              SYSTEM, {"campaign_id": campaign.id, "redraft": redraft,
+                                       "fell_back": drafted.fell_back})  # fmt: skip
             uow.commit()
         return brief
+
+    def _may_redraft(self, campaign: Campaign) -> bool:
+        """Once per campaign: a thin brief is drafted again by the next run, not by every run."""
+        with self.uow(self.workspace_id) as uow:
+            earlier = uow.events.latest(
+                EntityType.WORKSPACE, self.workspace_id, "campaign_brief_drafted", 50
+            )
+        return not any(
+            e.data.get("campaign_id") == campaign.id and e.data.get("redraft") for e in earlier
+        )
 
     def _carried(self, campaign: Campaign) -> list[Found]:
         """Companies an earlier run found but could not screen, oldest first, a few per run."""

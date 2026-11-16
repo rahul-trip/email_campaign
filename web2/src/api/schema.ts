@@ -1804,6 +1804,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/funnel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Funnel
+         * @description From a company found to a draft in Review: what became of each, and which vendors fail.
+         */
+        get: operations["funnel_api_reports_funnel_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/quality": {
         parameters: {
             query?: never;
@@ -2744,6 +2764,11 @@ export interface components {
         };
         /** CampaignOut */
         CampaignOut: {
+            /**
+             * Brief Gaps
+             * @default []
+             */
+            brief_gaps?: string[];
             /** Cadence Days */
             cadence_days: number[];
             /** Icp Brief */
@@ -2762,6 +2787,11 @@ export interface components {
             research_questions: string[];
             /** Target Titles */
             target_titles: string[];
+            /**
+             * Title Warnings
+             * @default []
+             */
+            title_warnings?: string[];
         };
         /** CampaignPatch */
         CampaignPatch: {
@@ -3399,6 +3429,31 @@ export interface components {
         ForgotIn: {
             /** Email */
             email: string;
+        };
+        /** FunnelOut */
+        FunnelOut: {
+            /** Days */
+            days: number;
+            /** Judged */
+            judged: number;
+            /** Judged Share */
+            judged_share: number | null;
+            /** Lead Share */
+            lead_share: number | null;
+            /** Leads */
+            leads: number;
+            /** Named */
+            named: number;
+            /** Outcomes */
+            outcomes: {
+                [key: string]: number;
+            };
+            /** Vendors */
+            vendors: components["schemas"]["VendorErrorsOut"][];
+            /** Verdicts */
+            verdicts: {
+                [key: string]: number;
+            };
         };
         /** GrantIn */
         GrantIn: {
@@ -4757,6 +4812,17 @@ export interface components {
         VendorCapIn: {
             /** Cap Micro Usd */
             cap_micro_usd: number | null;
+        };
+        /** VendorErrorsOut */
+        VendorErrorsOut: {
+            /** Calls */
+            calls: number;
+            /** Error Rate */
+            error_rate: number;
+            /** Errors */
+            errors: number;
+            /** Provider */
+            provider: string;
         };
         /** VendorKeyIn */
         VendorKeyIn: {
@@ -8382,6 +8448,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CostOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    funnel_api_reports_funnel_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FunnelOut"];
                 };
             };
             /** @description Validation Error */

@@ -20,7 +20,7 @@ from outbound.domain.enums import (
     SuppressionReason,
 )
 from outbound.providers.ports import LlmClient
-from outbound.services.brief import draft_brief
+from outbound.services.brief import draft
 from outbound.services.dns_check import (
     COMMON_DKIM_SELECTORS,
     MxLookup,
@@ -205,10 +205,14 @@ class SettingsService:
         with self._uow(self._workspace_id) as uow:
             campaign = uow.campaigns.get(campaign_id)
             profile = dict(self._workspace(uow).sender_profile)
-        brief = draft_brief(self._llm, campaign=campaign, profile=profile)
+        drafted = draft(self._llm, campaign=campaign, profile=profile)
         with self._uow(self._workspace_id) as uow:
-            updated = uow.campaigns.update(campaign_id, {"icp_brief": brief.to_json()})
-            self._record_change(uow, "campaign_brief_drafted", {"campaign_id": campaign_id})
+            updated = uow.campaigns.update(campaign_id, {"icp_brief": drafted.brief.to_json()})
+            self._record_change(
+                uow,
+                "campaign_brief_drafted",
+                {"campaign_id": campaign_id, "fell_back": drafted.fell_back},
+            )
             uow.commit()
             return updated
 

@@ -142,6 +142,7 @@ Model calls are recorded at $0 unless `LLM_PRICES` is set ([R-03](../tech-debt-a
 |---|---|---|
 | Status | Dashboard; `GET /api/status`; `outbound status` | Leads by status, holds by reason, failures, the review queue |
 | Quality | Reports; `outbound report quality` | Unedited share of sent first emails (target 80 %), flag rate, holds, catch-all share |
+| Funnel | Reports; `outbound report funnel --days N` | Companies named and how many the model read, what became of them, where the leads added are now, vendor failure rates: the baseline for lead-quality changes |
 | Cost | Reports; `outbound report cost --days N` | Spend by vendor and per prospect, paid calls |
 | Runs | Runs screen; `GET /api/runs` | Status, counts per stage and outcome, cost |
 | Lead journey | Lead page → Journey | One lead's eight stages, incidents and vendor calls |

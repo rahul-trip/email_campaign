@@ -48,6 +48,23 @@ def normalise_title(title: str) -> str:
     return " ".join(_ABBREVIATIONS.get(word, word) for word in words)
 
 
+# Nouns that make a phrase a job and not a kind of company ("BESS integrators", "VPP platforms").
+_ROLE_NOUNS = frozenset(
+    """chief officer president founder cofounder owner partner director head manager lead
+    principal engineer developer analyst scientist architect consultant specialist trader
+    strategist advisor adviser executive coordinator administrator controller planner buyer
+    procurement""".split()  # noqa: SIM905 - a long word list reads better as text
+)
+
+
+def is_role(title: str) -> bool:
+    """Whether a wanted "job title" names a job. A search for people titled "BESS
+    integrators" finds nobody, so such an entry is flagged when a campaign is saved and left
+    out of the people search."""
+    words = normalise_title(title).split()
+    return any(w in _ROLE_NOUNS or w.removesuffix("s") in _ROLE_NOUNS for w in words)
+
+
 def _words(title: str) -> set[str]:
     return set(normalise_title(title).split()) - _FILLER
 

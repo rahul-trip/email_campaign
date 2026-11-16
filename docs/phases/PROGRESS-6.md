@@ -103,7 +103,7 @@ Built:
 
 ## Lead quality (2026-11-16)
 
-Found by reading the VM's worker log and database (read-only) and written up as a plan of small branches, each branched from the one before where they touch the same code. Done: `phase-6/model-reply-budget` (migration 0020, R-35): discovery's model calls are no longer cut off, and a company the model could not judge is kept for the next run instead of rejected. Done on `phase-6/directory-sources` (R-36, stacked on that branch): the Y Combinator directory matches by word and stem and no longer returns 0, and neither it nor Exa repeats companies found before. Next, in order: a funnel report, the brief and scoring, decision-makers only, the catch-all resolver, the copy reading-grade limit.
+Found by reading the VM's worker log and database (read-only) and written up as a plan of small branches, each branched from the one before where they touch the same code. Done: `phase-6/model-reply-budget` (migration 0020, R-35): discovery's model calls are no longer cut off, and a company the model could not judge is kept for the next run instead of rejected. Done on `phase-6/directory-sources` (R-36, stacked on that branch): the Y Combinator directory matches by word and stem and no longer returns 0, and neither it nor Exa repeats companies found before. Done on `phase-6/funnel-report`: `outbound report funnel`, `GET /api/reports/funnel` and a Reports card (the baseline for everything below). Done on `phase-6/brief-and-scoring` (R-37): a brief with no must-haves is judged by its summary, type and size; thin briefs and non-job titles are flagged and a thin brief is drafted once more. Next, in order: decision-makers only, the catch-all resolver, the copy reading-grade limit.
 
 ## After the alpha
 

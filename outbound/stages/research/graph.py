@@ -40,6 +40,7 @@ from outbound.domain.names import (
     read_profile_title,
 )
 from outbound.domain.qualification import Check, checks, qualify
+from outbound.domain.ranking import is_role
 from outbound.logging import get_logger
 from outbound.prompts import research as prompts
 from outbound.providers.errors import BudgetExceeded, ProviderError
@@ -576,7 +577,10 @@ def search_people(
     or its website's name), and *unconfirmed* when the result only mentions the company. Anyone
     else is dropped: sharing one word ("Grid", "Energy") with the company is not enough.
     """
-    titles = " OR ".join(f'"{t}"' for t in target_titles[:4])
+    roles = [t for t in target_titles if is_role(t)][:4]  # "BESS integrators" finds nobody
+    if not roles:
+        return []
+    titles = " OR ".join(f'"{t}"' for t in roles)
     hits = search.search(f'site:linkedin.com/in "{company_name}" ({titles})', max_results=5)
     people: list[Person] = []
     for hit in hits:

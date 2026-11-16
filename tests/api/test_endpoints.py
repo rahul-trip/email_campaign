@@ -1160,3 +1160,28 @@ def test_the_profile_file_has_every_key_and_uploads_back(api: Api) -> None:
     assert (
         api.put("/api/settings/sender-profile", json={**blank, "greeting": "Yo"}).status_code == 422
     )
+
+
+def test_a_campaign_says_what_is_weak_in_its_brief_and_its_job_titles(api: Api) -> None:
+    created = api.post(
+        "/api/settings/campaigns",
+        json={"name": "weak", "target_titles": ["CTO", "BESS integrators"]},
+    ).json()
+    assert created["title_warnings"] == [
+        '"BESS integrators" is not a job title, so a search for it finds nobody: use a role'
+        ' such as "Head of Operations".'
+    ]
+    assert any("Say in a sentence" in g for g in created["brief_gaps"])
+    patched = api.patch(
+        f"/api/settings/campaigns/{created['id']}",
+        json={
+            "target_titles": ["CTO"],
+            "icp_brief": {
+                "summary": "x",
+                "keywords": ["a"],
+                "must_haves": ["b"],
+                "disqualifiers": ["c"],
+            },
+        },
+    ).json()
+    assert patched["title_warnings"] == [] and patched["brief_gaps"] == []

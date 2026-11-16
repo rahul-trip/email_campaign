@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
 from enum import StrEnum
 from typing import Any
 
@@ -104,6 +104,49 @@ class Brief:
             "source_hints": list(self.source_hints),
             "seed_companies": list(self.seed_companies),
         }
+
+
+def gaps(brief: Brief) -> tuple[str, ...]:
+    """What is missing from a brief that makes discovery and scoring weaker, in plain words
+    for the person editing it. Empty when it is well specified."""
+    out: list[str] = []
+    if not brief.summary:
+        out.append(
+            "Say in a sentence who you look for: the summary is what a company is judged against."
+        )
+    if not brief.must_haves:
+        out.append(
+            "No must-haves: a company is judged only against the summary"
+            + (", the company type and the size." if brief.summary else ".")
+            + " Add two or three facts a good customer must have."
+        )
+    if not brief.disqualifiers:
+        out.append(
+            "No rule-outs: vendors, competitors and companies that are too big will not be"
+            " turned away. Say who you do not want."
+        )
+    if not brief.keywords:
+        out.append(
+            "No keywords: directories are searched by the words of the summary and segments."
+        )
+    return tuple(out)
+
+
+def lacks_substance(brief: Brief) -> bool:
+    """No keywords and no must-haves: discovery has nothing to search by and scoring nothing
+    to judge by, as when a model's drafting failed and a plain fallback was stored."""
+    return not brief.keywords and not brief.must_haves
+
+
+def fill_gaps(brief: Brief, drafted: Brief) -> Brief:
+    """``brief`` with every field it leaves empty taken from ``drafted``. What a person
+    wrote is never replaced."""
+    changes: dict[str, Any] = {}
+    empty = Brief()
+    for field in fields(Brief):
+        if getattr(brief, field.name) == getattr(empty, field.name):
+            changes[field.name] = getattr(drafted, field.name)
+    return replace(brief, **changes)
 
 
 def _text(value: object, limit: int) -> str:

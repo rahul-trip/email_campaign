@@ -96,7 +96,7 @@ export const SECTIONS: Section[] = [
       {
         target: "campaign-brief",
         title: "Who we look for",
-        body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save.",
+        body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save. A yellow note lists what is missing (must-haves, rule-outs, keywords): the thinner the brief, the looser the fit score.",
       },
     ],
   },
@@ -256,6 +256,11 @@ export const SECTIONS: Section[] = [
         target: "reports-quality",
         title: "Is it working?",
         body: "The share of first emails sent without an edit (the target is 8 of 10), how many were flagged, and spend per prospect against the budget.",
+      },
+      {
+        target: "reports-funnel",
+        title: "From a company found to a draft",
+        body: "Follow what discovery found: how many companies it named, how many the model actually read, how many became leads, and where those leads are now (waiting, disqualified, failed at a step, held, or a draft ready). The last column shows each vendor's failure rate: a vendor that fails most calls explains leads that stall.",
       },
       {
         target: "reports-sources",

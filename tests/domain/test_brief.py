@@ -53,3 +53,30 @@ def test_garbage_gives_an_empty_brief() -> None:
     assert Brief.from_json(None).is_empty
     assert Brief.from_json({"keywords": "not a list"}).is_empty
     assert not Brief.from_json({"summary": "x"}).is_empty
+
+
+def test_gaps_say_in_plain_words_what_a_thin_brief_leaves_out() -> None:
+    from outbound.domain.brief import gaps
+
+    thin = Brief.from_json({"summary": "Energy start-ups"})
+    text = " ".join(gaps(thin))
+    assert "No must-haves" in text and "No rule-outs" in text and "No keywords" in text
+    assert "Say in a sentence" not in text
+    assert any("Say in a sentence" in g for g in gaps(Brief()))
+    full = Brief.from_json(
+        {"summary": "x", "keywords": ["a"], "must_haves": ["b"], "disqualifiers": ["c"]}
+    )
+    assert gaps(full) == ()
+
+
+def test_a_redraft_fills_only_what_is_empty() -> None:
+    from outbound.domain.brief import fill_gaps, lacks_substance
+
+    mine = Brief.from_json({"summary": "Mine", "regions": ["UK"]})
+    drafted = Brief.from_json(
+        {"summary": "Theirs", "regions": ["US"], "keywords": ["grid"], "must_haves": ["x"]}
+    )
+    merged = fill_gaps(mine, drafted)
+    assert merged.summary == "Mine" and merged.regions == ("UK",)  # a person's words stay
+    assert merged.keywords == ("grid",) and [c.text for c in merged.must_haves] == ["x"]
+    assert lacks_substance(mine) and not lacks_substance(merged)
