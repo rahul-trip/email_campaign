@@ -308,8 +308,8 @@ export const SECTIONS: Section[] = [
     steps: [
       {
         target: "onboarding-steps",
-        title: "Four steps to your first email",
-        body: "A new workspace starts empty. Your company (what you may truthfully say, and who signs), a mailbox for the drafts, who you want to reach, and your first leads. A tick appears as soon as a step is done, wherever you did it; the Dashboard shows Get started until the essentials are in place.",
+        title: "Five steps to your first leads",
+        body: "A new workspace starts empty, but you do not type it all. Press Read my website and your company is drafted for you to check; your campaign is suggested from it. Then who signs, your first leads (the engine can find ten for you now), and a mailbox for the drafts. Nothing is saved until you confirm it. A tick appears as soon as a step is done, wherever you did it; the Dashboard shows Get started until the essentials are in place.",
       },
     ],
   },

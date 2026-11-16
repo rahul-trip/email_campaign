@@ -107,7 +107,7 @@ test("a new customer's admin is taken to the guided setup, which starts empty", 
 
   await expect(boss).toHaveURL(/\/w\/globex-ltd\/onboarding$/);
   await expect(boss.getByRole("heading", { name: "Set up your workspace" })).toBeVisible();
-  await expect(boss.getByRole("button", { name: /Your company/ })).toHaveAttribute("aria-current", "step");
+  await expect(boss.getByRole("button", { name: /What you sell/ })).toHaveAttribute("aria-current", "step");
   // nothing of anyone else's was copied in
   await expect(boss.getByText("Quantra")).toHaveCount(0);
   await boss.getByRole("button", { name: /A mailbox/ }).click();

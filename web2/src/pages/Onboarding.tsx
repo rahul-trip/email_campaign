@@ -1,45 +1,55 @@
-/** A guided first setup: the same screens as Settings, one step at a time, in the order a new
- * workspace needs them. Each step's tick comes from the server's setup list, so finishing a
- * step anywhere (here or in Settings) ticks it here. */
+/** A guided first setup, one decision at a time. The company and the campaign are drafted from the
+ * person's own website and profile for them to check; each step's tick comes from the server's
+ * setup list, so finishing a step anywhere (here or in Settings) ticks it here. */
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { useState } from "react";
 import { useCurrent } from "../app/session";
 import { Button, Callout, Card, PageHeader, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { useSetup } from "../lib/setup";
-import { FirstCampaign } from "./Campaigns";
+import { useTour } from "../tour/Tour";
 import { Mailboxes } from "./Mailboxes";
-import { SenderProfile } from "./Settings";
+import { Audience } from "./onboarding/Audience";
+import { Company } from "./onboarding/Company";
+import { FirstLeads } from "./onboarding/FirstLeads";
+import { Sender } from "./onboarding/Sender";
 
-type StepId = "company" | "mailbox" | "campaign" | "leads";
+type StepId = "company" | "sender" | "campaign" | "leads" | "mailbox";
 
-const STEPS: { id: StepId; title: string; why: string; items: string[] }[] = [
-  { id: "company", title: "Your company", why: "Who you are in every email, and what the writer may truthfully say. Nothing is written until you confirm it.", items: ["profile", "legal", "signature"] },
-  { id: "mailbox", title: "A mailbox", why: "Approved emails are saved as drafts here for you to send. You can skip this and connect one later.", items: ["mailbox", "dns"] },
-  { id: "campaign", title: "Who to reach", why: "The job titles you want and a description of your ideal customer. Research, ranking and the fit score read this.", items: ["campaign"] },
-  { id: "leads", title: "Your first leads", why: "Add a few companies, then start a run.", items: ["leads"] },
+const STEPS: { id: StepId; title: string; why: string; items: string[]; required: boolean }[] = [
+  { id: "company", title: "What you sell", items: ["profile"], required: true, why: "We read your website and draft this for you. Keep only what is true: it ends up in emails under your name." },
+  { id: "sender", title: "Who signs", items: ["legal", "signature"], required: true, why: "Your name ends every email. Your legal name and address go in the footer the law requires." },
+  { id: "campaign", title: "Who to reach", items: ["campaign"], required: true, why: "The job titles you want and what your ideal customer looks like. Everything else is found from this." },
+  { id: "leads", title: "Your first leads", items: ["leads"], required: false, why: "Let the engine find companies that fit, or bring your own list." },
+  { id: "mailbox", title: "A mailbox", items: ["mailbox", "dns"], required: false, why: "Approved emails are saved here as drafts for you to send. You can connect it later." },
 ];
 
 export function OnboardingPage() {
   const { workspace } = useCurrent();
   const setup = useSetup();
+  const { start } = useTour();
   const [chosen, setChosen] = useState<StepId | null>(null);
   const status = new Map((setup.data?.items ?? []).map((i) => [i.key, i.status]));
-  const doneStep = (id: StepId) => STEPS.find((s) => s.id === id)!.items.every((key) => status.get(key) === "ok" || (id !== "company" && id !== "campaign" && status.get(key) === "warning"));
+  const doneStep = (id: StepId) => {
+    const step = STEPS.find((s) => s.id === id)!;
+    return step.items.every((key) => status.get(key) === "ok" || (!step.required && status.get(key) === "warning"));
+  };
   const firstOpen = STEPS.find((s) => !doneStep(s.id))?.id ?? "leads";
   const current = chosen ?? firstOpen;
   const index = STEPS.findIndex((s) => s.id === current);
   const step = STEPS[index]!;
+  const last = index === STEPS.length - 1;
+  const next = () => setChosen(STEPS[Math.min(index + 1, STEPS.length - 1)]!.id);
 
   if (workspace.role !== "admin") return <Callout>Setting up the workspace is for admins. Ask one of yours.</Callout>;
   return (
     <>
-      <PageHeader title="Set up your workspace" subtitle="Four short steps. You can leave and come back; your progress is saved as you go." />
+      <PageHeader title="Set up your workspace" subtitle="Five short steps. Your progress is saved as you go." />
       {setup.data?.done && (
         <Callout tone="good" className="mb-5" title="You are ready to start">
           Everything the engine needs is in place.{" "}
-          <Link to="/targets" className="font-semibold underline">Add your first leads</Link> or <Link to="/" className="font-semibold underline">go to the dashboard</Link>.
+          <Link to="/targets" className="font-semibold underline">Add leads</Link> or <Link to="/" className="font-semibold underline">go to the dashboard</Link>.
         </Callout>
       )}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -61,23 +71,28 @@ export function OnboardingPage() {
           </ol>
         </nav>
         <div className="min-w-0 space-y-4">
-          <Card title={`${index + 1}. ${step.title}`} subtitle={step.why}>
-            {step.id === "company" && <SenderProfile />}
-            {step.id === "mailbox" && <Mailboxes />}
-            {step.id === "campaign" && <FirstCampaign />}
-            {step.id === "leads" && (
-              <div className="flex flex-wrap items-center gap-3 text-[13px]">
-                <Link to="/targets" className={buttonClass("primary")}>Add leads <ArrowRight className="size-4" aria-hidden /></Link>
-                <span className="text-muted">Type a website, paste a list or upload a file. Then press Start run.</span>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted">Step {index + 1} of {STEPS.length}</p>
+          <Card title={step.title} subtitle={step.why}>
+            {step.id === "company" && <Company onNext={next} />}
+            {step.id === "sender" && <Sender onNext={next} />}
+            {step.id === "campaign" && <Audience onNext={next} />}
+            {step.id === "leads" && <FirstLeads onNext={next} />}
+            {step.id === "mailbox" && (
+              <div className="space-y-4">
+                <Mailboxes />
+                <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+                  <Link to="/" className={buttonClass("primary")}>Finish</Link>
+                  <Button variant="secondary" onClick={start}>Take the tour</Button>
+                </div>
               </div>
             )}
           </Card>
           <div className="flex items-center justify-between">
             <Button variant="secondary" disabled={index === 0} onClick={() => setChosen(STEPS[index - 1]!.id)}>Back</Button>
-            {index < STEPS.length - 1 ? (
-              <Button disabled={step.id === "campaign" && !doneStep(step.id)} onClick={() => setChosen(STEPS[index + 1]!.id)}>{doneStep(step.id) ? "Next" : "Skip for now"}</Button>
-            ) : (
-              <Link to="/" className={buttonClass("secondary")}>Finish</Link>
+            {!last && (
+              <Button variant="secondary" disabled={step.id === "campaign" && !doneStep(step.id)} onClick={next}>
+                {doneStep(step.id) ? "Next" : "Skip for now"}
+              </Button>
             )}
           </div>
         </div>

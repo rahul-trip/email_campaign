@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Megaphone, Plus, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { Button, Callout, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, SaveNote, Segmented, Textarea } from "../components/ui";
+import { useCurrent } from "../app/session";
 import { lines } from "../lib/format";
 
 type Campaign = Schemas["CampaignOut"];
@@ -125,7 +127,7 @@ function CampaignSwitch({ campaign, active, onDone }: { campaign: Campaign; acti
 }
 
 /** The workspace starts with one empty campaign; this fills it in. */
-export function FirstCampaign({ onSaved }: { onSaved?: () => void }) {
+export function FirstCampaign({ onSaved, autoSuggest = false }: { onSaved?: () => void; autoSuggest?: boolean }) {
   const queryClient = useQueryClient();
   const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
   const saved = () => {
@@ -133,17 +135,44 @@ export function FirstCampaign({ onSaved }: { onSaved?: () => void }) {
     void queryClient.invalidateQueries({ queryKey: ["setup"] });
     onSaved?.();
   };
-  return <QueryState query={campaigns}>{(all) => <CampaignForm campaign={all.find((c) => c.status === "active") ?? all[0]} onSaved={saved} />}</QueryState>;
+  return <QueryState query={campaigns}>{(all) => <CampaignForm essentials autoSuggest={autoSuggest} campaign={all.find((c) => c.status === "active") ?? all[0]} onSaved={saved} />}</QueryState>;
 }
 
-export function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campaign; onSaved: () => void; onCancel?: () => void }) {
-  const [name, setName] = useState(campaign?.name ?? "");
+const SUGGEST_REASON: Record<string, string> = {
+  profile_empty: "Confirm your company profile first; the suggestion is written from it.",
+  no_model: "No suggestion could be written just now. Fill it in yourself; you can change it later.",
+  model_failed: "No suggestion could be written just now. Fill it in yourself; you can change it later.",
+};
+
+export function CampaignForm({ campaign, onSaved, onCancel, essentials = false, autoSuggest = false }: { campaign?: Campaign; onSaved: () => void; onCancel?: () => void; essentials?: boolean; autoSuggest?: boolean }) {
+  const { workspace } = useCurrent();
+  // Nobody chose the name "default": offer one until they type their own.
+  const [name, setName] = useState(essentials && (!campaign || campaign.name === "default") ? `${workspace.name} outreach` : (campaign?.name ?? ""));
   const [titles, setTitles] = useState((campaign?.target_titles ?? []).join("\n"));
   const [icp, setIcp] = useState(campaign?.icp_description ?? "");
   const [minFit, setMinFit] = useState(campaign?.min_fit_score ?? 60);
   const [questions, setQuestions] = useState((campaign?.research_questions ?? []).join("\n"));
   const [cadence, setCadence] = useState((campaign?.cadence_days ?? [0, 3, 8]).join(", "));
   const tooMany = lines(questions).length > 3;
+  const suggest = useMutation({
+    mutationFn: () => ok(client.POST("/api/setup/campaign-draft")),
+    onSuccess: (found) => {
+      if (!found.drafted) return;
+      // Only blank fields change: what was typed stays.
+      if (!titles.trim() && found.target_titles.length) setTitles(found.target_titles.join("\n"));
+      if (!icp.trim() && found.icp_description) setIcp(found.icp_description);
+      if (!questions.trim() && found.research_questions.length) setQuestions(found.research_questions.join("\n"));
+    },
+  });
+  // Arriving at an empty form from onboarding: the suggestion is already there, once.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (autoSuggest && !asked.current && !titles.trim() && !icp.trim()) {
+      asked.current = true;
+      suggest.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const save = useMutation({
     mutationFn: () => {
       const body = {
@@ -167,15 +196,25 @@ export function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campa
   });
   return (
     <div className="grid gap-4 md:grid-cols-2">
+      <div className="flex flex-wrap items-center gap-3 md:col-span-2">
+        <Button variant="secondary" busy={suggest.isPending} onClick={() => suggest.mutate()}>
+          <Sparkles className="size-4" aria-hidden /> Suggest from my profile
+        </Button>
+        {suggest.data && !suggest.data.drafted && <span className="text-xs text-muted">{SUGGEST_REASON[suggest.data.reason ?? "model_failed"]}</span>}
+        {suggest.data?.drafted && <span className="text-xs text-muted">Suggested. Check it and change what is wrong; nothing is saved until you press the button below.</span>}
+        <Problem error={suggest.error} />
+      </div>
       <Field label="Name">
         <Input value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
+      {!essentials && (
       <Field label={`Minimum fit score: ${minFit}`} hint="Discovered companies below this are disqualified. Companies you add by hand skip this check.">
         <div className="flex items-center gap-3">
           <input type="range" min={0} max={100} value={minFit} onChange={(e) => setMinFit(Number(e.target.value))} className="h-8 flex-1 accent-[var(--primary-container)]" aria-label="Minimum fit score" />
           <Input type="number" min={0} max={100} value={minFit} onChange={(e) => setMinFit(Number(e.target.value))} className="w-20" aria-label="Minimum fit score, as a number" />
         </div>
       </Field>
+      )}
       <Field label="Wanted job titles" hint="One per line, best first. People found are ranked against these.">
         <Textarea rows={4} value={titles} onChange={(e) => setTitles(e.target.value)} placeholder={"Head of Trading\nCOO"} />
       </Field>
@@ -185,9 +224,11 @@ export function CampaignForm({ campaign, onSaved, onCancel }: { campaign?: Campa
       <Field label="Ideal customer" hint="Plain words: who they are, their size, what they do. The fit score and discovery read this." className="md:col-span-2">
         <Textarea rows={3} value={icp} onChange={(e) => setIcp(e.target.value)} />
       </Field>
-      <Field label="Follow-up days" hint="Business days after the first email, comma separated. Stored now; follow-ups arrive in a later phase.">
-        <Input value={cadence} onChange={(e) => setCadence(e.target.value)} className="font-mono" />
-      </Field>
+      {!essentials && (
+        <Field label="Follow-up days" hint="Business days after the first email, comma separated. Stored now; follow-ups arrive in a later phase.">
+          <Input value={cadence} onChange={(e) => setCadence(e.target.value)} className="font-mono" />
+        </Field>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <Button busy={save.isPending} disabled={!name.trim() || tooMany} onClick={() => save.mutate()}>
           {campaign ? "Save campaign" : "Create campaign"}
@@ -324,5 +365,47 @@ function BriefCard({ campaign, onSaved, tour }: { campaign: Campaign; onSaved: (
       )}
       <SaveNote mutation={draft} done="Brief drafted. Check it, then save any change." />
     </Card>
+  );
+}
+
+/** The brief in plain lists, for onboarding: what discovery will look for, to check before the first search. */
+export function BriefSummary({ campaign }: { campaign: Campaign }) {
+  const brief = (campaign.icp_brief ?? {}) as Brief;
+  const list = (key: string) => ((brief[key] as string[] | undefined) ?? []).filter(Boolean);
+  const must = (brief.must_haves ?? []).map((c) => c.text).filter(Boolean);
+  const groups: [string, string[]][] = [
+    ["Must have", must],
+    ["Rule out", list("disqualifiers")],
+    ["Where", list("regions")],
+    ["Kinds of company", list("segments")],
+  ];
+  return (
+    <div className="space-y-3 text-[13px]">
+      {brief.summary && <p>{String(brief.summary)}</p>}
+      {(campaign.brief_gaps ?? []).length > 0 && (
+        <Callout tone="attention" title="This brief is thin, so leads are judged loosely">
+          <ul className="list-disc pl-4">
+            {(campaign.brief_gaps ?? []).map((g) => (
+              <li key={g}>{g}</li>
+            ))}
+          </ul>
+        </Callout>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {groups.filter(([, items]) => items.length > 0).map(([label, items]) => (
+          <div key={label}>
+            <div className="mb-1 text-xs font-semibold text-muted">{label}</div>
+            <ul className="list-disc pl-4">
+              {items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <Link to="/campaigns" className="text-xs font-semibold text-primary hover:underline">
+        Edit the full brief
+      </Link>
+    </div>
   );
 }

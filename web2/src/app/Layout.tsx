@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { CampaignGate } from "../components/CampaignGate";
 import { NotificationBell } from "../components/Notifications";
-import { useNeedsCampaign } from "../lib/setup";
+import { useNeedsCampaign, useSetup } from "../lib/setup";
 import { Avatar, Menu, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
@@ -22,8 +22,10 @@ const WORKER_SILENT_MS = 45_000;
 export function Layout({ children }: { children: ReactNode }) {
   const current = useCurrent();
   const gated = useNeedsCampaign() && !isViewing(current.workspace);
+  // The tour waits until the setup is done, so it never opens on top of onboarding.
+  const setupDone = useSetup().data?.done === true;
   return (
-    <TourProvider autoStart={!gated}>
+    <TourProvider autoStart={!gated && setupDone}>
       <Shell gated={gated}>{children}</Shell>
     </TourProvider>
   );

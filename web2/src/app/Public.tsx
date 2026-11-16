@@ -482,7 +482,7 @@ function GetStarted({ none }: { none: boolean }) {
         <Field label="Company name">
           <Input aria-label="Company name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full" />
         </Field>
-        <Field label="Website (optional)">
+        <Field label="Website" hint="We read it to draft your profile, so you do not start from a blank page. Optional.">
           <Input aria-label="Website" value={website} onChange={(e) => setWebsite(e.target.value)} className="h-9 w-full" />
         </Field>
         <Problem error={create.error} />
