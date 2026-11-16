@@ -148,7 +148,8 @@ def register(app: typer.Typer) -> None:
         from datetime import timedelta
 
         from outbound.pipeline import NotConfigured, assemble, real_providers
-        from outbound.worker import Worker
+        from outbound.services.activity_notices import ActivityNotifier
+        from outbound.worker import Worker, workspace_names
 
         container = build_container(settings_for(database_url))
         refuse_unsafe_database(container)
@@ -187,12 +188,19 @@ def register(app: typer.Typer) -> None:
             build_transactional_email(container.settings),
             container.settings.app_base_url,
         )
+        activity = ActivityNotifier(container.uow, container.identity, workspace_names(container))
         engine = Worker(
             container,
             lambda workspace_id: assemble(container, workspace_id, live.get()),
             threads=threads,
             tick_every=tick_every,
-            periodic=[lambda: _enforce_caps(vendors, notices), notices.run, directory.run],
+            periodic=[
+                lambda: _enforce_caps(vendors, notices),
+                notices.run,
+                directory.run,
+                activity.prune,
+            ],
+            notifier=activity,
         )
         try:
             engine.run_forever(poll_seconds=poll_seconds)

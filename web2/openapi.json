@@ -4136,7 +4136,15 @@
             "enum": [
               "join_requested",
               "join_approved",
-              "join_rejected"
+              "join_rejected",
+              "drafts_ready",
+              "hot_lead",
+              "needs_attention",
+              "auto_approved",
+              "run_finished",
+              "run_failed",
+              "discovery_paused",
+              "account"
             ],
             "title": "Kind",
             "type": "string"

@@ -37,8 +37,9 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import PlatformRole
 from outbound.pipeline import assemble
 from outbound.providers.adapters.transactional_email import LogEmail
+from outbound.services.activity_notices import ActivityNotifier
 from outbound.services.seed import seed_defaults
-from outbound.worker import Worker
+from outbound.worker import Worker, workspace_names
 from tests.stages.world import PROFILE, World
 
 E2E_EMAIL = "operator@e2e.example"
@@ -101,7 +102,8 @@ def build() -> tuple[FastAPI, Worker]:
         uow.commit()
     app.state.identity.add_user(E2E_EMAIL, E2E_PASSWORD, name="Sam", workspace_id=workspace.id)
     app.state.identity.add_user(E2E_STAFF, E2E_PASSWORD, platform_role=PlatformRole.SUPERADMIN)
-    return app, Worker(container, lambda _ws: pipeline, tick_every=None)
+    notifier = ActivityNotifier(container.uow, container.identity, workspace_names(container))
+    return app, Worker(container, lambda _ws: pipeline, tick_every=None, notifier=notifier)
 
 
 def _serve_outbox(app: FastAPI, outbox: LogEmail) -> None:

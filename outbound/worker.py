@@ -30,7 +30,8 @@ from outbound.db.types import utcnow
 from outbound.domain.enums import RunStatus
 from outbound.logging import get_logger
 from outbound.pipeline import Pipeline, execute_run
-from outbound.services.autodiscovery import AutoDiscovery
+from outbound.services.activity_notices import ActivityNotifier
+from outbound.services.autodiscovery import REVIEW_FULL, AutoDiscovery
 from outbound.services.runs import RunRequest
 
 log = get_logger(__name__)
@@ -49,6 +50,17 @@ class Job:
     task: Task
 
 
+def workspace_names(container: Container) -> Callable[[str], tuple[str, str] | None]:
+    """A workspace's (slug, name) by id, for the notices the engine writes about it."""
+
+    def find(workspace_id: str) -> tuple[str, str] | None:
+        with container.platform() as platform:
+            found = platform.workspaces.get(workspace_id)
+        return (found.slug, found.name) if found else None
+
+    return find
+
+
 class Worker:
     def __init__(
         self,
@@ -61,6 +73,7 @@ class Worker:
         tick_limit: int = 50,
         periodic: Sequence[Callable[[], object]] = (),
         now: Callable[[], datetime] = utcnow,
+        notifier: ActivityNotifier | None = None,
     ) -> None:
         self._container = container
         self._assemble = assemble
@@ -69,6 +82,7 @@ class Worker:
         self._stale_after = stale_after
         self._tick_limit = tick_limit
         self._periodic = list(periodic)  # platform-wide jobs, once per tick interval
+        self._notifier = notifier  # tells the workspace's people what a run or tick did
         self._now = now
         self._last_served: dict[str, datetime] = {}
         self._last_tick: dict[str, datetime] = {}
@@ -136,22 +150,27 @@ class Worker:
         log.info("run_claimed", run_id=claimed.id, workspace_id=workspace_id, params=claimed.params)
         try:
             pipeline = self._assemble(workspace_id)
-            execute_run(
-                pipeline,
-                self._container,
-                workspace_id,
-                RunRequest.from_params(claimed.params),
-                run_id=claimed.id,
+            request = RunRequest.from_params(claimed.params)
+            report = execute_run(
+                pipeline, self._container, workspace_id, request, run_id=claimed.id
             )
         except Exception as error:
             log.exception("run_failed", run_id=claimed.id, error_type=type(error).__name__)
             self._fail(workspace_id, claimed.id, error)
+            reason = f"{type(error).__name__}: {error}"
+            self._notify(workspace_id, lambda n: n.run_failed(workspace_id, claimed.id, reason))
+        else:
+            self._notify(
+                workspace_id,
+                lambda n: n.after_run(workspace_id, report.run_id, by_person=not request.automatic),
+            )
 
     def _tick(self, workspace_id: str) -> bool:
         try:
             pipeline = self._assemble(workspace_id)
             self._queue_discovery(workspace_id, pipeline)
-            pipeline.tick.run(limit=self._tick_limit, skip_idle=True)
+            report = pipeline.tick.run(limit=self._tick_limit, skip_idle=True)
+            self._notify(workspace_id, lambda n: n.after_tick(workspace_id, report))
         except RunInProgress:
             log.info("tick_skipped", workspace_id=workspace_id, reason="a run is in progress")
         except Exception as error:  # one workspace's broken tick must not stop the others
@@ -161,10 +180,30 @@ class Worker:
     def _queue_discovery(self, workspace_id: str, pipeline: Pipeline) -> None:
         """Queue the search for new companies a campaign is due; the run is picked up next."""
         try:
-            AutoDiscovery(self._container.uow, workspace_id, pipeline.runs, self._now).queue_due()
+            discovery = AutoDiscovery(self._container.uow, workspace_id, pipeline.runs, self._now)
+            discovery.queue_due()
+            state = discovery.state()
+            if state.reason == REVIEW_FULL:
+                self._notify(
+                    workspace_id,
+                    lambda n: n.discovery_paused(
+                        workspace_id, state.waiting_for_review, state.review_limit
+                    ),
+                )
         except Exception as error:  # the tick's own work must still happen
             log.exception(
                 "auto_discovery_failed", workspace_id=workspace_id, error_type=type(error).__name__
+            )
+
+    def _notify(self, workspace_id: str, tell: Callable[[ActivityNotifier], object]) -> None:
+        """Tell the workspace's people what happened. Never allowed to fail a run or a tick."""
+        if self._notifier is None:
+            return
+        try:
+            tell(self._notifier)
+        except Exception as error:
+            log.exception(
+                "notify_failed", workspace_id=workspace_id, error_type=type(error).__name__
             )
 
     def _fail(self, workspace_id: str, run_id: str, error: Exception) -> None:

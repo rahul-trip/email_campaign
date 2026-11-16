@@ -3979,7 +3979,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "join_requested" | "join_approved" | "join_rejected";
+            kind: "join_requested" | "join_approved" | "join_rejected" | "drafts_ready" | "hot_lead" | "needs_attention" | "auto_approved" | "run_finished" | "run_failed" | "discovery_paused" | "account";
             /** Read */
             read: boolean;
             /** Workspace Id */

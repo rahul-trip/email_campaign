@@ -11,7 +11,7 @@ from datetime import datetime
 from types import TracebackType
 from typing import Any, Self
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from outbound.db.errors import NotFound
@@ -480,6 +480,68 @@ class NotificationRepository:
         self._session.add(row)
         self._session.flush()
         return snapshot(row, Notification)
+
+    def upsert_unread(
+        self,
+        user_id: str,
+        kind: NotificationKind,
+        *,
+        workspace_id: str | None,
+        data: dict[str, Any],
+        add_up: tuple[str, ...] = (),
+        once: tuple[str, str] | None = None,
+        quiet_since: datetime | None = None,
+    ) -> bool:
+        """Tell a person something without piling up lines. Returns whether anything was written.
+
+        - an unread notice of the same kind for the same workspace is updated, not repeated: the
+          counts named in ``add_up`` are added, other values replaced, and it moves to the top;
+        - ``once=(key, value)``: nothing if this person ever had a notice of this kind with that
+          value (one per lead, however often it is read);
+        - ``quiet_since``: nothing if one of this kind, read or not, is newer than that.
+        """
+        rows = list(
+            self._session.scalars(
+                select(NotificationRow)
+                .where(
+                    NotificationRow.user_id == user_id,
+                    NotificationRow.kind == kind,
+                    NotificationRow.workspace_id == workspace_id,
+                )
+                .order_by(NotificationRow.created_at.desc(), NotificationRow.id.desc())
+                .limit(200)
+            )
+        )
+        if quiet_since is not None and any(r.created_at >= quiet_since for r in rows):
+            return False
+        if once is not None:
+            key, value = once
+            if any(r.data.get(key) == value for r in rows):
+                return False
+        else:
+            unread = next((r for r in rows if r.read_at is None), None)
+            if unread is not None:
+                merged = dict(unread.data)
+                for key, value in data.items():
+                    old = merged.get(key)
+                    merged[key] = (
+                        old + value
+                        if key in add_up and isinstance(old, int) and isinstance(value, int)
+                        else value
+                    )
+                unread.data = merged
+                unread.created_at = utcnow()
+                self._session.flush()
+                return True
+        self.add(user_id, kind, workspace_id=workspace_id, data=data)
+        return True
+
+    def prune(self, before: datetime) -> int:
+        """Delete notifications older than ``before``; returns how many."""
+        result = self._session.execute(
+            delete(NotificationRow).where(NotificationRow.created_at < before)
+        )
+        return int(result.rowcount or 0)  # type: ignore[attr-defined]
 
     def for_user(self, user_id: str, *, limit: int = 50) -> list[Notification]:
         stmt = (

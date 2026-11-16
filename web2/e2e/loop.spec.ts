@@ -169,3 +169,17 @@ test("on Review the operator asks for changes, sees them, and approves the rewri
   await page.getByRole("button", { name: "Approve with my edit" }).click();
   await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
 });
+
+test("the bell tells what a run did and where to go", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("bell");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Notifications/ }).click();
+  const panel = page.getByRole("dialog", { name: "Notifications" });
+  await expect(panel.getByText(/Your run finished/)).toBeVisible();
+  await expect(panel.getByText(/waiting for review/)).toBeVisible();
+  await panel.getByText(/waiting for review/).click();
+  await expect(page).toHaveURL(/\/review$/);
+});

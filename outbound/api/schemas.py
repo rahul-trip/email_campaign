@@ -153,7 +153,19 @@ class MyJoinRequestOut(Out):
 
 class NotificationOut(Out):
     id: str
-    kind: Literal["join_requested", "join_approved", "join_rejected"]
+    kind: Literal[
+        "join_requested",
+        "join_approved",
+        "join_rejected",
+        "drafts_ready",
+        "hot_lead",
+        "needs_attention",
+        "auto_approved",
+        "run_finished",
+        "run_failed",
+        "discovery_paused",
+        "account",
+    ]
     workspace_id: str | None
     data: dict[str, Any]
     read: bool
