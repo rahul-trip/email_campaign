@@ -31,6 +31,7 @@ Column-level detail is in [schema](../data/schema.md). These are the places that
 | `messages`: `subject`, `generated_body`, `final_body`, `snippets` | Emails to the person | `[erased]` / blanked |
 | `inbound_messages`: `from_address`, `body_excerpt`, `extracted` | Replies (Phase 4; not written yet) | Blanked |
 | `provider_calls`: `response` | Vendors' answers: addresses, names, page text | Blanked for calls about the person, or containing their address or full name |
+| `provider_calls`: `detail` | One line of what the call asked ("Jane Doe at acme.com", an address, a search text) and one of what came back | Blanked with `response`, for calls about the person or whose detail mentions their address or full name |
 | `import_rows`: `raw` | The row as submitted | `{"erased": true}` where it contains the address |
 | `companies`: `research`, `research_answers`, `fit_reason` | Research may quote people's names and published addresses (`research.site_emails`) | Substring-redacted |
 | `events`: `data` | Old and new values of changes | `{"erased": true}` for the person, their addresses and messages |

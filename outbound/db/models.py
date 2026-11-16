@@ -126,7 +126,11 @@ class CampaignRow(Mutable, Base):
         UniqueConstraint("workspace_id", "name"),
         _tenant_fk("campaigns", "mailbox_id", "mailboxes"),
         CheckConstraint("min_fit_score BETWEEN 0 AND 100", name="min_fit_score_range"),
-    )
+        Index(
+            "uq_campaigns_one_active", "workspace_id", unique=True,
+            sqlite_where=text("status = 'active'"), postgresql_where=text("status = 'active'"),
+        ),  # exactly one active campaign per workspace (0022)
+    )  # fmt: skip
 
     name: Mapped[str] = mapped_column(String(200))
     target_titles: Mapped[list[str]] = mapped_column(Json)
@@ -665,6 +669,7 @@ class ProviderCallRow(AppendOnly, Base):
     response: Mapped[dict[str, Any] | None] = mapped_column(Json)
     cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
+    detail: Mapped[dict[str, Any] | None] = mapped_column(Json)  # {"asked": ..., "got": ...}
 
 
 class EventRow(AppendOnly, Base):

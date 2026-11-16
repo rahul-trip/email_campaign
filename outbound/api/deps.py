@@ -28,6 +28,7 @@ from outbound.domain.permissions import READ, Permission, Principal, can
 from outbound.logging import bind, get_logger
 from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.providers.registry import build_oauth_apps
+from outbound.services.autodiscovery import AutoDiscovery
 from outbound.services.candidates import CandidateService
 from outbound.services.directory import LeadDirectory
 from outbound.services.identity import CurrentUser, IdentityService
@@ -69,6 +70,7 @@ class Services:
     resume: ResumeService
     usage: UsageService
     directory: LeadDirectory
+    discovery: AutoDiscovery
 
 
 def build_services(
@@ -103,6 +105,7 @@ def build_services(
         resume=resume,
         usage=UsageService(uow, container.identity, workspace_id, quota, resume),
         directory=LeadDirectory(uow, workspace_id),
+        discovery=AutoDiscovery(uow, workspace_id, RunService(uow, workspace_id)),
         mailboxes=MailboxService(
             uow, container.identity, workspace_id,
             apps=build_oauth_apps(container.settings), base_url=container.settings.app_base_url,

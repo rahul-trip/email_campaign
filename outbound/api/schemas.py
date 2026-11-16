@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from outbound.domain.enums import (
     CandidateVerdict,
@@ -18,6 +18,7 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.domain.qualification import is_hot
 from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
 
@@ -152,7 +153,19 @@ class MyJoinRequestOut(Out):
 
 class NotificationOut(Out):
     id: str
-    kind: Literal["join_requested", "join_approved", "join_rejected"]
+    kind: Literal[
+        "join_requested",
+        "join_approved",
+        "join_rejected",
+        "drafts_ready",
+        "hot_lead",
+        "needs_attention",
+        "auto_approved",
+        "run_finished",
+        "run_failed",
+        "discovery_paused",
+        "account",
+    ]
     workspace_id: str | None
     data: dict[str, Any]
     read: bool
@@ -227,6 +240,12 @@ class CompanyOut(Out):
     row_version: int
     created_at: datetime | None
     updated_at: datetime | None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def hot(self) -> bool:
+        """A fit score above 80: shown with a flame, and never approved automatically."""
+        return is_hot(self.fit_score)
 
 
 class CompanyPage(Out):
@@ -310,6 +329,8 @@ class WaterfallOut(Out):
     cost_micro_usd: int
     latency_ms: int | None
     contact_id: str | None
+    asked: str = ""
+    got: str = ""
 
 
 class FactOut(Out):
@@ -323,6 +344,8 @@ class CallOut(Out):
     operation: str
     outcome: str
     cost_micro_usd: int
+    asked: str = ""
+    got: str = ""
 
 
 class IncidentOut(Out):
@@ -516,6 +539,9 @@ class WorkspaceSettingsIn(In):
     email_min_words: int | None = Field(default=None, ge=40, le=500)
     email_max_words: int | None = Field(default=None, ge=40, le=600)
     auto_discovery: bool | None = None
+    auto_approve_cold: bool | None = None
+    auto_discovery_per_day: int | None = Field(default=None, ge=1, le=6)
+    auto_discovery_review_limit: int | None = Field(default=None, ge=1, le=500)
 
 
 class SenderProfileIn(In):
@@ -594,6 +620,27 @@ class RunOut(Out):
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
+
+
+class AutoDiscoveryOut(Out):
+    reason: (
+        Literal[
+            "off",
+            "no_campaign",
+            "no_credits",
+            "run_in_progress",
+            "review_full",
+            "backlog",
+            "not_yet",
+        ]
+        | None
+    )  # why nothing is queued now; None: a search is due
+    campaign: str | None
+    last_search: datetime | None
+    next_search: datetime | None
+    per_day: int
+    review_limit: int
+    waiting_for_review: int
 
 
 class RunStepOut(Out):
@@ -724,6 +771,7 @@ class CampaignOut(Out):
     research_questions: list[str]
     cadence_days: list[int]
     icp_brief: dict[str, Any] | None = None
+    status: Literal["active", "paused", "archived"] = "active"
     brief_gaps: list[str] = []  # what the brief leaves out that weakens discovery and scoring
     title_warnings: list[str] = []  # wanted "job titles" that are not jobs
 
@@ -1231,6 +1279,16 @@ class LinkedInOut(Out):
 
 class RetryEmailOut(Out):
     queued_run_id: str
+
+
+class FindEmailAgainIn(In):
+    company_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class FindEmailAgainOut(Out):
+    queued_run_id: str | None  # None: nothing was asked for, so no run was queued
+    asked: int
+    skipped: int
 
 
 class DirectoryEntryOut(Out):

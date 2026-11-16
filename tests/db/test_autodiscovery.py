@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import Campaign
-from outbound.domain.enums import CompanySource, CompanyStatus, RunKind, RunStatus
-from outbound.services.autodiscovery import BACKLOG, INTERVAL, AutoDiscovery
+from outbound.domain.enums import CompanySource, CompanyStatus, MessageState, RunKind, RunStatus
+from outbound.services import autodiscovery
+from outbound.services.autodiscovery import BACKLOG, AutoDiscovery, interval_for
 from outbound.services.runs import RunMode, RunRequest, RunService
 from outbound.services.settings import SettingsService
 
@@ -59,7 +60,7 @@ def test_a_campaign_with_no_ideal_customer_is_left_alone(
     assert queued(factory, ws) == []
 
 
-def test_a_campaign_is_searched_once_a_day_however_the_last_search_ended(
+def test_a_campaign_is_searched_about_every_six_hours_however_the_last_search_ended(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
     campaign(factory, ws)
@@ -70,7 +71,7 @@ def test_a_campaign_is_searched_once_a_day_however_the_last_search_ended(
     with factory(ws) as uow:  # it ran and failed
         uow.runs.cancel(first)
         uow.commit()
-    clock.at += INTERVAL - timedelta(minutes=1)
+    clock.at += interval_for(autodiscovery.PER_DAY) - timedelta(minutes=1)
     assert service.queue_due() is None
     clock.at += timedelta(minutes=2)
     assert service.queue_due() is not None
@@ -141,3 +142,78 @@ def test_background_runs_do_not_hold_up_a_search(factory: UnitOfWorkFactory, ws:
         uow.runs.queue(RunKind.SYNC, {"jobs": []})
         uow.commit()
     assert auto(factory, ws).queue_due() is not None
+
+
+def test_the_wait_between_searches_follows_the_searches_a_day_setting(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    campaign(factory, ws)
+    SettingsService(factory, ws).update_workspace_settings({"auto_discovery_per_day": 2})
+    clock = Clock()
+    service = auto(factory, ws, clock)
+    first = service.queue_due()
+    assert first is not None
+    with factory(ws) as uow:
+        uow.runs.cancel(first)
+        uow.commit()
+    clock.at += timedelta(hours=11, minutes=59)
+    assert service.queue_due() is None  # twice a day is every twelve hours
+    clock.at += timedelta(minutes=2)
+    assert service.queue_due() is not None
+
+
+def waiting_drafts(factory: UnitOfWorkFactory, ws: str, count: int) -> None:
+    from outbound.domain.enums import ContactSource, EmailStatus, Provenance
+
+    with factory(ws) as uow:
+        for n in range(count):
+            company = uow.companies.create(domain=f"d{n}.example", source=CompanySource.MANUAL)
+            contact = uow.contacts.add(company.id, rank=1, source=ContactSource.SITE)
+            address = uow.emails.add(
+                contact.id, f"a@d{n}.example", Provenance.API_DATABASE,
+                status=EmailStatus.VALID, is_primary=True,
+            )  # fmt: skip
+            uow.messages.create(
+                company_id=company.id, contact_id=contact.id, contact_email_id=address.id,
+                step=0, subject="s", generated_body="b",
+            )  # fmt: skip
+        uow.commit()
+
+
+def test_no_search_while_review_holds_the_limit_and_it_resumes_below_it(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    campaign(factory, ws)
+    SettingsService(factory, ws).update_workspace_settings({"auto_discovery_review_limit": 3})
+    waiting_drafts(factory, ws, 3)
+    service = auto(factory, ws)
+    state = service.state()
+    assert (state.reason, state.waiting_for_review, state.review_limit) == (
+        autodiscovery.REVIEW_FULL,
+        3,
+        3,
+    )
+    assert service.queue_due() is None
+    with factory(ws) as uow:  # someone works one off
+        draft = uow.messages.in_state(MessageState.GENERATED)[0]
+        uow.messages.transition(draft.id, MessageState.REJECTED, expected_version=draft.row_version)
+        uow.commit()
+    assert service.state().reason is None
+    assert service.queue_due() is not None
+
+
+def test_the_state_says_why_nothing_is_queued(factory: UnitOfWorkFactory, ws: str) -> None:
+    service = auto(factory, ws)
+    assert service.state().reason == autodiscovery.NO_CAMPAIGN
+    campaign(factory, ws)
+    assert service.state().reason is None
+    SettingsService(factory, ws).update_workspace_settings({"auto_discovery": False})
+    assert service.state().reason == autodiscovery.OFF
+    SettingsService(factory, ws).update_workspace_settings({"auto_discovery": True})
+    first = service.queue_due()
+    assert service.state().reason == autodiscovery.RUN_IN_PROGRESS
+    with factory(ws) as uow:
+        uow.runs.cancel(first)  # type: ignore[arg-type]
+        uow.commit()
+    after = service.state()
+    assert after.reason == autodiscovery.NOT_YET and after.next_search is not None

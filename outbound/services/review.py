@@ -14,7 +14,7 @@ from datetime import datetime
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
-from outbound.domain.actors import OPERATOR
+from outbound.domain.actors import AUTO, OPERATOR
 from outbound.domain.copy_lint import LintRules
 from outbound.domain.editing import edit_distance
 from outbound.domain.entities import Company, Contact, ContactEmail, Event, Message
@@ -95,6 +95,8 @@ def _history_line(event: Event) -> HistoryLine:
     else:
         what = event.type.replace("_", " ").capitalize()
     detail = data.get("reason") or data.get("detail")
+    if event.actor == AUTO and what == "Approved":
+        what = "Approved automatically (cold lead)"
     return HistoryLine(event.created_at, what, event.actor, str(detail) if detail else None)
 
 

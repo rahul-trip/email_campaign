@@ -314,6 +314,15 @@ class NotificationKind(StrEnum):
     JOIN_REQUESTED = "join_requested"  # to the admins: someone asks to join
     JOIN_APPROVED = "join_approved"  # to the person who asked
     JOIN_REJECTED = "join_rejected"  # to the person who asked
+    # What the engine has to tell everyone in a workspace (``services.activity_notices``):
+    DRAFTS_READY = "drafts_ready"  # emails are waiting in Review
+    HOT_LEAD = "hot_lead"  # a lead scored above 80
+    NEEDS_ATTENTION = "needs_attention"  # leads were held or failed
+    AUTO_APPROVED = "auto_approved"  # cold leads' emails approved without a person
+    RUN_FINISHED = "run_finished"  # a run a person started
+    RUN_FAILED = "run_failed"
+    DISCOVERY_PAUSED = "discovery_paused"  # Review is full, so no search by itself
+    ACCOUNT = "account"  # credits running out, access ending
 
 
 class AuthTokenPurpose(StrEnum):

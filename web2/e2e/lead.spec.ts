@@ -1,4 +1,4 @@
-import { addTarget, expect, leadId, runEngine, signIn, test, unique } from "./helpers";
+import { addTarget, expect, leadId, openCard, runEngine, signIn, test, unique } from "./helpers";
 
 test("a lead held for consent is released by adding a person who consented", async ({ page }) => {
   await signIn(page);
@@ -24,8 +24,8 @@ test("a lead held for consent is released by adding a person who consented", asy
   await card.getByRole("button", { name: "Add person and release the hold" }).click();
   await expect(page.getByText("Added, and the hold is released.")).toBeVisible();
   await expect(page.getByText("Held: Consent required")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
-  await expect(page.getByText("consent recorded")).toBeVisible();
+  await openCard(page, "Activity");
+  await expect(page.getByText("Consent recorded")).toBeVisible();
 });
 
 test("edit a lead; delete needs the typed domain and removes it", async ({ page }) => {
@@ -39,6 +39,7 @@ test("edit a lead; delete needs the typed domain and removes it", async ({ page 
   await expect(page.getByRole("heading", { name: "Delete Me Ltd" })).toBeVisible();
   await expect(page.getByText("Set by you, kept as you set it")).toBeVisible();
 
+  await openCard(page, "Danger zone");
   await page.getByRole("button", { name: "Delete permanently…" }).click();
   const dialog = page.getByRole("dialog");
   const go = dialog.getByRole("button", { name: "Delete permanently" });
@@ -57,6 +58,7 @@ test("suppressing a domain asks first and reports what it cancelled", async ({ p
   const domain = unique("suppress-me");
   await addTarget(page, { website: domain, country: "US" });
   await page.goto(`/leads/${await leadId(page, domain)}`);
+  await openCard(page, "Danger zone");
   await page.getByRole("button", { name: "Suppress this domain" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Suppress domain" }).click();
   await expect(page.getByText(/Suppressed\. \d+ unsent email/)).toBeVisible();

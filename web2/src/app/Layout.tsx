@@ -3,7 +3,9 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Shield, Sun, X, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
+import { CampaignGate } from "../components/CampaignGate";
 import { NotificationBell } from "../components/Notifications";
+import { useNeedsCampaign } from "../lib/setup";
 import { Avatar, Menu, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
@@ -18,14 +20,19 @@ const WORKER_SILENT_MS = 45_000;
 
 /** The signed-in shell of one workspace. Who is signed in is settled before it renders (main.tsx). */
 export function Layout({ children }: { children: ReactNode }) {
+  const current = useCurrent();
+  const gated = useNeedsCampaign() && !isViewing(current.workspace);
   return (
-    <TourProvider autoStart>
-      <Shell>{children}</Shell>
+    <TourProvider autoStart={!gated}>
+      <Shell gated={gated}>{children}</Shell>
     </TourProvider>
   );
 }
 
-function Shell({ children }: { children: ReactNode }) {
+// Pages that stay open while the campaign is missing: where it can also be made, and the setup.
+const OPEN_WITHOUT_CAMPAIGN = /(^|\/)(settings|onboarding)(\/|$)/;
+
+function Shell({ children, gated }: { children: ReactNode; gated: boolean }) {
   const current = useCurrent();
   const viewing = isViewing(current.workspace);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -159,7 +166,7 @@ function Shell({ children }: { children: ReactNode }) {
               .
             </Banner>
           )}
-          {children}
+          {gated && !OPEN_WITHOUT_CAMPAIGN.test(pathname) ? <CampaignGate /> : children}
         </div>
       </main>
     </div>

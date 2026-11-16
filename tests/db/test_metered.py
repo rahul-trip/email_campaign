@@ -476,3 +476,54 @@ def test_a_company_source_is_cached_by_its_query_and_logged(
         ("find", CallOutcome.CACHE_HIT),
         ("find", CallOutcome.HIT),
     ]
+
+
+def details(factory: UnitOfWorkFactory, ws: str) -> list[dict[str, str] | None]:
+    from sqlalchemy import select
+
+    from outbound.db.models import ProviderCallRow
+
+    with factory(ws) as uow:
+        rows = uow.session.scalars(select(ProviderCallRow).order_by(ProviderCallRow.created_at))
+        return [r.detail for r in rows]
+
+
+def test_a_search_records_what_it_asked_and_how_many_results_came_back(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    search = MeteredSearch(FakeSearch(), meter(factory, ws))
+    search.search("Acme energy", topic="news", days=30)
+    search.search("acme energy ", topic="news", days=30)  # served from the ledger
+    first, cached = details(factory, ws)
+    assert first == {"asked": '"Acme energy", news, last 30 days', "got": "1 result"}
+    assert cached is not None and cached["asked"].lower() == first["asked"].lower()
+
+
+def test_pages_a_finder_and_a_blocked_call_say_what_they_asked(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    MeteredSearch(FakeSearch(), meter(factory, ws)).extract(["https://a.com", "https://b.com"])
+    budget = BudgetPolicy(monthly_caps={"fake": 1_500})
+    finder = MeteredFinder(FakeFinder(), meter(factory, ws, budget))
+    finder.find(JANE, "acme.com")
+    with pytest.raises(BudgetExceeded):
+        finder.find(PersonQuery(first_name="Joe", last_name="Bloggs"), "acme.com")
+    pages, found, blocked = details(factory, ws)
+    assert pages == {
+        "asked": "https://a.com, https://b.com",
+        "got": "2 of 2 pages read",
+    }
+    assert found is not None and found["asked"] == "Jane Doe at acme.com"
+    assert blocked is not None
+    assert blocked["asked"] == "Joe Bloggs at acme.com" and "monthly cap" in blocked["got"]
+
+
+def test_a_failed_call_keeps_its_reason(factory: UnitOfWorkFactory, ws: str) -> None:
+    class Failing(FakeSearch):
+        def search(self, query: str, **kwargs: object) -> list[SearchHit]:
+            raise ProviderError("fake", "the vendor said no")
+
+    with pytest.raises(ProviderError):
+        MeteredSearch(Failing(), meter(factory, ws)).search("Acme")
+    (failed,) = details(factory, ws)
+    assert failed is not None and "the vendor said no" in failed["got"]

@@ -49,10 +49,15 @@ def test_the_first_search_result_that_names_the_person_is_used() -> None:
     assert find_linkedin(nothing, "Jane Doe", "Acme", "acme.com") is None
 
 
-def lead(factory: UnitOfWorkFactory, ws: str, status: CompanyStatus = C.CONTACTS_FOUND) -> str:
+def lead(
+    factory: UnitOfWorkFactory,
+    ws: str,
+    status: CompanyStatus = C.CONTACTS_FOUND,
+    domain: str = "acme.com",
+) -> str:
     """A company at ``status`` with one person. Returns the person's id."""
     with factory(ws) as uow:
-        company = uow.companies.create(domain="acme.com", source=CompanySource.MANUAL, name="Acme")
+        company = uow.companies.create(domain=domain, source=CompanySource.MANUAL, name="Acme")
         version = company.row_version
         path = [C.RESEARCHED, C.QUALIFIED, C.CONTACTS_FOUND]
         if status in (C.EMAIL_READY, C.COPY_READY):
@@ -119,3 +124,35 @@ def test_find_email_again_is_refused_once_an_email_was_written(
     with pytest.raises(LeadError, match="Write to this person instead"):
         LeadService(factory, ws).retry_email(person)
     assert HoldReason.CATCH_ALL_UNVERIFIED  # catch-all holds are allowed; see the service
+
+
+def held_on_catch_all(factory: UnitOfWorkFactory, ws: str) -> tuple[str, str]:
+    """A lead held as catch-all unverified. Returns the company's and the person's ids."""
+    person = lead(factory, ws, C.CONTACTS_FOUND)
+    with factory(ws) as uow:
+        company = uow.companies.get(uow.contacts.get(person).company_id)
+        uow.companies.transition(
+            company.id,
+            C.HELD,
+            expected_version=company.row_version,
+            hold_reason=HoldReason.CATCH_ALL_UNVERIFIED,
+        )
+        uow.commit()
+    return company.id, person
+
+
+def test_find_email_again_for_many_leads_reopens_each_held_one_and_skips_the_rest(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    held_company, person = held_on_catch_all(factory, ws)
+    other = lead(factory, ws, C.COPY_READY, "other.com")
+    with factory(ws) as uow:
+        other_company = uow.contacts.get(other).company_id
+    asked, skipped = LeadService(factory, ws).retry_email_for_companies(
+        [held_company, held_company, other_company, "no-such-lead"]
+    )
+    assert (asked, skipped) == (1, 2)
+    with factory(ws) as uow:
+        assert uow.companies.get(held_company).status is C.CONTACTS_FOUND
+        assert uow.contacts.get(person).refresh_email is True
+        assert uow.contacts.get(other).refresh_email is False

@@ -52,7 +52,7 @@ export const SECTIONS: Section[] = [
       {
         target: "notifications",
         title: "Notifications",
-        body: "The bell shows what needs a look, such as someone asking to join your workspace. An admin opens it to find the request, then approves or rejects it under Settings, Team.",
+        body: "The bell lists what the engine did, newest first, and each line opens the page it is about: drafts waiting for review, a hot lead, leads that need you, a run that finished or failed, automatic discovery paused, credit warnings, and someone asking to join your workspace (an admin approves or rejects that under Settings, Team). An unread line is updated, not repeated.",
       },
       {
         target: "search",
@@ -94,6 +94,11 @@ export const SECTIONS: Section[] = [
     place: "/campaigns",
     steps: [
       {
+        target: "campaign-active",
+        title: "One campaign is active",
+        body: "A workspace keeps several campaigns but one is active: discovery, new targets and runs follow it. Switch on makes another campaign the active one and pauses this one, whose leads wait where they are until it is switched on again. Until a workspace has an active campaign with job titles and an ideal customer, the app asks for one first.",
+      },
+      {
         target: "campaign-brief",
         title: "Who we look for",
         body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save. A yellow note lists what is missing (must-haves, rule-outs, keywords): the thinner the brief, the looser the fit score.",
@@ -111,6 +116,11 @@ export const SECTIONS: Section[] = [
         body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also looks for new companies: in start-up directories such as Y Combinator when your campaign is after start-ups, and in pages that list many companies like the ones in its brief. It screens every company it finds against the brief and adds only those that fit, taking new angles each run. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
       },
       {
+        target: "auto-discovery",
+        title: "Discovery by itself",
+        body: "The worker searches for new companies for the active campaign about four times a day, and stops while Review holds 50 drafts (both numbers are under Settings, Limits and budget). This line says when the next search is, or why it is paused.",
+      },
+      {
         target: "recent-runs",
         title: "Watch it work",
         body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, where it looked, every company it found with why it was or was not added (Make a lead adds one the screening left out), what each vendor cost, and every lead it touched; click a lead to go to it.",
@@ -125,7 +135,7 @@ export const SECTIONS: Section[] = [
       {
         target: "review-queue",
         title: "Emails waiting for you",
-        body: "Every email the engine writes waits here. Nothing reaches your mailbox until you approve it. J and K move through the queue.",
+        body: "Every email the engine writes waits here, hot leads (a flame, fit above 80) first. Nothing reaches your mailbox until you approve it, unless you switched on automatic approval for cold leads in Settings, Limits and budget; hot leads always wait. J and K move through the queue.",
       },
       {
         target: "review-editor",
@@ -152,7 +162,7 @@ export const SECTIONS: Section[] = [
       {
         target: "attention-filter",
         title: "Holds, failures, websites",
-        body: "Everything that waits on a decision other than review. Each group says why in plain words and offers the action that fixes it, such as adding a person who has given consent.",
+        body: "Everything that waits on a decision other than review. Each group says why in plain words and offers the action that fixes it, such as adding a person who has given consent, or Find email again for a catch-all address the resolver could not prove (one lead, or all of them at once).",
       },
     ],
   },
@@ -213,7 +223,7 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-people",
         title: "People and consent",
-        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone.",
+        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. The card starts closed; press its title to open it, and it opens by itself when the lead needs you here. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone.",
       },
       {
         target: "lead-directory",
@@ -229,6 +239,11 @@ export const SECTIONS: Section[] = [
         target: "lead-research",
         title: "What research found",
         body: "Everything research found, in sections: what the company does, how well it fits (with a campaign brief, each must-have, sign and rule-out with what research found for it and its source, why they might buy now, and the risks), products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
+      },
+      {
+        target: "lead-activity",
+        title: "Activity",
+        body: "What happened to the lead in plain sentences, newest first, grouped by day: draft written, put on hold, email approved, saved to the mailbox. Show details adds the small events. The Vendor calls card next to it says what each call asked, such as the search text or the pages read.",
       },
       {
         target: "lead-policy",

@@ -166,7 +166,7 @@ class ErasureRepository(ScopedRepository):
                 (ProviderCallRow.company_id == company_id)
                 | ProviderCallRow.contact_id.in_(contact_ids),
             )
-            .values(company_id=None, contact_id=None, response=None)
+            .values(company_id=None, contact_id=None, response=None, detail=None)
         )
         run(
             update(ImportRowRow)
@@ -231,7 +231,7 @@ class ErasureRepository(ScopedRepository):
         self._session.execute(
             update(ProviderCallRow)
             .where(ProviderCallRow.workspace_id == ws, ProviderCallRow.contact_id == contact_id)
-            .values(contact_id=None, response=None)
+            .values(contact_id=None, response=None, detail=None)
         )
         self._session.execute(
             update(InboundMessageRow)
@@ -281,13 +281,18 @@ class ErasureRepository(ScopedRepository):
         link, so those are found by their text.
         """
         text = func.lower(sql_cast(ProviderCallRow.response, String))
+        said = func.lower(sql_cast(ProviderCallRow.detail, String))  # what the call asked and got
         matches: Any = ProviderCallRow.contact_id == contact_id
         for needle in needles:
-            matches = matches | text.contains(needle.lower(), autoescape=True)
+            matches = (
+                matches
+                | text.contains(needle.lower(), autoescape=True)
+                | said.contains(needle.lower(), autoescape=True)
+            )
         self._session.execute(
             update(ProviderCallRow)
             .where(ProviderCallRow.workspace_id == self._workspace_id, matches)
-            .values(response=None)
+            .values(response=None, detail=None)
         )
 
     def _scrub_company(self, company_id: str, needles: list[str]) -> None:

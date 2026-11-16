@@ -1,16 +1,14 @@
 /** A guided first setup: the same screens as Settings, one step at a time, in the order a new
  * workspace needs them. Each step's tick comes from the server's setup list, so finishing a
  * step anywhere (here or in Settings) ticks it here. */
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Check } from "lucide-react";
 import { useState } from "react";
-import { client, ok } from "../api/client";
 import { useCurrent } from "../app/session";
-import { Button, Callout, Card, PageHeader, QueryState, buttonClass } from "../components/ui";
+import { Button, Callout, Card, PageHeader, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
 import { useSetup } from "../lib/setup";
-import { CampaignForm } from "./Campaigns";
+import { FirstCampaign } from "./Campaigns";
 import { Mailboxes } from "./Mailboxes";
 import { SenderProfile } from "./Settings";
 
@@ -77,7 +75,7 @@ export function OnboardingPage() {
           <div className="flex items-center justify-between">
             <Button variant="secondary" disabled={index === 0} onClick={() => setChosen(STEPS[index - 1]!.id)}>Back</Button>
             {index < STEPS.length - 1 ? (
-              <Button onClick={() => setChosen(STEPS[index + 1]!.id)}>{doneStep(step.id) ? "Next" : "Skip for now"}</Button>
+              <Button disabled={step.id === "campaign" && !doneStep(step.id)} onClick={() => setChosen(STEPS[index + 1]!.id)}>{doneStep(step.id) ? "Next" : "Skip for now"}</Button>
             ) : (
               <Link to="/" className={buttonClass("secondary")}>Finish</Link>
             )}
@@ -87,10 +85,3 @@ export function OnboardingPage() {
     </>
   );
 }
-
-/** The workspace starts with one empty campaign; this fills it in. */
-function FirstCampaign() {
-  const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
-  return <QueryState query={campaigns}>{(all) => <CampaignForm campaign={all[0]} onSaved={() => void campaigns.refetch()} />}</QueryState>;
-}
-

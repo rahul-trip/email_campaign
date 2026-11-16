@@ -961,6 +961,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/find-email-again": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find Email Again
+         * @description Look again for the email of each lead held on a catch-all address, in one run.
+         */
+        post: operations["find_email_again_api_companies_find_email_again_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/release-policy-holds": {
         parameters: {
             query?: never;
@@ -1993,6 +2013,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/runs/auto-discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auto Discovery
+         * @description Whether the worker will search for new companies by itself, and when, or why not.
+         */
+        get: operations["auto_discovery_api_runs_auto_discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -2142,6 +2182,26 @@ export interface paths {
         patch: operations["update_campaign_api_settings_campaigns__campaign_id__patch"];
         trace?: never;
     };
+    "/api/settings/campaigns/{campaign_id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Campaign
+         * @description Switch this campaign on; the active one is paused and its leads wait.
+         */
+        post: operations["activate_campaign_api_settings_campaigns__campaign_id__activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
         parameters: {
             query?: never;
@@ -2153,6 +2213,23 @@ export interface paths {
         put?: never;
         /** Regenerate Campaign Brief */
         post: operations["regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/campaigns/{campaign_id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Pause Campaign */
+        post: operations["pause_campaign_api_settings_campaigns__campaign_id__pause_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2716,6 +2793,23 @@ export interface components {
             /** Workspace Id */
             workspace_id: string | null;
         };
+        /** AutoDiscoveryOut */
+        AutoDiscoveryOut: {
+            /** Campaign */
+            campaign: string | null;
+            /** Last Search */
+            last_search: string | null;
+            /** Next Search */
+            next_search: string | null;
+            /** Per Day */
+            per_day: number;
+            /** Reason */
+            reason: ("off" | "no_campaign" | "no_credits" | "run_in_progress" | "review_full" | "backlog" | "not_yet") | null;
+            /** Review Limit */
+            review_limit: number;
+            /** Waiting For Review */
+            waiting_for_review: number;
+        };
         /** Body_upload_targets_api_targets_upload_post */
         Body_upload_targets_api_targets_upload_post: {
             /** Campaign Id */
@@ -2731,12 +2825,22 @@ export interface components {
         /** CallOut */
         CallOut: {
             /**
+             * Asked
+             * @default
+             */
+            asked?: string;
+            /**
              * At
              * Format: date-time
              */
             at: string;
             /** Cost Micro Usd */
             cost_micro_usd: number;
+            /**
+             * Got
+             * @default
+             */
+            got?: string;
             /** Operation */
             operation: string;
             /** Outcome */
@@ -2785,6 +2889,12 @@ export interface components {
             name: string;
             /** Research Questions */
             research_questions: string[];
+            /**
+             * Status
+             * @default active
+             * @enum {string}
+             */
+            status?: "active" | "paused" | "archived";
             /** Target Titles */
             target_titles: string[];
             /**
@@ -2872,6 +2982,11 @@ export interface components {
             /** Fit Score */
             fit_score: number | null;
             hold_reason: components["schemas"]["HoldReason"] | null;
+            /**
+             * Hot
+             * @description A fit score above 80: shown with a flame, and never approved automatically.
+             */
+            readonly hot: boolean;
             /** Id */
             id: string;
             /** Last Error */
@@ -3420,6 +3535,20 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** FindEmailAgainIn */
+        FindEmailAgainIn: {
+            /** Company Ids */
+            company_ids: string[];
+        };
+        /** FindEmailAgainOut */
+        FindEmailAgainOut: {
+            /** Asked */
+            asked: number;
+            /** Queued Run Id */
+            queued_run_id: string | null;
+            /** Skipped */
+            skipped: number;
+        };
         /** ForgetIn */
         ForgetIn: {
             /** Email */
@@ -3850,7 +3979,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "join_requested" | "join_approved" | "join_rejected";
+            kind: "join_requested" | "join_approved" | "join_rejected" | "drafts_ready" | "hot_lead" | "needs_attention" | "auto_approved" | "run_finished" | "run_failed" | "discovery_paused" | "account";
             /** Read */
             read: boolean;
             /** Workspace Id */
@@ -4894,6 +5023,11 @@ export interface components {
         /** WaterfallOut */
         WaterfallOut: {
             /**
+             * Asked
+             * @default
+             */
+            asked?: string;
+            /**
              * At
              * Format: date-time
              */
@@ -4902,6 +5036,11 @@ export interface components {
             contact_id: string | null;
             /** Cost Micro Usd */
             cost_micro_usd: number;
+            /**
+             * Got
+             * @default
+             */
+            got?: string;
             /** Latency Ms */
             latency_ms: number | null;
             /** Operation */
@@ -4930,8 +5069,14 @@ export interface components {
          * @description Only the settings an operator may change, each with its real type.
          */
         WorkspaceSettingsIn: {
+            /** Auto Approve Cold */
+            auto_approve_cold?: boolean | null;
             /** Auto Discovery */
             auto_discovery?: boolean | null;
+            /** Auto Discovery Per Day */
+            auto_discovery_per_day?: number | null;
+            /** Auto Discovery Review Limit */
+            auto_discovery_review_limit?: number | null;
             /** Budget Per Prospect Micro Usd */
             budget_per_prospect_micro_usd?: number | null;
             /** Country Policy Enabled */
@@ -6888,6 +7033,39 @@ export interface operations {
             };
         };
     };
+    find_email_again_api_companies_find_email_again_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindEmailAgainIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindEmailAgainOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     release_policy_holds_api_companies_release_policy_holds_post: {
         parameters: {
             query?: never;
@@ -8772,6 +8950,26 @@ export interface operations {
             };
         };
     };
+    auto_discovery_api_runs_auto_discovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AutoDiscoveryOut"];
+                };
+            };
+        };
+    };
     run_api_runs__run_id__get: {
         parameters: {
             query?: never;
@@ -9046,7 +9244,69 @@ export interface operations {
             };
         };
     };
+    activate_campaign_api_settings_campaigns__campaign_id__activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_campaign_api_settings_campaigns__campaign_id__pause_post: {
         parameters: {
             query?: never;
             header?: never;

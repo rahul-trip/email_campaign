@@ -1,4 +1,4 @@
-import { addTarget, expect, leadId, runEngine, signIn, test, unique } from "./helpers";
+import { addTarget, expect, leadId, openCard, runEngine, signIn, test, unique } from "./helpers";
 
 test("targets to review to draft, and an unapproved email is never drafted", async ({ page }) => {
   await signIn(page);
@@ -39,7 +39,10 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
   // 5. The drafted lead's page shows its emails, vendor calls and timeline.
   await page.goto(`/leads/${await leadId(page, approved)}`);
   await expect(page.getByRole("heading", { name: "Vendor calls" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await openCard(page, "Activity");
+  await expect(page.getByText("Draft saved to the mailbox").first()).toBeVisible();
+  await expect(page.getByText("status changed")).toHaveCount(0);
   await expect(page.getByText("edited", { exact: false }).first()).toBeVisible();
 
   // 6. The journey: how it arrived, eight stages as keyboard tabs.
@@ -165,4 +168,18 @@ test("on Review the operator asks for changes, sees them, and approves the rewri
   await expect(page.getByLabel("Changes")).toBeVisible(); // the diff against the engine's text
   await page.getByRole("button", { name: "Approve with my edit" }).click();
   await expect(queue.getByRole("button", { name: new RegExp(domain) })).toHaveCount(0);
+});
+
+test("the bell tells what a run did and where to go", async ({ page }) => {
+  await signIn(page);
+  const domain = unique("bell");
+  await addTarget(page, { website: domain, country: "US" });
+  await runEngine(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: /^Notifications/ }).click();
+  const panel = page.getByRole("dialog", { name: "Notifications" });
+  await expect(panel.getByText(/Your run finished/)).toBeVisible();
+  await expect(panel.getByText(/waiting for review/)).toBeVisible();
+  await panel.getByText(/waiting for review/).click();
+  await expect(page).toHaveURL(/\/review$/);
 });

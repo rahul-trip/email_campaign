@@ -78,6 +78,8 @@ class CallView:
     operation: str
     outcome: str
     cost_micro_usd: int
+    asked: str = ""
+    got: str = ""
 
 
 @dataclass(frozen=True)
@@ -247,7 +249,15 @@ def _calls_between(
         if (start is None or c.created_at > start) and (end is None or c.created_at <= end)
     ]
     return [
-        CallView(c.created_at, c.provider, c.operation, c.outcome.value, c.cost_micro_usd)
+        CallView(
+            c.created_at,
+            c.provider,
+            c.operation,
+            c.outcome.value,
+            c.cost_micro_usd,
+            (c.detail or {}).get("asked", ""),
+            (c.detail or {}).get("got", ""),
+        )
         for c in chosen
     ]
 

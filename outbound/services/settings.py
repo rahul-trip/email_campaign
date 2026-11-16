@@ -67,6 +67,9 @@ SETTING_FIELDS = frozenset(
         "email_min_words",
         "email_max_words",
         "auto_discovery",  # off: the worker never searches for companies on its own
+        "auto_discovery_per_day",  # searches a day, 1 to 6
+        "auto_discovery_review_limit",  # no search while Review holds this many drafts
+        "auto_approve_cold",  # on: emails to cold leads (fit 80 or lower) skip Review
     }
 )
 
@@ -198,6 +201,26 @@ class SettingsService:
                 return updated
         except ValueError as error:
             raise SettingsError(str(error)) from None
+
+    def activate_campaign(self, campaign_id: str) -> Campaign:
+        """Switch a campaign on. The one that was active is paused: its leads wait."""
+        with self._uow(self._workspace_id) as uow:
+            before = uow.campaigns.active()
+            activated = uow.campaigns.activate(campaign_id)
+            self._record_change(
+                uow,
+                "campaign_activated",
+                {"campaign": activated.name, "paused": before.name if before else None},
+            )
+            uow.commit()
+            return activated
+
+    def pause_campaign(self, campaign_id: str) -> Campaign:
+        with self._uow(self._workspace_id) as uow:
+            paused = uow.campaigns.pause(campaign_id)
+            self._record_change(uow, "campaign_paused", {"campaign": paused.name})
+            uow.commit()
+            return paused
 
     def regenerate_brief(self, campaign_id: str) -> Campaign:
         """Draft the campaign's brief again from its description and the sender profile. The

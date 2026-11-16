@@ -4,6 +4,7 @@ import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlo
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { DirectoryCard } from "../components/DirectoryCard";
+import { FitBadge } from "../components/FitBadge";
 import { PolicySkip } from "../components/PolicySkip";
 import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
@@ -31,6 +32,7 @@ import {
 } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
+import { activityDays } from "../lib/activity";
 import { callOutcome, describe, describeHold, emailStatus, leadStatus, messageState } from "../lib/status";
 
 type Company = Schemas["CompanyOut"];
@@ -99,6 +101,12 @@ export function LeadDetailPage() {
   const emailStepFailed = company.status === "failed" && company.failed_stage === "email";
   // The person the email waiting for review (or approved) is written to.
   const liveRecipient = messages.find((m) => m.state === "generated" || m.state === "approved")?.contact_id;
+  // Where the page expects the operator to act on people, the card is open for them.
+  const peopleNeeded = (company.status === "failed" && (company.failed_stage === "contacts" || company.failed_stage === "email")) || (company.status === "held" && hold?.action === "person");
+  const recipientName = contacts.find((c) => c.id === liveRecipient)?.full_name;
+  const pausedCampaign = (campaigns.data ?? []).find((c) => c.id === company.campaign_id && c.status !== "active");
+  const calls = waterfall.data ?? [];
+  const spent = calls.reduce((n, c) => n + c.cost_micro_usd, 0);
 
   return (
     <>
@@ -118,7 +126,10 @@ export function LeadDetailPage() {
               {company.domain} <ExternalLink className="size-3" aria-hidden />
             </a>
             <span className="text-xs">Country {company.country_code ?? "unknown"}</span>
-            <span className="text-xs">Fit {company.fit_score ?? "?"}/100</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              Fit <FitBadge score={company.fit_score} hot={company.hot} />
+              {company.fit_score == null && "?"}
+            </span>
             <span className="text-xs">Priority {company.priority}</span>
             <span className="text-xs">Added {ago(company.created_at)}</span>
           </span>
@@ -200,11 +211,22 @@ export function LeadDetailPage() {
           </Callout>
         )}
         {company.status === "held" && <HoldPanel company={company} onDone={refresh} />}
+        {pausedCampaign && (
+          <Callout tone="attention" title={`Its campaign, ${pausedCampaign.name}, is paused`}>
+            This lead waits where it is until that campaign is switched on again under Campaigns.
+          </Callout>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-5">
-          <Card tour="lead-people" title={`People and addresses (${contacts.length})`} subtitle="In rank order: the first usable person gets the email.">
+          <Card
+            collapsible
+            forceOpen={peopleNeeded}
+            tour="lead-people"
+            title={`People and addresses (${contacts.length})`}
+            subtitle={`${recipientName ? `The email is to ${recipientName}. ` : ""}In rank order: the first usable person gets the email.`}
+          >
             {contacts.length === 0 ? (
               <Empty title="No people yet">Research finds people on the company's site; or add someone you know below.</Empty>
             ) : (
@@ -267,7 +289,7 @@ export function LeadDetailPage() {
 
           <Research company={company} />
 
-          <Card title="Vendor calls" subtitle="Every paid call made for this lead, in order. A cache hit reused a stored answer at no cost.">
+          <Card collapsible title="Vendor calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${usd(spent)} in all. Every paid call made for this lead, in order; a cache hit reused a stored answer at no cost.`}>
             <QueryState query={waterfall}>
               {(steps) =>
                 steps.length === 0 ? (
@@ -279,6 +301,7 @@ export function LeadDetailPage() {
                         <Th>When</Th>
                         <Th>Vendor</Th>
                         <Th>Call</Th>
+                        <Th>What was asked</Th>
                         <Th>Result</Th>
                         <Th className="text-right">Cost</Th>
                       </tr>
@@ -289,8 +312,19 @@ export function LeadDetailPage() {
                           <Td className="whitespace-nowrap text-xs text-muted">{when(step.at)}</Td>
                           <Td className="font-medium">{step.provider}</Td>
                           <Td className="text-xs">{words(step.operation)}</Td>
+                          <Td className="max-w-xs break-words text-xs">
+                            {step.asked ? (
+                              <>
+                                {step.asked}
+                                {step.contact_id && contacts.find((c) => c.id === step.contact_id)?.full_name && <span className="text-muted"> · for {contacts.find((c) => c.id === step.contact_id)?.full_name}</span>}
+                              </>
+                            ) : (
+                              <span className="text-muted">not recorded</span>
+                            )}
+                          </Td>
                           <Td>
                             <StatusBadge status={describe(callOutcome, step.outcome)} />
+                            {step.got && <div className="mt-0.5 text-[11px] text-muted">{step.got}</div>}
                           </Td>
                           <Td className="text-right font-mono text-xs">{usd(step.cost_micro_usd)}</Td>
                         </tr>
@@ -303,7 +337,7 @@ export function LeadDetailPage() {
           </Card>
 
           {changes.length > 0 && (
-            <Card title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
+            <Card collapsible title="Your values kept" subtitle="The engine found a different value for something you set. Yours was kept; this is what it found.">
               <Table>
                 <thead>
                   <tr>
@@ -325,26 +359,13 @@ export function LeadDetailPage() {
             </Card>
           )}
 
-          <Card title="Timeline">
-            <QueryState query={timeline}>
-              {(events) => (
-                <ol className="relative space-y-3 border-l border-line pl-4">
-                  {events.map((e, i) => (
-                    <li key={i} className="relative">
-                      <span className={cx("absolute -left-[21px] top-1 size-2.5 rounded-full border-2 border-surface", e.actor === "operator" ? "bg-primary-container" : "bg-outline")} aria-hidden />
-                      <div className="text-[13px]">
-                        <span className="font-medium">{words(e.type)}</span> <span className="text-xs text-muted">{e.actor === "operator" ? "by you" : `by ${e.actor}`}</span>
-                      </div>
-                      <div className="text-xs text-muted">
-                        {when(e.at)}
-                        {summary(e.data) && ` · ${summary(e.data)}`}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </QueryState>
-          </Card>
+          <Activity
+            events={timeline.data ?? []}
+            pending={timeline.isPending}
+            error={timeline.error}
+            names={Object.fromEntries(contacts.map((c) => [c.id, c.full_name ?? "A person"]))}
+            fit={company.fit_score ?? null}
+          />
         </div>
 
         <div className="flex flex-col gap-5">
@@ -734,6 +755,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   const [consented, setConsented] = useState(false);
   const [basis, setBasis] = useState<Basis>("express");
   const [evidence, setEvidence] = useState("");
+  const hash = useRouterState({ select: (state) => state.location.hash });
   const heldForConsent = company.status === "held" && (company.hold_reason === "consent_required" || company.hold_reason === "entity_unknown");
   // Decided when the person is added: the hold is released by then, so the page no longer says it was held.
   const [doneText, setDoneText] = useState("Person added.");
@@ -767,7 +789,7 @@ function AddPerson({ company, onAdded }: { company: Company; onAdded: () => void
   const needsFullName = name.trim().split(/\s+/).length < 2 && email.trim() === "";
   const ready = name.trim() !== "" && !needsFullName && (!consented || evidence.trim() !== "");
   return (
-    <Card id="add-person" tour="lead-add-person" tone={heldForConsent ? "attention" : undefined} title="Add a person" subtitle={`Someone you know at ${company.name ?? company.domain}. They are tried first when an email is written${heldForConsent ? ", and their consent is what this lead is waiting for" : ""}.`}>
+    <Card id="add-person" collapsible forceOpen={heldForConsent || hash === "add-person"} tour="lead-add-person" tone={heldForConsent ? "attention" : undefined} title="Add a person" subtitle={`Someone you know at ${company.name ?? company.domain}. They are tried first when an email is written${heldForConsent ? ", and their consent is what this lead is waiting for" : ""}.`}>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Name" hint={needsFullName && name.trim() ? "First and last name, or give their work email, so the address can be found." : undefined}>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="First and last name" />
@@ -932,7 +954,12 @@ function Research({ company }: { company: Company }) {
   const empty = !research.summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
   if (empty) return null;
   return (
-    <Card tour="lead-research" title="Research" subtitle={company.updated_at ? `Last updated ${ago(company.updated_at)} (${when(company.updated_at)})` : undefined}>
+    <Card
+      collapsible
+      tour="lead-research"
+      title="Research"
+      subtitle={`${company.fit_score != null ? `Fit ${company.fit_score}/100. ` : ""}${hooks.length + newsItems.length} thing${hooks.length + newsItems.length === 1 ? "" : "s"} worth mentioning${company.updated_at ? `. Last updated ${ago(company.updated_at)}` : ""}`}
+    >
       <div className="space-y-3">
         {(Boolean(research.summary) || sector) && (
           <Section title="What they do">
@@ -1103,7 +1130,7 @@ function DangerZone({ company }: { company: Company }) {
     },
   });
   return (
-    <Card tour="lead-danger" tone="error" title={<span className="text-error">Danger zone</span>}>
+    <Card collapsible tour="lead-danger" tone="error" title={<span className="text-error">Danger zone</span>}>
       <div className="space-y-4 text-[13px]">
         <div>
           <div className="font-medium">Do not contact this company</div>
@@ -1136,9 +1163,51 @@ function DangerZone({ company }: { company: Company }) {
   );
 }
 
-function summary(data: Record<string, unknown>): string {
-  return ["field", "from", "to", "reason", "hold_reason", "error"]
-    .filter((key) => data[key])
-    .map((key) => `${words(key)}: ${words(String(data[key]))}`)
-    .join(", ");
+/** What happened to the lead, as sentences, newest first. Minor events are behind a toggle. */
+function Activity({ events, pending, error, names, fit }: { events: Schemas["TimelineOut"][]; pending: boolean; error: unknown; names: Record<string, string>; fit: number | null }) {
+  const [detailed, setDetailed] = useState(false);
+  const days = activityDays(events, names, fit, detailed);
+  const latest = activityDays(events, names, fit, false)[0]?.lines[0];
+  return (
+    <Card
+      collapsible
+      tour="lead-activity"
+      title="Activity"
+      subtitle={latest ? `${latest.line.text}, ${ago(latest.at)}` : "What has happened to this lead"}
+    >
+      <Problem error={error} />
+      {pending ? (
+        <Skeleton rows={3} />
+      ) : (
+        <>
+          {days.length === 0 && <p className="text-xs text-muted">Nothing has happened yet.</p>}
+          <div className="space-y-4">
+            {days.map((day) => (
+              <section key={day.label}>
+                <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{day.label}</h3>
+                <ol className="relative space-y-2.5 border-l border-line pl-4">
+                  {day.lines.map((row, i) => (
+                    <li key={i} className="relative">
+                      <span className={cx("absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-surface", row.line.tone === "good" ? "bg-good" : row.line.tone === "error" ? "bg-error" : row.line.tone === "attention" ? "bg-attention" : "bg-outline")} aria-hidden />
+                      <div className="text-[13px]">
+                        {row.line.text}
+                        {row.count > 1 && <span className="text-muted"> ×{row.count}</span>}
+                        {row.by && <span className="text-xs text-muted"> · by {row.by}</span>}
+                      </div>
+                      <div className="text-[11px] text-muted" title={when(row.at)}>
+                        {new Date(row.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+          <button type="button" onClick={() => setDetailed(!detailed)} className="mt-3 text-xs font-semibold text-primary hover:underline">
+            {detailed ? "Hide details" : "Show details"}
+          </button>
+        </>
+      )}
+    </Card>
+  );
 }

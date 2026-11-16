@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
+    AutoDiscoveryOut,
     CandidateOut,
     CostOut,
     DiscoverySearchOut,
@@ -46,6 +47,16 @@ def start_run(body: RunIn, svc: Annotated[Services, Depends(services)]) -> RunOu
         skip_directory=body.skip_directory,
     )
     return RunOut.model_validate(svc.runs.queue(request))
+
+
+@router.get(
+    "/runs/auto-discovery",
+    response_model=AutoDiscoveryOut,
+    dependencies=[Depends(require(P.RUNS_READ))],
+)
+def auto_discovery(svc: Annotated[Services, Depends(services)]) -> AutoDiscoveryOut:
+    """Whether the worker will search for new companies by itself, and when, or why not."""
+    return AutoDiscoveryOut.model_validate(svc.discovery.state())
 
 
 @router.get("/runs", response_model=list[RunOut], dependencies=[Depends(require(P.RUNS_READ))])

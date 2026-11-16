@@ -126,7 +126,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `POST /api/targets/upload` | login + CSRF | multipart: `file` (CSV or XLSX, ≤ 2 MB), `campaign_id?`, `preview` (default **true**: checks and saves nothing) | 200 `IntakeOut` | 422 `invalid_request` (too large, unreadable) | `load_rows` → `IntakeService.run` |
 | `GET /api/targets/waiting` | login | — | 200 `list[WaitingRowOut]` | — | `IntakeService.needing_confirmation` |
 | `POST /api/targets/{row_id}/confirm` | login + CSRF | `ConfirmIn {domain}` | 200 `RowOut` | 409 `action_not_allowed` | `IntakeService.confirm` |
-| `PATCH /api/companies/{company_id}` | login + CSRF | `CompanyPatch {row_version, name?, country_code (2 letters)?, priority 1–9?, campaign_id?, …}` | 200 `CompanyOut` | 409 `version_conflict` | `LeadService.update` |
+| `PATCH /api/companies/{company_id}` | login + CSRF | `CompanyPatch {row_version, name?, country_code (2 letters)?, priority 1–9?, campaign_id?, …}` | 200 `CompanyOut` (every `CompanyOut` carries `hot`: the fit score is above 80) | 409 `version_conflict` | `LeadService.update` |
 
 ## Review
 
@@ -145,8 +145,9 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/companies/{company_id}` | login | — | 200 `LeadOut` (company, people with addresses and consents, messages, notes) | — | `LeadService.detail` |
 | `GET /api/companies/{company_id}/journey` | login | — | 200 `JourneyOut` | — | `LeadService.journey` |
 | `GET /api/companies/{company_id}/timeline` | login | — | 200 `list[TimelineOut]` (events) | — | `LeadService.timeline` |
-| `GET /api/companies/{company_id}/waterfall` | login | — | 200 `list[WaterfallOut]` (vendor calls) | — | `LeadService.waterfall` |
+| `GET /api/companies/{company_id}/waterfall` | login | — | 200 `list[WaterfallOut {at, provider, operation, outcome, cost_micro_usd, latency_ms, contact_id, asked, got}]` (vendor calls; `asked` and `got` are empty for calls made before they were kept) | — | `LeadService.waterfall` |
 | `POST /api/companies/{company_id}/retry` | login + CSRF | — | 200 `CompanyOut` | 409 not failed | `LeadService.retry` |
+| `POST /api/companies/find-email-again` | login + CSRF (`leads:write`) | `FindEmailAgainIn {company_ids 1–200}` | 200 `FindEmailAgainOut {queued_run_id \| null, asked, skipped}`: each lead held on a catch-all address has its catch-all people (else the first-ranked one) marked for a fresh search and moves to `contacts_found`; one run is queued for all; other leads are skipped, not refused | 422 empty list | `LeadService.retry_email_for_companies` |
 | `POST /api/companies/{company_id}/release-hold` | login + CSRF | `ReleaseIn {resume_to?}` | 200 `CompanyOut` | 409 not held; no default resume point; a country-rule hold whose cause is unchanged | `LeadService.release_hold` |
 | `POST /api/companies/{company_id}/requalify` | login + CSRF | — | 200 `CompanyOut` | 409 not disqualified | `LeadService.requalify` |
 | `POST /api/companies/{company_id}/policy-skip` | login + CSRF | `PolicySkipIn {from_stage, reason (1–1000)}` | 200 `CompanyOut` | 409 nothing left to check, or the stage is later than where the rule stopped the lead | `LeadService.skip_policy` |
@@ -165,8 +166,9 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 
 | Method and path | Auth | Request | Response | Errors | Calls |
 |---|---|---|---|---|---|
-| `POST /api/runs` | login + CSRF | `RunIn {limit 1–500 (50), only[], mode manual\|discovery\|mixed, discover 1–50 (10), campaign?}` | **202** `RunOut` (queued) | — | `RunService.queue` |
+| `POST /api/runs` | login + CSRF | `RunIn {limit 1–500 (50; the web app no longer sends it), only[], mode manual\|discovery\|mixed, discover 1–50 (10), campaign?}` | **202** `RunOut` (queued) | — | `RunService.queue` |
 | `GET /api/runs` | login | — | 200 `list[RunOut]` (the 20 most recent) | — | `RunService.recent` |
+| `GET /api/runs/auto-discovery` | login (`runs.read`) | — | 200 `AutoDiscoveryOut {reason, campaign, last_search, next_search, per_day, review_limit, waiting_for_review}`; `reason` is null when a search is due, else `off`, `no_campaign`, `no_credits`, `run_in_progress`, `review_full`, `backlog` or `not_yet` | — | `AutoDiscovery.state` |
 | `GET /api/runs/{run_id}` | login | — | 200 `RunOut` (live cost while running) | — | `RunService.get` |
 | `POST /api/runs/{run_id}/cancel` | login + CSRF | — | 200 `RunOut` | — | `RunService.cancel` |
 | `GET /api/runs/{run_id}/searches` | login (`runs.read`) | — | 200 `list[DiscoverySearchOut {query, new_leads, already_leads, source, angle, found, pages[]}]` | 404 | `RunService.searches` |
@@ -185,11 +187,15 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/settings/sender-profile` | login | — | 200 object | — | `SettingsService.sender_profile` |
 | `PUT /api/settings/sender-profile` | login + CSRF | `SenderProfileIn` (known fields only, with length limits; `reviewed_at` ignored, set by the server) | 200 object | 422 `invalid_request` | `SettingsService.update_sender_profile` |
 | `GET /api/settings/workspace` | login | — | 200 object | — | `SettingsService.workspace_settings` |
-| `PUT /api/settings/workspace` | login + CSRF | `WorkspaceSettingsIn {safe_to_send_only?, budget_per_prospect_micro_usd 0–100,000,000 or null?, few_shot_examples 0–20?, timezone?, country_policy_enabled?, footer_enabled?}` | 200 object | 422 `send_enabled` before Phase 5; unknown fields | `SettingsService.update_workspace_settings` |
-| `GET /api/settings/campaigns` | login | — | 200 `list[CampaignOut]` | — | `SettingsService.campaigns` |
+| `PUT /api/settings/workspace` | login + CSRF | `WorkspaceSettingsIn {safe_to_send_only?, budget_per_prospect_micro_usd 0–100,000,000 or null?, few_shot_examples 0–20?, timezone?, country_policy_enabled?, footer_enabled?, auto_discovery?, auto_discovery_per_day 1–6?, auto_discovery_review_limit 1–500?, auto_approve_cold?}` | 200 object | 422 `send_enabled` before Phase 5; unknown fields | `SettingsService.update_workspace_settings` |
+| `GET /api/settings/campaigns` | login | — | 200 `list[CampaignOut]` (each with `status` `active` or `paused`; one is active) | — | `SettingsService.campaigns` |
 | `POST /api/settings/campaigns` | login + CSRF | `CampaignIn {name, target_titles, icp_description?, min_fit_score 0–100 (60), research_questions ≤ 3, cadence_days}` | 201 `CampaignOut` | — | `SettingsService.create_campaign` |
 | `PATCH /api/settings/campaigns/{campaign_id}` | login + CSRF | `CampaignPatch` (`icp_brief` is cleaned by `domain.brief.Brief`) | 200 `CampaignOut` | — | `SettingsService.update_campaign` |
 | `POST /api/settings/campaigns/{campaign_id}/brief/regenerate` | login + CSRF (`campaigns:write`) | — | 200 `CampaignOut` with a new `icp_brief` | 404 no such campaign | `SettingsService.regenerate_brief` |
+| `POST /api/settings/campaigns/{campaign_id}/activate` | login + CSRF (`campaigns:write`) | — | 200 `CampaignOut`: the campaign is the active one and the previous one is paused | 404 | `SettingsService.activate_campaign` |
+| `POST /api/settings/campaigns/{campaign_id}/pause` | login + CSRF (`campaigns:write`) | — | 200 `CampaignOut` (paused) | 404 | `SettingsService.pause_campaign` |
+| `GET /api/me/notifications` | login | — | 200 `NotificationsOut {items[], unread}`: the caller's own notifications, newest first (`kind` is one of `join_requested`, `join_approved`, `join_rejected`, `drafts_ready`, `hot_lead`, `needs_attention`, `auto_approved`, `run_finished`, `run_failed`, `discovery_paused`, `account`; `data` holds the counts, ids and the workspace's `slug` and `workspace_name`) | — | `IdentityService.notifications` |
+| `POST /api/me/notifications/read` | login + CSRF | `ReadIn {id \| null}` (null: all) | 204 | — | `IdentityService.mark_notifications_read` |
 | `GET /api/settings/policies` | login | — | 200 `list[PolicyOut]` | — | `SettingsService.policies` |
 | `PUT /api/settings/policies/{country_code}` | login + CSRF | `PolicyIn {rule, requires_corporate_subscriber, allowed_provenance?, footer_template?, reviewed_by?}` | 200 `PolicyOut` (version bumped on change) | — | `SettingsService.save_policy` |
 | `DELETE /api/settings/policies/{country_code}` | login + CSRF | — | 204 | — | `SettingsService.delete_policy` |

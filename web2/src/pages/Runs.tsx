@@ -21,10 +21,8 @@ const WORKER_SILENT_MS = 45_000;
 export function RunsPage() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<Mode>("manual");
-  const [limit, setLimit] = useState(50);
   const [discover, setDiscover] = useState(10);
-  const [campaign, setCampaign] = useState("");
-  const [skipDirectory, setSkipDirectory] = useState(false);
+    const [skipDirectory, setSkipDirectory] = useState(false);
   const usage = useUsage();
   const canSkip = usage.data?.features.includes("directory_bypass") ?? false;
 
@@ -40,7 +38,7 @@ export function RunsPage() {
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const start = useMutation({
-    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, limit, discover, ...(mode !== "manual" && campaign ? { campaign } : {}), ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
     onSuccess: refresh,
   });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
@@ -53,9 +51,10 @@ export function RunsPage() {
       <PageHeader title="Runs" subtitle="A run moves every company that is due as far as it can go, step by step, and records what it spent." />
 
       <RunStats runs={runs.data ?? []} />
+      <AutoDiscoveryLine />
 
       <Card tour="start-run" title="Start a run" className="mb-5">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
           <Field label="What to run" hint={MODES.find(([m]) => m === mode)?.[2]}>
             <Select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
               {MODES.map(([value, label]) => (
@@ -65,23 +64,13 @@ export function RunsPage() {
               ))}
             </Select>
           </Field>
-          <Field label="Leads per stage" hint="At most this many per step.">
-            <Input type="number" min={1} max={500} value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="w-28" />
-          </Field>
           {mode !== "manual" ? (
             <>
               <Field label="Companies to discover">
                 <Input type="number" min={1} max={50} value={discover} onChange={(e) => setDiscover(Number(e.target.value))} className="w-28" />
               </Field>
               <Field label="Campaign to search for">
-                <Select value={campaign} onChange={(e) => setCampaign(e.target.value)} className="w-48">
-                  <option value="">Default</option>
-                  {(campaigns.data ?? []).map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Select>
+                <div className="flex h-8 items-center text-[13px] font-medium">{(campaigns.data ?? []).find((c) => c.status === "active")?.name ?? "None active"}</div>
               </Field>
             </>
           ) : (
@@ -103,7 +92,7 @@ export function RunsPage() {
             <Play className="size-3.5 fill-current" aria-hidden /> Start run
           </Button>
           <span className="text-xs text-muted">
-            Runs are carried out by the worker process. Budget per prospect: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
+            A run works on up to 50 leads at each step; the rest wait for the next run. Runs are carried out by the worker process. Budget per prospect: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
           </span>
         </div>
         {busy && !queuedTooLong && <p className="mt-2 text-xs text-muted">A run is already queued or running; a new one waits for it.</p>}
@@ -244,6 +233,33 @@ function RunSummary({ run }: { run: Run }) {
         <p className="text-xs text-muted">{run.status === "cancelled" ? "Cancelled before it moved anything." : Object.keys(counts).length ? "Nothing was due, so nothing moved." : "Nothing recorded."}</p>
       ) : null}
       {line && <p className={`text-[11px] ${totals.newLeads === 0 ? "text-attention" : "text-muted"}`}>{line}</p>}
+    </div>
+  );
+}
+
+const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/** Whether the worker searches for new companies by itself, when it next will, or why it is not. */
+function AutoDiscoveryLine() {
+  const state = useQuery({ queryKey: ["auto-discovery"], queryFn: () => ok(client.GET("/api/runs/auto-discovery")), refetchInterval: 30000 });
+  const d = state.data;
+  if (!d) return null;
+  const every = `about every ${Math.round(24 / d.per_day)} hours`;
+  const why: Record<string, string> = {
+    off: "Automatic discovery is switched off (Settings, Limits).",
+    no_campaign: "Automatic discovery waits for an active campaign that says who it is after.",
+    no_credits: "Automatic discovery is paused: no discovery credits are left.",
+    run_in_progress: "A run is in progress; the next search waits for it.",
+    review_full: `Automatic discovery is paused: Review holds ${d.waiting_for_review} drafts. It resumes below ${d.review_limit}.`,
+    backlog: "Automatic discovery waits while the leads already found are being worked on.",
+  };
+  const text = d.reason == null || d.reason === "not_yet" ? `Automatic discovery is on, ${every}.${d.next_search ? ` Next search around ${clock(d.next_search)}.` : " The next search starts on the next pass."}` : why[d.reason];
+  const paused = d.reason !== null && d.reason !== "not_yet" && d.reason !== "run_in_progress";
+  return (
+    <div data-tour="auto-discovery">
+      <Callout tone={paused ? "attention" : "info"} className="mb-5">
+        {text}
+      </Callout>
     </div>
   );
 }

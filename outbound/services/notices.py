@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 from outbound.db.identity import IdentityUnitOfWorkFactory
 from outbound.db.types import utcnow
-from outbound.domain.enums import MembershipRole, UserStatus
+from outbound.domain.enums import MembershipRole, NotificationKind, UserStatus
 from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import OutgoingEmail, TransactionalEmail
@@ -64,6 +64,7 @@ class NoticeService:
                     sent["workspace"] += self._to_admins(
                         ws.id, f"{ws.name}: {label} credits at {level}%", self._ask(text)
                     )
+                    self._bell(ws.id, ws.slug, ws.name, text, f"{step.value}:{level}:{period}")
             if quota.access_until:
                 day = f"{quota.access_until:%Y-%m-%d}"
                 if quota.access_until <= now:
@@ -79,6 +80,7 @@ class NoticeService:
                     sent["workspace"] += self._to_admins(
                         ws.id, f"{ws.name}: {text.split('.')[0].lower()}", self._ask(text)
                     )
+                    self._bell(ws.id, ws.slug, ws.name, text, f"{kind}:{day}")
             sent["workspace"] += self._grants(ws.id, ws.name, now)
         sent["staff"] += self._requests(now) + self._failing_keys(now)
         if any(sent.values()):
@@ -153,6 +155,20 @@ class NoticeService:
             )
             ids.commit()
         return True
+
+    def _bell(self, workspace_id: str, slug: str, name: str, text: str, key: str) -> None:
+        """The same notice in the app's bell, once, for each admin of the workspace."""
+        with self._identity() as ids:
+            for member, user in ids.memberships.members(workspace_id):
+                if member.role is MembershipRole.ADMIN and user.status is UserStatus.ACTIVE:
+                    ids.notifications.upsert_unread(
+                        user.id,
+                        NotificationKind.ACCOUNT,
+                        workspace_id=workspace_id,
+                        data={"slug": slug, "workspace_name": name, "text": text, "key": key},
+                        once=("key", key),
+                    )
+            ids.commit()
 
     def _to_admins(self, workspace_id: str, subject: str, text: str) -> int:
         with self._identity() as ids:

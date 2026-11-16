@@ -386,6 +386,88 @@
         "title": "AuditOut",
         "type": "object"
       },
+      "AutoDiscoveryOut": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "last_search": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Search"
+          },
+          "next_search": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Search"
+          },
+          "per_day": {
+            "title": "Per Day",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "off",
+                  "no_campaign",
+                  "no_credits",
+                  "run_in_progress",
+                  "review_full",
+                  "backlog",
+                  "not_yet"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "review_limit": {
+            "title": "Review Limit",
+            "type": "integer"
+          },
+          "waiting_for_review": {
+            "title": "Waiting For Review",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "reason",
+          "campaign",
+          "last_search",
+          "next_search",
+          "per_day",
+          "review_limit",
+          "waiting_for_review"
+        ],
+        "title": "AutoDiscoveryOut",
+        "type": "object"
+      },
       "Body_upload_targets_api_targets_upload_post": {
         "properties": {
           "campaign_id": {
@@ -418,6 +500,11 @@
       },
       "CallOut": {
         "properties": {
+          "asked": {
+            "default": "",
+            "title": "Asked",
+            "type": "string"
+          },
           "at": {
             "format": "date-time",
             "title": "At",
@@ -426,6 +513,11 @@
           "cost_micro_usd": {
             "title": "Cost Micro Usd",
             "type": "integer"
+          },
+          "got": {
+            "default": "",
+            "title": "Got",
+            "type": "string"
           },
           "operation": {
             "title": "Operation",
@@ -567,6 +659,16 @@
             },
             "title": "Research Questions",
             "type": "array"
+          },
+          "status": {
+            "default": "active",
+            "enum": [
+              "active",
+              "paused",
+              "archived"
+            ],
+            "title": "Status",
+            "type": "string"
           },
           "target_titles": {
             "items": {
@@ -950,6 +1052,12 @@
               }
             ]
           },
+          "hot": {
+            "description": "A fit score above 80: shown with a flame, and never approved automatically.",
+            "readOnly": true,
+            "title": "Hot",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1096,7 +1204,8 @@
           "next_action_at",
           "row_version",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "hot"
         ],
         "title": "CompanyOut",
         "type": "object"
@@ -2685,6 +2794,56 @@
         "title": "FactOut",
         "type": "object"
       },
+      "FindEmailAgainIn": {
+        "additionalProperties": false,
+        "properties": {
+          "company_ids": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Company Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company_ids"
+        ],
+        "title": "FindEmailAgainIn",
+        "type": "object"
+      },
+      "FindEmailAgainOut": {
+        "properties": {
+          "asked": {
+            "title": "Asked",
+            "type": "integer"
+          },
+          "queued_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued Run Id"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued_run_id",
+          "asked",
+          "skipped"
+        ],
+        "title": "FindEmailAgainOut",
+        "type": "object"
+      },
       "ForgetIn": {
         "additionalProperties": false,
         "properties": {
@@ -3977,7 +4136,15 @@
             "enum": [
               "join_requested",
               "join_approved",
-              "join_rejected"
+              "join_rejected",
+              "drafts_ready",
+              "hot_lead",
+              "needs_attention",
+              "auto_approved",
+              "run_finished",
+              "run_failed",
+              "discovery_paused",
+              "account"
             ],
             "title": "Kind",
             "type": "string"
@@ -7339,6 +7506,11 @@
       },
       "WaterfallOut": {
         "properties": {
+          "asked": {
+            "default": "",
+            "title": "Asked",
+            "type": "string"
+          },
           "at": {
             "format": "date-time",
             "title": "At",
@@ -7358,6 +7530,11 @@
           "cost_micro_usd": {
             "title": "Cost Micro Usd",
             "type": "integer"
+          },
+          "got": {
+            "default": "",
+            "title": "Got",
+            "type": "string"
           },
           "latency_ms": {
             "anyOf": [
@@ -7435,6 +7612,17 @@
         "additionalProperties": false,
         "description": "Only the settings an operator may change, each with its real type.",
         "properties": {
+          "auto_approve_cold": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Approve Cold"
+          },
           "auto_discovery": {
             "anyOf": [
               {
@@ -7445,6 +7633,32 @@
               }
             ],
             "title": "Auto Discovery"
+          },
+          "auto_discovery_per_day": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Discovery Per Day"
+          },
+          "auto_discovery_review_limit": {
+            "anyOf": [
+              {
+                "maximum": 500.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Auto Discovery Review Limit"
           },
           "budget_per_prospect_micro_usd": {
             "anyOf": [
@@ -10481,6 +10695,48 @@
         ]
       }
     },
+    "/api/companies/find-email-again": {
+      "post": {
+        "description": "Look again for the email of each lead held on a catch-all address, in one run.",
+        "operationId": "find_email_again_api_companies_find_email_again_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindEmailAgainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindEmailAgainOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find Email Again",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/release-policy-holds": {
       "post": {
         "operationId": "release_policy_holds_api_companies_release_policy_holds_post",
@@ -13014,6 +13270,28 @@
         ]
       }
     },
+    "/api/runs/auto-discovery": {
+      "get": {
+        "description": "Whether the worker will search for new companies by itself, and when, or why not.",
+        "operationId": "auto_discovery_api_runs_auto_discovery_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoDiscoveryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auto Discovery",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/runs/{run_id}": {
       "get": {
         "operationId": "run_api_runs__run_id__get",
@@ -13402,6 +13680,49 @@
         ]
       }
     },
+    "/api/settings/campaigns/{campaign_id}/activate": {
+      "post": {
+        "description": "Switch this campaign on; the active one is paused and its leads wait.",
+        "operationId": "activate_campaign_api_settings_campaigns__campaign_id__activate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Activate Campaign",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/campaigns/{campaign_id}/brief/regenerate": {
       "post": {
         "operationId": "regenerate_campaign_brief_api_settings_campaigns__campaign_id__brief_regenerate_post",
@@ -13439,6 +13760,48 @@
           }
         },
         "summary": "Regenerate Campaign Brief",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/campaigns/{campaign_id}/pause": {
+      "post": {
+        "operationId": "pause_campaign_api_settings_campaigns__campaign_id__pause_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "campaign_id",
+            "required": true,
+            "schema": {
+              "title": "Campaign Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Pause Campaign",
         "tags": [
           "settings"
         ]

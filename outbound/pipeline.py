@@ -16,6 +16,7 @@ from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Workspace
 from outbound.domain.enums import (
+    CampaignStatus,
     CompanyStatus,
     UsageStep,
 )
@@ -57,6 +58,8 @@ from outbound.providers.registry import (
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
 from outbound.runner.tick import Job, Tick
+from outbound.services import defaults
+from outbound.services.autoapprove import AutoApprover
 from outbound.services.discovery import Discoverer, Discovery, domain_resolver
 from outbound.services.inbox import InboxSync
 from outbound.services.intake import IntakeService
@@ -203,6 +206,8 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
         if isinstance(mailboxes, StoredMailboxes):
             jobs.append(MailboxHealth(mailboxes))
 
+    review = ReviewService(uow, workspace_id, writer)
+    jobs.append(AutoApprover(uow, workspace_id, review))
     intake = IntakeService(uow, workspace_id, search)
     # First in the tick: credits that appeared (a new period, a grant) release waiting work
     # before this tick's pipeline looks for it.
@@ -211,7 +216,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),
-        review=ReviewService(uow, workspace_id, writer),
+        review=review,
         runs=RunService(uow, workspace_id),
         intake=intake,
         meter=meter,
@@ -298,10 +303,17 @@ def discover_companies(
     """Find companies that fit the campaign in every source that suits its brief, screen
     them, and add up to ``count`` of the best as discovered targets (``services.discovery``)."""
     with container.uow(workspace_id) as uow:
-        campaign = uow.campaigns.by_name(campaign_name)
+        # "Default" means the workspace's active campaign, whatever it is called.
+        campaign = (
+            uow.campaigns.active() if campaign_name == defaults.DEFAULT_CAMPAIGN_NAME else None
+        ) or uow.campaigns.by_name(campaign_name)
         workspace = uow.workspace()
     if campaign is None:
         raise LookupError(f"no campaign named {campaign_name!r}")
+    if campaign.status is not CampaignStatus.ACTIVE:
+        raise ValueError(
+            f"the {campaign.name!r} campaign is paused: switch it on under Campaigns first"
+        )
     if not (campaign.icp_description or "").strip() and not campaign.icp_brief:
         raise ValueError(
             f"describe the ideal customer on the {campaign_name!r} campaign first: "

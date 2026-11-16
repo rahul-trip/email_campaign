@@ -95,7 +95,7 @@ events          → any row by (entity_type, entity_id)   — the only polymorph
      - `messages`: `subject` and `generated_body` become `[erased]` (they are required columns), while `final_body` and `snippets` become NULL.
      - `inbound_messages`: sender, excerpt and extracted data become NULL.
      - `consents.evidence` and any `notes` about the person (or mentioning their address) become `[erased]`.
-     - `provider_calls.response` becomes NULL for calls about the contact.
+     - `provider_calls.response` and `provider_calls.detail` become NULL for calls about the contact, and for calls whose answer or detail mentions the person.
      - `import_rows.raw` becomes `{"erased": true}` for any row mentioning the address.
      - `events.data` becomes `{"erased": true}` for the contact, their addresses and their messages.
   4. Moves the company to `suppressed` if nobody workable is left and its status allows it.
@@ -137,6 +137,8 @@ CREATE TABLE campaigns (
   UNIQUE (workspace_id, name),
   FOREIGN KEY (workspace_id, mailbox_id) REFERENCES mailboxes (workspace_id, id)
 );
+-- Exactly one active campaign per workspace (migration 0022; 0022 paused all but one where there were several)
+CREATE UNIQUE INDEX uq_campaigns_one_active ON campaigns (workspace_id) WHERE status = 'active';
 
 CREATE TABLE mailboxes (
   address           TEXT NOT NULL,
@@ -254,6 +256,19 @@ CREATE TABLE sessions (                -- a signed-in browser; platform table, n
   user_agent    TEXT,
   data          JSON                  -- OAuth state while connecting a mailbox (Phase 6c)
 );
+
+CREATE TABLE notifications (           -- what a person should see in the app's bell, until read (0017); platform table, no RLS
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL CHECK (kind IN ('join_requested','join_approved','join_rejected',
+                  'drafts_ready','hot_lead','needs_attention','auto_approved','run_finished',
+                  'run_failed','discovery_paused','account')),  -- the last eight added in 0023
+  workspace_id  TEXT REFERENCES workspaces(id),
+  data          JSON NOT NULL,        -- counts and ids for the line; always the workspace's slug and name
+  read_at       TIMESTAMP,
+  created_at    TIMESTAMP NOT NULL    -- moved forward when an unread line of the kind is updated
+);
+CREATE INDEX ix_notifications_user ON notifications (user_id, created_at);
 
 CREATE TABLE audit_log (               -- append-only; platform table, no RLS
   id              TEXT PRIMARY KEY,
@@ -466,7 +481,8 @@ CREATE TABLE provider_calls (     -- append-only
   outcome         TEXT NOT NULL CHECK (outcome IN ('hit','miss','error','cache_hit','blocked_by_cap')),
   response        JSON,            -- normalised; never secrets
   cost_micro_usd  BIGINT NOT NULL DEFAULT 0,
-  latency_ms      INTEGER
+  latency_ms      INTEGER,
+  detail          JSON             -- {"asked": ..., "got": ...} one line each, up to 300 characters (0021); NULL on older rows. May name a person or address: erased with `response`
 );
 CREATE INDEX ix_provider_calls_cache ON provider_calls (workspace_id, provider, operation, request_hash, created_at);
 CREATE INDEX ix_provider_calls_spend ON provider_calls (workspace_id, created_at);
@@ -667,4 +683,4 @@ Migrations 0006–0009 (Phase 6a) are described above: the run heartbeat and loc
 | `import_batches.filename` | For webhook batches, `webhook:{event_id}`; a second request with the same event id is answered as a duplicate and creates nothing |
 | `runs.status` | `queued` (made by the API), `running` (claimed by the worker), then `succeeded`, `failed` or `cancelled`. A run cancelled while running stays `cancelled` when it finishes. `runs.counts` is `{stage: {outcome: n}}`, or `{"error": ...}` for a run that failed outright |
 | `mailboxes.dns_check` | `{domain, ok, spf, dkim, dmarc}`, each check `{name, ok, detail, record}` |
-| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_micro_usd`, `few_shot_examples`, `timezone`. `send_enabled` cannot be switched on before Phase 5. The webhook secret is not stored here: it is the environment setting `INTAKE_WEBHOOK_SECRET` |
+| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_micro_usd`, `few_shot_examples`, `timezone`, `auto_discovery`, `auto_discovery_per_day` (1–6, default 4), `auto_discovery_review_limit` (default 50) and `auto_approve_cold` (default false). `send_enabled` cannot be switched on before Phase 5. The webhook secret is not stored here: it is the environment setting `INTAKE_WEBHOOK_SECRET` |

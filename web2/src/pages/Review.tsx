@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import { diffWords } from "diff";
-import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Keyboard, RotateCcw, Wand2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Flame, Keyboard, RotateCcw, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
+import { FitBadge } from "../components/FitBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Callout, Card, Checkbox, Dialog, Empty, Field, Input, Label, PageHeader, Problem, Skeleton, Textarea } from "../components/ui";
 import { cx } from "../lib/cx";
@@ -43,7 +44,8 @@ export function ReviewPage() {
   const { message } = useSearch({ from: "/review" });
   const [selected, setSelected] = useState<string | null>(message ?? null);
   const [showKeys, setShowKeys] = useState(false);
-  const items = queue.data ?? [];
+  // Hot leads first, so the emails that always need you are not buried; the rest keep their order.
+  const items = [...(queue.data ?? [])].sort((a, b) => Number(b.company.hot) - Number(a.company.hot));
   const index = Math.max(0, items.findIndex((item) => item.message.id === selected));
   const current = items[index] as Item | undefined;
 
@@ -160,7 +162,10 @@ function Queue({ items, current, onPick }: { items: Item[]; current: string; onP
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[13px] font-semibold">{item.company.name ?? item.company.domain}</span>
+                  <span className="truncate text-[13px] font-semibold">
+                    {item.company.hot && <Flame className="mr-1 inline size-3.5 text-attention" aria-label="Hot lead" />}
+                    {item.company.name ?? item.company.domain}
+                  </span>
                   {item.company.country_code && <span className="font-mono text-[10px] text-muted">{item.company.country_code}</span>}
                 </div>
                 <div className="mt-0.5 truncate text-xs">{item.contact.full_name ?? "Name unknown"}</div>
@@ -453,9 +458,9 @@ function Context({
       <Card title="Why this lead">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{company.name ?? company.domain}</span>
-          <span className={cx("rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold", (company.fit_score ?? 0) >= 70 ? "bg-good-container text-on-good-container" : "bg-surface-container")}>
-            fit {company.fit_score ?? "?"}/100
-          </span>
+          <span className="text-xs text-muted">Fit</span>
+          <FitBadge score={company.fit_score} hot={company.hot} />
+          {company.fit_score == null && <span className="text-xs text-muted">not scored</span>}
         </div>
         {company.fit_reason && <p className="mt-1 text-xs text-muted">{company.fit_reason}</p>}
         {Boolean(research.summary) && <p className="mt-2 text-[13px] leading-relaxed">{String(research.summary)}</p>}

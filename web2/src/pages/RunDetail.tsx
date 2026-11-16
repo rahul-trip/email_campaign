@@ -20,6 +20,8 @@ const OUTCOME: Record<string, { label: string; tone: string }> = {
   deferred: { label: "Will retry", tone: "bg-surface-container text-muted" },
 };
 const ORDER = ["failed", "held", "deferred", "moved"];
+// Settings of the run that mean nothing to a reader of its page.
+const HIDDEN_PARAMS = new Set(["limit", "only", "automatic"]);
 
 /** One run: what it was asked to do, and every lead it moved, held, failed or put off. */
 export function RunDetailPage() {
@@ -105,7 +107,7 @@ export function RunDetailPage() {
         </Callout>
       )}
 
-      <Card tour="run-summary" title="Step by step" subtitle={Object.keys(params).length ? `Asked for: ${Object.entries(params).map(([k, v]) => `${words(k)} ${Array.isArray(v) ? v.join(", ") || "all" : String(v)}`).join(" · ")}` : "Every step, over all the work that was due."} className="mb-5">
+      <Card tour="run-summary" title="Step by step" subtitle={Object.keys(params).filter((k) => !HIDDEN_PARAMS.has(k)).length ? `Asked for: ${Object.entries(params).filter(([k]) => !HIDDEN_PARAMS.has(k)).map(([k, v]) => `${words(k)} ${Array.isArray(v) ? v.join(", ") || "all" : String(v)}`).join(" · ")}` : "Every step, over all the work that was due."} className="mb-5">
         {stageRows.length === 0 ? (
           <p className="text-xs text-muted">{live ? "No step has finished yet." : "Nothing was due, so no step had anything to do."}</p>
         ) : (
@@ -138,7 +140,7 @@ export function RunDetailPage() {
       </Card>
 
       {(searches.data?.length ?? 0) > 0 && (
-        <Card tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
+        <Card collapsible tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
           <ul className="divide-y divide-line text-[13px]">
             {searches.data!.map((q, i) => (
               <li key={i} className="py-1.5">
@@ -170,7 +172,7 @@ export function RunDetailPage() {
       )}
 
       {(candidates.data?.length ?? 0) > 0 && (
-        <Card tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
+        <Card collapsible tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
           <Table>
             <thead>
               <tr>
@@ -190,7 +192,7 @@ export function RunDetailPage() {
         </Card>
       )}
 
-      <Card tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
+      <Card collapsible tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
         <QueryState query={calls}>
           {(rows) =>
             rows.length === 0 ? (

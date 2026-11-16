@@ -7,12 +7,20 @@ from datetime import datetime
 
 from sqlalchemy import ColumnElement, case, func, select
 
-from outbound.db.models import CompanyRow, DiscoveryCandidateRow, MessageRow, ProviderCallRow
+from outbound.db.models import (
+    CompanyRow,
+    DiscoveryCandidateRow,
+    EventRow,
+    MessageRow,
+    ProviderCallRow,
+)
 from outbound.db.repositories.base import ScopedRepository
+from outbound.domain.actors import AUTO
 from outbound.domain.enums import (
     CallOutcome,
     CandidateVerdict,
     CompanyStatus,
+    EntityType,
     HoldReason,
     MessageState,
 )
@@ -99,15 +107,30 @@ class ReportRepository(ScopedRepository):
         return [ErrorRow(p, int(n), int(e or 0)) for p, n, e in self._session.execute(stmt)]
 
     def touch_one(self) -> TouchOneStats:
-        stmt = select(MessageRow.state, MessageRow.edit_distance, MessageRow.lint_report).where(
+        # An email the engine approved by itself was never chosen by a person, so it says
+        # nothing about whether people accept what is written: left out of "sent unedited".
+        automatic = set(
+            self._session.scalars(
+                select(EventRow.entity_id).where(
+                    EventRow.workspace_id == self._workspace_id,
+                    EventRow.entity_type == EntityType.MESSAGE,
+                    EventRow.actor == AUTO,
+                )
+            )
+        )
+        stmt = select(
+            MessageRow.id, MessageRow.state, MessageRow.edit_distance, MessageRow.lint_report
+        ).where(
             MessageRow.workspace_id == self._workspace_id,
             MessageRow.step == 0,
             MessageRow.state != MessageState.CANCELLED,
         )
         written = flagged = sent = unedited = 0
-        for state, distance, lint_report in self._session.execute(stmt):
+        for message_id, state, distance, lint_report in self._session.execute(stmt):
             written += 1
             flagged += bool((lint_report or {}).get("flagged"))
+            if message_id in automatic:
+                continue
             if state in (MessageState.SENT, MessageState.BOUNCED):
                 sent += 1
                 unedited += distance == 0

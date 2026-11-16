@@ -122,3 +122,9 @@ def test_must_haves_a_person_wrote_replace_the_implied_ones() -> None:
 
 def test_a_brief_with_nothing_to_judge_by_still_scores_60() -> None:
     assert qualify(Brief(), {}).score == 60
+
+
+def test_a_lead_is_hot_only_above_eighty() -> None:
+    from outbound.domain.qualification import is_hot
+
+    assert [is_hot(s) for s in (None, 0, 80, 81, 100)] == [False, False, False, True, True]

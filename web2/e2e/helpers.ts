@@ -73,3 +73,9 @@ export async function leadId(page: Page, domain: string): Promise<string> {
   const found = await (await page.request.get(`/api/companies?q=${encodeURIComponent(domain)}`)).json();
   return found.items[0].id;
 }
+
+/** Open a collapsible card by its title, unless it is already open. */
+export async function openCard(page: Page, title: string) {
+  const header = page.getByRole("button", { name: new RegExp(`^${title}`) }).first();
+  if ((await header.getAttribute("aria-expanded")) === "false") await header.click();
+}

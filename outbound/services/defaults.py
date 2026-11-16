@@ -58,4 +58,9 @@ def default_workspace_settings() -> dict[str, Any]:
         "email_min_words": 120,  # the first email's length, set under Settings → Limits
         "email_max_words": 200,
         "auto_discovery": True,  # the worker searches for a campaign's customers once a day
+        # Off: every email waits for a person. On: a cold lead's email (fit 80 or lower) is
+        # approved, and saved as a draft, without one. Nothing is ever sent by the engine.
+        "auto_approve_cold": False,
+        "auto_discovery_per_day": 4,  # searches a day (about every six hours)
+        "auto_discovery_review_limit": 50,  # none while this many drafts wait in Review
     }

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, GitFork, Plus, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
+import { FitBadge } from "../components/FitBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, Card, Empty, PageHeader, Problem, Select, Skeleton, Table, Td, Th, buttonClass } from "../components/ui";
 import { cx } from "../lib/cx";
@@ -163,13 +164,7 @@ export function LeadsPage() {
                     </Td>
                     <Td className="text-center font-mono text-xs text-muted">{company.country_code ?? "–"}</Td>
                     <Td className="text-center">
-                      {company.fit_score != null ? (
-                        <span className={cx("rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold", company.fit_score >= 70 ? "bg-good-container text-on-good-container" : "bg-surface-container text-muted")}>
-                          {company.fit_score}
-                        </span>
-                      ) : (
-                        <span className="text-muted">–</span>
-                      )}
+                      {company.fit_score != null ? <FitBadge score={company.fit_score} hot={company.hot} /> : <span className="text-muted">–</span>}
                     </Td>
                     <Td className="hidden text-center font-mono text-xs md:table-cell">{company.priority}</Td>
                     <Td className="hidden whitespace-nowrap text-xs text-muted xl:table-cell">

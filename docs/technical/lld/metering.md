@@ -18,7 +18,7 @@ The meter stands between every stage and every paid vendor. Before a call it ans
 
 - Cache vendor answers by request, per workspace, with a time-to-live (TTL) for each kind of call.
 - Check the monthly cap per provider and the per-prospect ceiling *before* a call.
-- Write one `provider_calls` row for every call, cache hit, error and refusal, each committed in its own transaction.
+- Write one `provider_calls` row for every call, cache hit, error and refusal, each committed in its own transaction. Each row also keeps `detail`: one line of what was asked and one of what came back, supplied by the wrapper (`Meter.call(asked=, got=)`): a search's text and result count, the pages read, "Jane Doe at acme.com", an address and its status, a model and the start of its instruction. A cache hit, a refusal by a cap and an error carry it too (an error's second line is the vendor's message, which never holds a key).
 - Attribute every row to the current run, company and contact.
 
 **Not its job:**
@@ -142,7 +142,7 @@ The `provider_calls` table is the cost ledger behind the reports, the lead's ven
 
 ## Security and privacy
 
-`provider_calls.response` stores the vendor's answer, which can contain names and addresses. It is blanked by forget and delete ([data lifecycle](../data/data-lifecycle.md)), but there is no retention purge yet ([R-07](../tech-debt-and-risks.md#r-07--p1--data-no-backups-no-retention-unsalted-suppression-hashes-a6-e3)). Requests are stored only as a hash.
+`provider_calls.response` stores the vendor's answer, and `provider_calls.detail` the words of what was asked and got; both can contain names and addresses. Both are blanked by forget and delete (forget also matches calls whose `detail` mentions the person) ([data lifecycle](../data/data-lifecycle.md)), but there is no retention purge yet ([R-07](../tech-debt-and-risks.md#r-07--p1--data-no-backups-no-retention-unsalted-suppression-hashes-a6-e3)). Requests are stored only as a hash.
 
 ## Tests
 

@@ -231,6 +231,7 @@ class ProviderCallRepository(ScopedRepository):
         run_id: str | None = None,
         company_id: str | None = None,
         contact_id: str | None = None,
+        detail: dict[str, Any] | None = None,
     ) -> str:
         row = ProviderCallRow(
             workspace_id=self._workspace_id,
@@ -244,6 +245,7 @@ class ProviderCallRepository(ScopedRepository):
             run_id=run_id,
             company_id=company_id,
             contact_id=contact_id,
+            detail=detail,
         )
         self._session.add(row)
         self._session.flush()

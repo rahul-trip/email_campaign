@@ -29,6 +29,12 @@ NO_MUST_HAVES = 60
 SIGNAL_POINTS = 10
 MAX_SIGNAL_POINTS = 20
 MAX_TEXT = 300
+HOT_ABOVE = 80  # a fit score above this is a hot lead; 80 itself and below is cold
+
+
+def is_hot(score: int | None) -> bool:
+    """A hot lead scores above 80. A lead with no score yet is neither hot nor cold."""
+    return score is not None and score > HOT_ABOVE
 
 
 class Verdict(StrEnum):
