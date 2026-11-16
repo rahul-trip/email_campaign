@@ -1,4 +1,4 @@
-import { addTarget, expect, leadId, runEngine, signIn, test, unique } from "./helpers";
+import { addTarget, expect, leadId, openCard, runEngine, signIn, test, unique } from "./helpers";
 
 test("targets to review to draft, and an unapproved email is never drafted", async ({ page }) => {
   await signIn(page);
@@ -39,7 +39,10 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
   // 5. The drafted lead's page shows its emails, vendor calls and timeline.
   await page.goto(`/leads/${await leadId(page, approved)}`);
   await expect(page.getByRole("heading", { name: "Vendor calls" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Timeline" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await openCard(page, "Activity");
+  await expect(page.getByText("Draft saved to the mailbox").first()).toBeVisible();
+  await expect(page.getByText("status changed")).toHaveCount(0);
   await expect(page.getByText("edited", { exact: false }).first()).toBeVisible();
 
   // 6. The journey: how it arrived, eight stages as keyboard tabs.

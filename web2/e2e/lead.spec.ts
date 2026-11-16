@@ -24,8 +24,8 @@ test("a lead held for consent is released by adding a person who consented", asy
   await card.getByRole("button", { name: "Add person and release the hold" }).click();
   await expect(page.getByText("Added, and the hold is released.")).toBeVisible();
   await expect(page.getByText("Held: Consent required")).toHaveCount(0);
-  await openCard(page, "Timeline");
-  await expect(page.getByText("consent recorded")).toBeVisible();
+  await openCard(page, "Activity");
+  await expect(page.getByText("Consent recorded")).toBeVisible();
 });
 
 test("edit a lead; delete needs the typed domain and removes it", async ({ page }) => {

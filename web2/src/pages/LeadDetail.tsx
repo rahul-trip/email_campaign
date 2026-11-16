@@ -31,6 +31,7 @@ import {
 } from "../components/ui";
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
+import { activityDays } from "../lib/activity";
 import { callOutcome, describe, describeHold, emailStatus, leadStatus, messageState } from "../lib/status";
 
 type Company = Schemas["CompanyOut"];
@@ -348,26 +349,13 @@ export function LeadDetailPage() {
             </Card>
           )}
 
-          <Card collapsible title="Timeline" subtitle={`${timeline.data?.length ?? 0} events`}>
-            <QueryState query={timeline}>
-              {(events) => (
-                <ol className="relative space-y-3 border-l border-line pl-4">
-                  {events.map((e, i) => (
-                    <li key={i} className="relative">
-                      <span className={cx("absolute -left-[21px] top-1 size-2.5 rounded-full border-2 border-surface", e.actor === "operator" ? "bg-primary-container" : "bg-outline")} aria-hidden />
-                      <div className="text-[13px]">
-                        <span className="font-medium">{words(e.type)}</span> <span className="text-xs text-muted">{e.actor === "operator" ? "by you" : `by ${e.actor}`}</span>
-                      </div>
-                      <div className="text-xs text-muted">
-                        {when(e.at)}
-                        {summary(e.data) && ` · ${summary(e.data)}`}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </QueryState>
-          </Card>
+          <Activity
+            events={timeline.data ?? []}
+            pending={timeline.isPending}
+            error={timeline.error}
+            names={Object.fromEntries(contacts.map((c) => [c.id, c.full_name ?? "A person"]))}
+            fit={company.fit_score ?? null}
+          />
         </div>
 
         <div className="flex flex-col gap-5">
@@ -1165,9 +1153,51 @@ function DangerZone({ company }: { company: Company }) {
   );
 }
 
-function summary(data: Record<string, unknown>): string {
-  return ["field", "from", "to", "reason", "hold_reason", "error"]
-    .filter((key) => data[key])
-    .map((key) => `${words(key)}: ${words(String(data[key]))}`)
-    .join(", ");
+/** What happened to the lead, as sentences, newest first. Minor events are behind a toggle. */
+function Activity({ events, pending, error, names, fit }: { events: Schemas["TimelineOut"][]; pending: boolean; error: unknown; names: Record<string, string>; fit: number | null }) {
+  const [detailed, setDetailed] = useState(false);
+  const days = activityDays(events, names, fit, detailed);
+  const latest = activityDays(events, names, fit, false)[0]?.lines[0];
+  return (
+    <Card
+      collapsible
+      tour="lead-activity"
+      title="Activity"
+      subtitle={latest ? `${latest.line.text}, ${ago(latest.at)}` : "What has happened to this lead"}
+    >
+      <Problem error={error} />
+      {pending ? (
+        <Skeleton rows={3} />
+      ) : (
+        <>
+          {days.length === 0 && <p className="text-xs text-muted">Nothing has happened yet.</p>}
+          <div className="space-y-4">
+            {days.map((day) => (
+              <section key={day.label}>
+                <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{day.label}</h3>
+                <ol className="relative space-y-2.5 border-l border-line pl-4">
+                  {day.lines.map((row, i) => (
+                    <li key={i} className="relative">
+                      <span className={cx("absolute -left-[21px] top-1.5 size-2.5 rounded-full border-2 border-surface", row.line.tone === "good" ? "bg-good" : row.line.tone === "error" ? "bg-error" : row.line.tone === "attention" ? "bg-attention" : "bg-outline")} aria-hidden />
+                      <div className="text-[13px]">
+                        {row.line.text}
+                        {row.count > 1 && <span className="text-muted"> ×{row.count}</span>}
+                        {row.by && <span className="text-xs text-muted"> · by {row.by}</span>}
+                      </div>
+                      <div className="text-[11px] text-muted" title={when(row.at)}>
+                        {new Date(row.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+          <button type="button" onClick={() => setDetailed(!detailed)} className="mt-3 text-xs font-semibold text-primary hover:underline">
+            {detailed ? "Hide details" : "Show details"}
+          </button>
+        </>
+      )}
+    </Card>
+  );
 }
