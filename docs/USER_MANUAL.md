@@ -380,6 +380,32 @@ Automatic sending cannot be switched on in this version.
 
 ---
 
+## 5a. The new app (web3, being tried out)
+
+A redesigned app does everything the current one does, on the same data. It is switched on by
+whoever runs the service (`WEB_APP=web3`); the addresses are the same, so bookmarks keep working.
+What is different:
+
+- **Today** replaces the Dashboard: how many drafts wait and how long the oldest has waited, what
+  you reviewed today (and your streak), when discovery next runs, the week's approved drafts,
+  leads and spend against last week, and folding sections for what needs you, the pipeline, the
+  active campaign with its fit scores, where good leads come from, and what happened.
+- **Every page section folds.** The first is open; the rest show a one-line summary.
+  *Expand all* and *Collapse all* sit above them, and your choice is remembered in this browser.
+- **⌘K (Ctrl+K)** opens a search box anywhere: type part of a company's name or website to open
+  it, or a page's name to go there.
+- **Review** shows the email as it will be drafted, with the action bar always in view and
+  *Ctrl+Enter* to approve. "Why this lead" lists each must-have, signal and rule-out with its
+  evidence.
+- **Leads** has saved views (Hot, Waiting review, On hold…), filters for fit, source and country,
+  sorting, and shows each lead's contact, address status and spend.
+- **A lead's Journey** is a tab on the lead's page, next to *Overview* and *Activity*.
+- **Discovery runs**: *Start a run now* opens a panel showing what will run, how many companies to
+  find (10, 25 or 50), which sources suit your brief and how often their leads passed recently.
+- **Setting up** opens with a short welcome, then five steps with your progress at the top, and
+  ends with what happens next.
+- **Light, dark or system** theme, from your account menu.
+
 ## 6. What happens to a company, step by step
 
 | # | Step | What it does | Where it can stop |

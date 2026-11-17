@@ -137,4 +137,5 @@ Done: LinkedIn profile lookups in research ask for five people per search (a lea
 - Read-only API additions for it: lead filters (`min_fit`, `hot`, `source`, `country`), `sort` and `include=summary` on `GET /api/companies`; `GET /api/reports/daily`, `GET /api/reports/fit`, `GET /api/runs/plan`. Tests in `tests/api/test_web3_reads.py`.
 - Route parity with web2 is checked in CI (`npm run check:parity`); all 181 routes are covered.
 - `WEB_APP=web3` serves it; the default stays web2.
-- Still open before the switch: bento layouts for the remaining ported screens, the guided tour and browser tests for web3, the admin console's own header, the audit CSV export, and the user manual.
+- Guided tour and the full browser suite run on web3 (40 tests, in CI). The admin console has its own staff header. The user manual describes web3 (§5a).
+- Still open before the switch: richer layouts for the screens still drawn through `ui/compat.tsx` (Add leads, Campaigns, Reports, Policies, Settings, LinkedIn, admin), a live-data look on the deployed VM, and then `WEB_APP=web3` in Doppler.
