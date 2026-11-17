@@ -22,6 +22,8 @@ from outbound.api.schemas import (
     LinkedInOut,
     MessageOut,
     NoteOut,
+    NotHereIn,
+    PeopleCheckOut,
     PersonIn,
     PersonPatch,
     PolicySkipIn,
@@ -342,6 +344,31 @@ def directory_skip(
 ) -> DirectoryBadgeOut:
     svc.directory.skip(company_id, body.skip)
     return directory_badge(company_id, svc)
+
+
+@router.post(
+    "/contacts/{contact_id}/not-here",
+    response_model=ContactOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def not_here(
+    contact_id: str, body: NotHereIn, svc: Annotated[Services, Depends(services)]
+) -> ContactOut:
+    """Say this person does not work at the lead: kept, greyed out, never written to."""
+    moved = svc.leads.mark_not_here(contact_id, note=body.note)
+    return ContactOut.model_validate(
+        {**moved.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in moved.emails]}
+    )
+
+
+@router.post(
+    "/companies/{company_id}/check-people",
+    response_model=PeopleCheckOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def check_people(company_id: str, svc: Annotated[Services, Depends(services)]) -> PeopleCheckOut:
+    """Look again at who works here: set aside people whose profile says otherwise."""
+    return PeopleCheckOut.model_validate(svc.leads.check_people(company_id).__dict__)
 
 
 @router.post(

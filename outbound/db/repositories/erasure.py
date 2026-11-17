@@ -20,6 +20,7 @@ from outbound.db.models import (
     EventRow,
     ImportRowRow,
     InboundMessageRow,
+    LinkedInMessageRow,
     MessageRow,
     NoteRow,
     ProviderCallRow,
@@ -107,6 +108,11 @@ class ErasureRepository(ScopedRepository):
             update(ConsentRow)
             .where(ConsentRow.workspace_id == ws, ConsentRow.contact_id == contact_id)
             .values(evidence=ERASED)
+        )
+        self._session.execute(  # the drafts name and address the person
+            delete(LinkedInMessageRow).where(
+                LinkedInMessageRow.workspace_id == ws, LinkedInMessageRow.contact_id == contact_id
+            )
         )
         self._scrub_provider_calls(contact_id, needles)
         self._scrub_company(company_id, needles)

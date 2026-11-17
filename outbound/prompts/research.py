@@ -24,30 +24,34 @@ or 'LTIMindtree'; never a page title, headline or slogan; empty if the pages do 
 "news": ["<recent, specific, dated if the text dates it>", ...],
 "hooks": ["<a concrete, specific thing worth mentioning in a first email>", ...],
 "ruled_out": [{{"id": "<a rule's id, e.g. 'D1'>", "evidence": "<the words on the pages that
-show it>"}}, ...]}}
+show it>"}}, ...],
+"people": [{{"name": "<full name>", "title": "<job title>",
+"linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}
+"people" comes only from the "Team pages" block, when there is one: every person it lists who
+works at this company, most senior first. Leave out customers, partners, investors, authors of
+quoted articles and anyone the text does not place at the company. No team pages: an empty
+list.
 "ruled_out" lists only rules you are given under "What rules a company out" that the pages
 clearly show this company meets; when in doubt, leave it out. An empty list is a good answer.
 List every product or service, every recent news item and every hook the text supports; do
 not leave a point out to keep the lists short. A hook must be something only this company
 would have said or done. {_JSON_ONLY}"""
 
-SIGNALS_SYSTEM_PROMPT = f"""\
-You answer a salesperson's research questions about one company, and note hiring and
-technology signals. {_GROUNDED}
+EMPLOYMENT_SYSTEM_PROMPT = f"""\
+You decide whether people found by a public search work at one company. For each numbered
+person you get the headline and snippet of their public profile.
+{_GROUNDED}
 
-Return: {{"answers": {{"<question exactly as asked>": "<short answer, or empty string>"}},
-"hiring": "<what the careers text or search results show about hiring, or empty>",
-"tech": ["<technology or tool the company is shown to use>", ...]}}
+For each person answer one of:
+- "works_here": the text says they work at this company now.
+- "not_here": the text says they work at a different company now, or they are clearly a
+  namesake (a person whose name is the company's name, a page that is not a person, a
+  different company that shares a word with this one).
+- "unsure": the text does not say, or it is out of date. Prefer "unsure" to a guess.
+
+Return: {{"people": [{{"n": <number>, "verdict": "works_here" | "not_here" | "unsure",
+"reason": "<one short sentence quoting what decided it>"}}, ...]}}
 {_JSON_ONLY}"""
-
-PERSONA_SYSTEM_PROMPT = f"""\
-You extract the people listed on a company's team, leadership or about page.
-{_GROUNDED} Only people who work at this company: leave out customers, partners, investors,
-authors of quoted articles and anyone the text does not place at the company.
-
-Return: {{"people": [{{"name": "<full name>", "title": "<job title>",
-"linkedin_url": "<profile URL if the text gives one, else empty>"}}, ...]}}
-Every person the text lists, most senior first. {_JSON_ONLY}"""
 
 NEWS_SYSTEM_PROMPT = f"""\
 You pick the news worth opening a first email to one company with. You are given numbered
@@ -64,6 +68,29 @@ text only>"}}, ...],
 - "market": only results about regulation, tenders, funding, acquisitions or market moves that a
   company like this one would care about. Every one that qualifies, best first.
 - Use only the numbers you were given. Empty lists are a good answer. {_JSON_ONLY}"""
+
+NEWS_SIGNALS_SYSTEM_PROMPT = f"""\
+You do two things for a salesperson about one company, in one reply.
+1. Pick the news worth opening a first email with, from numbered search results in two lists:
+   news about the company itself, and news about its market.
+2. Answer the salesperson's research questions, and note hiring and technology signals, from
+   the company's pages and the search results about hiring and technology.
+{_GROUNDED}
+
+Return: {{"company": [{{"n": <number>, "detail": "<one sentence: what happened, from the result
+text only>"}}, ...],
+"market": [{{"n": <number>, "detail": "<one sentence: what happened>",
+"matters": "<one sentence: why it matters to this company>"}}, ...],
+"answers": {{"<question exactly as asked>": "<short answer, or empty string>"}},
+"hiring": "<what the careers text or search results show about hiring, or empty>",
+"tech": ["<technology or tool the company is shown to use>", ...]}}
+- "company": only results that are about THIS company (it is named, or clearly the subject).
+  Leave out results that merely mention it in a list, and anything that is a press-release
+  boilerplate, a job ad, a stock price or a directory listing. Every one that qualifies, best first.
+- "market": only results about regulation, tenders, funding, acquisitions or market moves that a
+  company like this one would care about. Every one that qualifies, best first.
+- Use only the numbers you were given. Empty lists and empty answers are good answers.
+{_JSON_ONLY}"""
 
 FIT_SYSTEM_PROMPT = f"""\
 You judge how well a company matches a seller's ideal customer, from 0 (no match) to 100
@@ -100,22 +127,14 @@ def untrusted(title: str, body: str) -> str:
     return f"## {title}\n{untrusted_text(body)}\n"
 
 
-def build_site_user_prompt(company: str, domain: str, pages: str, rules: Sequence[str] = ()) -> str:
-    """``rules`` are the brief's disqualifiers as "D1. <text>" lines, if it has any."""
-    ruled = _block("What rules a company out", "\n".join(rules)) if rules else ""
-    return _block("Company", f"{company} ({domain})") + ruled + untrusted("Pages", pages)
-
-
-def build_signals_user_prompt(
-    company: str, questions: Sequence[str], pages: str, search_snippets: str
+def build_site_user_prompt(
+    company: str, domain: str, pages: str, rules: Sequence[str] = (), *, team: str = ""
 ) -> str:
-    asked = "\n".join(f"- {q}" for q in questions)
-    return (
-        _block("Company", company)
-        + _block("Questions", asked)
-        + untrusted("Pages", pages)
-        + untrusted("Search results (hiring, technology)", search_snippets)
-    )
+    """``rules`` are the brief's disqualifiers as "D1. <text>" lines, if it has any; ``team``
+    is the text of the team, leadership and about pages, read for the people on them."""
+    ruled = _block("What rules a company out", "\n".join(rules)) if rules else ""
+    people = untrusted("Team pages", team) if team else ""
+    return _block("Company", f"{company} ({domain})") + ruled + untrusted("Pages", pages) + people
 
 
 def build_news_user_prompt(
@@ -129,8 +148,24 @@ def build_news_user_prompt(
     )
 
 
-def build_persona_user_prompt(company: str, team_text: str) -> str:
-    return _block("Company", company) + untrusted("Team text", team_text)
+def build_news_signals_user_prompt(
+    *,
+    company: str,
+    sector: str,
+    summary: str,
+    company_hits: str,
+    market_hits: str,
+    questions: Sequence[str],
+    pages: str,
+    search_snippets: str,
+) -> str:
+    asked = "\n".join(f"- {q}" for q in questions)
+    return (
+        build_news_user_prompt(company, sector, summary, company_hits, market_hits)
+        + _block("Questions", asked)
+        + untrusted("Pages", pages)
+        + untrusted("Search results (hiring, technology)", search_snippets)
+    )
 
 
 def build_fit_user_prompt(
@@ -167,3 +202,9 @@ def build_qualify_user_prompt(
         + untrusted("Answers to research questions", answers)
         + untrusted("Pages", pages)
     )
+
+
+def build_employment_user_prompt(company: str, domain: str, summary: str, people: str) -> str:
+    return _block(
+        "Company", f"{company} ({domain}): {summary}" if summary else f"{company} ({domain})"
+    ) + untrusted("People", people)

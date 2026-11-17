@@ -115,6 +115,18 @@ Not checked live: nothing here has been deployed or run against the real vendors
 
 Done: a person deletes their own account (Settings → Your account, password required) and a superadmin deletes any account (console → Users). Hard delete; mailboxes disconnected; a sole member's workspace suspended; the last admin of a shared workspace and the last superadmin are refused. No migration. Not checked live: a Google mailbox's grant revocation on delete. Open: no purge of a suspended workspace left behind.
 
+## People placement (2026-11-17, branch `phase-6/people-placement`, migration 0025, R-42)
+
+Done: every person a search finds is placed at the company by rules (`domain/placement.py`) and, for the unsure, one model call per lead; people who work elsewhere are kept as `not_here`, never worked on and not added again; the lead page shows why, can set someone aside or bring them back, and **Check who works here** re-checks a lead's people. Not checked live: the model's verdicts on real profiles; run `check-people` on `quantra-energy-2` after deploy and read the result before trusting it on every lead. Open: no script yet to re-check every lead in a workspace at once.
+
+## LinkedIn messages (2026-11-17, branch `phase-6/people-placement`, migration 0026, R-43)
+
+Done: the contacts step writes a connection note and a follow-up for each confirmed decision-maker with a LinkedIn profile, before any email is looked for; the lead page has a LinkedIn card and the nav a LinkedIn page (copy, edit, rewrite, skip, mark sent); marking one sent holds the lead's email as `linkedin_contacted`, released to the email step, and the email then mentions it. Nothing is sent to LinkedIn. Not checked live: draft quality on real research. Open: setting someone aside as not here does not skip their unsent draft (R-43); the 200-character limit is not a setting.
+
+## Fewer vendor and model calls (2026-11-17, same branch)
+
+Done: LinkedIn profile lookups in research ask for five people per search (a lead with ten people: 2 searches, was 10); **Check who works here** reads profile headlines five people per search (was one each); LinkedIn drafts for a lead's people are one model call (was one per person, up to three), with one more call only for the drafts the checks reject. Related questions now share one model call with one output schema: the site call also returns the people on the team pages (given in their own block with their own length cap, so nothing is cut short or sent twice), and the news call also answers the campaign's questions and the hiring and tech signals. Research makes 3 model calls instead of 5 for a typical lead.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

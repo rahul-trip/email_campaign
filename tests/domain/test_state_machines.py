@@ -12,12 +12,14 @@ from outbound.domain.enums import (
     ContactStatus,
     EmailStatus,
     HoldReason,
+    LinkedInState,
     MessageState,
 )
 from outbound.domain.state_machines import (
     COMPANY,
     CONTACT,
     EMAIL,
+    LINKEDIN,
     MESSAGE,
     STAGE_INPUT_STATUS,
     IllegalTransition,
@@ -45,7 +47,7 @@ EXPECTED_COMPANY: dict[CompanyStatus, set[CompanyStatus]] = {
         C.FAILED,
         C.SUPPRESSED,
     },
-    C.COPY_READY: {C.NEW, C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED},
+    C.COPY_READY: {C.NEW, C.APPROVED, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED},
     C.APPROVED: {C.NEW, C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED},
     C.IN_SEQUENCE: {C.REPLIED, C.COMPLETED, C.CONTACTS_FOUND, C.SUPPRESSED},
     C.FAILED: {
@@ -94,8 +96,9 @@ EXPECTED_EMAIL: dict[EmailStatus, set[EmailStatus]] = {
     E.INVALID: set(),
 }
 EXPECTED_CONTACT: dict[ContactStatus, set[ContactStatus]] = {
-    K.UNCONFIRMED: {K.CANDIDATE, K.ACTIVE, K.OPTED_OUT, K.FORGOTTEN},
-    K.CANDIDATE: {K.ACTIVE, K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN},
+    K.UNCONFIRMED: {K.CANDIDATE, K.ACTIVE, K.NOT_HERE, K.OPTED_OUT, K.FORGOTTEN},
+    K.NOT_HERE: {K.CANDIDATE, K.OPTED_OUT, K.FORGOTTEN},
+    K.CANDIDATE: {K.ACTIVE, K.BOUNCED, K.REFERRED_AWAY, K.NOT_HERE, K.OPTED_OUT, K.FORGOTTEN},
     K.ACTIVE: {K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN},
     K.BOUNCED: {K.OPTED_OUT, K.FORGOTTEN},
     K.REFERRED_AWAY: {K.OPTED_OUT, K.FORGOTTEN},
@@ -103,11 +106,19 @@ EXPECTED_CONTACT: dict[ContactStatus, set[ContactStatus]] = {
     K.FORGOTTEN: set(),
 }
 
+L = LinkedInState
+EXPECTED_LINKEDIN: dict[LinkedInState, set[LinkedInState]] = {
+    L.DRAFTED: {L.SENT, L.SKIPPED},
+    L.SKIPPED: {L.DRAFTED},
+    L.SENT: set(),  # final: what was sent stays sent
+}
+
 MACHINES: list[tuple[StateMachine, dict]] = [  # type: ignore[type-arg]
     (COMPANY, EXPECTED_COMPANY),
     (MESSAGE, EXPECTED_MESSAGE),
     (EMAIL, EXPECTED_EMAIL),
     (CONTACT, EXPECTED_CONTACT),
+    (LINKEDIN, EXPECTED_LINKEDIN),
 ]
 
 
@@ -173,3 +184,14 @@ def test_only_stages_that_can_fail_a_lead_have_a_retry_status() -> None:
 def test_an_unverified_catch_all_cannot_skip_to_sendable_without_resolution() -> None:
     assert not EMAIL.allows(E.CATCH_ALL_UNVERIFIED, E.VALID)
     assert not EMAIL.allows(E.CATCH_ALL_PENDING, E.VALID)
+
+
+def test_a_person_can_be_set_aside_as_not_here_and_confirmed_back() -> None:
+    from outbound.domain.enums import ContactStatus as K
+    from outbound.domain.state_machines import CONTACT
+
+    for before in (K.UNCONFIRMED, K.CANDIDATE):
+        assert CONTACT.allows(before, K.NOT_HERE)
+    assert CONTACT.allows(K.NOT_HERE, K.CANDIDATE)
+    assert not CONTACT.allows(K.NOT_HERE, K.ACTIVE)  # never straight to being written to
+    assert not CONTACT.allows(K.ACTIVE, K.NOT_HERE)  # once active, suppress instead

@@ -36,6 +36,8 @@ import {
 import { cx } from "../lib/cx";
 import { ago, usd, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
+import { isViewing, useCurrent } from "../app/session";
+import { LinkedInDraftCard } from "../components/LinkedInDraft";
 import { callOutcome, describe, describeHold, emailStatus, leadStatus, messageState } from "../lib/status";
 
 type Company = Schemas["CompanyOut"];
@@ -99,6 +101,8 @@ export function LeadDetailPage() {
     );
 
   const { company, contacts, messages, notes } = lead.data;
+  const here = contacts.filter((c) => c.status !== "not_here");
+  const away = contacts.filter((c) => c.status === "not_here");
   const hold = company.hold_reason ? describeHold(company.hold_reason) : null;
   const countryBlocked = (company.policy_decision as { outcome?: string } | null)?.outcome === "block";
   // Only the times the engine tried to overwrite a value you set: yours was kept, theirs is shown.
@@ -240,21 +244,38 @@ export function LeadDetailPage() {
               {contacts.length === 0 ? (
                 <Empty title="No people yet">Research finds people on the company's site; or add someone you know below.</Empty>
               ) : (
-                <ul className="divide-y divide-line">
-                  {contacts.map((contact) => (
-                    <Person
-                      key={contact.id}
-                      contact={contact}
-                      onChanged={refresh}
-                      retryAfterEdit={emailStepFailed}
-                      company={company}
-                      recipient={liveRecipient === contact.id}
-                      writtenTo={messages.some((m) => m.contact_id === contact.id)}
-                    />
-                  ))}
-                </ul>
+                <>
+                  <ul className="divide-y divide-line">
+                    {here.map((contact) => (
+                      <Person
+                        key={contact.id}
+                        contact={contact}
+                        onChanged={refresh}
+                        retryAfterEdit={emailStepFailed}
+                        company={company}
+                        recipient={liveRecipient === contact.id}
+                        writtenTo={messages.some((m) => m.contact_id === contact.id)}
+                      />
+                    ))}
+                  </ul>
+                  {away.length > 0 && (
+                    <details className="mt-3 rounded-lg border border-line" data-tour="lead-people-away">
+                      <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted hover:bg-surface-low">
+                        {away.length} found who work elsewhere (set aside, never written to)
+                      </summary>
+                      <ul className="divide-y divide-line px-3">
+                        {away.map((contact) => (
+                          <Person key={contact.id} contact={contact} onChanged={refresh} retryAfterEdit={false} company={company} recipient={false} writtenTo={false} />
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </>
               )}
+              <CheckPeople company={company} onDone={refresh} />
             </Card>
+
+            <LinkedInCard company={company} contacts={contacts} onChanged={refresh} />
 
             <DirectoryCard companyId={company.id} />
 
@@ -476,6 +497,89 @@ const RECIPIENT_CHANGEABLE = new Set(["contacts_found", "email_ready", "copy_rea
 const EMAIL_RETRY = new Set(["contacts_found", "email_ready", "failed", "held"]);
 const WORKABLE = new Set(["candidate", "active"]);
 
+/** The LinkedIn note and message written for each confirmed person, to paste into LinkedIn by hand. */
+function LinkedInCard({ company, contacts, onChanged }: { company: Company; contacts: Contact[]; onChanged: () => void }) {
+  const { workspace } = useCurrent();
+  const queryClient = useQueryClient();
+  const drafts = useQuery({ queryKey: ["linkedin-lead", company.id], queryFn: () => ok(client.GET("/api/companies/{company_id}/linkedin", { params: { path: { company_id: company.id } } })) });
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ["linkedin-lead", company.id] });
+    void queryClient.invalidateQueries({ queryKey: ["linkedin"] });
+    onChanged();
+  };
+  const write = useMutation({
+    mutationFn: (contactId: string) => ok(client.POST("/api/contacts/{contact_id}/linkedin", { params: { path: { contact_id: contactId } } })),
+    onSuccess: refresh,
+  });
+  const byContact = new Map((drafts.data ?? []).map((d) => [d.contact_id, d]));
+  const person = (id: string) => contacts.find((c) => c.id === id);
+  // Confirmed people with a profile and no message yet: one button each.
+  const unwritten = contacts.filter((c) => WORKABLE.has(c.status) && c.linkedin_url && !byContact.has(c.id));
+  const viewing = isViewing(workspace);
+  const held = company.hold_reason === "linkedin_contacted";
+  return (
+    <Card
+      tour="lead-linkedin"
+      title={`LinkedIn (${drafts.data?.length ?? 0})`}
+      subtitle="A connection note and a first message for each confirmed person, written before their email is found. Copy them into LinkedIn yourself: nothing is sent from here."
+    >
+      {held && (
+        <Callout tone="attention" title="The email waits for you">
+          You messaged someone here on LinkedIn, so the email is on hold. Release the hold above when you want it written as well.
+        </Callout>
+      )}
+      <QueryState query={drafts}>
+        {(rows) => (
+          <div className="space-y-3">
+            {rows.length === 0 && unwritten.length === 0 && (
+              <p className="text-xs text-muted">Nothing yet. A message is written for a confirmed decision-maker who has a LinkedIn profile; use Find LinkedIn on a person, and confirm that they work here, to get one.</p>
+            )}
+            {rows.map((draft) => (
+              <LinkedInDraftCard key={draft.id} draft={draft} person={person(draft.contact_id)?.full_name} profile={person(draft.contact_id)?.linkedin_url} readOnly={viewing} onChanged={refresh} />
+            ))}
+            {!viewing &&
+              unwritten.map((c) => (
+                <div key={c.id} className="flex flex-wrap items-center gap-3 text-xs">
+                  <span className="font-medium">{c.full_name}</span>
+                  <Button size="sm" variant="secondary" busy={write.isPending && write.variables === c.id} onClick={() => write.mutate(c.id)}>
+                    Write LinkedIn message
+                  </Button>
+                </div>
+              ))}
+            <Problem error={write.error} />
+          </div>
+        )}
+      </QueryState>
+    </Card>
+  );
+}
+
+/** Look again at who a search found: one search per person and one model call, then people whose
+ * profile says they work elsewhere are set aside. Nobody you confirmed or wrote to is touched. */
+function CheckPeople({ company, onDone }: { company: Company; onDone: () => void }) {
+  const { workspace } = useCurrent();
+  const check = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/{company_id}/check-people", { params: { path: { company_id: company.id } } })),
+    onSuccess: onDone,
+  });
+  if (isViewing(workspace)) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3" data-tour="lead-check-people">
+      <Button size="sm" variant="secondary" busy={check.isPending} onClick={() => check.mutate()} title="One search per person and one model call: sets aside people whose profile says they work elsewhere">
+        Check who works here
+      </Button>
+      {check.data && (
+        <span className="text-xs text-muted" role="status">
+          {check.data.checked === 0
+            ? "Nobody to check."
+            : `Checked ${check.data.checked}: ${check.data.works_here} work here, ${check.data.not_here} set aside, ${check.data.unsure} still unsure.`}
+        </span>
+      )}
+      <Problem error={check.error} />
+    </div>
+  );
+}
+
 function Person({
   contact,
   onChanged,
@@ -509,6 +613,11 @@ function Person({
     onSuccess: onChanged,
   });
   const unconfirmed = contact.status === "unconfirmed";
+  const notHere = contact.status === "not_here";
+  const markNotHere = useMutation({
+    mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/not-here", { params: { path: { contact_id: contact.id } }, body: { note: "" } })),
+    onSuccess: onChanged,
+  });
   const choose = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/change-recipient", { params: { path: { company_id: companyId } }, body: { contact_id: contact.id } })),
     onSuccess: () => {
@@ -548,11 +657,12 @@ function Person({
             <span className="font-semibold">{contact.full_name ?? "(no name)"}</span>
             {contact.title && <span className="text-xs text-muted">{contact.title}</span>}
             {unconfirmed && (
-              <span className="rounded-full bg-attention-container px-2 py-0.5 text-caption font-medium text-on-attention-container" title="A search found this person, but their profile does not clearly say they work here.">
+              <span className="rounded-full bg-attention-container px-2 py-0.5 text-caption font-medium text-on-attention-container" title={contact.placement_note ?? "A search found this person, but their profile does not clearly say they work here."}>
                 Unconfirmed: check they work here
               </span>
             )}
-            {!unconfirmed && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-caption">{words(contact.status)}</span>}
+            {notHere && <span className="rounded-full bg-surface-container px-2 py-0.5 text-caption font-medium text-muted">Works elsewhere</span>}
+            {!unconfirmed && !notHere && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-container px-1.5 text-caption">{words(contact.status)}</span>}
             {recipient && <span className="rounded-full bg-primary-fixed px-2 py-0.5 text-caption font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url ? (
               <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-caption font-medium text-primary hover:underline">
@@ -578,6 +688,7 @@ function Person({
               </span>
             )}
           </div>
+          {(unconfirmed || notHere) && contact.placement_note && <p className="mt-1 pl-8 text-xs text-muted">{contact.placement_note}</p>}
           <ul className="mt-1.5 space-y-1 pl-8">
             {contact.emails.map((email) => (
               <li key={email.id} className="flex flex-wrap items-center gap-2 text-xs">
@@ -599,9 +710,14 @@ function Person({
         </div>
         {!gone && (
           <div className="flex flex-wrap gap-1">
-            {unconfirmed && (
-              <Button size="sm" busy={confirm.isPending} onClick={() => confirm.mutate()}>
-                Confirm they work here
+            {(unconfirmed || notHere) && (
+              <Button size="sm" variant={notHere ? "secondary" : "primary"} busy={confirm.isPending} onClick={() => confirm.mutate()}>
+                {notHere ? "They do work here" : "Confirm they work here"}
+              </Button>
+            )}
+            {(unconfirmed || WORKABLE.has(contact.status)) && !writtenTo && (
+              <Button variant="ghost" size="sm" busy={markNotHere.isPending} onClick={() => markNotHere.mutate()} title="Keep them on the lead, set aside; they are never written to">
+                Doesn't work here
               </Button>
             )}
             <Button variant="ghost" size="sm" onClick={() => setPanel(panel === "edit" ? null : "edit")}>
@@ -631,7 +747,7 @@ function Person({
           </div>
         )}
       </div>
-      <Problem error={findLinkedin.error ?? retryEmail.error} className="mt-2" />
+      <Problem error={findLinkedin.error ?? retryEmail.error ?? markNotHere.error ?? confirm.error} className="mt-2" />
       {panel === "edit" && (
         <EditPerson
           contact={contact}

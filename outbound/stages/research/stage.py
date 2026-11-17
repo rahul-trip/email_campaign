@@ -8,6 +8,7 @@ from outbound.db.uow import UnitOfWork
 from outbound.domain.brief import Brief
 from outbound.domain.enums import CompanyStatus, ContactSource, ContactStatus, LegalEntityType
 from outbound.domain.names import display_name, same_person
+from outbound.domain.placement import Placement
 from outbound.domain.policies import OPERATOR_CHOSEN
 from outbound.stages.base import StageContext, StageResult
 from outbound.stages.research.graph import (
@@ -78,6 +79,13 @@ class ResearchStage:
         )
 
 
+_STATUS = {
+    Placement.WORKS_HERE: ContactStatus.CANDIDATE,
+    Placement.UNSURE: ContactStatus.UNCONFIRMED,
+    Placement.NOT_HERE: ContactStatus.NOT_HERE,
+}
+
+
 def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -> None:
     known = uow.contacts.for_company(company_id)
     rank = len(known)
@@ -97,5 +105,6 @@ def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -
             last_name=last or None,
             title=person.title or None,
             linkedin_url=person.linkedin_url,
-            status=ContactStatus.CANDIDATE if person.confirmed else ContactStatus.UNCONFIRMED,
+            status=_STATUS[person.placement],
+            placement_note=person.reason or None,
         )

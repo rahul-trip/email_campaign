@@ -45,12 +45,13 @@ class FakeLlm:
 
     ROLES: ClassVar[dict[str, str]] = {
         "read a company's own web pages": "site",
-        "answer a salesperson's research questions": "signals",
-        "extract the people listed": "persona",
+        "You do two things for a salesperson": "news_signals",
+        "decide whether people found by a public search work": "employment",
         "judge how well a company matches": "fit",
         "pick the news worth opening": "news",
         "You revise a cold email exactly": "revise",
         "You write the first email from one person": "actor",
+        "You write two LinkedIn texts": "linkedin",
         "You check a cold email before it goes": "critic",
         "You plan web searches that find companies": "discovery",
         "You write the brief that says which companies": "brief",
@@ -67,6 +68,23 @@ class FakeLlm:
         self.users: dict[str, str] = {}
         self.replies: dict[str, Any] = {
             "discovery": {"queries": ["grid forecasting for wind farm operators in Germany"]},
+            "linkedin": {
+                "drafts": [
+                    {
+                        "n": 1,
+                        "note": "Saw Acme's Leeds contract. I work on forecasting for operators.",
+                        "message": (
+                            "Hi Jane, congratulations on the Leeds grid contract. A three "
+                            "year deal like that will make forecast error expensive quickly, "
+                            "because every extra megawatt hour of imbalance lands on your own "
+                            "balance sheet rather than someone else's. We built Forecaster for "
+                            "exactly that problem and cut error for a comparable operator last "
+                            "year. Would it be useful if I sent over how they did it?"
+                        ),
+                    }
+                ]
+            },
+            "employment": {"people": []},  # nobody is settled: everyone stays unsure
             "website": {"n": 0},  # no website is clearly theirs, unless a test says otherwise
             "brief": {
                 "summary": "Utilities and grid operators that need better load forecasts.",
@@ -139,11 +157,29 @@ class FakeLlm:
         role = next((r for needle, r in self.ROLES.items() if needle in system), "unknown")
         self.calls.append(role)
         self.users[role] = user
-        reply = self.replies[role]
-        if callable(reply):  # a reply that depends on what was asked
-            reply = reply(user)
+        reply = self._reply(role, user)
         text = reply if isinstance(reply, str) else json.dumps(reply)
         return LlmResult(text=text, provider=self.name, model=self.model)
+
+    def _one(self, role: str, user: str) -> Any:
+        reply = self.replies[role]
+        return reply(user) if callable(reply) else reply  # a reply may depend on what was asked
+
+    def _reply(self, role: str, user: str) -> Any:
+        """The combined calls answer with the parts tests set by their old role: the site call
+        brings the ``persona`` people when it was given team pages, and the news call brings
+        the ``signals`` answers."""
+        if role == "site":
+            site = self._one("site", user)
+            if isinstance(site, dict) and "## Team pages" in user and "people" not in site:
+                site = {**site, "people": self._one("persona", user).get("people", [])}
+            return site
+        if role == "news_signals":
+            news, signals = self._one("news", user), self._one("signals", user)
+            if not isinstance(signals, dict):  # a test that breaks the signals reply on purpose
+                return signals
+            return {**news, **signals} if isinstance(news, dict) else news
+        return self._one(role, user)
 
 
 def screen_all(score: int, **by_name: int) -> Callable[[str], dict[str, Any]]:

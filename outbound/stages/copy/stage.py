@@ -7,11 +7,12 @@ from typing import Any
 from outbound.db.repositories.workspaces import MailboxView
 from outbound.db.uow import UnitOfWork
 from outbound.domain.copy_lint import LintRules
-from outbound.domain.entities import Contact, ContactEmail
+from outbound.domain.entities import Contact, ContactEmail, LinkedInMessage
 from outbound.domain.enums import (
     WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     HoldReason,
+    LinkedInState,
     MessageState,
 )
 from outbound.domain.footer import DEFAULT_FOOTER, MissingProfileField, render_footer
@@ -65,6 +66,8 @@ class CopyStage:
                 else None
             )
             notes = "\n".join(n.body for n in uow.notes.for_company(company.id))
+            if chosen:
+                notes = _with_linkedin(notes, uow.linkedin.for_contact(chosen[0].id))
             shots = (
                 uow.messages.edited_examples(company.campaign_id, wanted)
                 if company.campaign_id and wanted
@@ -124,6 +127,18 @@ class CopyStage:
             reason=_summary(output),
             write=lambda uow: _save(uow, company.id, contact, address, output, mailbox_id),
         )
+
+
+def _with_linkedin(notes: str, message: LinkedInMessage | None) -> str:
+    """When the person was already messaged on LinkedIn, the email may say so, not repeat it."""
+    if message is None or message.state is not LinkedInState.SENT or message.sent_at is None:
+        return notes
+    said = (
+        f"The sender already messaged this person on LinkedIn on {message.sent_at:%d %B %Y}"
+        f" (connection note: {message.note}). Do not repeat that; you may refer to it in one"
+        " short clause."
+    )
+    return f"{notes}\n{said}".strip()
 
 
 def _rules(settings: dict[str, Any]) -> LintRules:

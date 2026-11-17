@@ -8,7 +8,7 @@
  */
 
 /** Where a section lives. The two lead pages need a real lead, so the tour opens the newest one. */
-export type Place = "/" | "/onboarding" | "/targets" | "/campaigns" | "/runs" | "/review" | "/attention" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
+export type Place = "/" | "/onboarding" | "/targets" | "/campaigns" | "/runs" | "/review" | "/attention" | "/linkedin" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
 
 export type Step = {
   /** The `data-tour` name of the element to point at; none means a centred message. */
@@ -167,6 +167,18 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "linkedin",
+    title: "LinkedIn",
+    place: "/linkedin",
+    steps: [
+      {
+        target: "linkedin-filter",
+        title: "Messages to paste into LinkedIn",
+        body: "Every connection note and first message written for your confirmed people, newest first, so you can work through them in one sitting: Open their LinkedIn, Copy the note, Copy the message, then Mark sent. To send is what is still waiting; Sent and Skipped keep the record. Marking one sent holds that lead's email until you release it.",
+      },
+    ],
+  },
+  {
     id: "leads",
     title: "Leads",
     place: "/leads",
@@ -223,7 +235,12 @@ export const SECTIONS: Section[] = [
       {
         target: "lead-people",
         title: "People and consent",
-        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. The card starts closed; press its title to open it, and it opens by itself when the lead needs you here. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone.",
+        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. The card starts closed; press its title to open it, and it opens by itself when the lead needs you here. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone. A person whose profile says they work at another company is set aside under \"found who work elsewhere\"; Doesn't work here does the same by hand and They do work here undoes it. Check who works here, under the list, looks again at everyone a search found.",
+      },
+      {
+        target: "lead-linkedin",
+        title: "LinkedIn message",
+        body: "For each confirmed decision-maker with a LinkedIn profile, a connection note (200 characters, the most a free account allows) and a first message to send once they accept, written before their email is found. Copy them into LinkedIn yourself; nothing is sent from here. Edit, Rewrite or Skip them. Mark sent on LinkedIn once you have sent one: the lead's email then waits, so the person is not contacted twice at once, until you release the hold.",
       },
       {
         target: "lead-directory",

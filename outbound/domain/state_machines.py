@@ -14,6 +14,7 @@ from outbound.domain.enums import (
     ContactStatus,
     EmailStatus,
     HoldReason,
+    LinkedInState,
     MessageState,
     PolicyStage,
     RunStatus,
@@ -92,7 +93,7 @@ COMPANY = StateMachine(
             C.FAILED,
             C.SUPPRESSED,
         ),
-        C.COPY_READY: _row(C.NEW, C.APPROVED, C.CONTACTS_FOUND, C.REJECTED, C.SUPPRESSED),
+        C.COPY_READY: _row(C.NEW, C.APPROVED, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
         C.APPROVED: _row(C.NEW, C.IN_SEQUENCE, C.CONTACTS_FOUND, C.HELD, C.REJECTED, C.SUPPRESSED),
         # A bounce or a referral sends the lead back for the next contact.
         C.IN_SEQUENCE: _row(C.REPLIED, C.COMPLETED, C.CONTACTS_FOUND, C.SUPPRESSED),
@@ -121,6 +122,8 @@ _HELD_RESUMES: Mapping[HoldReason, CompanyStatus | None] = {
     HoldReason.COUNTRY_UNKNOWN: C.RESEARCHED,
     HoldReason.ENTITY_UNKNOWN: C.RESEARCHED,
     HoldReason.NEEDS_OPERATOR: None,  # the caller must choose where to resume
+    # The email step reruns from cache at no cost; copy then writes knowing about LinkedIn.
+    HoldReason.LINKEDIN_CONTACTED: C.CONTACTS_FOUND,
 }
 
 
@@ -214,8 +217,12 @@ CONTACT = StateMachine(
     "contact",
     {
         # Confirmed by the operator, or suppressed and forgotten like anyone else.
-        K.UNCONFIRMED: _row(K.CANDIDATE, K.ACTIVE, K.OPTED_OUT, K.FORGOTTEN),
-        K.CANDIDATE: _row(K.ACTIVE, K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN),
+        K.UNCONFIRMED: _row(K.CANDIDATE, K.ACTIVE, K.NOT_HERE, K.OPTED_OUT, K.FORGOTTEN),
+        # Found to work elsewhere; the operator can say they do work here after all.
+        K.NOT_HERE: _row(K.CANDIDATE, K.OPTED_OUT, K.FORGOTTEN),
+        K.CANDIDATE: _row(
+            K.ACTIVE, K.BOUNCED, K.REFERRED_AWAY, K.NOT_HERE, K.OPTED_OUT, K.FORGOTTEN
+        ),
         K.ACTIVE: _row(K.BOUNCED, K.REFERRED_AWAY, K.OPTED_OUT, K.FORGOTTEN),
         K.BOUNCED: _row(K.OPTED_OUT, K.FORGOTTEN),
         K.REFERRED_AWAY: _row(K.OPTED_OUT, K.FORGOTTEN),
@@ -225,6 +232,17 @@ CONTACT = StateMachine(
     ContactStatus,
 )
 
+
+L = LinkedInState
+LINKEDIN = StateMachine(
+    "linkedin_message",
+    {
+        L.DRAFTED: _row(L.SENT, L.SKIPPED),
+        L.SKIPPED: _row(L.DRAFTED),
+        L.SENT: _row(),
+    },
+    LinkedInState,
+)
 
 W = WorkspaceStatus
 WORKSPACE = StateMachine(

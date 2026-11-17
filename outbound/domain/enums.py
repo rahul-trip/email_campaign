@@ -34,6 +34,14 @@ class HoldReason(StrEnum):
     COUNTRY_UNKNOWN = "country_unknown"
     ENTITY_UNKNOWN = "entity_unknown"
     NEEDS_OPERATOR = "needs_operator"
+    # The operator messaged the person on LinkedIn: the email waits until they release it.
+    LINKEDIN_CONTACTED = "linkedin_contacted"
+
+
+class LinkedInState(StrEnum):
+    DRAFTED = "drafted"  # written, waiting for the operator to copy it into LinkedIn
+    SENT = "sent"  # the operator says they sent it (nothing is ever sent from here)
+    SKIPPED = "skipped"  # the operator will not use it
 
 
 class CompanySource(StrEnum):
@@ -53,6 +61,9 @@ class ContactStatus(StrEnum):
     # Found by a public search whose employer could not be confirmed. Never worked on (no paid
     # lookups, no email) until the operator confirms the person works there.
     UNCONFIRMED = "unconfirmed"
+    # A search found them but they work somewhere else (the profile or the operator says so).
+    # Kept so a rerun of research does not add them back; never worked on.
+    NOT_HERE = "not_here"
     CANDIDATE = "candidate"
     ACTIVE = "active"
     BOUNCED = "bounced"
@@ -254,6 +265,7 @@ class EntityType(StrEnum):
     MAILBOX = "mailbox"
     WORKSPACE = "workspace"
     IMPORT_ROW = "import_row"
+    LINKEDIN_MESSAGE = "linkedin_message"
 
 
 class PolicyStage(StrEnum):

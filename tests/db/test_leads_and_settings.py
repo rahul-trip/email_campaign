@@ -6,7 +6,7 @@ import pytest
 
 from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.entities import Company, CountryPolicy
+from outbound.domain.entities import Company, Contact, CountryPolicy
 from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
@@ -566,6 +566,93 @@ def test_a_person_a_search_could_not_place_is_confirmed_by_the_operator(
             if e.type == "status_changed"
         ]
     assert (event.actor, event.data["reason"]) == ("operator", CONFIRMED_WORKS_HERE)
+
+
+def _search_person(
+    factory: UnitOfWorkFactory,
+    ws: str,
+    company_id: str,
+    name: str,
+    slug: str,
+    status: ContactStatus = ContactStatus.UNCONFIRMED,
+) -> Contact:
+    with factory(ws) as uow:
+        person = uow.contacts.add(
+            company_id,
+            rank=1,
+            source=ContactSource.SEARCH,
+            full_name=name,
+            linkedin_url=f"https://www.linkedin.com/in/{slug}",
+            status=status,
+        )
+        uow.commit()
+    return person
+
+
+def test_a_person_can_be_set_aside_as_not_working_here_and_brought_back(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = make(factory, ws, "coval.dev", name="Coval")
+    person = _search_person(factory, ws, company.id, "Kristen Coval", "kristencoval")
+    service = leads(factory, ws)
+    aside = service.mark_not_here(person.id, note="works at AWS")
+    assert (aside.contact.status, aside.contact.placement_note) == (
+        ContactStatus.NOT_HERE,
+        "works at AWS",
+    )
+    back = service.confirm_person(person.id)  # "They do work here"
+    assert (back.contact.status, back.contact.placement_note) == (ContactStatus.CANDIDATE, None)
+
+
+def test_a_person_written_to_cannot_be_set_aside(factory: UnitOfWorkFactory, ws: str) -> None:
+    company, cto, _ = rebase(factory, ws)
+    with factory(ws) as uow:
+        address = uow.emails.for_contact(cto)[0]
+        uow.messages.create(
+            company_id=company.id,
+            contact_id=cto,
+            contact_email_id=address.id,
+            step=0,
+            subject="hello",
+            generated_body="body",
+        )
+        uow.commit()
+    with pytest.raises(LeadError, match="already been written"):
+        leads(factory, ws).mark_not_here(cto)
+
+
+def test_checking_people_sets_aside_the_ones_whose_profile_says_otherwise(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from outbound.providers.ports import SearchHit
+    from tests.stages.fakes import FakeLlm, FakeSearch
+
+    company = make(factory, ws, "volue.com", name="Volue")
+    roth = _search_person(factory, ws, company.id, "Dan Roth", "danielproth")
+    ours = _search_person(
+        factory, ws, company.id, "Ann Roe", "annroe", status=ContactStatus.CANDIDATE
+    )
+    chosen = _search_person(factory, ws, company.id, "Sam Lee", "samlee")
+    service = leads(factory, ws)
+    service.confirm_person(chosen.id)  # the operator vouched for them: never re-judged
+    hits = [
+        SearchHit(
+            url="https://www.linkedin.com/in/danielproth", title="Dan Roth - CTO - G&W Electric"
+        ),
+        SearchHit(
+            url="https://www.linkedin.com/in/annroe", title="Ann Roe - Head of Sales - Volue"
+        ),
+        SearchHit(url="https://www.linkedin.com/in/samlee", title="Sam Lee - CTO - Other Co"),
+    ]
+    search = FakeSearch({}, hits)
+    checker = LeadService(factory, ws, search=search, llm=FakeLlm())
+    result = checker.check_people(company.id)
+    assert len(search.searches) == 1  # both people in one search
+    assert (result.checked, result.works_here, result.not_here) == (2, 1, 1)
+    with factory(ws) as uow:
+        assert uow.contacts.get(roth.id).status is ContactStatus.NOT_HERE
+        assert uow.contacts.get(ours.id).status is ContactStatus.CANDIDATE
+        assert uow.contacts.get(chosen.id).status is ContactStatus.CANDIDATE  # untouched
 
 
 # ------------------------------------------------------------------ settings

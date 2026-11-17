@@ -84,6 +84,7 @@ const routeTree = root.addChildren([
   leads,
   page("/leads/$companyId", lazy(() => import("./pages/LeadDetail"), "LeadDetailPage")),
   page("/leads/$companyId/journey", lazy(() => import("./pages/LeadJourney"), "LeadJourneyPage")),
+  page("/linkedin", lazy(() => import("./pages/LinkedIn"), "LinkedInPage")),
   page("/targets", lazy(() => import("./pages/Targets"), "TargetsPage")),
   page("/runs", lazy(() => import("./pages/Runs"), "RunsPage")),
   page("/runs/$runId", lazy(() => import("./pages/RunDetail"), "RunDetailPage")),
