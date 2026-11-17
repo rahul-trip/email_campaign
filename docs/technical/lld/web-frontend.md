@@ -6,7 +6,9 @@ last_verified: 2026-10-21 (6deda34)
 applies_to: Phase 3b
 ---
 
-# Web frontend (web2)
+# Web frontend (web2, and its successor web3)
+
+> **web3 (2026-11-17, branch `phase-6/web3-redesign`).** A redesigned app in `web3/`, beside web2, over the same API and database. It keeps web2's paths, so links still open. `web3/FEATURE_MAP.md` gives every feature its home and `web3/VERIFICATION.md` checks each mockup element against the API; `npm --prefix web3 run check:parity` (in CI) fails while web3 does not call a route web2 calls. Design system: tokens on `:root` with a warm dark theme (`web3/src/styles.css`), components in `web3/src/ui/` (`core`, `sections` — every section folds, the first open — `overlay`, `viz`, `lead`), and `ui/compat.tsx`, web2's component API drawn with web3's tokens, so ported screens keep their exact behaviour. Rebuilt screens: shell with ⌘K palette and credits meter, day-zero campaign gate, Today, Review, Needs attention, Leads, Lead detail tabs (journey is a tab), full-screen onboarding, and the start-run drawer (uses `GET /api/runs/plan`). `WEB_APP=web3` makes `outbound serve` hand it out.
 
 **Code:** `web2/` · **Layer:** client (talks only to the API) · **Tests:** `web2/e2e/*.spec.ts` (Playwright), `npm run typecheck`
 

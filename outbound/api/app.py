@@ -50,8 +50,13 @@ from outbound.services.directory import DirectoryService, finder_price
 from outbound.services.identity import IdentityService
 from outbound.services.vendors import VendorService
 
-# The built web app.
-WEB_DIST = Path(__file__).resolve().parents[2] / "web2" / "dist"
+# The built web apps; ``WEB_APP`` picks one (web2 until web3 replaces it).
+ROOT = Path(__file__).resolve().parents[2]
+WEB_DIST = ROOT / "web2" / "dist"
+
+
+def web_dist_for(app_name: str) -> Path:
+    return ROOT / app_name / "dist"
 
 
 SECURITY_HEADERS = {
@@ -218,4 +223,4 @@ def create_app_from_container(container: Container) -> FastAPI:
         search=search_or_none(config),
         writer=writer_or_none(config),
     )
-    return create_app(factory)
+    return create_app(factory, web_dist=web_dist_for(config.web_app))
