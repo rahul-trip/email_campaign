@@ -267,3 +267,45 @@ def test_refusals_of_a_replaced_key_no_longer_count(
 
     refused(1, datetime.now(UTC) + timedelta(seconds=1))
     assert vendor(staff.get("/api/admin/vendors").json(), "scrubby")["key_refusals"] == 1
+
+
+def test_a_vendor_takes_up_to_three_keys_and_each_slot_is_managed_on_its_own(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    _, services = app_and_services
+    service = VendorService(services.container.platform, services.container.settings)
+    keys = {slot: f"placeholder-slot-{slot}-key" for slot in (1, 2, 3)}
+    for slot, key in keys.items():
+        out = staff.put(f"/api/admin/vendors/tavily/key?slot={slot}", json={"key": key})
+        assert out.status_code == 200
+    listed = vendor(out.json(), "tavily")["keys"]
+    assert [k["slot"] for k in listed] == [1, 2, 3]
+    assert all(k["key"].endswith(keys[k["slot"]][-4:]) for k in listed)
+    assert all(keys[k["slot"]] not in str(k) for k in listed)  # never in full
+
+    settings, _ = service.effective_settings()
+    assert settings.tavily_api_key.get_secret_value() == keys[1]
+    assert [k.get_secret_value() for k in settings.vendor_key_pools["tavily"]] == list(
+        keys.values()
+    )
+
+    assert (
+        staff.put("/api/admin/vendors/tavily/key?slot=4", json={"key": keys[1]}).status_code == 422
+    )
+    assert staff.post("/api/admin/vendors/tavily/reveal?slot=2").json()["key"] == keys[2]
+
+    out = staff.delete("/api/admin/vendors/tavily/key?slot=2")
+    assert [k["slot"] for k in vendor(out.json(), "tavily")["keys"]] == [1, 3]
+    assert staff.delete("/api/admin/vendors/tavily/key?slot=2").status_code == 422
+    out = staff.post("/api/admin/vendors/tavily/rollback?slot=2")
+    assert [k["slot"] for k in vendor(out.json(), "tavily")["keys"]] == [1, 2, 3]
+    assert audited(services, "vendor_key_removed")
+
+
+def test_one_key_left_means_no_pool(staff: Api, app_and_services: tuple[FastAPI, Services]) -> None:
+    _, services = app_and_services
+    service = VendorService(services.container.platform, services.container.settings)
+    staff.put("/api/admin/vendors/exa/key?slot=2", json={"key": "placeholder-exa-two"})
+    settings, _ = service.effective_settings()
+    assert settings.exa_api_key.get_secret_value() == "placeholder-exa-two"
+    assert "exa" not in settings.vendor_key_pools

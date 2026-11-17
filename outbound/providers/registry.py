@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 import httpx
 from pydantic import SecretStr
@@ -16,6 +17,7 @@ from pydantic import SecretStr
 from outbound.config import Settings
 from outbound.domain.enums import MailboxGateway
 from outbound.domain.errors import ConfigurationError
+from outbound.domain.vendors import BY_CODE
 from outbound.providers import oauth
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
@@ -29,6 +31,7 @@ from outbound.providers.adapters.tavily import TavilySearch
 from outbound.providers.adapters.yc_directory import YcDirectory
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder, ZeroBounceVerifier
 from outbound.providers.errors import ProviderAuthError
+from outbound.providers.keypool import KeyPool, ResolverKeyPool
 from outbound.providers.oauth import OAuthApp
 from outbound.providers.ports import (
     CatchAllResolver,
@@ -95,11 +98,37 @@ _RESOLVERS: dict[str, _Entry[CatchAllResolver]] = {
 }
 
 
+def _pooled[T](
+    code: str, build_one: Callable[[Settings], T], settings: Settings, *, resolver: bool = False
+) -> T:
+    """The vendor's adapter, or, when it has several keys, one per key behind a ``KeyPool``
+    that uses a random one for each call and skips a refused one."""
+    keys = settings.vendor_key_pools.get(code, [])
+    if len(keys) < 2:
+        return build_one(settings)
+    setting = BY_CODE[code].setting
+    members = [build_one(settings.model_copy(update={setting: key})) for key in keys]
+    return cast(T, ResolverKeyPool(members) if resolver else KeyPool(members))
+
+
+def _from_table[T](
+    table: dict[str, _Entry[T]],
+    name: str,
+    entry: _Entry[T],
+    settings: Settings,
+    client: httpx.Client | None,
+) -> T:
+    def one(s: Settings) -> T:
+        return entry.build(s, client)
+
+    return _pooled(name, one, settings, resolver=table is _RESOLVERS)
+
+
 def _configured[T](
     table: dict[str, _Entry[T]], settings: Settings, client: httpx.Client | None
 ) -> dict[str, T]:
     return {
-        name: entry.build(settings, client)
+        name: _from_table(table, name, entry, settings, client)
         for name, entry in table.items()
         if entry.is_configured(settings)
     }
@@ -117,7 +146,7 @@ def _build[T](
             raise ProviderAuthError(
                 name, "not configured: its API key is missing in the environment"
             )
-        built.append(entry.build(settings, client))
+        built.append(_from_table(table, name, entry, settings, client))
     return built
 
 
@@ -163,7 +192,12 @@ def build_llm(
 ) -> LlmClient:
     """The configured chat model, or ``model`` on the same provider (the writer's, for example).
 
-    The key comes from the vendor's own variable, else LLM_API_KEY."""
+    The key comes from the vendor's own variable, else LLM_API_KEY (the one the console's
+    several keys replace)."""
+    return _pooled("llm", lambda s: _llm(s, client, model), settings)
+
+
+def _llm(settings: Settings, client: httpx.Client | None, model: str) -> LlmClient:
     own = {
         "anthropic": settings.anthropic_api_key,
         "openai": settings.openai_api_key,
@@ -186,8 +220,13 @@ def build_company_registry(
     settings: Settings, client: httpx.Client | None = None
 ) -> CompanyRegistry | None:
     """Companies House, or ``None`` with no key (a UK lead then stays "legal entity unknown")."""
-    key = _key(settings.companies_house_api_key)
-    return CompaniesHouse(key, client=client) if key else None
+    if not _key(settings.companies_house_api_key):
+        return None
+    return _pooled(
+        "companies_house",
+        lambda s: CompaniesHouse(_key(s.companies_house_api_key), client=client),
+        settings,
+    )
 
 
 def build_company_sources(
@@ -196,10 +235,18 @@ def build_company_sources(
     """Where discovery looks besides web search: the Y Combinator directory (no key), then
     the UK register and Exa when their keys are set."""
     sources: list[LeadSource] = [YcDirectory(client=client)]
-    if key := _key(settings.companies_house_api_key):
-        sources.append(CompaniesHouse(key, client=client))
-    if key := _key(settings.exa_api_key):
-        sources.append(ExaSearch(key, client=client))
+    if _key(settings.companies_house_api_key):
+        sources.append(
+            _pooled(
+                "companies_house",
+                lambda s: CompaniesHouse(_key(s.companies_house_api_key), client=client),
+                settings,
+            )
+        )
+    if _key(settings.exa_api_key):
+        sources.append(
+            _pooled("exa", lambda s: ExaSearch(_key(s.exa_api_key), client=client), settings)
+        )
     return sources
 
 
@@ -218,7 +265,9 @@ def build_oauth_apps(settings: Settings) -> dict[MailboxGateway, OAuthApp]:
 
 
 def build_search(settings: Settings, client: httpx.Client | None = None) -> SearchProvider:
-    return TavilySearch(_key(settings.tavily_api_key), client=client)
+    return _pooled(
+        "tavily", lambda s: TavilySearch(_key(s.tavily_api_key), client=client), settings
+    )
 
 
 def build_transactional_email(settings: Settings) -> TransactionalEmail:

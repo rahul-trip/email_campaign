@@ -77,6 +77,7 @@ from outbound.domain.enums import (
 )
 from outbound.domain.permissions import Permission as P
 from outbound.domain.platform_settings import PlatformSettings
+from outbound.domain.vendors import MAX_KEYS
 from outbound.services.admin import (
     AdminError,
     AdminService,
@@ -542,7 +543,7 @@ def audit_csv(
 
 def _vendors(service: VendorService) -> VendorsOut:
     return VendorsOut(
-        vendors=[VendorOut(**v.__dict__) for v in service.statuses()],
+        vendors=[VendorOut.model_validate(v) for v in service.statuses()],
         llm=service.llm_settings(),
     )
 
@@ -552,23 +553,37 @@ def vendors(_: Reader, service: Vendors) -> VendorsOut:
     return _vendors(service)
 
 
+# Which of a vendor's keys (1 to MAX_KEYS); each call to the vendor uses one at random.
+Slot = Annotated[int, Query(ge=1, le=MAX_KEYS)]
+
+
 @router.put("/vendors/{vendor}/key", response_model=VendorsOut)
 def replace_vendor_key(
-    vendor: str, body: VendorKeyIn, staff: KeyHolder, service: Vendors
+    vendor: str, body: VendorKeyIn, staff: KeyHolder, service: Vendors, slot: Slot = 1
 ) -> VendorsOut:
-    service.replace_key(vendor, body.key, by=staff.user.id)
+    service.replace_key(vendor, body.key, by=staff.user.id, slot=slot)
+    return _vendors(service)
+
+
+@router.delete("/vendors/{vendor}/key", response_model=VendorsOut)
+def remove_vendor_key(vendor: str, staff: KeyHolder, service: Vendors, slot: Slot) -> VendorsOut:
+    service.remove_key(vendor, slot, by=staff.user.id)
     return _vendors(service)
 
 
 @router.post("/vendors/{vendor}/rollback", response_model=VendorsOut)
-def roll_back_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> VendorsOut:
-    service.roll_back(vendor, by=staff.user.id)
+def roll_back_vendor_key(
+    vendor: str, staff: KeyHolder, service: Vendors, slot: Slot = 1
+) -> VendorsOut:
+    service.roll_back(vendor, by=staff.user.id, slot=slot)
     return _vendors(service)
 
 
 @router.post("/vendors/{vendor}/reveal", response_model=RevealedKeyOut)
-def reveal_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> RevealedKeyOut:
-    return RevealedKeyOut(key=service.reveal(vendor, by=staff.user.id))
+def reveal_vendor_key(
+    vendor: str, staff: KeyHolder, service: Vendors, slot: Slot = 1
+) -> RevealedKeyOut:
+    return RevealedKeyOut(key=service.reveal(vendor, by=staff.user.id, slot=slot))
 
 
 @router.put("/vendors/{vendor}/paused", response_model=VendorsOut)
@@ -724,9 +739,9 @@ def remove_directory_company(domain: str, staff: Writer, service: Directory) -> 
 
 
 @router.post("/vendors/{vendor}/test", response_model=KeyCheckOut)
-def test_vendor_key(vendor: str, staff: KeyHolder, service: Vendors) -> KeyCheckOut:
-    """One small real call with the stored key, to show whether it works."""
-    result = service.test_key(vendor, by=staff.user.id)
+def test_vendor_key(vendor: str, staff: KeyHolder, service: Vendors, slot: Slot = 1) -> KeyCheckOut:
+    """One small real call with the slot's stored key, to show whether it works."""
+    result = service.test_key(vendor, by=staff.user.id, slot=slot)
     return KeyCheckOut(ok=result.ok, message=result.message)
 
 

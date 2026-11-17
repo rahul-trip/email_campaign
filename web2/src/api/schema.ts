@@ -677,7 +677,8 @@ export interface paths {
         /** Replace Vendor Key */
         put: operations["replace_vendor_key_api_admin_vendors__vendor__key_put"];
         post?: never;
-        delete?: never;
+        /** Remove Vendor Key */
+        delete: operations["remove_vendor_key_api_admin_vendors__vendor__key_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -745,7 +746,7 @@ export interface paths {
         put?: never;
         /**
          * Test Vendor Key
-         * @description One small real call with the stored key, to show whether it works.
+         * @description One small real call with the slot's stored key, to show whether it works.
          */
         post: operations["test_vendor_key_api_admin_vendors__vendor__test_post"];
         delete?: never;
@@ -5328,6 +5329,24 @@ export interface components {
             /** Key */
             key: string;
         };
+        /** VendorKeyOut */
+        VendorKeyOut: {
+            /** Can Roll Back */
+            can_roll_back: boolean;
+            /** Key */
+            key: string;
+            /**
+             * Set At
+             * Format: date-time
+             */
+            set_at: string;
+            /** Set By */
+            set_by: string | null;
+            /** Slot */
+            slot: number;
+            /** Version */
+            version: number;
+        };
         /** VendorOut */
         VendorOut: {
             /** Can Roll Back */
@@ -5342,6 +5361,8 @@ export interface components {
             key: string;
             /** Key Refusals */
             key_refusals: number;
+            /** Keys */
+            keys: components["schemas"]["VendorKeyOut"][];
             /** Name */
             name: string;
             /** Paused */
@@ -6871,7 +6892,9 @@ export interface operations {
     };
     replace_vendor_key_api_admin_vendors__vendor__key_put: {
         parameters: {
-            query?: never;
+            query?: {
+                slot?: number;
+            };
             header?: never;
             path: {
                 vendor: string;
@@ -6883,6 +6906,39 @@ export interface operations {
                 "application/json": components["schemas"]["VendorKeyIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_vendor_key_api_admin_vendors__vendor__key_delete: {
+        parameters: {
+            query: {
+                slot: number;
+            };
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -6941,7 +6997,9 @@ export interface operations {
     };
     reveal_vendor_key_api_admin_vendors__vendor__reveal_post: {
         parameters: {
-            query?: never;
+            query?: {
+                slot?: number;
+            };
             header?: never;
             path: {
                 vendor: string;
@@ -6972,7 +7030,9 @@ export interface operations {
     };
     roll_back_vendor_key_api_admin_vendors__vendor__rollback_post: {
         parameters: {
-            query?: never;
+            query?: {
+                slot?: number;
+            };
             header?: never;
             path: {
                 vendor: string;
@@ -7003,7 +7063,9 @@ export interface operations {
     };
     test_vendor_key_api_admin_vendors__vendor__test_post: {
         parameters: {
-            query?: never;
+            query?: {
+                slot?: number;
+            };
             header?: never;
             path: {
                 vendor: string;

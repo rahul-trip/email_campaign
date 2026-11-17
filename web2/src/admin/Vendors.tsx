@@ -5,33 +5,56 @@ import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, Query
 import { Pill, When } from "./bits";
 
 type Vendor = Schemas["VendorOut"];
+type Slot = { vendor: Vendor; slot: number };
+const MAX_KEYS = 3;
 const path = (vendor: string) => ({ params: { path: { vendor } } });
+const inSlot = (vendor: string, slot: number) => ({ params: { path: { vendor }, query: { slot } } });
+const freeSlot = (v: Vendor) => [1, 2, 3].find((n) => !v.keys.some((k) => k.slot === n)) ?? 1;
 
 export function VendorsPage() {
   const queryClient = useQueryClient();
   const vendors = useQuery({ queryKey: ["admin", "vendors"], queryFn: () => ok(client.GET("/api/admin/vendors")) });
-  const [replacing, setReplacing] = useState<Vendor | null>(null);
+  const [replacing, setReplacing] = useState<Slot | null>(null);
   const [tested, setTested] = useState<Record<string, { ok: boolean | null; message: string }>>({});
   const test = useMutation({
-    mutationFn: async (v: Vendor) => ({ code: v.code, result: await ok(client.POST("/api/admin/vendors/{vendor}/test", path(v.code))) }),
-    onSuccess: ({ code, result }) => setTested((all) => ({ ...all, [code]: result })),
+    mutationFn: async ({ vendor, slot }: Slot) => ({
+      id: `${vendor.code}:${slot}`,
+      result: await ok(client.POST("/api/admin/vendors/{vendor}/test", inSlot(vendor.code, slot))),
+    }),
+    onSuccess: ({ id, result }) => setTested((all) => ({ ...all, [id]: result })),
   });
   const [capping, setCapping] = useState<Vendor | null>(null);
-  const [revealed, setRevealed] = useState<{ vendor: Vendor; key: string } | null>(null);
+  const [revealed, setRevealed] = useState<{ vendor: Vendor; slot: number; key: string } | null>(null);
   const refresh = (data: unknown) => queryClient.setQueryData(["admin", "vendors"], data);
-  const rollback = useMutation({ mutationFn: (v: Vendor) => ok(client.POST("/api/admin/vendors/{vendor}/rollback", path(v.code))), onSuccess: refresh });
+  const rollback = useMutation({ mutationFn: ({ vendor, slot }: Slot) => ok(client.POST("/api/admin/vendors/{vendor}/rollback", inSlot(vendor.code, slot))), onSuccess: refresh });
+  const remove = useMutation({
+    mutationFn: ({ vendor, slot }: Slot) => ok(client.DELETE("/api/admin/vendors/{vendor}/key", inSlot(vendor.code, slot))),
+    onSuccess: refresh,
+  });
   const pause = useMutation({
     mutationFn: (v: Vendor) => ok(client.PUT("/api/admin/vendors/{vendor}/paused", { ...path(v.code), body: { paused: !v.paused } })),
     onSuccess: refresh,
   });
   const reveal = useMutation({
-    mutationFn: async (v: Vendor) => ({ vendor: v, key: (await ok(client.POST("/api/admin/vendors/{vendor}/reveal", path(v.code)))).key }),
+    mutationFn: async ({ vendor, slot }: Slot) => ({ vendor, slot, key: (await ok(client.POST("/api/admin/vendors/{vendor}/reveal", inSlot(vendor.code, slot)))).key }),
     onSuccess: setRevealed,
   });
+  const busy = (m: { isPending: boolean; variables?: Slot }, v: Vendor, slot: number) => m.isPending && m.variables?.vendor.code === v.code && m.variables.slot === slot;
+  const result = (v: Vendor, slot: number) => {
+    const r = tested[`${v.code}:${slot}`];
+    return r ? (
+      <div role="status" className={`mt-1 max-w-64 text-caption ${r.ok === false ? "text-error" : r.ok ? "text-good" : "text-muted"}`}>
+        {r.message}
+      </div>
+    ) : null;
+  };
   return (
     <>
-      <PageHeader title="Vendors and keys" subtitle="The third-party services the platform pays for. A new key reaches the worker on its next run; no restart." />
-      <Problem error={rollback.error ?? pause.error ?? reveal.error ?? test.error} className="mb-3" />
+      <PageHeader
+        title="Vendors and keys"
+        subtitle="The third-party services the platform pays for. A vendor can have up to three keys: each call uses one at random and skips a key that is refused or out of credit. A new key reaches the worker on its next run; no restart."
+      />
+      <Problem error={rollback.error ?? remove.error ?? pause.error ?? reveal.error ?? test.error} className="mb-3" />
       <QueryState query={vendors} rows={6}>
         {(data) => (
           <div className="space-y-4">
@@ -41,8 +64,7 @@ export function VendorsPage() {
                   <tr>
                     <Th>Vendor</Th>
                     <Th>Does</Th>
-                    <Th>Key</Th>
-                    <Th>Set</Th>
+                    <Th>Keys</Th>
                     <Th>Spend this month</Th>
                     <Th>Status</Th>
                     <Th />
@@ -50,14 +72,56 @@ export function VendorsPage() {
                 </thead>
                 <tbody>
                   {data.vendors.map((v) => (
-                    <tr key={v.code}>
+                    <tr key={v.code} className="align-top">
                       <Td className="font-medium">{v.name}</Td>
                       <Td className="text-muted">{v.role}</Td>
-                      <Td className="font-mono text-xs">
-                        {v.key}
-                        {v.source === "environment" && <span className="ml-2 text-caption text-muted">from the environment</span>}
+                      <Td className="text-xs">
+                        {v.keys.length === 0 ? (
+                          <div>
+                            <span className="font-mono">{v.key}</span>
+                            {v.source === "environment" && <span className="ml-2 text-caption text-muted">from the environment</span>}
+                            {v.source === "environment" && v.can_test && (
+                              <Button size="sm" variant="ghost" className="ml-1" busy={busy(test, v, 1)} onClick={() => test.mutate({ vendor: v, slot: 1 })} title="Makes one small real call (a fraction of a cent) to check the key works">
+                                Test
+                              </Button>
+                            )}
+                            {result(v, 1)}
+                          </div>
+                        ) : (
+                          <ul className="space-y-1">
+                            {v.keys.map((k) => (
+                              <li key={k.slot}>
+                                <div className="flex flex-wrap items-center gap-1 whitespace-nowrap">
+                                  <span className="font-mono">{k.key}</span>
+                                  <span className="text-caption text-muted">
+                                    key {k.slot} · <When iso={k.set_at} />
+                                  </span>
+                                  <Button size="sm" variant="ghost" onClick={() => setReplacing({ vendor: v, slot: k.slot })}>
+                                    Replace
+                                  </Button>
+                                  {v.can_test && (
+                                    <Button size="sm" variant="ghost" busy={busy(test, v, k.slot)} onClick={() => test.mutate({ vendor: v, slot: k.slot })} title="Makes one small real call (a fraction of a cent) to check the key works">
+                                      Test
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="ghost" busy={busy(reveal, v, k.slot)} onClick={() => reveal.mutate({ vendor: v, slot: k.slot })}>
+                                    Reveal
+                                  </Button>
+                                  {k.can_roll_back && (
+                                    <Button size="sm" variant="ghost" onClick={() => rollback.mutate({ vendor: v, slot: k.slot })}>
+                                      Roll back
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="ghost" busy={busy(remove, v, k.slot)} onClick={() => remove.mutate({ vendor: v, slot: k.slot })} title="Stops using this key. It can be rolled back for 30 days.">
+                                    Remove
+                                  </Button>
+                                </div>
+                                {result(v, k.slot)}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </Td>
-                      <Td className="text-muted">{v.set_at ? <When iso={v.set_at} time /> : "—"}</Td>
                       <Td className="whitespace-nowrap text-xs">
                         ${(v.spend_micro_usd / 1e6).toFixed(2)}
                         {v.cap_micro_usd != null ? ` of $${(v.cap_micro_usd / 1e6).toFixed(0)}` : ""}
@@ -68,29 +132,11 @@ export function VendorsPage() {
                       <Td>
                         {v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
                         {v.key_refusals > 0 && <div className="mt-1 text-caption text-error">refused {v.key_refusals}× in the last day</div>}
-                        {tested[v.code] && (
-                          <div role="status" className={`mt-1 max-w-56 text-caption ${tested[v.code]!.ok === false ? "text-error" : tested[v.code]!.ok ? "text-good" : "text-muted"}`}>
-                            {tested[v.code]!.message}
-                          </div>
-                        )}
                       </Td>
                       <Td className="space-x-1 text-right whitespace-nowrap">
-                        <Button size="sm" variant="secondary" onClick={() => setReplacing(v)}>
-                          {v.source === "database" ? "Replace" : "Add key"}
-                        </Button>
-                        {v.source !== "none" && v.can_test && (
-                          <Button size="sm" variant="ghost" busy={test.isPending && test.variables?.code === v.code} onClick={() => test.mutate(v)} title="Makes one small real call (a fraction of a cent) to check the key works">
-                            Test
-                          </Button>
-                        )}
-                        {v.source === "database" && (
-                          <Button size="sm" variant="ghost" busy={reveal.isPending && reveal.variables?.code === v.code} onClick={() => reveal.mutate(v)}>
-                            Reveal
-                          </Button>
-                        )}
-                        {v.can_roll_back && (
-                          <Button size="sm" variant="ghost" onClick={() => rollback.mutate(v)}>
-                            Roll back
+                        {v.keys.length < MAX_KEYS && (
+                          <Button size="sm" variant="secondary" onClick={() => setReplacing({ vendor: v, slot: freeSlot(v) })}>
+                            Add key
                           </Button>
                         )}
                         {v.source !== "none" && (
@@ -108,10 +154,10 @@ export function VendorsPage() {
           </div>
         )}
       </QueryState>
-      {replacing && <ReplaceKey vendor={replacing} onClose={() => setReplacing(null)} onDone={(data) => { refresh(data); setReplacing(null); }} />}
+      {replacing && <ReplaceKey target={replacing} onClose={() => setReplacing(null)} onDone={(data) => { refresh(data); setReplacing(null); }} />}
       {capping && <CapDialog vendor={capping} onClose={() => setCapping(null)} onDone={(data) => { refresh(data); setCapping(null); }} />}
       {revealed && (
-        <Dialog title={`${revealed.vendor.name} key`} onClose={() => setRevealed(null)} footer={<Button onClick={() => setRevealed(null)}>Done</Button>}>
+        <Dialog title={`${revealed.vendor.name} key ${revealed.slot}`} onClose={() => setRevealed(null)} footer={<Button onClick={() => setRevealed(null)}>Done</Button>}>
           <Callout tone="attention">This view is recorded in the audit log.</Callout>
           <code className="block break-all rounded-lg bg-surface-low p-3 font-mono text-xs">{revealed.key}</code>
         </Dialog>
@@ -120,15 +166,17 @@ export function VendorsPage() {
   );
 }
 
-function ReplaceKey({ vendor, onClose, onDone }: { vendor: Vendor; onClose: () => void; onDone: (data: unknown) => void }) {
+function ReplaceKey({ target, onClose, onDone }: { target: Slot; onClose: () => void; onDone: (data: unknown) => void }) {
+  const { vendor, slot } = target;
   const [key, setKey] = useState("");
   const save = useMutation({
-    mutationFn: () => ok(client.PUT("/api/admin/vendors/{vendor}/key", { ...path(vendor.code), body: { key } })),
+    mutationFn: () => ok(client.PUT("/api/admin/vendors/{vendor}/key", { ...inSlot(vendor.code, slot), body: { key } })),
     onSuccess: onDone,
   });
+  const exists = vendor.keys.some((k) => k.slot === slot);
   return (
     <Dialog
-      title={`${vendor.source === "database" ? "Replace" : "Add"} the ${vendor.name} key`}
+      title={`${exists ? "Replace" : "Add"} ${vendor.name} key ${slot}`}
       onClose={onClose}
       footer={
         <>

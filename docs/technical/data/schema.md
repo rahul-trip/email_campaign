@@ -590,12 +590,13 @@ CREATE TABLE platform_settings (
 CREATE TABLE platform_credentials (
   id TEXT PRIMARY KEY,
   vendor TEXT NOT NULL,        -- a code in outbound/domain/vendors.py
+  slot INTEGER NOT NULL DEFAULT 1, -- 1..3 (CHECK); a vendor's live keys, one per slot (migration 0025)
   version INTEGER NOT NULL,    -- 1, 2, ...; UNIQUE (vendor, version)
   key_version INTEGER NOT NULL, -- the SECRETS_KEYS entry that sealed it
   nonce BLOB NOT NULL,
   ciphertext BLOB NOT NULL,    -- AES-256-GCM; associated data 'platform|vendor|version'
   last4 TEXT NOT NULL,         -- the only part ever shown
-  active BOOLEAN NOT NULL,     -- one active row per vendor
+  active BOOLEAN NOT NULL,     -- one active row per vendor and slot
   created_by TEXT,
   created_at TIMESTAMP NOT NULL,
   retired_at TIMESTAMP

@@ -29,6 +29,9 @@ VENDORS: tuple[Vendor, ...] = (
 )
 BY_CODE: dict[str, Vendor] = {v.code: v for v in VENDORS}
 
+# How many live keys a vendor may have; each call uses one at random (``providers/keypool.py``).
+MAX_KEYS = 3
+
 # The language-model settings an admin may change without a deploy, and their types.
 LLM_FIELDS: dict[str, type] = {
     "llm_provider": str,

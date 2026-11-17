@@ -138,8 +138,12 @@ class AdminQueries:
         it is not counted: replacing a refused key clears the warning at once. The language
         model's ledger name is its provider preset, so any provider that is not a vendor code
         goes by the ``llm`` key's time."""
-        live = select(PlatformCredentialRow.vendor, PlatformCredentialRow.created_at).where(
-            PlatformCredentialRow.active.is_(True)
+        # With several keys, a call is refused only once every key was; any key saved since
+        # may be the fix, so the newest one decides.
+        live = (
+            select(PlatformCredentialRow.vendor, func.max(PlatformCredentialRow.created_at))
+            .where(PlatformCredentialRow.active.is_(True))
+            .group_by(PlatformCredentialRow.vendor)
         )
         key_set_at: dict[str, datetime] = dict(self._session.execute(live).tuples().all())
         stmt = select(ProviderCallRow.provider, ProviderCallRow.created_at).where(
