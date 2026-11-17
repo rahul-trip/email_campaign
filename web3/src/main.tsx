@@ -3,6 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode, useEffect, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { SIGNED_OUT, actIn } from "./api/client";
+import { AdminApp } from "./admin/AdminApp";
 import { PublicApp } from "./app/Public";
 import { CurrentContext, go, inWorkspace, isViewing, rememberWorkspace, useMe } from "./app/session";
 import { Button, Empty } from "./ui/core";
@@ -83,16 +84,8 @@ if (inside && window.location.pathname === `/w/${inside[1]}`) window.history.rep
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>{inside ? <WorkspaceApp slug={decodeURIComponent(inside[1]!)} /> : inAdmin ? <AdminSoon /> : <PublicApp />}</ToastProvider>
+      <ToastProvider>{inside ? <WorkspaceApp slug={decodeURIComponent(inside[1]!)} /> : inAdmin ? <AdminApp /> : <PublicApp />}</ToastProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
 
-/** The admin console is rebuilt after the workspace screens; until then it lives in web2. */
-function AdminSoon() {
-  return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <Empty title="The admin console is being rebuilt">It is the last part of the web3 build. Use it in the current app at /admin until then.</Empty>
-    </main>
-  );
-}
