@@ -66,6 +66,7 @@ from outbound.api.schemas import (
     VendorPauseIn,
     VendorsOut,
 )
+from outbound.db.errors import NotFound
 from outbound.domain.entitlements import Plan
 from outbound.domain.enums import (
     MembershipRole,
@@ -415,6 +416,23 @@ def enable_user(user_id: str, staff: Writer, service: Admin) -> None:
 @router.post("/users/{user_id}/sign-out")
 def sign_out_user(user_id: str, staff: Writer, service: Admin) -> dict[str, int]:
     return {"signed_out": service.sign_out_everywhere(user_id, by=staff.user.id)}
+
+
+@router.delete("/users/{user_id}", status_code=204)
+def delete_user(
+    user_id: str, staff: Writer, ids: Annotated[IdentityService, Depends(identity)]
+) -> None:
+    """Delete a person for good. Superadmin only; people delete themselves in their settings."""
+    if staff.user.platform_role is not PlatformRole.SUPERADMIN:
+        raise ApiError(403, "forbidden", "Only a superadmin can delete an account.")
+    if user_id == staff.user.id:
+        raise ApiError(409, "not_yourself", "Delete your own account from your settings.")
+    try:
+        ids.delete_account(user_id, by=staff.user.id)
+    except NotFound:
+        raise ApiError(404, "not_found", "No such user.") from None
+    except IdentityError as error:
+        raise AdminError(error.status, error.code, error.detail) from None
 
 
 @router.put("/users/{user_id}/platform-role", status_code=204)

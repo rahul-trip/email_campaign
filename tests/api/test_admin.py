@@ -335,6 +335,37 @@ def test_only_a_superadmin_changes_platform_roles_and_the_last_one_stays(
     )
 
 
+def test_only_a_superadmin_deletes_an_account_and_never_their_own_or_the_last_one(
+    staff: Api,
+    superadmin: Api,
+    services: Services,
+    app_and_services: tuple[FastAPI, Services],
+    ws: str,
+) -> None:
+    app, _ = app_and_services
+    victim = add_user(app, "victim@customer.example", ws, MembershipRole.MEMBER)
+    with services.container.uow(ws) as uow:
+        uow.mailboxes.create("v@customer.example", "customer.example", owner_user_id=victim)
+        uow.commit()
+    ids = {u["email"]: u["id"] for u in superadmin.get("/api/admin/users").json()}
+    assert staff.delete(f"/api/admin/users/{victim}").status_code == 403
+    mine = ids[SUPER]
+    assert superadmin.delete(f"/api/admin/users/{mine}").status_code == 409
+    assert superadmin.delete("/api/admin/users/missing").status_code == 404
+    assert superadmin.delete(f"/api/admin/users/{victim}").status_code == 204
+    assert victim not in {u["id"] for u in superadmin.get("/api/admin/users").json()}
+    with services.container.uow(ws) as uow:
+        assert uow.mailboxes.all() == []
+    found = audited(services, "user_deleted")
+    assert len(found) == 1 and found[0]["target_id"] == victim
+    assert "victim@customer.example" not in str(found[0])
+    # The last superadmin is protected even from another platform admin's request.
+    other = add_user(app, "second-super@platform.example", platform_role=PlatformRole.SUPERADMIN)
+    assert superadmin.delete(f"/api/admin/users/{other}").status_code == 204
+    only = sign_in(app, SUPER)
+    assert only.delete(f"/api/admin/users/{ids[STAFF]}").status_code == 204
+
+
 # ------------------------------------------------------------------ plans and settings
 
 

@@ -33,6 +33,7 @@ OPEN = {
     "/api/auth/password/forgot",
     "/api/auth/password/reset",
     "/api/auth/password/change",
+    "/api/auth/account/delete",  # a person deleting themselves, with their password
     # Public on purpose: a person who is not a user asks to leave the directory, by email link.
     "/api/auth/remove-my-data",
     "/api/auth/remove-my-data/confirm",

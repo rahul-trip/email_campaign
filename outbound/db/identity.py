@@ -103,6 +103,12 @@ class UserRepository:
         self._row(user_id).platform_role = role
         self._session.flush()
 
+    def delete(self, user_id: str) -> None:
+        """Remove the account. Memberships, sessions, notifications and join requests go with
+        it (``ON DELETE CASCADE``); a mailbox they owned is left with no owner."""
+        self._session.delete(self._row(user_id))
+        self._session.flush()
+
     def all(self) -> list[User]:
         rows = self._session.scalars(select(UserRow).order_by(UserRow.email))
         return [snapshot(row, User) for row in rows]
@@ -224,6 +230,12 @@ class AuthTokenRepository:
 
     def replace_hash(self, token_id: str, token_hash: str, expires_at: datetime) -> None:
         self._set(token_id, token_hash=token_hash, expires_at=expires_at)
+
+    def delete_for_email(self, email: str) -> None:
+        """Forget every invitation and reset link for an address (its account is gone)."""
+        self._session.execute(
+            delete(AuthTokenRow).where(AuthTokenRow.email == normalise_email(email))
+        )
 
     def revoke_open(self, purpose: AuthTokenPurpose, email: str) -> None:
         """Retire every open link of this kind for this address (a new one replaces them)."""

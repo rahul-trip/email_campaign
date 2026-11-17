@@ -180,6 +180,13 @@ class AdminQueries:
             )
         return found
 
+    def mailboxes_owned_by(self, user_id: str) -> list[tuple[str, str]]:
+        """(workspace id, mailbox id) of every mailbox this person connected, in any workspace."""
+        stmt = select(MailboxRow.workspace_id, MailboxRow.id).where(
+            MailboxRow.owner_user_id == user_id
+        )
+        return [(ws, mailbox) for ws, mailbox in self._session.execute(stmt)]
+
     def last_activity(self) -> dict[str, datetime]:
         stmt = select(CompanyRow.workspace_id, func.max(CompanyRow.updated_at)).group_by(
             CompanyRow.workspace_id

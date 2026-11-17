@@ -59,13 +59,20 @@ export function UsersPage() {
   const me = useMe();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [asking, setAsking] = useState<{ id: string; email: string; to: "disable" } | null>(null);
+  const [asking, setAsking] = useState<{ id: string; email: string; to: "disable" | "delete" } | null>(null);
   const users = useQuery({ queryKey: ["admin", "users", q], queryFn: () => ok(client.GET("/api/admin/users", { params: { query: { q: q || undefined } } })) });
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
   const path = (id: string) => ({ params: { path: { user_id: id } } });
   const enable = useMutation({ mutationFn: (id: string) => client.POST("/api/admin/users/{user_id}/enable", path(id)), onSuccess: refresh });
   const disable = useMutation({
     mutationFn: (id: string) => client.POST("/api/admin/users/{user_id}/disable", path(id)),
+    onSuccess: () => {
+      setAsking(null);
+      refresh();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => ok(client.DELETE("/api/admin/users/{user_id}", path(id))),
     onSuccess: () => {
       setAsking(null);
       refresh();
@@ -140,6 +147,11 @@ export function UsersPage() {
                             Enable
                           </Button>
                         )}
+                        {isSuper && u.id !== me.data?.user.id && (
+                          <Button size="sm" variant="danger-ghost" data-tour="admin-user-delete" onClick={() => setAsking({ id: u.id, email: u.email, to: "delete" })}>
+                            Delete
+                          </Button>
+                        )}
                       </Td>
                     </tr>
                   ))}
@@ -149,7 +161,12 @@ export function UsersPage() {
           )
         }
       </QueryState>
-      {asking && (
+      {asking?.to === "delete" && (
+        <Confirm title={`Delete ${asking.email}?`} confirmLabel="Delete" busy={remove.isPending} error={remove.error} onClose={() => { setAsking(null); remove.reset(); }} onConfirm={() => remove.mutate(asking.id)}>
+          Their account is erased for good and their mailboxes are disconnected. A workspace where they are the only person is suspended. This cannot be undone; to stop someone signing in for now, disable them instead.
+        </Confirm>
+      )}
+      {asking?.to === "disable" && (
         <Confirm title={`Disable ${asking.email}?`} confirmLabel="Disable" busy={disable.isPending} error={disable.error} onClose={() => setAsking(null)} onConfirm={() => disable.mutate(asking.id)}>
           They are signed out everywhere now and cannot sign in until you enable the account again.
         </Confirm>

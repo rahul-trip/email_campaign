@@ -42,6 +42,7 @@ Real accounts and revocable sessions ([ADR 0026](../adr/0026-revocable-sessions-
 | `GET /api/auth/me` | login | — | 200 `Me` (memberships, platform role) | 401 when signed out | — |
 | `POST /api/auth/password/forgot` | CSRF | `{email}` | 204 always (never reveals whether the address exists) | — | `IdentityService` |
 | `POST /api/auth/password/reset` | CSRF | `{token, password}` | 200 `Me` | 410 expired/used token | `IdentityService` |
+| `POST /api/auth/account/delete` | login + CSRF | `{password}` | 204, session cleared | 400 wrong password; 409 `last_admin`, `last_superadmin` | `IdentityService.delete_account` |
 | `POST /api/auth/password/change` | login + CSRF | `{current_password, new_password}` | 204 | 401 wrong current password | `IdentityService` |
 | `GET /api/auth/invitations/{token}` | open | — | 200 (workspace name, role, inviter) | 410 expired/used/revoked | `IdentityService` |
 | `POST /api/auth/invitations/{token}/accept` | CSRF | `{name?, password}` | 200 `Me` | 410 expired/used/revoked | `IdentityService` |
@@ -105,6 +106,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `POST /api/admin/customers/{workspace_id}/resume` | `ADMIN_WRITE` | Release leads waiting on credit |
 | `PATCH /api/admin/customers/{workspace_id}/members/{user_id}`, `DELETE .../members/{user_id}` | `ADMIN_WRITE` | Platform-side team management |
 | `POST /api/admin/customers/{workspace_id}/mailboxes/{mailbox_id}/reconnect` | `ADMIN_WRITE` | Force a customer to reconnect a mailbox |
+| `DELETE /api/admin/users/{user_id}` | `ADMIN_WRITE` and superadmin | — | 204 | 403 not a superadmin; 409 `not_yourself`, `last_superadmin`, `last_admin`; 404 | `IdentityService.delete_account` |
 | `GET /api/admin/users`, `POST .../disable`, `/enable`, `/sign-out`, `PUT .../platform-role` | `ADMIN_READ`/`ADMIN_WRITE` | Platform staff account management |
 | `GET /api/admin/plans`, `PUT /plans/default`, `PUT /plans/{code}` | `ADMIN_READ`/`ADMIN_WRITE` | The plan catalog |
 | `GET /api/admin/vendors`, `PUT .../key`, `POST .../rollback`, `POST .../reveal`, `PUT .../paused`, `PATCH /vendors/llm`, `PUT .../cap` | `ADMIN_KEYS` | Platform vendor keys, encrypted, versioned, with audited reveal and rollback |

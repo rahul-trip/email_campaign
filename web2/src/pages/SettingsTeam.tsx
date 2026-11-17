@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { useCurrent, useIsAdmin } from "../app/session";
+import { go, useCurrent, useIsAdmin } from "../app/session";
 import { Avatar, Button, Callout, Card, Confirm, Field, Input, Problem, QueryState, SaveNote, Select, Table, Td, Th } from "../components/ui";
 import { ago, when } from "../lib/format";
 
@@ -279,6 +279,12 @@ export function Account() {
     },
   });
   const others = useMutation({ mutationFn: () => ok(client.POST("/api/auth/logout-others")) });
+  const [deleting, setDeleting] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const remove = useMutation({
+    mutationFn: () => ok(client.POST("/api/auth/account/delete", { body: { password: confirmation } })),
+    onSuccess: () => go("/sign-in"),
+  });
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card tour="account-password" title="Password" subtitle={`You sign in as ${me.user.email}.`}>
@@ -312,6 +318,30 @@ export function Account() {
         </div>
         <Problem error={others.error} className="mt-2" />
       </Card>
+      <Card tour="account-delete" title="Delete your account" subtitle="Removes your sign-in for good. The mailboxes you connected are disconnected, and a workspace where you are the only person is suspended, with its data kept. Workspaces with other people need another admin first.">
+        <Button variant="danger" onClick={() => setDeleting(true)}>
+          Delete my account
+        </Button>
+      </Card>
+      {deleting && (
+        <Confirm
+          title="Delete your account?"
+          confirmLabel="Delete my account"
+          busy={remove.isPending}
+          error={remove.error}
+          onClose={() => {
+            setDeleting(false);
+            setConfirmation("");
+            remove.reset();
+          }}
+          onConfirm={() => remove.mutate()}
+        >
+          <p className="text-body">This cannot be undone. Enter your password to confirm.</p>
+          <Field label="Your password">
+            <Input type="password" autoComplete="current-password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} className="w-full" />
+          </Field>
+        </Confirm>
+      )}
     </div>
   );
 }

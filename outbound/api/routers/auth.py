@@ -13,6 +13,7 @@ from outbound.api.errors import ApiError
 from outbound.api.schemas import (
     AcceptIn,
     ChangePasswordIn,
+    DeleteAccountIn,
     ForgotIn,
     InvitationOut,
     LoginIn,
@@ -121,6 +122,17 @@ def change_password(body: ChangePasswordIn, user: User, ids: Ids) -> None:
         ids.change_password(user, body.current_password, body.new_password)
     except IdentityError as error:
         raise _refuse(error) from None
+
+
+@router.post("/account/delete", status_code=204)
+def delete_account(
+    body: DeleteAccountIn, request: Request, response: Response, user: User, ids: Ids
+) -> None:
+    try:
+        ids.delete_account(user.user.id, by=user.user.id, password=body.password)
+    except IdentityError as error:
+        raise _refuse(error) from None
+    clear_session(request, response)
 
 
 @router.get("/invitations/{token}", response_model=InvitationOut)
