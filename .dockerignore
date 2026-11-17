@@ -30,3 +30,8 @@ scripts/
 docs/
 deploy/
 .deploy-local/
+web3/dist
+web3/node_modules
+web3/test-results
+web3/playwright-report
+web2/

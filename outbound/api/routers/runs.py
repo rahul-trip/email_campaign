@@ -10,8 +10,14 @@ from outbound.api.schemas import (
     AutoDiscoveryOut,
     CandidateOut,
     CostOut,
+    DailyOut,
+    DayOut,
+    DiscoveryPlanOut,
     DiscoverySearchOut,
+    FitBandOut,
+    FitOut,
     FunnelOut,
+    PlannedSourceOut,
     PromoteIn,
     QualityOut,
     RunCallOut,
@@ -26,6 +32,7 @@ from outbound.db.types import utcnow
 from outbound.domain.discovery import YIELD_DAYS
 from outbound.domain.errors import InvalidInput
 from outbound.domain.permissions import Permission as P
+from outbound.services.reports import review_streak
 from outbound.services.runs import RunRequest
 
 router = APIRouter(prefix="/api", tags=["runs"])
@@ -57,6 +64,28 @@ def start_run(body: RunIn, svc: Annotated[Services, Depends(services)]) -> RunOu
 def auto_discovery(svc: Annotated[Services, Depends(services)]) -> AutoDiscoveryOut:
     """Whether the worker will search for new companies by itself, and when, or why not."""
     return AutoDiscoveryOut.model_validate(svc.discovery.state())
+
+
+@router.get(
+    "/runs/plan", response_model=DiscoveryPlanOut, dependencies=[Depends(require(P.RUNS_READ))]
+)
+def discovery_plan(svc: Annotated[Services, Depends(services)]) -> DiscoveryPlanOut:
+    """Which sources the next discovery run would ask for the active campaign, and why the
+    others would be skipped. Nothing is searched; a source whose key is missing is skipped
+    only when the run starts."""
+    plan = svc.reports.discovery_plan()
+    return DiscoveryPlanOut(
+        campaign=plan.campaign,
+        sources=[
+            PlannedSourceOut(
+                source=p.source, suited=p.suited, why_not=p.why_not, share=p.share,
+                found=p.record.found if p.record else None,
+                qualified=p.record.qualified if p.record else None,
+                rate=round(p.record.rate, 3) if p.record else None,
+            )
+            for p in plan.sources
+        ],
+    )  # fmt: skip
 
 
 @router.get("/runs", response_model=list[RunOut], dependencies=[Depends(require(P.RUNS_READ))])
@@ -213,4 +242,32 @@ def cost(
         calls_by_provider=report.calls_by_provider,
         outcomes={o.value: n for o, n in report.outcomes.items()},
         paid_calls=report.paid_calls,
+    )
+
+
+@router.get(
+    "/reports/daily", response_model=DailyOut, dependencies=[Depends(require(P.REPORTS_READ))]
+)
+def daily(
+    svc: Annotated[Services, Depends(services)], days: Annotated[int, Query(ge=1, le=90)] = 14
+) -> DailyOut:
+    """Per-day counts, oldest first, for sparklines, week-on-week changes and the review streak."""
+    rows = svc.reports.daily(days)
+    return DailyOut(
+        days=[DayOut.model_validate(r) for r in rows],
+        review_streak=review_streak(rows),
+    )
+
+
+@router.get("/reports/fit", response_model=FitOut, dependencies=[Depends(require(P.REPORTS_READ))])
+def fit(svc: Annotated[Services, Depends(services)]) -> FitOut:
+    """How the active campaign's companies spread over fit scores, in bands of ten."""
+    report = svc.reports.fit()
+    return FitOut(
+        campaign_id=report.campaign_id,
+        campaign=report.campaign,
+        min_fit_score=report.min_fit_score,
+        bands=[FitBandOut(start=start, count=n) for start, n in report.bands],
+        scored=report.scored,
+        unscored=report.unscored,
     )

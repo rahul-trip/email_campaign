@@ -1,0 +1,358 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useParams } from "@tanstack/react-router";
+import { ArrowRight } from "lucide-react";
+import { useState } from "react";
+import { client, ok, type Schemas } from "../api/client";
+import { StatusBadge } from "../components/StatusBadge";
+import { Button, buttonClass, Callout, Card, Empty, Input, PageHeader, Problem, QueryState, Sections, Skeleton, Stat, Table, Td, Th } from "../ui/compat";
+import { cx } from "../lib/cx";
+import { ago, duration, usd, when, words } from "../lib/format";
+import { OUTCOME_LABEL, STAGES, STAGE_LABEL, countsOf, discoveryLine, totalsOf } from "../lib/runs";
+import { candidateVerdict, describe, discoverySource, leadStatus, runStatus } from "../lib/status";
+
+type Lead = Schemas["RunLeadOut"];
+type Candidate = Schemas["CandidateOut"];
+
+const OUTCOME: Record<string, { label: string; tone: string }> = {
+  moved: { label: "Moved on", tone: "bg-good-soft text-good" },
+  held: { label: "Held", tone: "bg-attention-soft text-attention" },
+  failed: { label: "Failed", tone: "bg-error-soft text-error" },
+  deferred: { label: "Will retry", tone: "bg-surface-3 text-muted" },
+};
+const ORDER = ["failed", "held", "deferred", "moved"];
+// Settings of the run that mean nothing to a reader of its page.
+const HIDDEN_PARAMS = new Set(["limit", "only", "automatic"]);
+
+/** One run: what it was asked to do, and every lead it moved, held, failed or put off. */
+export function RunDetailPage() {
+  const { runId } = useParams({ from: "/runs/$runId" });
+  const path = { params: { path: { run_id: runId } } };
+  const run = useQuery({
+    queryKey: ["run", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}", path)),
+    refetchInterval: (query) => (["queued", "running"].includes(query.state.data?.status ?? "") ? 3000 : false),
+  });
+  const live = ["queued", "running"].includes(run.data?.status ?? "");
+  const leads = useQuery({
+    queryKey: ["run-leads", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}/leads", path)),
+    refetchInterval: live ? 3000 : false,
+  });
+
+  const calls = useQuery({
+    queryKey: ["run-calls", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}/calls", path)),
+    refetchInterval: live ? 3000 : false,
+  });
+  const searches = useQuery({
+    queryKey: ["run-searches", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}/searches", path)),
+    refetchInterval: live ? 3000 : false,
+  });
+  const candidates = useQuery({
+    queryKey: ["run-candidates", runId],
+    queryFn: () => ok(client.GET("/api/runs/{run_id}/candidates", path)),
+    refetchInterval: live ? 3000 : false,
+  });
+
+  if (run.isPending) return <Skeleton rows={6} />;
+  if (run.isError) return <Problem error={run.error} />;
+  const data = run.data;
+  const params = (data.params ?? {}) as Record<string, unknown>;
+  const totals = totalsOf(data.counts);
+  const discovery = discoveryLine(totals);
+  const byStage = countsOf(data.counts);
+  const stageRows = (STAGES as readonly string[]).filter((st) => st in byStage).map((st) => [st, byStage[st]!] as const);
+  const outcomeColumns = ["advanced", "held", "failed", "waiting", "deferred", "suppressed", "skipped"].filter((o) => o === "advanced" || o === "held" || o === "failed" || stageRows.some(([, v]) => (v[o] ?? 0) > 0));
+
+  return (
+    <Sections>
+        <PageHeader
+          crumbs={
+            <>
+              <Link to="/runs" className="hover:text-ink hover:underline">
+                Runs
+              </Link>{" "}
+              / <span className="text-ink">Run from {ago(data.started_at ?? data.created_at)}</span>
+            </>
+          }
+          title="Run"
+          subtitle={
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small">
+              <StatusBadge status={describe(runStatus, data.status)} />
+              <span>Started {when(data.started_at) || "not yet"}</span>
+              {data.finished_at && <span>Finished {when(data.finished_at)}</span>}
+              <span>Spend {usd(data.cost_micro_usd)}</span>
+              <span className="font-mono text-muted">{data.id}</span>
+            </span>
+          }
+        />
+
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5" data-tour="run-numbers">
+          <Stat label="Took" value={data.started_at ? duration(data.started_at, data.finished_at) : "—"} hint={live ? "still going" : data.finished_at ? `finished ${ago(data.finished_at)}` : undefined} />
+          <Stat label="Steps completed" value={totals.moved} hint={`${totals.newLeads} new lead${totals.newLeads === 1 ? "" : "s"} found`} tone="good" />
+          <Stat label="Held" value={totals.held} hint={totals.held ? "waiting on you or a rule" : "none"} tone={totals.held ? "attention" : undefined} />
+          <Stat label="Failed" value={totals.failed} hint={totals.failed ? "see the list below" : "none"} tone={totals.failed ? "error" : undefined} />
+          <Stat label="Spend" value={usd(data.cost_micro_usd)} hint={totals.moved ? `${usd(data.cost_micro_usd / totals.moved)} per step completed` : "no paid calls"} />
+        </div>
+
+        {(totals.failed > 0 || data.status === "failed") && (
+          <Callout tone="error" title={data.status === "failed" ? "This run failed" : `${totals.failed} step${totals.failed === 1 ? "" : "s"} failed`} className="mb-5">
+            The leads that failed are listed first below, each with the reason. A failed lead is tried again by the next run, or press Retry on its page.
+          </Callout>
+        )}
+        {discovery && (
+          <Callout tone={totals.newLeads === 0 ? "attention" : "good"} title="Discovery" className="mb-5">
+            {discovery}
+          </Callout>
+        )}
+
+        <Card tour="run-summary" title="Step by step" subtitle={Object.keys(params).filter((k) => !HIDDEN_PARAMS.has(k)).length ? `Asked for: ${Object.entries(params).filter(([k]) => !HIDDEN_PARAMS.has(k)).map(([k, v]) => `${words(k)} ${Array.isArray(v) ? v.join(", ") || "all" : String(v)}`).join(" · ")}` : "Every step, over all the work that was due."} className="mb-5">
+          {stageRows.length === 0 ? (
+            <p className="text-small text-muted">{live ? "No step has finished yet." : "Nothing was due, so no step had anything to do."}</p>
+          ) : (
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Step</Th>
+                  {outcomeColumns.map((o) => (
+                    <Th key={o} className="text-right">
+                      {OUTCOME_LABEL[o] ?? o}
+                    </Th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {stageRows.map(([stage, outcomes]) => (
+                  <tr key={stage}>
+                    <Td className="font-medium">{STAGE_LABEL[stage] ?? words(stage)}</Td>
+                    {outcomeColumns.map((o) => (
+                      <Td key={o} className={cx("tnum text-right text-small", !outcomes[o] && "text-muted", o === "failed" && outcomes[o] ? "font-semibold text-error" : "")}>
+                        {outcomes[o] ?? 0}
+                      </Td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          )}
+          {live && <p className="mt-3 text-small text-muted">This run is still going; the numbers and the list below fill in as it works.</p>}
+        </Card>
+
+        {(searches.data?.length ?? 0) > 0 && (
+          <Card collapsible defaultOpen tour="run-searches" title="Where it looked" subtitle="Directories first, then searches for pages that list many companies like the ones you want. Each run takes new angles and never reads a page twice." className="mb-5">
+            <ul className="divide-y divide-line text-body">
+              {searches.data!.map((q, i) => (
+                <li key={i} className="py-1.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="mr-2 text-small font-medium text-muted">{discoverySource[q.source] ?? words(q.source)}</span>
+                      {q.query}
+                      {q.angle && <span className="ml-2 text-small text-muted">({q.angle})</span>}
+                    </span>
+                    <span className="whitespace-nowrap text-small text-muted">
+                      <strong className={cx("font-semibold", q.found > 0 ? "text-ink" : "text-muted")}>{q.found} found</strong>
+                    </span>
+                  </div>
+                  {q.pages.length > 0 && (
+                    <ul className="mt-0.5 space-y-0.5 pl-4 text-small text-muted">
+                      {q.pages.map((url) => (
+                        <li key={url} className="truncate">
+                          <a href={url} target="_blank" rel="noreferrer" className="hover:underline">
+                            {url}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {(candidates.data?.length ?? 0) > 0 && (
+          <Card collapsible tour="run-candidates" title="Companies it found" subtitle="Every company found, best fit first, with why it was or was not added. Add one the screening left out with Make a lead." className="mb-5">
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Company</Th>
+                  <Th>Found in</Th>
+                  <Th className="text-right">Fit</Th>
+                  <Th>Decision</Th>
+                  <Th />
+                </tr>
+              </thead>
+              <tbody>
+                {candidates.data!.map((c) => (
+                  <CandidateRow key={c.id} candidate={c} runId={runId} />
+                ))}
+              </tbody>
+            </Table>
+          </Card>
+        )}
+
+        <Card collapsible tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
+          <QueryState query={calls}>
+            {(rows) =>
+              rows.length === 0 ? (
+                <p className="text-small text-muted">No vendor was called in this run.</p>
+              ) : (
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Vendor</Th>
+                      <Th>For</Th>
+                      <Th className="text-right">Calls</Th>
+                      <Th className="text-right">Found</Th>
+                      <Th className="text-right">Nothing</Th>
+                      <Th className="text-right">Reused</Th>
+                      <Th className="text-right">Errors</Th>
+                      <Th className="text-right">Avg time</Th>
+                      <Th className="text-right">Cost</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((c) => (
+                      <tr key={`${c.provider}:${c.operation}`}>
+                        <Td className="font-medium">{c.provider}</Td>
+                        <Td className="text-muted">{words(c.operation)}</Td>
+                        <Td className="tnum text-right text-small">{c.calls}</Td>
+                        <Td className="tnum text-right text-small">{c.found}</Td>
+                        <Td className="tnum text-right text-small">{c.nothing}</Td>
+                        <Td className="tnum text-right text-small">{c.reused}</Td>
+                        <Td className={cx("tnum text-right text-small", c.errors > 0 && "font-semibold text-error")}>{c.errors}{c.blocked ? ` (+${c.blocked} blocked)` : ""}</Td>
+                        <Td className="tnum text-right text-small text-muted">{c.avg_latency_ms == null ? "–" : `${c.avg_latency_ms} ms`}</Td>
+                        <Td className="tnum text-right text-small">{usd(c.cost_micro_usd)}</Td>
+                      </tr>
+                    ))}
+                    <tr className="border-t border-line font-semibold">
+                      <Td>Total</Td>
+                      <Td />
+                      <Td className="tnum text-right text-small">{rows.reduce((n, c) => n + c.calls, 0)}</Td>
+                      <Td colSpan={5} />
+                      <Td className="tnum text-right text-small">{usd(rows.reduce((n, c) => n + c.cost_micro_usd, 0))}</Td>
+                    </tr>
+                  </tbody>
+                </Table>
+              )
+            }
+          </QueryState>
+        </Card>
+
+        <Card tour="run-leads" title="Leads this run touched" subtitle="Each lead it moved on, held, failed or will retry, with every step. Click a lead to open it." className="p-0 [&>header]:px-4 [&>header]:pt-4">
+          <QueryState query={leads}>
+            {(rows) =>
+              rows.length === 0 ? (
+                <Empty title={live ? "Nothing yet" : "No lead changed"}>{live ? "Leads appear here as the run moves them." : "This run found nothing due, or left every lead where it was."}</Empty>
+              ) : (
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Lead</Th>
+                      <Th>Result</Th>
+                      <Th>What happened</Th>
+                      <Th>Now</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...rows].sort((a, b) => ORDER.indexOf(a.outcome) - ORDER.indexOf(b.outcome)).map((lead) => (
+                      <LeadRow key={lead.company_id} lead={lead} />
+                    ))}
+                  </tbody>
+                </Table>
+              )
+            }
+          </QueryState>
+        </Card>
+    </Sections>
+  );
+}
+
+function LeadRow({ lead }: { lead: Lead }) {
+  const outcome = OUTCOME[lead.outcome] ?? OUTCOME.moved;
+  return (
+    <tr className="align-top hover:bg-surface-2">
+      <Td>
+        <Link to="/leads/$companyId" params={{ companyId: lead.company_id }} className="font-semibold text-primary hover:underline">
+          {lead.name ?? lead.domain}
+        </Link>
+        <div className="font-mono text-label text-muted">{lead.domain}</div>
+      </Td>
+      <Td>
+        <span className={cx("rounded-full px-2 py-0.5 text-label font-medium", outcome.tone)}>{outcome.label}</span>
+      </Td>
+      <Td>
+        <ol className="space-y-0.5 text-small">
+          {lead.steps.map((step, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-1">
+              {step.kind === "deferred" ? (
+                <span className="text-muted">put off</span>
+              ) : (
+                <>
+                  <span>{describe(leadStatus, step.from_status ?? "").label}</span>
+                  <ArrowRight className="size-3 text-muted" aria-hidden />
+                  <span className="font-medium">{describe(leadStatus, step.to_status ?? "").label}</span>
+                </>
+              )}
+              {step.detail && <span className="text-muted">· {step.detail}</span>}
+            </li>
+          ))}
+        </ol>
+      </Td>
+      <Td className="whitespace-nowrap">
+        <StatusBadge status={describe(leadStatus, lead.status)} />
+        <div className="mt-1">
+          <Link to="/leads/$companyId/journey" params={{ companyId: lead.company_id }} className={buttonClass("ghost", "sm")}>
+            Journey
+          </Link>
+        </div>
+      </Td>
+    </tr>
+  );
+}
+
+function CandidateRow({ candidate: c, runId }: { candidate: Candidate; runId: string }) {
+  const queryClient = useQueryClient();
+  const [domain, setDomain] = useState("");
+  const promote = useMutation({
+    mutationFn: () =>
+      ok(client.POST("/api/candidates/{candidate_id}/promote", { params: { path: { candidate_id: c.id } }, body: { domain: domain.trim() || null } })),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["run-candidates", runId] }),
+  });
+  const canPromote = c.verdict !== "accepted" && c.verdict !== "already_lead";
+  return (
+    <tr>
+      <Td>
+        <div className="font-medium">
+          {c.company_id ? (
+            <Link to="/leads/$companyId" params={{ companyId: c.company_id }} className="hover:underline">
+              {c.name}
+            </Link>
+          ) : (
+            c.name
+          )}
+          {c.domain && <span className="ml-2 font-mono text-small text-muted">{c.domain}</span>}
+        </div>
+        {(c.evidence || c.description) && <p className="mt-0.5 line-clamp-2 max-w-xl text-small text-muted">{c.evidence || c.description}</p>}
+      </Td>
+      <Td className="text-small text-muted">{c.sources.map((src) => discoverySource[src] ?? words(src)).join(", ")}</Td>
+      <Td className="tnum text-right text-small">{c.screen_score ?? "–"}</Td>
+      <Td>
+        <StatusBadge status={describe(candidateVerdict, c.verdict)} title={c.reason} />
+        {c.reason && <p className="mt-0.5 max-w-xs text-small text-muted">{c.reason}</p>}
+      </Td>
+      <Td className="text-right">
+        {canPromote && (
+          <div className="flex items-center justify-end gap-2">
+            {!c.domain && <Input value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="website.com" aria-label={`${c.name}'s website`} className="w-36" />}
+            <Button size="sm" variant="secondary" busy={promote.isPending} disabled={!c.domain && !domain.trim()} onClick={() => promote.mutate()}>
+              Make a lead
+            </Button>
+          </div>
+        )}
+        {promote.error && <Problem error={promote.error} className="mt-1" />}
+      </Td>
+    </tr>
+  );
+}

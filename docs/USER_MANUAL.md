@@ -110,25 +110,20 @@ Waiting work continues **by itself** as soon as credits exist: when the month re
 
 ### 3.4 The guided tour
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Campaigns, Runs, Review, Needs attention, LinkedIn, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
+The first time you sign in on a browser (once setup is done), a one-minute tour opens by itself:
+nine steps across seven stops — Welcome, Today, ⌘K search, Review, Needs attention, Leads,
+Discovery runs, Campaigns, and a send-off. Each step spotlights the part of the screen it is
+about, with a short line on what it does for you; a little rocket moves along the track as you go.
 
-Every step has these buttons:
+- **Show me / Next** goes on (on the last step it says **Let's go**); **Back** goes back.
+- The **→** and **←** keys do the same; **Escape** or **Skip tour** closes it.
 
-1. **Next** goes to the next step. On the last step it says **Finish**.
-2. **Back** goes to the previous step.
-3. **Skip section** leaves the rest of the section you are in and jumps to the first step of the next one, opening that screen for you. On the last section it ends the tour.
-4. **End tour** closes it. Pressing Escape does the same.
+It opens once per browser. To see it again, open your account menu and choose **Take the guided tour**.
 
-The tour opens once per browser; ending or finishing it is remembered, and it will not come back by itself. To see it again, press **Tour** at the top right of any page.
-
-The two sections about a single lead open your most recent lead. If you have none yet, they say so; add a target and start a run, then take the tour again. A step whose part of the screen has nothing to show yet (for example the review queue when it is empty) is shown in the middle of the page.
-
-**For whoever changes the app:** the tour is data, not code. Its text and the element each step points at are in `web2/src/tour/steps.ts`; the player is `web2/src/tour/Tour.tsx`.
-
-- New screen: add a section to `steps.ts` (in the order a person would meet it) and a `place` for it.
-- New feature or changed screen: add or edit a step. Give the element `data-tour="name"` (or `tour="name"` on a `Card` or `Tabs`), and use the same name as the step's `target`.
-- Removed or renamed element: change or delete the step. `web2/e2e/tour.spec.ts` walks every step against a real lead and fails if a step points at something that no longer exists, so a forgotten step shows up in the checks.
-- Keep this section of the manual in step with the sections in `steps.ts`.
+**For whoever changes the app:** the tour is data. Its steps (text, emoji, the element each points
+at) are in `web3/src/tour/steps.ts`; the player is `web3/src/tour/Tour.tsx`. Keep it short: one
+step per screen that matters. Give the element `data-tour="name"` and use that name as the step's
+`target`. `web3/e2e/tour.spec.ts` walks every step and fails if one points at something missing.
 
 ---
 
@@ -379,6 +374,32 @@ Every Save shows what happened next to it: *Saving…*, then a green tick, or th
 Automatic sending cannot be switched on in this version.
 
 ---
+
+## 5a. The new app (web3, being tried out)
+
+A redesigned app does everything the current one does, on the same data. It is switched on by
+whoever runs the service (`WEB_APP=web3`); the addresses are the same, so bookmarks keep working.
+What is different:
+
+- **Today** replaces the Dashboard: how many drafts wait and how long the oldest has waited, what
+  you reviewed today (and your streak), when discovery next runs, the week's approved drafts,
+  leads and spend against last week, and folding sections for what needs you, the pipeline, the
+  active campaign with its fit scores, where good leads come from, and what happened.
+- **Every page section folds.** The first is open; the rest show a one-line summary.
+  *Expand all* and *Collapse all* sit above them, and your choice is remembered in this browser.
+- **⌘K (Ctrl+K)** opens a search box anywhere: type part of a company's name or website to open
+  it, or a page's name to go there.
+- **Review** shows the email as it will be drafted, with the action bar always in view and
+  *Ctrl+Enter* to approve. "Why this lead" lists each must-have, signal and rule-out with its
+  evidence.
+- **Leads** has saved views (Hot, Waiting review, On hold…), filters for fit, source and country,
+  sorting, and shows each lead's contact, address status and spend.
+- **A lead's Journey** is a tab on the lead's page, next to *Overview* and *Activity*.
+- **Discovery runs**: *Start a run now* opens a panel showing what will run, how many companies to
+  find (10, 25 or 50), which sources suit your brief and how often their leads passed recently.
+- **Setting up** opens with a short welcome, then five steps with your progress at the top, and
+  ends with what happens next.
+- **Light, dark or system** theme, from your account menu.
 
 ## 6. What happens to a company, step by step
 

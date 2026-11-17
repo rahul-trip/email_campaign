@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -252,8 +252,19 @@ class CompanyOut(Out):
         return is_hot(self.fit_score)
 
 
+class LeadSummaryOut(Out):
+    contact_name: str | None
+    contact_title: str | None
+    email_status: str | None
+    cost_micro_usd: int
+
+
+class CompanyRowOut(CompanyOut):
+    summary: LeadSummaryOut | None = None  # only with ``include=summary``
+
+
 class CompanyPage(Out):
-    items: list[CompanyOut]
+    items: list[CompanyRowOut]
     total: int
 
 
@@ -1458,3 +1469,49 @@ class LinkedInEditIn(In):
 class LinkedInSentOut(Out):
     item: LinkedInDraftOut
     email_held: bool
+
+
+# --------------------------------------------------------------------------- web3 read models
+
+
+class DayOut(Out):
+    day: date
+    leads: int
+    approved: int
+    reviewed: int
+    sent: int
+    spend_micro_usd: int
+
+
+class DailyOut(Out):
+    days: list[DayOut]
+    review_streak: int  # consecutive days, ending today or yesterday, with a review by a person
+
+
+class FitBandOut(Out):
+    start: int  # 0, 10, ... 90 (90 holds 90 to 100)
+    count: int
+
+
+class FitOut(Out):
+    campaign_id: str | None
+    campaign: str | None
+    min_fit_score: int | None
+    bands: list[FitBandOut]
+    scored: int
+    unscored: int
+
+
+class PlannedSourceOut(Out):
+    source: str
+    suited: bool
+    why_not: str | None
+    share: float
+    found: int | None  # its 90-day record, when it has one
+    qualified: int | None
+    rate: float | None
+
+
+class DiscoveryPlanOut(Out):
+    campaign: str | None
+    sources: list[PlannedSourceOut]

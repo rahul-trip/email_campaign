@@ -2,24 +2,28 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import ColumnElement, case, func, select
 
 from outbound.db.models import (
     CompanyRow,
+    ContactEmailRow,
+    ContactRow,
     DiscoveryCandidateRow,
     EventRow,
     MessageRow,
     ProviderCallRow,
 )
 from outbound.db.repositories.base import ScopedRepository
-from outbound.domain.actors import AUTO
+from outbound.domain.actors import AUTO, SYSTEM
 from outbound.domain.enums import (
     CallOutcome,
     CandidateVerdict,
     CompanyStatus,
+    ContactStatus,
     EntityType,
     HoldReason,
     MessageState,
@@ -62,6 +66,34 @@ class ErrorRow:
     provider: str
     calls: int
     errors: int
+
+
+@dataclass
+class DayRow:
+    """What happened on one UTC day."""
+
+    day: date
+    leads: int = 0  # companies added, by any route
+    approved: int = 0  # emails approved, by a person or automatically
+    reviewed: int = 0  # emails a person approved or rejected
+    sent: int = 0  # emails seen in a Sent folder
+    spend_micro_usd: int = 0
+
+
+@dataclass(frozen=True)
+class LeadSummary:
+    """The one line a leads list shows about a company's people and spend."""
+
+    company_id: str
+    contact_name: str | None
+    contact_title: str | None
+    email_status: str | None
+    cost_micro_usd: int
+
+
+# People the engine works on; the others (unconfirmed, not here, gone) are not "the contact".
+_WORKED_ON = (ContactStatus.ACTIVE, ContactStatus.CANDIDATE)
+_DECIDED = (MessageState.APPROVED.value, MessageState.REJECTED.value)
 
 
 class ReportRepository(ScopedRepository):
@@ -193,3 +225,130 @@ class ReportRepository(ScopedRepository):
             ProviderCallRow.created_at >= since,
             ProviderCallRow.created_at < until,
         )
+
+    # ------------------------------------------------------------------ web3 read models
+
+    def daily(self, since: datetime, until: datetime) -> list[DayRow]:
+        """One row per UTC day from ``since`` to ``until``, oldest first, days with nothing
+        included. Grouped here rather than in SQL so SQLite and Postgres agree."""
+        days: dict[date, DayRow] = {}
+        cursor = since.date()
+        while cursor <= until.date():
+            days[cursor] = DayRow(cursor)
+            cursor = date.fromordinal(cursor.toordinal() + 1)
+
+        def bump(moment: datetime | None, field: str, by: int = 1) -> None:
+            if moment is not None and moment.date() in days:
+                row = days[moment.date()]
+                setattr(row, field, getattr(row, field) + by)
+
+        for (created,) in self._session.execute(
+            select(CompanyRow.created_at).where(
+                CompanyRow.workspace_id == self._workspace_id,
+                CompanyRow.created_at >= since,
+                CompanyRow.created_at < until,
+            )
+        ):
+            bump(created, "leads")
+        for created, actor, data in self._session.execute(
+            select(EventRow.created_at, EventRow.actor, EventRow.data).where(
+                EventRow.workspace_id == self._workspace_id,
+                EventRow.entity_type == EntityType.MESSAGE,
+                EventRow.type == "status_changed",
+                EventRow.created_at >= since,
+                EventRow.created_at < until,
+            )
+        ):
+            to = (data or {}).get("to")
+            if to == MessageState.APPROVED.value:
+                bump(created, "approved")
+            if to in _DECIDED and actor not in (SYSTEM, AUTO):
+                bump(created, "reviewed")
+        for (sent_at,) in self._session.execute(
+            select(MessageRow.sent_at).where(
+                MessageRow.workspace_id == self._workspace_id,
+                MessageRow.sent_at >= since,
+                MessageRow.sent_at < until,
+            )
+        ):
+            bump(sent_at, "sent")
+        for created, cost in self._session.execute(
+            select(ProviderCallRow.created_at, ProviderCallRow.cost_micro_usd).where(
+                *self._window(since, until), ProviderCallRow.cost_micro_usd > 0
+            )
+        ):
+            bump(created, "spend_micro_usd", int(cost))
+        return list(days.values())
+
+    def fit_scores(self, campaign_id: str | None) -> tuple[dict[int, int], int]:
+        """How many companies have each fit score, and how many have none yet, for one campaign
+        (or every company when ``campaign_id`` is None)."""
+        where = [CompanyRow.workspace_id == self._workspace_id]
+        if campaign_id is not None:
+            where.append(CompanyRow.campaign_id == campaign_id)
+        stmt = select(CompanyRow.fit_score, func.count()).where(*where)
+        scores: dict[int, int] = {}
+        unscored = 0
+        for score, n in self._session.execute(stmt.group_by(CompanyRow.fit_score)):
+            if score is None:
+                unscored += int(n)
+            else:
+                scores[int(score)] = int(n)
+        return scores, unscored
+
+    def lead_summaries(self, company_ids: Collection[str]) -> dict[str, LeadSummary]:
+        """For each company: its first-ranked person the engine works on, that person's main
+        address status, and what its vendor calls cost. Three queries for a whole page."""
+        ids = list(company_ids)
+        if not ids:
+            return {}
+        people: dict[str, tuple[str, str | None, str | None]] = {}
+        stmt = (
+            select(ContactRow.company_id, ContactRow.id, ContactRow.full_name, ContactRow.title)
+            .where(
+                ContactRow.workspace_id == self._workspace_id,
+                ContactRow.company_id.in_(ids),
+                ContactRow.status.in_(_WORKED_ON),
+            )
+            .order_by(ContactRow.company_id, ContactRow.rank, ContactRow.created_at)
+        )
+        for company_id, contact_id, name, title in self._session.execute(stmt):
+            people.setdefault(company_id, (contact_id, name, title))
+        statuses: dict[str, str] = {}
+        contact_ids = [p[0] for p in people.values()]
+        if contact_ids:
+            stmt_e = (
+                select(ContactEmailRow.contact_id, ContactEmailRow.status)
+                .where(
+                    ContactEmailRow.workspace_id == self._workspace_id,
+                    ContactEmailRow.contact_id.in_(contact_ids),
+                )
+                .order_by(ContactEmailRow.is_primary.desc(), ContactEmailRow.created_at.desc())
+            )
+            for contact_id, status in self._session.execute(stmt_e):
+                statuses.setdefault(contact_id, status.value)
+        costs = {
+            company_id: int(cost)
+            for company_id, cost in self._session.execute(
+                select(
+                    ProviderCallRow.company_id,
+                    func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                )
+                .where(
+                    ProviderCallRow.workspace_id == self._workspace_id,
+                    ProviderCallRow.company_id.in_(ids),
+                )
+                .group_by(ProviderCallRow.company_id)
+            )
+        }
+        out: dict[str, LeadSummary] = {}
+        for company_id in ids:
+            person = people.get(company_id)
+            out[company_id] = LeadSummary(
+                company_id,
+                person[1] if person else None,
+                person[2] if person else None,
+                statuses.get(person[0]) if person else None,
+                costs.get(company_id, 0),
+            )
+        return out

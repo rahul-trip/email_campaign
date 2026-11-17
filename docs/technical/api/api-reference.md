@@ -143,7 +143,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 
 | Method and path | Auth | Request | Response | Errors | Calls |
 |---|---|---|---|---|---|
-| `GET /api/companies` | login | query `status?`, `hold_reason?`, `campaign_id?`, `q?`, `limit` 1–200 (50), `offset` | 200 `CompanyPage` | — | `LeadService.search` |
+| `GET /api/companies` | login | query `status?`, `hold_reason?`, `campaign_id?`, `q?`, `waiting_for_credits?`, `min_fit?` 0–100, `hot?` (fit above 80; unscored is neither), `source?` (`CompanySource`), `country?` (2 letters, any case), `sort` `newest` (default) \| `fit` (unscored last) \| `updated` \| `name`, `include?` `summary`, `limit` 1–200 (50), `offset` | 200 `CompanyPage {items: list[CompanyRowOut], total}`; with `include=summary` each row's `summary` is `LeadSummaryOut {contact_name, contact_title, email_status, cost_micro_usd}` (first-ranked active or candidate person, their main address status, the lead's vendor spend), else null | 422 bad `sort`, `min_fit` or `country` | `LeadService.search`, `ReportService.lead_summaries` |
 | `GET /api/companies/{company_id}` | login | — | 200 `LeadOut` (company, people with addresses and consents, messages, notes) | — | `LeadService.detail` |
 | `GET /api/companies/{company_id}/journey` | login | — | 200 `JourneyOut` | — | `LeadService.journey` |
 | `GET /api/companies/{company_id}/timeline` | login | — | 200 `list[TimelineOut]` (events) | — | `LeadService.timeline` |
@@ -171,6 +171,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `POST /api/runs` | login + CSRF | `RunIn {limit 1–500 (50; the web app no longer sends it), only[], mode manual\|discovery\|mixed, discover 1–50 (10), campaign?}` | **202** `RunOut` (queued) | — | `RunService.queue` |
 | `GET /api/runs` | login | — | 200 `list[RunOut]` (the 20 most recent) | — | `RunService.recent` |
 | `GET /api/runs/auto-discovery` | login (`runs.read`) | — | 200 `AutoDiscoveryOut {reason, campaign, last_search, next_search, per_day, review_limit, waiting_for_review}`; `reason` is null when a search is due, else `off`, `no_campaign`, `no_credits`, `run_in_progress`, `review_full`, `backlog` or `not_yet` | — | `AutoDiscovery.state` |
+| `GET /api/runs/plan` | login (`runs.read`) | — | 200 `DiscoveryPlanOut {campaign, sources: list[PlannedSourceOut {source, suited, why_not, share, found, qualified, rate}]}`: the sources the next discovery run would ask for the active campaign's brief, in order, then the unsuited ones with the reason; a source whose key is missing is skipped only when the run starts. Read-only | — | `ReportService.discovery_plan` |
 | `GET /api/runs/{run_id}` | login | — | 200 `RunOut` (live cost while running) | — | `RunService.get` |
 | `POST /api/runs/{run_id}/cancel` | login + CSRF | — | 200 `RunOut` | — | `RunService.cancel` |
 | `GET /api/runs/{run_id}/searches` | login (`runs.read`) | — | 200 `list[DiscoverySearchOut {query, new_leads, already_leads, source, angle, found, pages[]}]` | 404 | `RunService.searches` |
@@ -179,6 +180,8 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 | `GET /api/status` | login | — | 200 `StatusOut` (counts by status, review queue, holds) | — | `ReportService.status` |
 | `GET /api/reports/quality` | login | — | 200 `QualityOut` | — | `ReportService.quality` |
 | `GET /api/reports/cost` | login | query `days` 1–365 (30) | 200 `CostOut` | — | `ReportService.cost` |
+| `GET /api/reports/daily` | login (`reports:read`) | query `days` 1–90 (14) | 200 `DailyOut {days: list[DayOut {day, leads, approved, reviewed, sent, spend_micro_usd}], review_streak}`: one row per UTC day, oldest first, today included; `reviewed` counts approvals and rejections by a person (not `auto` or the system); `review_streak` is consecutive days with a review ending today or yesterday | 422 `days` out of range | `ReportService.daily` |
+| `GET /api/reports/fit` | login (`reports:read`) | — | 200 `FitOut {campaign_id, campaign, min_fit_score, bands: list[FitBandOut {start, count}], scored, unscored}`: the active campaign's companies (every company when none is active) in fit bands 0, 10 … 90 (90 holds 90–100) | — | `ReportService.fit` |
 | `GET /api/reports/funnel` | `reports:read` | `days` (1–365, default 30) | 200 `FunnelOut`: companies discovery named (and how many the model scored), screening verdicts, leads added and where they are now (`waiting`, `failed:<stage>`, `held:<reason>`, a status), and per-vendor calls and failures | 422 for `days` out of range | `ReportService.funnel` |
 | `GET /api/reports/sources` | `reports:read` | — | 200 `SourceYieldOut[]`: per discovery source over 90 days, companies named, leads, passed the fit gate, rate | — | `ReportService.sources` |
 

@@ -100,6 +100,8 @@ class Settings(BaseSettings):
     app_base_url: str = "http://127.0.0.1:8000"  # links in invitations and resets start with it
     superadmin_enabled: bool = True  # alpha only: a superadmin may read any workspace
     terms_version: str = "2026-10"  # the Terms a person accepts when they set a password
+    # The built web app `outbound serve` hands out: web3, or web2 (the old one, unused).
+    web_app: Literal["web2", "web3"] = "web3"
     email_from: str = "Outbound <no-reply@localhost>"
     smtp_host: str = ""  # blank: messages go to the log (development)
     smtp_port: int = 587

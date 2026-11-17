@@ -5,9 +5,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
+from outbound.db.repositories.reports import DayRow, LeadSummary
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
-from outbound.domain.discovery import YIELD_DAYS, SourceYield
+from outbound.domain.brief import Brief
+from outbound.domain.discovery import (
+    CH,
+    SOURCE_ORDER,
+    STARTUP_SOURCES,
+    YIELD_DAYS,
+    SourceYield,
+    plan_sources,
+    share,
+)
 from outbound.domain.enums import (
     CallOutcome,
     CandidateVerdict,
@@ -110,6 +120,48 @@ class FunnelReport:
         return self.verdicts.get(CandidateVerdict.ACCEPTED, 0) / self.named if self.named else None
 
 
+@dataclass(frozen=True)
+class FitReport:
+    """How the active campaign's companies spread over fit scores, in bands of ten."""
+
+    campaign_id: str | None
+    campaign: str | None
+    min_fit_score: int | None
+    bands: list[tuple[int, int]]  # (band start 0, 10, ... 90, count); 90 holds 90 to 100
+    unscored: int
+
+    @property
+    def scored(self) -> int:
+        return sum(n for _, n in self.bands)
+
+
+@dataclass(frozen=True)
+class PlannedSource:
+    source: str
+    suited: bool  # the brief allows it; whether its vendor key is set is known only at run time
+    why_not: str | None
+    share: float  # how much of the usual amount it would be asked for (0.5 to 2)
+    record: SourceYield | None
+
+
+@dataclass(frozen=True)
+class DiscoveryPlan:
+    campaign: str | None
+    sources: list[PlannedSource]  # suited ones in the order discovery would ask them, then the rest
+
+
+def review_streak(days: list[DayRow]) -> int:
+    """Consecutive days with a review by a person, counting back from today; a day not yet
+    reviewed today does not break a streak that ran to yesterday."""
+    streak = 0
+    for n, row in enumerate(reversed(days)):
+        if row.reviewed:
+            streak += 1
+        elif n > 0:
+            break
+    return streak
+
+
 def outcome(status: CompanyStatus, hold_reason: HoldReason | None, failed_stage: str | None) -> str:
     """Where a lead is, as one key: ``waiting``, ``failed:<stage>``, ``held:<reason>``, or its
     status (``disqualified``, ``email_ready``, ``copy_ready``...)."""
@@ -187,3 +239,56 @@ class ReportService:
             len(prospects),
             outcomes,
         )
+
+    # ------------------------------------------------------------------ web3 read models
+
+    def daily(self, days: int = 14) -> list[DayRow]:
+        """Per-day counts for the last ``days`` days, today included, oldest first."""
+        now = utcnow()
+        since = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        with self._uow(self._workspace_id) as uow:
+            return uow.reports.daily(since, now + timedelta(seconds=1))
+
+    def fit(self) -> FitReport:
+        """Fit-score bands for the active campaign (every company when none is active)."""
+        with self._uow(self._workspace_id) as uow:
+            campaign = uow.campaigns.active()
+            scores, unscored = uow.reports.fit_scores(campaign.id if campaign else None)
+        bands = dict.fromkeys(range(0, 100, 10), 0)
+        for score, n in scores.items():
+            bands[min(max(score, 0), 99) // 10 * 10] += n
+        return FitReport(
+            campaign.id if campaign else None,
+            campaign.name if campaign else None,
+            campaign.min_fit_score if campaign else None,
+            sorted(bands.items()),
+            unscored,
+        )
+
+    def lead_summaries(self, company_ids: list[str]) -> dict[str, LeadSummary]:
+        with self._uow(self._workspace_id) as uow:
+            return uow.reports.lead_summaries(company_ids)
+
+    def discovery_plan(self) -> DiscoveryPlan:
+        """Which sources the next discovery run would ask for the active campaign, best record
+        first, and why the others would be skipped. Read-only: nothing is searched."""
+        with self._uow(self._workspace_id) as uow:
+            campaign = uow.campaigns.active()
+            yields = uow.candidates.source_yield(since=utcnow() - timedelta(days=YIELD_DAYS))
+        brief = Brief.from_json(campaign.icp_brief) if campaign else Brief()
+        order = plan_sources(brief, available=SOURCE_ORDER, yields=yields)
+        planned = [
+            PlannedSource(name, True, None, round(share(name, yields), 2), yields.get(name))
+            for name in order
+        ]
+        for name in SOURCE_ORDER:
+            if name not in order:
+                why = (
+                    "only for a brief that looks for start-ups"
+                    if name in STARTUP_SOURCES
+                    else "only for a UK brief with industry (SIC) codes"
+                    if name == CH
+                    else "not suited to this brief"
+                )
+                planned.append(PlannedSource(name, False, why, 0.0, yields.get(name)))
+        return DiscoveryPlan(campaign.name if campaign else None, planned)

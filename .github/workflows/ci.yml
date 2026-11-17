@@ -73,8 +73,8 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest tests
 
-  web2:
-    name: web2 app (types, build, generated client, browser test with the guided tour)
+  web3:
+    name: web app, web3 (types, build, generated client, route parity with web2, browser tests with the tour)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,22 +87,24 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web2/package-lock.json
+          cache-dependency-path: web3/package-lock.json
       - run: uv sync --frozen
       - run: npm ci
-        working-directory: web2
+        working-directory: web3
       - name: Generated client matches the API
-        working-directory: web2
+        working-directory: web3
         run: |
           npm run gen:api
           git diff --exit-code openapi.json src/api/schema.ts
-      # typecheck covers the app and the browser tests; build is what the server serves.
       - run: npm run build
-        working-directory: web2
+        working-directory: web3
+      - name: Every API route web2 uses is used by web3
+        working-directory: web3
+        run: npm run check:parity
       - run: npx playwright install --with-deps chromium
-        working-directory: web2
+        working-directory: web3
       - run: npx playwright test
-        working-directory: web2
+        working-directory: web3
 
   image:
     name: production image builds
@@ -141,7 +143,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Known vulnerabilities in web2 dependencies
+      - name: Known vulnerabilities in web3 dependencies
         continue-on-error: true
-        working-directory: web2
+        working-directory: web3
         run: npm audit --audit-level=high
