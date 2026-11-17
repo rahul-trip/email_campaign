@@ -136,6 +136,6 @@ Done: LinkedIn profile lookups in research ask for five people per search (a lea
 - A new web app in `web3/` beside web2 (kept as it is), over the same API and data; no migration.
 - Read-only API additions for it: lead filters (`min_fit`, `hot`, `source`, `country`), `sort` and `include=summary` on `GET /api/companies`; `GET /api/reports/daily`, `GET /api/reports/fit`, `GET /api/runs/plan`. Tests in `tests/api/test_web3_reads.py`.
 - Route parity with web2 is checked in CI (`npm run check:parity`); all 181 routes are covered.
-- `WEB_APP=web3` serves it; the default stays web2.
+- `WEB_APP` picks the app; the default is web3.
 - Guided tour and the full browser suite run on web3 (40 tests, in CI). The admin console has its own staff header. The user manual describes web3 (§5a).
-- Still open before the switch: richer layouts for the screens still drawn through `ui/compat.tsx` (Add leads, Campaigns, Reports, Policies, Settings, LinkedIn, admin), a live-data look on the deployed VM, and then `WEB_APP=web3` in Doppler.
+- **web3 is the app (2026-11-17).** The Docker image builds web3 and `WEB_APP` defaults to it (image build checked locally); CI tests web3 only; web2 stays in the repo, unused. The tour is nine short steps. The shared component layer was restyled, so every screen matches. Left: deploy to the VM and look at it with real data (no `WEB_APP` change needed).
