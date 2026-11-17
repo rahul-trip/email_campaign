@@ -60,6 +60,7 @@ STAFF_IDLE, STAFF_ABSOLUTE = timedelta(hours=8), timedelta(days=3)
 SEEN_EVERY = timedelta(minutes=5)  # how often last_seen_at is written
 JOIN_CODE_TRIES = 10  # wrong join codes one person may try in JOIN_CODE_WINDOW
 JOIN_CODE_WINDOW = timedelta(hours=1)
+MAX_WORKSPACE_ID = 64  # ids are 36 characters; a longer header names nothing
 
 
 class IdentityError(Exception):
@@ -71,10 +72,19 @@ class IdentityError(Exception):
 
 
 @dataclass(frozen=True)
+class WorkspaceCheck:
+    """The status of the workspace a request named, read while signing the person in."""
+
+    workspace_id: str
+    status: WorkspaceStatus | None  # None: no such workspace
+
+
+@dataclass(frozen=True)
 class CurrentUser:
     user: User
     session_id: str
     memberships: tuple[Membership, ...] = ()
+    workspace: WorkspaceCheck | None = None
 
     def role_in(self, workspace_id: str) -> MembershipRole | None:
         return next((m.role for m in self.memberships if m.workspace_id == workspace_id), None)
@@ -187,8 +197,22 @@ class IdentityService:
         log.info("login_succeeded", user_id=user.id)
         return signed
 
-    def authenticate(self, token: str | None) -> CurrentUser | None:
-        """The signed-in person behind a cookie, or None if it is missing, revoked or expired."""
+    def authenticate(
+        self,
+        token: str | None,
+        *,
+        workspace_id: str | None = None,
+        default_to_only: bool = False,
+    ) -> CurrentUser | None:
+        """The signed-in person behind a cookie, or None if it is missing, revoked or expired.
+
+        With ``workspace_id`` (what the request's ``X-Workspace-Id`` named), the status of that
+        workspace is read in the same transaction, for a member of it or a platform superadmin.
+        With none named, ``default_to_only`` uses the person's one workspace, as a request without
+        the header does. Anyone else gets no check, and the caller refuses them before it would
+        matter. This saves the request a transaction of its own for that one question, which at a
+        distance from the database is most of a tenth of a second.
+        """
         if not token:
             return None
         now = utcnow()
@@ -206,7 +230,16 @@ class IdentityService:
                 ids.sessions.seen(session.id, now)
                 ids.commit()
             memberships = tuple(ids.memberships.for_user(user.id))
-        return CurrentUser(user, session.id, memberships)
+            target = workspace_id
+            if not target and default_to_only and len(memberships) == 1:
+                target = memberships[0].workspace_id
+            check = None
+            may_look = user.platform_role is PlatformRole.SUPERADMIN or any(
+                m.workspace_id == target for m in memberships
+            )
+            if target and len(target) <= MAX_WORKSPACE_ID and may_look:
+                check = WorkspaceCheck(target, ids.workspace_status(target))
+        return CurrentUser(user, session.id, memberships, check)
 
     def logout(self, token: str | None) -> None:
         if not token:

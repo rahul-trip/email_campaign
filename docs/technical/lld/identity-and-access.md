@@ -114,6 +114,7 @@ One table, `auth_tokens`, serves three `AuthTokenPurpose`s with the same shape: 
 ## Invariants
 
 - A session row, once revoked or expired, authenticates nothing — checked on every request, not cached.
+- The workspace-closed check does not cost a transaction of its own: `IdentityService.authenticate(workspace_id=…)` reads the named workspace's status in the sign-in transaction, after the membership is known (a member, or a superadmin) and with the row-level-security key set to that one workspace (`IdentityUnitOfWork.workspace_status`, `db/session.py::bind_workspace`). `deps.py::tenant` still refuses first for a non-member, and reads the status separately only when the sign-in did not (`_workspace_status`). `deps.py::_signed_in` signs a person in once per request, however many dependencies ask.
 - A `Principal`'s permissions come only from `ROLE_PERMISSIONS`/`PLATFORM_PERMISSIONS`/`superadmin_view`; there is no per-user permission override.
 - A superadmin's cross-workspace view is always read-only; `can()` grants it exactly `READ`, never `WORK` or any workspace-admin permission.
 - An `auth_tokens` row of a given purpose and email is revoked before a fresh one of the same purpose and email is issued.

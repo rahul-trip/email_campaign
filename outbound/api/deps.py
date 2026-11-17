@@ -169,14 +169,44 @@ def identity(request: Request) -> IdentityService:
     return service
 
 
-def current_user(
-    request: Request, ids: Annotated[IdentityService, Depends(identity)]
+def _signed_in(
+    request: Request,
+    ids: IdentityService,
+    *,
+    workspace_id: str | None = None,
+    for_tenant: bool = False,
 ) -> CurrentUser:
-    user = ids.authenticate(session_token(request))
+    """Sign the person in once per request, whichever dependency asks first.
+
+    A route can need both ``current_user`` and a tenant (the mailbox OAuth route does); the
+    second one reuses the first one's answer instead of opening another transaction.
+    """
+    known: CurrentUser | None = getattr(request.state, "signed_in", None)
+    if known is not None:
+        return known
+    user = ids.authenticate(
+        session_token(request), workspace_id=workspace_id, default_to_only=for_tenant
+    )
     if user is None:
         raise ApiError(401, "unauthenticated", "Sign in to continue.")
     bind(user_id=user.user.id)
+    request.state.signed_in = user
     return user
+
+
+def current_user(
+    request: Request, ids: Annotated[IdentityService, Depends(identity)]
+) -> CurrentUser:
+    return _signed_in(request, ids)
+
+
+def workspace_user(
+    request: Request, ids: Annotated[IdentityService, Depends(identity)]
+) -> CurrentUser:
+    """The signed-in person, with the status of the workspace the request names read in the same
+    transaction (see ``IdentityService.authenticate``)."""
+    named = request.headers.get(WORKSPACE_HEADER, "").strip()
+    return _signed_in(request, ids, workspace_id=named or None, for_tenant=True)
 
 
 @dataclass(frozen=True)
@@ -190,7 +220,7 @@ class Tenant:
         return f"user:{self.user.user.id}"
 
 
-def tenant(request: Request, user: Annotated[CurrentUser, Depends(current_user)]) -> Tenant:
+def tenant(request: Request, user: Annotated[CurrentUser, Depends(workspace_user)]) -> Tenant:
     workspace_id = request.headers.get(WORKSPACE_HEADER, "").strip()
     if not workspace_id:
         if len(user.memberships) != 1:
@@ -205,7 +235,11 @@ def tenant(request: Request, user: Annotated[CurrentUser, Depends(current_user)]
     if role is None and not superadmin_view:
         log.warning("workspace_refused", workspace_id=workspace_id[:64])
         raise ApiError(403, "not_a_member", "You are not a member of that workspace.")
-    status = _workspace_status(request, workspace_id)
+    read = user.workspace
+    if read is not None and read.workspace_id == workspace_id:
+        status = read.status  # read while signing in: no second transaction
+    else:
+        status = _workspace_status(request, workspace_id)
     if status is None:
         raise ApiError(404, "not_found", "No such workspace.")
     if status in (WorkspaceStatus.SUSPENDED, WorkspaceStatus.DELETED) and not superadmin_view:
