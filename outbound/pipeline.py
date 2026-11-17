@@ -54,6 +54,8 @@ from outbound.providers.registry import (
     build_resolver,
     build_search,
     build_verifier,
+    configured_resolvers,
+    configured_verifiers,
 )
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner, RunReport
@@ -72,6 +74,7 @@ from outbound.stages.contacts import ContactsStage
 from outbound.stages.copy.stage import CopyStage
 from outbound.stages.deliver import DeliverStage
 from outbound.stages.email.directory import DirectoryFinder
+from outbound.stages.email.fallback import ResolverChain, VerifierChain
 from outbound.stages.email.poller import CatchAllPoller
 from outbound.stages.email.stage import EmailDeps, EmailStage
 from outbound.stages.gate import GateStage
@@ -99,6 +102,9 @@ class Providers:
     copy_llm: LlmClient | None = None  # the writer's model; None means ``llm``
     # Where discovery looks besides web search: directories such as Y Combinator's.
     company_sources: list[LeadSource] = field(default_factory=list)
+    # Backups, tried in order when ``verifier`` or ``resolver`` fails (a refused key, an outage).
+    backup_verifiers: list[EmailVerifier] = field(default_factory=list)
+    backup_resolvers: list[CatchAllResolver] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -128,13 +134,26 @@ def real_providers(settings: Settings) -> Providers:
         try:
             resolver = build_resolver(settings)
         except ProviderError:
-            resolver = None  # no resolver configured: catch-alls stay unverified
+            resolver = None  # the chosen one has no key: the first backup takes its place
+        verifier = build_verifier(settings)
+        backup_verifiers = [
+            v for name, v in configured_verifiers(settings).items() if name != verifier.name
+        ]
+        backup_resolvers = [
+            r
+            for name, r in configured_resolvers(settings).items()
+            if resolver is None or name != resolver.name
+        ]
+        if resolver is None and backup_resolvers:
+            resolver = backup_resolvers.pop(0)
         return Providers(
             search=build_search(settings),
             llm=build_llm(settings),
             finders=build_finder_chain(settings),
-            verifier=build_verifier(settings),
+            verifier=verifier,
             resolver=resolver,
+            backup_verifiers=backup_verifiers,
+            backup_resolvers=backup_resolvers,
             registry=build_company_registry(settings),
             copy_llm=build_llm(settings, model=settings.llm_copy_model)
             if settings.llm_copy_model
@@ -182,8 +201,18 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     finders = [MeteredFinder(DirectoryFinder(uow, workspace_id), meter, ttl=None)] + [
         MeteredFinder(f, meter) for f in providers.finders
     ]
-    verifier = MeteredVerifier(providers.verifier, meter)
-    resolver = MeteredResolver(providers.resolver, meter) if providers.resolver else None
+    verifier: EmailVerifier = MeteredVerifier(providers.verifier, meter)
+    if providers.backup_verifiers:
+        verifier = VerifierChain(
+            [verifier] + [MeteredVerifier(v, meter) for v in providers.backup_verifiers]
+        )
+    resolver: CatchAllResolver | None = None
+    if providers.resolver is not None:
+        resolver = MeteredResolver(providers.resolver, meter)
+        if providers.backup_resolvers:
+            resolver = ResolverChain(
+                [resolver] + [MeteredResolver(r, meter) for r in providers.backup_resolvers]
+            )
 
     stages: list[Stage] = [
         ResearchStage(ResearchDeps(search, llm, registry)),

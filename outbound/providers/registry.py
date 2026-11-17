@@ -64,14 +64,7 @@ _FINDERS: dict[str, _Entry[EmailFinder]] = {
 }
 
 _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
-    "hunter": _Entry(
-        lambda s, c: HunterVerifier(_key(s.hunter_api_key), client=c),
-        lambda s: bool(_key(s.hunter_api_key)),
-    ),
-    "zerobounce": _Entry(
-        lambda s, c: ZeroBounceVerifier(_key(s.zerobounce_api_key), client=c),
-        lambda s: bool(_key(s.zerobounce_api_key)),
-    ),
+    # Order matters: backups are tried in it, the vendors that only verify before the finders.
     "orbisearch": _Entry(
         lambda s, c: OrbiSearchVerifier(_key(s.orbisearch_api_key), client=c),
         lambda s: bool(_key(s.orbisearch_api_key)),
@@ -79,6 +72,14 @@ _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
     "myemailverifier": _Entry(
         lambda s, c: MyEmailVerifierVerifier(_key(s.myemailverifier_api_key), client=c),
         lambda s: bool(_key(s.myemailverifier_api_key)),
+    ),
+    "hunter": _Entry(
+        lambda s, c: HunterVerifier(_key(s.hunter_api_key), client=c),
+        lambda s: bool(_key(s.hunter_api_key)),
+    ),
+    "zerobounce": _Entry(
+        lambda s, c: ZeroBounceVerifier(_key(s.zerobounce_api_key), client=c),
+        lambda s: bool(_key(s.zerobounce_api_key)),
     ),
 }
 

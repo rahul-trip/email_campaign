@@ -274,6 +274,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-47 · P2 · Email: a refused verifier or resolver key stopped the step although other vendors had keys — closed 2026-11-17
+
+- **Was:** only `VERIFIER` and `CATCH_ALL_RESOLVER` were ever built. From 13 to 16 Nov every Scrubby submit failed (19 errors, then 3 refusals of its key) while Enrichley had a working key and was never asked; OrbiSearch's key likewise sat unused behind MyEmailVerifier. A catch-all lead failed with "the catch-all resolver is not answering" instead.
+- **Fixed by:** `outbound/stages/email/fallback.py::VerifierChain` and `ResolverChain`, built by `pipeline.real_providers` / `assemble` from every vendor with a key (each metered on its own). `Waterfall._verify` records `verified_by` from the vendor that answered and saves a queued catch-all under the resolver that took it; `ResolverChain.poll` routes by that name (older tickets, saved under the verifier's name, go to the first resolver).
+- **Evidence:** `tests/stages/test_fallback.py`.
+- **Still open:** a vendor that answers "unknown" or "unresolved" is not asked again elsewhere; only failures fall through.
+
 ### R-46 · P3 · Admin console: a replaced key kept showing "key refused" for a day — closed 2026-11-17
 
 - **Was:** on 17 Nov the Vendors page showed Scrubby as *key refused* although its key worked: 14 of 14 submits that morning were accepted. All three refusals were of the previous key (16 Nov, 13:17–14:22 UTC), replaced at 16:27. `AdminQueries.key_failures` counted every refusal in the last 24 hours, whichever key it was for, so the flag, and the once-a-day staff email, outlived the key that caused them.

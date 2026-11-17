@@ -237,15 +237,16 @@ class Waterfall:
         except ProviderError as error:
             out.problems.append(f"{self._verifier.name}: {error}")
             return False
-        verified_by = self._verifier.name
+        # The vendor that answered: with backups it may not be the first one.
+        verified_by = checked.provider or self._verifier.name
 
-        def record(status: EmailStatus, ref: str | None = None) -> Record:
+        def record(status: EmailStatus, ref: str | None = None, by: str | None = None) -> Record:
             made = Record(
                 address,
                 provenance,
                 status,
                 found_by,
-                verified_by,
+                by or verified_by,
                 ref,
                 existing_id=existing_id,
                 contact_id=contact.id,
@@ -277,11 +278,12 @@ class Waterfall:
             out.resolver_down = True
             return False
         if ticket.result is None:
-            record(EmailStatus.CATCH_ALL_PENDING, ticket.ref)
+            # Saved under the resolver that took it, so the poller asks that one.
+            record(EmailStatus.CATCH_ALL_PENDING, ticket.ref, by=ticket.provider)
             out.verdict = Verdict.PENDING
             return False
         if ticket.result.status is ResolutionStatus.VALID:
-            out.chosen = record(EmailStatus.CATCH_ALL_RESOLVED)
+            out.chosen = record(EmailStatus.CATCH_ALL_RESOLVED, by=ticket.result.provider)
             out.verdict = Verdict.READY
             return True
         if ticket.result.status is ResolutionStatus.INVALID:

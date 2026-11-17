@@ -70,7 +70,9 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 |---|---|---|
 | `build_finder_chain(settings)` | Finders in `FINDER_CHAIN` order | `ProviderAuthError` |
 | `build_verifier(settings)` | The `VERIFIER` | `ProviderAuthError` |
-| `build_resolver(settings)` | The `CATCH_ALL_RESOLVER` | `ProviderAuthError`; `pipeline.real_providers` turns that into "no resolver" |
+| `build_resolver(settings)` | The `CATCH_ALL_RESOLVER` | `ProviderAuthError`; `pipeline.real_providers` then uses the first other resolver with a key, or none |
+
+`pipeline.real_providers` also fills `Providers.backup_verifiers` and `backup_resolvers` with every other configured vendor, in `_VERIFIERS` / `_RESOLVERS` order (the verify-only vendors first). `pipeline.assemble` meters each one separately and wraps them in `outbound/stages/email/fallback.py::VerifierChain` / `ResolverChain`, which move on only when a call raises `ProviderError`.
 | `build_llm(settings)` | `OpenAiCompatibleLlm` for `LLM_PROVIDER` and `LLM_MODEL`. The key comes from the vendor's own variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `COPILOT_API_KEY`), else `LLM_API_KEY` | — |
 | `build_search(settings)` | Tavily | `ProviderAuthError` |
 | `build_company_registry(settings)` | Companies House, or `None` without a key | — |
