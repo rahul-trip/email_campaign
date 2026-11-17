@@ -437,7 +437,7 @@ function Orb() {
 }
 
 /** A short, light confetti burst. Skipped entirely with "reduce motion". */
-function Confetti() {
+export function Confetti() {
   const colours = ["var(--primary)", "var(--violet)", "var(--good-dot)", "var(--attention-dot)", "var(--working-dot)", "var(--error-dot)"];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden" aria-hidden>

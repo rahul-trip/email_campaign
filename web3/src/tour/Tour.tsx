@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { client, ok } from "../api/client";
 import { Button } from "../ui/compat";
 import { SECTIONS, type Place } from "./steps";
+import { Confetti } from "../pages/Onboarding";
 
 const STORAGE_KEY = "outbound.tour";
 
@@ -30,6 +31,7 @@ type Position = { section: number; step: number };
 type Box = { target: string; top: number; left: number; width: number; height: number };
 
 const PAD = 6;
+const TOTAL = SECTIONS.reduce((n, s) => n + s.steps.length, 0);
 const CARD_WIDTH = 360;
 
 /** The element a step points at: the first one on screen, since some appear twice (wide and narrow layouts). */
@@ -108,31 +110,42 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
     return () => window.clearInterval(timer);
   }, [step?.target, pathname]);
 
-  const next = () => {
-    if (!at || !section) return;
-    if (at.step + 1 < section.steps.length) setAt({ section: at.section, step: at.step + 1 });
-    else skipSection();
-  };
-  const back = () => {
-    if (!at) return;
-    if (at.step > 0) setAt({ section: at.section, step: at.step - 1 });
-    else if (at.section > 0) setAt({ section: at.section - 1, step: SECTIONS[at.section - 1].steps.length - 1 });
-  };
-  const skipSection = () => {
-    if (!at) return;
-    if (at.section + 1 < SECTIONS.length) setAt({ section: at.section + 1, step: 0 });
-    else end();
-  };
+  // Moves read the latest position, so the keyboard listener never acts on a stale one.
+  const next = useCallback(() => {
+    setAt((prev) => {
+      if (!prev) return prev;
+      const here = SECTIONS[prev.section]!;
+      if (prev.step + 1 < here.steps.length) return { section: prev.section, step: prev.step + 1 };
+      if (prev.section + 1 < SECTIONS.length) return { section: prev.section + 1, step: 0 };
+      markSeen();
+      setBox(null);
+      return null;
+    });
+  }, []);
+  const back = useCallback(() => {
+    setAt((prev) => {
+      if (!prev) return prev;
+      if (prev.step > 0) return { section: prev.section, step: prev.step - 1 };
+      if (prev.section > 0) return { section: prev.section - 1, step: SECTIONS[prev.section - 1]!.steps.length - 1 };
+      return prev;
+    });
+  }, []);
 
   useEffect(() => {
     if (!active) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && end();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") end();
+      if ((event.target as HTMLElement).closest("input, textarea, select")) return;
+      if (event.key === "ArrowRight") next();
+      if (event.key === "ArrowLeft") back();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, end]);
+  }, [active, end, next, back]);
 
   const value = useMemo(() => ({ start }), [start]);
   const first = at ? at.section === 0 && at.step === 0 : false;
+  const overall = at ? SECTIONS.slice(0, at.section).reduce((n, x) => n + x.steps.length, 0) + at.step + 1 : 0;
   const last = at && section ? at.section === SECTIONS.length - 1 && at.step === section.steps.length - 1 : false;
 
   return (
@@ -146,30 +159,41 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
             className="pointer-events-none fixed z-[60] rounded-lg transition-all duration-200"
             style={
               box
-                ? { top: box.top - PAD, left: box.left - PAD, width: box.width + PAD * 2, height: box.height + PAD * 2, boxShadow: "0 0 0 9999px rgba(10,12,18,.5)", outline: "2px solid var(--primary)" }
+                ? { top: box.top - PAD, left: box.left - PAD, width: box.width + PAD * 2, height: box.height + PAD * 2, boxShadow: "0 0 0 9999px rgba(10,12,18,.55), 0 0 0 6px var(--primary-line), 0 0 32px 8px var(--primary-line)", outline: "2px solid var(--primary)", borderRadius: 14 }
                 : { inset: 0, background: "rgba(10,12,18,.5)" }
             }
           />
+          {last && <Confetti />}
           <div
             role="dialog"
             aria-label="Product tour"
             data-target-found={step.target ? String(box !== null) : "none"}
-            className="fixed z-[70] flex flex-col rounded-xl border border-line bg-surface p-4 shadow-3"
+            className="fixed z-[70] flex animate-rise flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-3"
             style={cardPosition(box)}
           >
-            <div className="flex items-center justify-between gap-2 text-label text-muted">
-              <span>
-                {section.title} · section {at.section + 1} of {SECTIONS.length} · step {at.step + 1} of {section.steps.length}
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-violet to-good-dot" />
+            <div className="flex items-center justify-between gap-2 text-label font-semibold tracking-wide text-primary uppercase">
+              <span>{section.title}</span>
+              <span className="tnum text-muted normal-case">
+                {overall} of {TOTAL}
               </span>
             </div>
-            <div className="mt-2 flex gap-1" aria-hidden>
-              {SECTIONS.map((s, i) => (
-                <span key={s.id} className={`h-1 flex-1 rounded-full ${i < at.section ? "bg-primary" : i === at.section ? "bg-primary/60" : "bg-surface-3"}`} />
+            <div className="relative mt-3 h-6" aria-hidden>
+              <div className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-surface-3" />
+              <div className="absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-primary to-violet transition-all duration-500" style={{ width: `${((overall - 1) / Math.max(1, TOTAL - 1)) * 100}%` }} />
+              {Array.from({ length: TOTAL }, (_, i) => (
+                <span key={i} className={`absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full ${i < overall ? "bg-primary" : "bg-surface-3 ring-2 ring-surface"}`} style={{ left: `${(i / Math.max(1, TOTAL - 1)) * 100}%` }} />
               ))}
+              <span className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-[18px] transition-all duration-500 [transition-timing-function:cubic-bezier(0.2,0.9,0.3,1.4)]" style={{ left: `${((overall - 1) / Math.max(1, TOTAL - 1)) * 100}%` }}>
+                🚀
+              </span>
             </div>
             <div className="min-h-0 overflow-y-auto">
-            <h2 className="mt-3 text-heading font-semibold">{step.title}</h2>
-            <p className="mt-1 text-body leading-relaxed text-ink">{step.body}</p>
+            <div key={step.title} className="mt-3 flex animate-rise items-start gap-3">
+              {step.icon && <span className="flex size-12 shrink-0 animate-pop items-center justify-center rounded-2xl bg-gradient-to-br from-primary-soft to-surface-3 text-[26px] shadow-1">{step.icon}</span>}
+              <h2 className="pt-1 text-title font-semibold text-ink">{step.title}</h2>
+            </div>
+            <p className="mt-1.5 text-body text-ink-2">{step.body}</p>
             {leadNeeded(section.place) && firstLead.isSuccess && !leadId && (
               <p className="mt-2 rounded-lg bg-attention-soft p-2 text-small text-attention">There is no lead yet, so there is nothing to point at. Add a lead and start a run, then take the tour again.</p>
             )}
@@ -179,18 +203,15 @@ export function TourProvider({ children, autoStart }: { children: ReactNode; aut
             </div>
             <div className="mt-4 flex shrink-0 flex-wrap items-center gap-2">
               <Button autoFocus onClick={next}>
-                {last ? "Finish" : "Next"}
+                {last ? "Let's go" : first ? "Show me" : "Next"}
               </Button>
               {!first && (
                 <Button variant="secondary" onClick={back}>
                   Back
                 </Button>
               )}
-              <Button variant="secondary" onClick={skipSection}>
-                Skip section
-              </Button>
               <Button variant="ghost" onClick={end} className="ml-auto">
-                End tour
+                {last ? "Close" : "Skip tour"}
               </Button>
             </div>
           </div>

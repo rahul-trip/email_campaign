@@ -110,25 +110,20 @@ Waiting work continues **by itself** as soon as credits exist: when the month re
 
 ### 3.4 The guided tour
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Campaigns, Runs, Review, Needs attention, LinkedIn, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
+The first time you sign in on a browser (once setup is done), a one-minute tour opens by itself:
+nine steps across seven stops — Welcome, Today, ⌘K search, Review, Needs attention, Leads,
+Discovery runs, Campaigns, and a send-off. Each step spotlights the part of the screen it is
+about, with a short line on what it does for you; a little rocket moves along the track as you go.
 
-Every step has these buttons:
+- **Show me / Next** goes on (on the last step it says **Let's go**); **Back** goes back.
+- The **→** and **←** keys do the same; **Escape** or **Skip tour** closes it.
 
-1. **Next** goes to the next step. On the last step it says **Finish**.
-2. **Back** goes to the previous step.
-3. **Skip section** leaves the rest of the section you are in and jumps to the first step of the next one, opening that screen for you. On the last section it ends the tour.
-4. **End tour** closes it. Pressing Escape does the same.
+It opens once per browser. To see it again, open your account menu and choose **Take the guided tour**.
 
-The tour opens once per browser; ending or finishing it is remembered, and it will not come back by itself. To see it again, press **Tour** at the top right of any page.
-
-The two sections about a single lead open your most recent lead. If you have none yet, they say so; add a target and start a run, then take the tour again. A step whose part of the screen has nothing to show yet (for example the review queue when it is empty) is shown in the middle of the page.
-
-**For whoever changes the app:** the tour is data, not code. Its text and the element each step points at are in `web2/src/tour/steps.ts`; the player is `web2/src/tour/Tour.tsx`.
-
-- New screen: add a section to `steps.ts` (in the order a person would meet it) and a `place` for it.
-- New feature or changed screen: add or edit a step. Give the element `data-tour="name"` (or `tour="name"` on a `Card` or `Tabs`), and use the same name as the step's `target`.
-- Removed or renamed element: change or delete the step. `web2/e2e/tour.spec.ts` walks every step against a real lead and fails if a step points at something that no longer exists, so a forgotten step shows up in the checks.
-- Keep this section of the manual in step with the sections in `steps.ts`.
+**For whoever changes the app:** the tour is data. Its steps (text, emoji, the element each points
+at) are in `web3/src/tour/steps.ts`; the player is `web3/src/tour/Tour.tsx`. Keep it short: one
+step per screen that matters. Give the element `data-tour="name"` and use that name as the step's
+`target`. `web3/e2e/tour.spec.ts` walks every step and fails if one points at something missing.
 
 ---
 
