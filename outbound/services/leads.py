@@ -64,6 +64,9 @@ EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 _POLICY_HOLDS = frozenset(
     {HoldReason.COUNTRY_UNKNOWN, HoldReason.CONSENT_REQUIRED, HoldReason.ENTITY_UNKNOWN}
 )
+# Holds that need no fix per lead, so many can be released with one press: the operator's own
+# choice to wait (a LinkedIn message was sent). The country and consent holds need a fix first.
+_BULK_RELEASABLE = frozenset({HoldReason.LINKEDIN_CONTACTED})
 # Past the point where any country check runs.
 _AFTER_THE_MAILBOX = frozenset(
     {
@@ -413,6 +416,69 @@ class LeadService:
             )
             uow.commit()
             return updated
+
+    def retry_many(self, company_ids: list[str], *, actor: str | None = None) -> tuple[int, int]:
+        """Send each failed lead back to the stage that failed, in one transaction.
+
+        A lead that is not failed any more (it retried itself, or someone else acted) is skipped,
+        not refused, so one stale row on a screen does not stop the rest. Returns
+        (retried, skipped)."""
+        actor = actor or self._actor
+        retried = skipped = 0
+        with self._uow(self._workspace_id) as uow:
+            for company_id in dict.fromkeys(company_ids):
+                try:
+                    company = uow.companies.get(company_id)
+                except NotFound:
+                    skipped += 1
+                    continue
+                if company.status is not CompanyStatus.FAILED or company.failed_stage is None:
+                    skipped += 1
+                    continue
+                uow.companies.transition(
+                    company_id,
+                    retry_status_for(company.failed_stage),
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason=f"retry after {company.failed_stage} failed",
+                    next_action_at=None,
+                )
+                retried += 1
+            uow.commit()
+        return retried, skipped
+
+    def release_many(self, company_ids: list[str], *, actor: str | None = None) -> tuple[int, int]:
+        """Release each lead held for a reason that needs no fix per lead (``_BULK_RELEASABLE``),
+        to where that hold resumes. Anything else is skipped. Returns (released, skipped)."""
+        actor = actor or self._actor
+        released = skipped = 0
+        with self._uow(self._workspace_id) as uow:
+            for company_id in dict.fromkeys(company_ids):
+                try:
+                    company = uow.companies.get(company_id)
+                except NotFound:
+                    skipped += 1
+                    continue
+                target = (
+                    resume_status_for(company.hold_reason)
+                    if company.status is CompanyStatus.HELD
+                    and company.hold_reason in _BULK_RELEASABLE
+                    else None
+                )
+                if target is None:
+                    skipped += 1
+                    continue
+                uow.companies.transition(
+                    company_id,
+                    target,
+                    expected_version=company.row_version,
+                    actor=actor,
+                    reason="hold released",
+                    next_action_at=None,
+                )
+                released += 1
+            uow.commit()
+        return released, skipped
 
     def release_hold(
         self,

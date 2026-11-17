@@ -162,7 +162,7 @@ export const SECTIONS: Section[] = [
       {
         target: "attention-filter",
         title: "Holds, failures, websites",
-        body: "Everything that waits on a decision other than review. Each group says why in plain words and offers the action that fixes it, such as adding a person who has given consent, or Find email again for a catch-all address the resolver could not prove (one lead, or all of them at once).",
+        body: "Everything that waits on a decision other than review. Each group says why in plain words and offers the action that fixes it, such as adding a person who has given consent, or Find email again for a catch-all address the resolver could not prove (one lead, or all of them at once). Failures are grouped by the step that failed, each with Retry all, and Retry every failed lead does them all in one run; leads you held after messaging them on LinkedIn have Release all.",
       },
     ],
   },

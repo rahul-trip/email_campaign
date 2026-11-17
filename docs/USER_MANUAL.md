@@ -204,7 +204,9 @@ Good to know:
 Everything that waits on you apart from review, grouped by reason, each group saying in plain words why and what fixes it:
 
 - **Held** leads, one group per hold reason (section 7.1). Each row offers the action that resolves it: **Use XX and release** when the research suggested a country, **Add a person with consent** for consent and company-type holds, or *Waiting for the resolver* for catch-all addresses. A lead held on a catch-all address the resolver could not prove has **Find email again** (searches that person's address afresh, with new answers from the vendors, in one run started now); **Find again for all (N)** on the group does the same for every lead in it after you confirm that each lookup costs vendor credits.
-- **Failed** leads, with the step, the reason and when the automatic retry is due; **Retry now** retries at once.
+- **Failed** leads, one group per step that failed (research, qualification, people, the email address, writing the email, the mailbox), with the reason and when the automatic retry is due. **Retry now** retries one lead at once; **Retry all (N)** on a group retries every lead in it, and **Retry every failed lead** (shown when more than one step failed) retries them all. Each lead goes back to its own failed step, in one run started now, after you confirm; a step that pays vendors costs again, while what was already found is reused. A lead that moved on since the page loaded is skipped and counted.
+- Leads held because you **messaged them on LinkedIn** have **Release all (N)**: each goes back to finding and writing its email, in one run.
+- Country, consent and company-type holds have no button for all of them: each needs its own fix first (a country, a person with consent), and releasing them without it would only hold them again.
 - **Websites to confirm:** companies added by name where the website found is not certain. Press **Yes, domain** if the guess is right, or type the right website and press **Use this website**.
 
 The buttons at the top show one kind at a time.

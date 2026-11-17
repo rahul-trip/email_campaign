@@ -1335,6 +1335,16 @@ class FindEmailAgainIn(In):
     company_ids: list[str] = Field(min_length=1, max_length=200)
 
 
+class RetryManyIn(In):
+    company_ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class RetryManyOut(Out):
+    queued_run_id: str | None  # None: nothing was retried, so no run was queued
+    retried: int
+    skipped: int
+
+
 class FindEmailAgainOut(Out):
     queued_run_id: str | None  # None: nothing was asked for, so no run was queued
     asked: int

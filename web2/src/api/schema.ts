@@ -1019,6 +1019,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/release-holds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Release Many
+         * @description Release leads held only by your own choice (messaged on LinkedIn), in one run now.
+         */
+        post: operations["release_many_api_companies_release_holds_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/release-policy-holds": {
         parameters: {
             query?: never;
@@ -1050,6 +1070,26 @@ export interface paths {
          * @description Let every waiting lead and row continue, as far as the credits go.
          */
         post: operations["resume_all_api_companies_resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry Many
+         * @description Retry every failed lead given, at the stage that failed, in one run started now.
+         */
+        post: operations["retry_many_api_companies_retry_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4787,6 +4827,20 @@ export interface components {
             /** Queued Run Id */
             queued_run_id: string;
         };
+        /** RetryManyIn */
+        RetryManyIn: {
+            /** Company Ids */
+            company_ids: string[];
+        };
+        /** RetryManyOut */
+        RetryManyOut: {
+            /** Queued Run Id */
+            queued_run_id: string | null;
+            /** Retried */
+            retried: number;
+            /** Skipped */
+            skipped: number;
+        };
         /** RevealedKeyOut */
         RevealedKeyOut: {
             /** Key */
@@ -7558,6 +7612,39 @@ export interface operations {
             };
         };
     };
+    release_many_api_companies_release_holds_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryManyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryManyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     release_policy_holds_api_companies_release_policy_holds_post: {
         parameters: {
             query?: never;
@@ -7596,6 +7683,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumedOut"];
+                };
+            };
+        };
+    };
+    retry_many_api_companies_retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryManyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryManyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

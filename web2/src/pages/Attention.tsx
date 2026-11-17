@@ -41,6 +41,10 @@ export function AttentionPage() {
   const total = held.length + failed.length + confirm.length + parked.length + rows;
   const groups = HOLD_REASONS.map((reason) => [reason, held.filter((c) => c.hold_reason === reason)] as const).filter(([, rows]) => rows.length > 0);
   const show = (kind: Filter) => filter === "all" || filter === kind;
+  // Failures by the step that failed, in pipeline order: each has its own Retry all.
+  const byStage = STEP_ORDER.map((stage) => [stage, failed.filter((c) => (c.failed_stage ?? "other") === stage)] as const)
+    .concat([["other", failed.filter((c) => !STEP_ORDER.includes(c.failed_stage ?? "other"))] as const])
+    .filter(([, rows]) => rows.length > 0);
 
   return (
     <>
@@ -83,7 +87,13 @@ export function AttentionPage() {
                 title={hold.label}
                 count={rows.length}
                 explain={`${hold.why} ${hold.fix}`}
-                actions={reason === "catch_all_unverified" ? <FindAgainAll ids={rows.map((c) => c.id)} /> : undefined}
+                actions={
+                  reason === "catch_all_unverified" ? (
+                    <FindAgainAll ids={rows.map((c) => c.id)} />
+                  ) : reason === "linkedin_contacted" ? (
+                    <BulkAction ids={rows.map((c) => c.id)} kind="release" label="Release all" />
+                  ) : undefined
+                }
               >
                 {rows.map((company) => (
                   <HeldRow key={company.id} company={company} />
@@ -92,13 +102,25 @@ export function AttentionPage() {
             );
           })}
 
-        {show("failed") && failed.length > 0 && (
-          <Group title="Failed" count={failed.length} explain="A step failed. The lead retries itself up to 3 times, waiting longer each time; you can retry at once.">
-            {failed.map((company) => (
-              <FailedRow key={company.id} company={company} />
-            ))}
-          </Group>
+        {show("failed") && failed.length > 1 && byStage.length > 1 && (
+          <div className="flex justify-end" data-tour="attention-retry-all">
+            <BulkAction ids={failed.map((c) => c.id)} kind="retry" label="Retry every failed lead" />
+          </div>
         )}
+        {show("failed") &&
+          byStage.map(([stage, rows]) => (
+            <Group
+              key={stage}
+              title={`Failed at ${STEP_NAMES[stage] ?? words(stage).toLowerCase()}`}
+              count={rows.length}
+              explain="A step failed. The lead retries itself up to 3 times, waiting longer each time; you can retry at once."
+              actions={<BulkAction ids={rows.map((c) => c.id)} kind="retry" label="Retry all" />}
+            >
+              {rows.map((company) => (
+                <FailedRow key={company.id} company={company} />
+              ))}
+            </Group>
+          ))}
 
         {show("confirm") && confirm.length > 0 && (
           <Group title="Websites to confirm" count={confirm.length} explain="These were added by name, and the website found is not certain. Confirm it, or give the right one.">
@@ -255,6 +277,53 @@ function HeldRow({ company }: { company: Company }) {
       {findAgain.isSuccess && <span className="text-xs text-good">Queued: it runs now</span>}
       {(setCountry.error ?? findAgain.error) != null && <Problem error={setCountry.error ?? findAgain.error} className="w-full" />}
     </Row>
+  );
+}
+
+const STEP_ORDER = ["research", "gate", "contacts", "email", "copy", "deliver"];
+const STEP_NAMES: Record<string, string> = {
+  research: "research",
+  gate: "qualification",
+  contacts: "people",
+  email: "the email address",
+  copy: "writing the email",
+  deliver: "the mailbox",
+  other: "another step",
+};
+
+/** Retry (or release) many leads with one press, in one run started now. Leads that changed
+ * since the page loaded are skipped, not refused. */
+function BulkAction({ ids, kind, label }: { ids: string[]; kind: "retry" | "release"; label: string }) {
+  const refresh = useRefresh();
+  const [confirming, setConfirming] = useState(false);
+  const run = useMutation({
+    mutationFn: () => {
+      const body = { company_ids: ids.slice(0, 200) };
+      return ok(kind === "retry" ? client.POST("/api/companies/retry", { body }) : client.POST("/api/companies/release-holds", { body }));
+    },
+    onSuccess: () => {
+      setConfirming(false);
+      refresh();
+    },
+  });
+  const n = ids.length;
+  const what = kind === "retry" ? `Retry ${n} lead${n === 1 ? "" : "s"}?` : `Release ${n} lead${n === 1 ? "" : "s"}?`;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Button size="sm" onClick={() => setConfirming(true)}>
+        <RefreshCw className="size-3.5" aria-hidden /> {label} ({n})
+      </Button>
+      {run.data && <span className="text-xs text-good" role="status">{run.data.retried} started{run.data.skipped ? `, ${run.data.skipped} had already moved on` : ""}</span>}
+      {confirming && (
+        <Confirm title={what} confirmLabel={kind === "retry" ? "Retry" : "Release"} busy={run.isPending} error={run.error} onClose={() => setConfirming(false)} onConfirm={() => run.mutate()}>
+          <p>
+            {kind === "retry"
+              ? "Each lead goes back to the step that failed and runs again now, in one run. A step that pays vendors (research, the email address, writing) costs again for every lead; anything it already found is reused."
+              : "Each lead goes back to looking for its email and writing it, in one run started now; the email will say you already wrote on LinkedIn."}
+          </p>
+        </Confirm>
+      )}
+    </span>
   );
 }
 
