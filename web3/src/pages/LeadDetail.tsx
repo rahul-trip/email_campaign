@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
+import { Tabs } from "../ui/overlay";
+import { JourneyView } from "./LeadJourney";
 import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlock, UserPlus } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
@@ -63,6 +65,8 @@ function useRefreshLead() {
 
 export function LeadDetailPage() {
   const { companyId } = useParams({ from: "/leads/$companyId" });
+  const tab = useSearch({ from: "/leads/$companyId" }).tab ?? "overview";
+  const navigate = useNavigate({ from: "/leads/$companyId" });
   const path = { params: { path: { company_id: companyId } } };
   const refresh = useRefreshLead();
   const lead = useQuery({ queryKey: ["lead", companyId], queryFn: () => ok(client.GET("/api/companies/{company_id}", path)) });
@@ -145,7 +149,7 @@ export function LeadDetailPage() {
           }
           actions={
             <>
-              <Link to="/leads/$companyId/journey" params={{ companyId }} className={buttonClass("secondary")}>
+              <Link to="/leads/$companyId" params={{ companyId }} search={{ tab: "journey" }} className={buttonClass("secondary")}>
                 <GitFork className="size-3.5" aria-hidden /> Journey
               </Link>
               {!NOT_RESEARCHABLE.has(company.status) && (
@@ -232,7 +236,29 @@ export function LeadDetailPage() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mb-5">
+          <Tabs
+            label="Lead views"
+            value={tab}
+            onChange={(t) => void navigate({ search: { tab: t === "overview" ? undefined : t }, replace: true })}
+            tabs={[
+              { key: "overview", label: "Overview" },
+              { key: "journey", label: "Journey" },
+              { key: "activity", label: "Activity", count: timeline.data?.length },
+            ]}
+          />
+        </div>
+        {tab === "journey" && <JourneyView companyId={companyId} />}
+        {tab === "activity" && (
+          <Activity
+            events={timeline.data ?? []}
+            pending={timeline.isPending}
+            error={timeline.error}
+            names={Object.fromEntries(contacts.map((c) => [c.id, c.full_name ?? "A person"]))}
+            fit={company.fit_score ?? null}
+          />
+        )}
+        <div hidden={tab !== "overview"} className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex min-w-0 flex-col gap-5">
             <Card
               collapsible

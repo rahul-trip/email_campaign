@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+
 import { AlertCircle, Check, Clock, Coins, FileText, Info, Layers, Users, X } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { JOURNEY_POLICY_STAGE, PolicySkip } from "../components/PolicySkip";
 import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
-import { Callout, Card, Facts, Label, PageHeader, Problem, Skeleton, Table, Td, Th, buttonClass } from "../ui/compat";
+import { Callout, Card, Facts, Label, Problem, Skeleton, Table, Td, Th } from "../ui/compat";
 import { cx } from "../lib/cx";
 import { usd, when, words } from "../lib/format";
 import { callOutcome, describe } from "../lib/status";
@@ -30,8 +30,8 @@ function firstStage(stages: Stage[]): string {
   return (open ?? [...stages].reverse().find((s) => s.state === "done") ?? stages[0]).key;
 }
 
-export function LeadJourneyPage() {
-  const { companyId } = useParams({ from: "/leads/$companyId/journey" });
+/** The journey of one lead, shown as a tab on its page. */
+export function JourneyView({ companyId }: { companyId: string }) {
   const path = { params: { path: { company_id: companyId } } };
   const journey = useQuery({ queryKey: ["journey", companyId], queryFn: () => ok(client.GET("/api/companies/{company_id}/journey", path)) });
   const lead = useQuery({ queryKey: ["lead", companyId], queryFn: () => ok(client.GET("/api/companies/{company_id}", path)) });
@@ -40,7 +40,7 @@ export function LeadJourneyPage() {
   if (journey.isPending || lead.isPending) return <Skeleton rows={8} />;
   if (journey.isError || lead.isError) return <Problem error={journey.error ?? lead.error} />;
 
-  const { company, contacts, messages } = lead.data;
+  const { contacts, messages } = lead.data;
   const trail = journey.data;
   const selected = trail.stages.find((s) => s.key === (picked ?? firstStage(trail.stages))) ?? trail.stages[0];
   const finished = trail.stages.filter((s) => s.state === "done").length;
@@ -48,28 +48,6 @@ export function LeadJourneyPage() {
 
   return (
     <>
-      <PageHeader
-        crumbs={
-          <>
-            <Link to="/leads" className="hover:text-ink hover:underline">
-              Leads
-            </Link>{" "}
-            /{" "}
-            <Link to="/leads/$companyId" params={{ companyId }} className="hover:text-ink hover:underline">
-              {company.name ?? company.domain}
-            </Link>{" "}
-            / <span className="text-ink">Journey</span>
-          </>
-        }
-        title={`Journey: ${company.name ?? company.domain}`}
-        subtitle={`${company.domain} · country ${company.country_code ?? "unknown"} · fit ${company.fit_score ?? "?"}/100`}
-        actions={
-          <Link to="/leads/$companyId" params={{ companyId }} className={buttonClass("primary")}>
-            Open the lead to act on it
-          </Link>
-        }
-      />
-
       <div data-tour="journey-header" className="mb-5">
         <Callout tone={blocked ? "attention" : "info"} title={trail.headline} className="text-body">
           <span className="font-semibold">What happens next: </span>
@@ -112,7 +90,7 @@ function Tile({ icon, label, value }: { icon: React.ReactNode; label: string; va
         {icon}
       </span>
       <div>
-        <div className="font-mono text-lg font-semibold">{value}</div>
+        <div className="tnum text-title font-semibold text-ink">{value}</div>
         <div className="text-label text-muted">{label}</div>
       </div>
     </div>
