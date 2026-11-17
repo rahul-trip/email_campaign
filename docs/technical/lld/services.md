@@ -43,7 +43,7 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `brief.py` | `draft` / `draft_brief` (one model call over the campaign and the sender profile's *What the writer may use*, saying whether it `fell_back`; `fallback_brief` without a model) | `SettingsService.regenerate_brief`; discovery |
 | `autodiscovery.py` | `AutoDiscovery.state` (everything that decides whether the active campaign is due a search, and the reason when not) and `queue_due` (queues a discovery run through `RunService`; see [the tick](runner-and-worker.md#the-tick)) | worker tick |
 | `runs.py` | `RunService` (`queue`, `get`, `recent` (the newest `HISTORY` runs of `OPERATOR_KINDS`, `requested_only`: the worker's `sync` runs and its timer pipeline runs, which have no `mode` in their params, are left out), `cancel`), `RunRequest`, `RunMode` (`manual`, `discovery`, `mixed`) | API runs router; worker (`RunRequest.from_params`) |
-| `reports.py` | `ReportService` (`status`, `quality`, `funnel`, `sources`, `cost`) | CLI `status`, `report`; API runs router |
+| `reports.py` | `ReportService` (`status`, `quality`, `funnel`, `sources`, `cost`, `daily`, `fit`, `lead_summaries`, `discovery_plan`) | CLI `status`, `report`; API runs router |
 | `journey.py` | `build_journey` (pure), `Journey`, `StageView` | `LeadService.journey` |
 | `webhook.py` | `WebhookService.receive`, `sign`, `verify` | API webhook router |
 | `seed.py` | `seed_defaults` | CLI `seed` (and the `migrate` service on every deploy) |
@@ -164,6 +164,10 @@ Details: [data lifecycle](../data/data-lifecycle.md#the-three-ways-out).
   - `quality`: unedited share of sent touch-1 emails against the 80 % target, flag rate, holds by reason, catch-all share;
   - `funnel(days)`: what discovery named (and how many the model scored), the screening verdicts, where the leads added in the period are now (`outcome`: `waiting`, `failed:<stage>`, `held:<reason>` or the status) and each vendor's calls and failures, cache hits not counted;
   - `cost`: spend by vendor and per prospect over a window.
+  - `daily(days)`: per UTC day, leads added, emails approved, emails reviewed by a person, emails sent and spend; grouped in Python so SQLite and Postgres agree. `review_streak` (a pure function) counts consecutive reviewed days back from today;
+  - `fit()`: the active campaign's fit scores in bands of ten, plus the unscored count;
+  - `lead_summaries(ids)`: for a page of leads, the first-ranked person the engine works on, their main address status and the lead's vendor spend, in three queries;
+  - `discovery_plan()`: `domain.discovery.plan_sources` over every known source for the active brief, with each source's share and 90-day record and why an unsuited one is skipped. Nothing is searched.
 
 ## Webhook
 

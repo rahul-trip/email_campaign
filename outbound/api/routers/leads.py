@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -8,6 +8,7 @@ from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
     CompanyOut,
     CompanyPage,
+    CompanyRowOut,
     ConsentIn,
     ConsentOut,
     ContactOut,
@@ -19,6 +20,7 @@ from outbound.api.schemas import (
     FindEmailAgainOut,
     JourneyOut,
     LeadOut,
+    LeadSummaryOut,
     LinkedInOut,
     MessageOut,
     NoteOut,
@@ -36,7 +38,7 @@ from outbound.api.schemas import (
     TimelineOut,
     WaterfallOut,
 )
-from outbound.domain.enums import CompanyStatus, HoldReason
+from outbound.domain.enums import CompanySource, CompanyStatus, HoldReason
 from outbound.domain.permissions import Permission as P
 from outbound.services.leads import LeadDetail
 from outbound.services.runs import RunRequest
@@ -67,6 +69,12 @@ def companies(
     campaign_id: str | None = None,
     q: str | None = None,
     waiting_for_credits: bool | None = None,
+    min_fit: Annotated[int | None, Query(ge=0, le=100)] = None,
+    hot: bool | None = None,
+    source: CompanySource | None = None,
+    country: Annotated[str | None, Query(min_length=2, max_length=2)] = None,
+    sort: Literal["newest", "fit", "updated", "name"] = "newest",
+    include: Literal["summary"] | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> CompanyPage:
@@ -76,10 +84,23 @@ def companies(
         campaign_id=campaign_id,
         text=q,
         waiting_for_credits=waiting_for_credits,
+        min_fit=min_fit,
+        hot=hot,
+        source=source,
+        country=country,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
-    return CompanyPage(items=[CompanyOut.model_validate(c) for c in items], total=total)
+    summaries = svc.reports.lead_summaries([c.id for c in items]) if include == "summary" else {}
+    rows = []
+    for company in items:
+        row = CompanyRowOut.model_validate(company)
+        found = summaries.get(company.id)
+        if found is not None:
+            row.summary = LeadSummaryOut.model_validate(found)
+        rows.append(row)
+    return CompanyPage(items=rows, total=total)
 
 
 @router.get(

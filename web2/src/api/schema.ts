@@ -2070,6 +2070,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/reports/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Daily
+         * @description Per-day counts, oldest first, for sparklines, week-on-week changes and the review streak.
+         */
+        get: operations["daily_api_reports_daily_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/reports/fit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fit
+         * @description How the active campaign's companies spread over fit scores, in bands of ten.
+         */
+        get: operations["fit_api_reports_fit_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/reports/funnel": {
         parameters: {
             query?: never;
@@ -2271,6 +2311,28 @@ export interface paths {
          * @description Whether the worker will search for new companies by itself, and when, or why not.
          */
         get: operations["auto_discovery_api_runs_auto_discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/runs/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Discovery Plan
+         * @description Which sources the next discovery run would ask for the active campaign, and why the
+         *     others would be skipped. Nothing is searched; a source whose key is missing is skipped
+         *     only when the run starts.
+         */
+        get: operations["discovery_plan_api_runs_plan_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3325,7 +3387,7 @@ export interface components {
         /** CompanyPage */
         CompanyPage: {
             /** Items */
-            items: components["schemas"]["CompanyOut"][];
+            items: components["schemas"]["CompanyRowOut"][];
             /** Total */
             total: number;
         };
@@ -3342,6 +3404,72 @@ export interface components {
             /** Row Version */
             row_version: number;
         };
+        /** CompanyRowOut */
+        CompanyRowOut: {
+            /** Campaign Id */
+            campaign_id: string | null;
+            /** Country Code */
+            country_code: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Credit Wait Step */
+            credit_wait_step?: ("discovery" | "manual" | "research" | "email" | "copy" | "deliver" | "rewrite") | null;
+            /** Domain */
+            domain: string;
+            /** Failed Stage */
+            failed_stage: string | null;
+            /** Fit Reason */
+            fit_reason: string | null;
+            /** Fit Score */
+            fit_score: number | null;
+            hold_reason: components["schemas"]["HoldReason"] | null;
+            /**
+             * Hot
+             * @description A fit score above 80: shown with a flame, and never approved automatically.
+             */
+            readonly hot: boolean;
+            /** Id */
+            id: string;
+            /** Last Error */
+            last_error: string | null;
+            /** Legal Entity Type */
+            legal_entity_type: string;
+            /** Manual Fields */
+            manual_fields: string[];
+            /** Name */
+            name: string | null;
+            /** Next Action At */
+            next_action_at: string | null;
+            /** Policy Decision */
+            policy_decision: {
+                [key: string]: unknown;
+            } | null;
+            /** Policy Skip From */
+            policy_skip_from?: string | null;
+            /** Priority */
+            priority: number;
+            /** Research */
+            research: {
+                [key: string]: unknown;
+            } | null;
+            /** Research Answers */
+            research_answers: {
+                [key: string]: unknown;
+            } | null;
+            /** Row Version */
+            row_version: number;
+            /** Source */
+            source: string;
+            status: components["schemas"]["CompanyStatus"];
+            summary?: components["schemas"]["LeadSummaryOut"] | null;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * CompanySource
+         * @enum {string}
+         */
+        CompanySource: "manual" | "discovery" | "import" | "referral";
         /**
          * CompanyStatus
          * @enum {string}
@@ -3538,6 +3666,31 @@ export interface components {
             steps: components["schemas"]["AdminStepOut"][];
             /** Waiting */
             waiting: number;
+        };
+        /** DailyOut */
+        DailyOut: {
+            /** Days */
+            days: components["schemas"]["DayOut"][];
+            /** Review Streak */
+            review_streak: number;
+        };
+        /** DayOut */
+        DayOut: {
+            /** Approved */
+            approved: number;
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /** Leads */
+            leads: number;
+            /** Reviewed */
+            reviewed: number;
+            /** Sent */
+            sent: number;
+            /** Spend Micro Usd */
+            spend_micro_usd: number;
         };
         /** DecideJoinIn */
         DecideJoinIn: {
@@ -3782,6 +3935,13 @@ export interface components {
             /** Skip */
             skip: boolean;
         };
+        /** DiscoveryPlanOut */
+        DiscoveryPlanOut: {
+            /** Campaign */
+            campaign: string | null;
+            /** Sources */
+            sources: components["schemas"]["PlannedSourceOut"][];
+        };
         /** DiscoverySearchOut */
         DiscoverySearchOut: {
             /** Already Leads */
@@ -3854,6 +4014,28 @@ export interface components {
             queued_run_id: string | null;
             /** Skipped */
             skipped: number;
+        };
+        /** FitBandOut */
+        FitBandOut: {
+            /** Count */
+            count: number;
+            /** Start */
+            start: number;
+        };
+        /** FitOut */
+        FitOut: {
+            /** Bands */
+            bands: components["schemas"]["FitBandOut"][];
+            /** Campaign */
+            campaign: string | null;
+            /** Campaign Id */
+            campaign_id: string | null;
+            /** Min Fit Score */
+            min_fit_score: number | null;
+            /** Scored */
+            scored: number;
+            /** Unscored */
+            unscored: number;
         };
         /** ForgetIn */
         ForgetIn: {
@@ -4084,6 +4266,17 @@ export interface components {
             messages: components["schemas"]["MessageOut"][];
             /** Notes */
             notes: components["schemas"]["NoteOut"][];
+        };
+        /** LeadSummaryOut */
+        LeadSummaryOut: {
+            /** Contact Name */
+            contact_name: string | null;
+            /** Contact Title */
+            contact_title: string | null;
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Email Status */
+            email_status: string | null;
         };
         /** LinkedInDraftOut */
         LinkedInDraftOut: {
@@ -4594,6 +4787,23 @@ export interface components {
             seats?: number | null;
             /** Version */
             version: number;
+        };
+        /** PlannedSourceOut */
+        PlannedSourceOut: {
+            /** Found */
+            found: number | null;
+            /** Qualified */
+            qualified: number | null;
+            /** Rate */
+            rate: number | null;
+            /** Share */
+            share: number;
+            /** Source */
+            source: string;
+            /** Suited */
+            suited: boolean;
+            /** Why Not */
+            why_not: string | null;
         };
         /** PlansOut */
         PlansOut: {
@@ -7550,6 +7760,12 @@ export interface operations {
                 campaign_id?: string | null;
                 q?: string | null;
                 waiting_for_credits?: boolean | null;
+                min_fit?: number | null;
+                hot?: boolean | null;
+                source?: components["schemas"]["CompanySource"] | null;
+                country?: string | null;
+                sort?: "newest" | "fit" | "updated" | "name";
+                include?: "summary" | null;
                 limit?: number;
                 offset?: number;
             };
@@ -9540,6 +9756,57 @@ export interface operations {
             };
         };
     };
+    daily_api_reports_daily_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DailyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fit_api_reports_fit_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitOut"];
+                };
+            };
+        };
+    };
     funnel_api_reports_funnel_get: {
         parameters: {
             query?: {
@@ -9867,6 +10134,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AutoDiscoveryOut"];
+                };
+            };
+        };
+    };
+    discovery_plan_api_runs_plan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryPlanOut"];
                 };
             };
         };

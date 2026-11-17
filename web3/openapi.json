@@ -1265,7 +1265,7 @@
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/CompanyOut"
+              "$ref": "#/components/schemas/CompanyRowOut"
             },
             "title": "Items",
             "type": "array"
@@ -1345,6 +1345,287 @@
         ],
         "title": "CompanyPatch",
         "type": "object"
+      },
+      "CompanyRowOut": {
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "country_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Code"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "credit_wait_step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "discovery",
+                  "manual",
+                  "research",
+                  "email",
+                  "copy",
+                  "deliver",
+                  "rewrite"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Wait Step"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "failed_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Stage"
+          },
+          "fit_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Reason"
+          },
+          "fit_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Score"
+          },
+          "hold_reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HoldReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hot": {
+            "description": "A fit score above 80: shown with a flame, and never approved automatically.",
+            "readOnly": true,
+            "title": "Hot",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "legal_entity_type": {
+            "title": "Legal Entity Type",
+            "type": "string"
+          },
+          "manual_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Fields",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "next_action_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action At"
+          },
+          "policy_decision": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Decision"
+          },
+          "policy_skip_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Skip From"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "integer"
+          },
+          "research": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research"
+          },
+          "research_answers": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Research Answers"
+          },
+          "row_version": {
+            "title": "Row Version",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompanyStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LeadSummaryOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "domain",
+          "name",
+          "source",
+          "status",
+          "hold_reason",
+          "failed_stage",
+          "last_error",
+          "country_code",
+          "legal_entity_type",
+          "priority",
+          "fit_score",
+          "fit_reason",
+          "campaign_id",
+          "research",
+          "research_answers",
+          "policy_decision",
+          "manual_fields",
+          "next_action_at",
+          "row_version",
+          "created_at",
+          "updated_at",
+          "hot"
+        ],
+        "title": "CompanyRowOut",
+        "type": "object"
+      },
+      "CompanySource": {
+        "enum": [
+          "manual",
+          "discovery",
+          "import",
+          "referral"
+        ],
+        "title": "CompanySource",
+        "type": "string"
       },
       "CompanyStatus": {
         "enum": [
@@ -1955,6 +2236,66 @@
           "max_prospect_budget_micro_usd"
         ],
         "title": "CustomerRowOut",
+        "type": "object"
+      },
+      "DailyOut": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/DayOut"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "review_streak": {
+            "title": "Review Streak",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "days",
+          "review_streak"
+        ],
+        "title": "DailyOut",
+        "type": "object"
+      },
+      "DayOut": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "integer"
+          },
+          "day": {
+            "format": "date",
+            "title": "Day",
+            "type": "string"
+          },
+          "leads": {
+            "title": "Leads",
+            "type": "integer"
+          },
+          "reviewed": {
+            "title": "Reviewed",
+            "type": "integer"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "spend_micro_usd": {
+            "title": "Spend Micro Usd",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "leads",
+          "approved",
+          "reviewed",
+          "sent",
+          "spend_micro_usd"
+        ],
+        "title": "DayOut",
         "type": "object"
       },
       "DecideJoinIn": {
@@ -2689,6 +3030,34 @@
         "title": "DirectorySkipIn",
         "type": "object"
       },
+      "DiscoveryPlanOut": {
+        "properties": {
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedSourceOut"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "campaign",
+          "sources"
+        ],
+        "title": "DiscoveryPlanOut",
+        "type": "object"
+      },
       "DiscoverySearchOut": {
         "properties": {
           "already_leads": {
@@ -2919,6 +3288,86 @@
           "skipped"
         ],
         "title": "FindEmailAgainOut",
+        "type": "object"
+      },
+      "FitBandOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "count"
+        ],
+        "title": "FitBandOut",
+        "type": "object"
+      },
+      "FitOut": {
+        "properties": {
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/FitBandOut"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "campaign": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "min_fit_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Fit Score"
+          },
+          "scored": {
+            "title": "Scored",
+            "type": "integer"
+          },
+          "unscored": {
+            "title": "Unscored",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "campaign_id",
+          "campaign",
+          "min_fit_score",
+          "bands",
+          "scored",
+          "unscored"
+        ],
+        "title": "FitOut",
         "type": "object"
       },
       "ForgetIn": {
@@ -3592,6 +4041,55 @@
           "notes"
         ],
         "title": "LeadOut",
+        "type": "object"
+      },
+      "LeadSummaryOut": {
+        "properties": {
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "contact_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Title"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "email_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Status"
+          }
+        },
+        "required": [
+          "contact_name",
+          "contact_title",
+          "email_status",
+          "cost_micro_usd"
+        ],
+        "title": "LeadSummaryOut",
         "type": "object"
       },
       "LinkedInDraftOut": {
@@ -5243,6 +5741,77 @@
           "version"
         ],
         "title": "PlanSaveIn",
+        "type": "object"
+      },
+      "PlannedSourceOut": {
+        "properties": {
+          "found": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found"
+          },
+          "qualified": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualified"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "share": {
+            "title": "Share",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "suited": {
+            "title": "Suited",
+            "type": "boolean"
+          },
+          "why_not": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why Not"
+          }
+        },
+        "required": [
+          "source",
+          "suited",
+          "why_not",
+          "share",
+          "found",
+          "qualified",
+          "rate"
+        ],
+        "title": "PlannedSourceOut",
         "type": "object"
       },
       "PlansOut": {
@@ -11306,6 +11875,107 @@
           },
           {
             "in": "query",
+            "name": "min_fit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Fit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hot"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/CompanySource"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 2,
+                  "minLength": 2,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "newest",
+              "enum": [
+                "newest",
+                "fit",
+                "updated",
+                "name"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "summary",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
+          },
+          {
+            "in": "query",
             "name": "limit",
             "required": false,
             "schema": {
@@ -14020,6 +14690,74 @@
         ]
       }
     },
+    "/api/reports/daily": {
+      "get": {
+        "description": "Per-day counts, oldest first, for sparklines, week-on-week changes and the review streak.",
+        "operationId": "daily_api_reports_daily_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "days",
+            "required": false,
+            "schema": {
+              "default": 14,
+              "maximum": 90,
+              "minimum": 1,
+              "title": "Days",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Daily",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/reports/fit": {
+      "get": {
+        "description": "How the active campaign's companies spread over fit scores, in bands of ten.",
+        "operationId": "fit_api_reports_fit_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FitOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Fit",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
     "/api/reports/funnel": {
       "get": {
         "description": "From a company found to a draft in Review: what became of each, and which vendors fail.",
@@ -14462,6 +15200,28 @@
           }
         },
         "summary": "Auto Discovery",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/plan": {
+      "get": {
+        "description": "Which sources the next discovery run would ask for the active campaign, and why the\nothers would be skipped. Nothing is searched; a source whose key is missing is skipped\nonly when the run starts.",
+        "operationId": "discovery_plan_api_runs_plan_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Discovery Plan",
         "tags": [
           "runs"
         ]

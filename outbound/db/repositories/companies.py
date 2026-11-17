@@ -22,6 +22,7 @@ from outbound.domain.enums import (
     HoldReason,
     UsageStep,
 )
+from outbound.domain.qualification import HOT_ABOVE
 from outbound.domain.state_machines import COMPANY, STAGE_INPUT_STATUS
 
 
@@ -174,11 +175,28 @@ class CompanyRepository(ScopedRepository):
         campaign_id: str | None = None,
         text: str | None = None,
         waiting_for_credits: bool | None = None,
+        min_fit: int | None = None,
+        hot: bool | None = None,
+        source: CompanySource | None = None,
+        country: str | None = None,
+        sort: str = "newest",
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Company], int]:
-        """A page of companies, newest first, and how many match in all."""
+        """A page of companies and how many match in all. ``sort`` is ``newest`` (the default),
+        ``fit`` (best fit first, unscored last), ``updated`` or ``name``."""
         filters = [CompanyRow.workspace_id == self._workspace_id]
+        if min_fit is not None:
+            filters.append(CompanyRow.fit_score >= min_fit)
+        if hot is not None:
+            # A hot lead scores above 80 (domain.qualification.HOT_ABOVE); unscored is neither.
+            filters.append(
+                CompanyRow.fit_score > HOT_ABOVE if hot else CompanyRow.fit_score <= HOT_ABOVE
+            )
+        if source is not None:
+            filters.append(CompanyRow.source == source)
+        if country:
+            filters.append(func.upper(CompanyRow.country_code) == country.strip().upper())
         if waiting_for_credits is not None:
             parked = CompanyRow.credit_wait_step.is_not(None)
             filters.append(parked if waiting_for_credits else ~parked)
@@ -196,10 +214,15 @@ class CompanyRepository(ScopedRepository):
                 )
             )
         total = self._session.scalar(select(func.count()).select_from(CompanyRow).where(*filters))
+        order: tuple[Any, ...] = {
+            "fit": (CompanyRow.fit_score.desc().nulls_last(), CompanyRow.created_at.desc()),
+            "updated": (CompanyRow.updated_at.desc(), CompanyRow.created_at.desc()),
+            "name": (func.lower(func.coalesce(CompanyRow.name, CompanyRow.domain)),),
+        }.get(sort, (CompanyRow.created_at.desc(),))
         stmt = (
             select(CompanyRow)
             .where(*filters)
-            .order_by(CompanyRow.created_at.desc(), CompanyRow.id.desc())
+            .order_by(*order, CompanyRow.id.desc())
             .limit(limit)
             .offset(offset)
         )
