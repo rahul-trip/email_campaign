@@ -5970,6 +5970,56 @@
         "title": "RetryEmailOut",
         "type": "object"
       },
+      "RetryManyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "company_ids": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Company Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company_ids"
+        ],
+        "title": "RetryManyIn",
+        "type": "object"
+      },
+      "RetryManyOut": {
+        "properties": {
+          "queued_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued Run Id"
+          },
+          "retried": {
+            "title": "Retried",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued_run_id",
+          "retried",
+          "skipped"
+        ],
+        "title": "RetryManyOut",
+        "type": "object"
+      },
       "RevealedKeyOut": {
         "properties": {
           "key": {
@@ -11348,6 +11398,48 @@
         ]
       }
     },
+    "/api/companies/release-holds": {
+      "post": {
+        "description": "Release leads held only by your own choice (messaged on LinkedIn), in one run now.",
+        "operationId": "release_many_api_companies_release_holds_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryManyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryManyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Release Many",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/release-policy-holds": {
       "post": {
         "operationId": "release_policy_holds_api_companies_release_policy_holds_post",
@@ -11392,6 +11484,48 @@
         "summary": "Resume All",
         "tags": [
           "usage"
+        ]
+      }
+    },
+    "/api/companies/retry": {
+      "post": {
+        "description": "Retry every failed lead given, at the stage that failed, in one run started now.",
+        "operationId": "retry_many_api_companies_retry_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryManyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryManyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Retry Many",
+        "tags": [
+          "leads"
         ]
       }
     },

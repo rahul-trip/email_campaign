@@ -30,6 +30,8 @@ from outbound.api.schemas import (
     RecipientIn,
     ReleaseIn,
     RetryEmailOut,
+    RetryManyIn,
+    RetryManyOut,
     SkipCheckIn,
     TimelineOut,
     WaterfallOut,
@@ -172,6 +174,30 @@ def skip_policy(
 )
 def revoke_policy_skip(company_id: str, svc: Annotated[Services, Depends(services)]) -> CompanyOut:
     return CompanyOut.model_validate(svc.leads.revoke_policy_skip(company_id))
+
+
+@router.post(
+    "/companies/retry",
+    response_model=RetryManyOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def retry_many(body: RetryManyIn, svc: Annotated[Services, Depends(services)]) -> RetryManyOut:
+    """Retry every failed lead given, at the stage that failed, in one run started now."""
+    retried, skipped = svc.leads.retry_many(body.company_ids)
+    run = svc.runs.queue(RunRequest()) if retried else None
+    return RetryManyOut(queued_run_id=run.id if run else None, retried=retried, skipped=skipped)
+
+
+@router.post(
+    "/companies/release-holds",
+    response_model=RetryManyOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def release_many(body: RetryManyIn, svc: Annotated[Services, Depends(services)]) -> RetryManyOut:
+    """Release leads held only by your own choice (messaged on LinkedIn), in one run now."""
+    released, skipped = svc.leads.release_many(body.company_ids)
+    run = svc.runs.queue(RunRequest()) if released else None
+    return RetryManyOut(queued_run_id=run.id if run else None, retried=released, skipped=skipped)
 
 
 @router.post(

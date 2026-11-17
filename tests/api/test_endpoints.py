@@ -1215,3 +1215,33 @@ def test_setup_drafts_answer_for_an_admin_and_save_nothing(api: Api, services: S
     assert drafted.json()["reason"] == "no_search"
     campaign = api.post("/api/setup/campaign-draft", json={})
     assert campaign.status_code == 200 and campaign.json()["drafted"] is False
+
+
+def test_failed_leads_are_retried_together_in_one_run(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    a = seed_company(factory, ws, "a.com", C.FAILED, failed_stage="research")
+    b = seed_company(
+        factory, ws, "b.com", C.RESEARCHED, C.QUALIFIED, C.FAILED, failed_stage="contacts"
+    )
+    held = seed_company(factory, ws, "c.com", C.RESEARCHED, C.HELD, hold=HoldReason.COUNTRY_UNKNOWN)
+    sent = api.post("/api/companies/retry", json={"company_ids": [a, b, held, "nope"]}).json()
+    assert (sent["retried"], sent["skipped"]) == (2, 2) and sent["queued_run_id"]
+    assert api.get(f"/api/companies/{a}").json()["company"]["status"] == "new"
+    assert api.get(f"/api/companies/{b}").json()["company"]["status"] == "qualified"  # its own step
+    nothing = api.post("/api/companies/retry", json={"company_ids": [held]}).json()
+    assert (nothing["retried"], nothing["queued_run_id"]) == (0, None)
+
+
+def test_only_holds_that_need_no_fix_are_released_together(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    path = (C.RESEARCHED, C.QUALIFIED, C.CONTACTS_FOUND, C.HELD)
+    li = seed_company(factory, ws, "a.com", *path, hold=HoldReason.LINKEDIN_CONTACTED)
+    country = seed_company(
+        factory, ws, "b.com", C.RESEARCHED, C.HELD, hold=HoldReason.COUNTRY_UNKNOWN
+    )
+    sent = api.post("/api/companies/release-holds", json={"company_ids": [li, country]}).json()
+    assert (sent["retried"], sent["skipped"]) == (1, 1)
+    assert api.get(f"/api/companies/{li}").json()["company"]["status"] == "contacts_found"
+    assert api.get(f"/api/companies/{country}").json()["company"]["status"] == "held"
