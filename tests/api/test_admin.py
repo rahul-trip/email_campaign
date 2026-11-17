@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import event
 
 from outbound.api.deps import Services
 from outbound.domain.enums import MembershipRole, PlatformRole
@@ -249,6 +250,45 @@ def test_a_suspended_customer_is_locked_out_and_can_be_reopened(
     assert staff.patch(f"{base}/status", json={"status": "active"}).status_code == 200
     assert sign_in(api.app, ADMIN).get("/api/companies").status_code == 200  # type: ignore[arg-type]
     assert staff.patch(f"{base}/status", json={"status": "deleted"}).status_code == 422
+
+
+def test_the_workspace_is_checked_while_signing_in_not_in_a_transaction_of_its_own(
+    api: Api, free: Services
+) -> None:
+    """Each transaction costs several round trips to a remote database, so a request that names
+    its workspace asks whether it is closed in the sign-in transaction: sign-in, then the
+    page's own work, and nothing else."""
+    checkouts: list[int] = []
+
+    def counted(*_: object) -> None:
+        checkouts.append(1)
+
+    engine = free.container.engine
+    event.listen(engine, "checkout", counted)
+    try:
+        assert api.get("/api/status").status_code == 200
+    finally:
+        event.remove(engine, "checkout", counted)
+    assert len(checkouts) == 2
+
+
+def test_a_closed_workspace_is_refused_with_or_without_the_workspace_header(
+    api: Api, staff: Api, superadmin: Api, free: Services
+) -> None:
+    base = f"/api/admin/customers/{free.workspace_id}"
+    staff.patch(f"{base}/status", json={"status": "suspended", "note": "unpaid"})
+    login = {"email": ADMIN, "password": "plum kettle orbit lantern meadow"}
+    for named in (True, False):
+        again = TestClient(api.app)
+        again.post("/api/auth/login", json=login, headers={"X-Requested-With": "outbound"})
+        headers = {"X-Workspace-Id": free.workspace_id} if named else {}
+        refused = again.get("/api/companies", headers=headers)
+        assert refused.status_code == 403 and refused.json()["code"] == "workspace_closed"
+    # A superadmin may still look into it, read-only; an unknown workspace is still not found.
+    seen = superadmin.client.get("/api/companies", headers={"X-Workspace-Id": free.workspace_id})
+    assert seen.status_code == 200
+    unknown = superadmin.client.get("/api/companies", headers={"X-Workspace-Id": "no-such-id"})
+    assert unknown.status_code == 404
 
 
 def test_a_paused_engine_is_shown_to_the_customer_and_stops_runs(

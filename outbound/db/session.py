@@ -59,6 +59,20 @@ def make_session_factory(engine: Engine) -> sessionmaker[Session]:
     return factory
 
 
+def bind_workspace(session: Session, workspace_id: str) -> None:
+    """Set the row-level-security key now, for the transaction this session already has open.
+
+    ``_set_workspace`` does the same at the start of a tenant unit of work. This is for a
+    transaction that learns its workspace later, such as the sign-in check, which reads the
+    workspace's status in the transaction it already has instead of opening another.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(
+            text("SELECT set_config(:name, :value, true)"),
+            {"name": WORKSPACE_SETTING, "value": workspace_id},
+        )
+
+
 def _set_workspace(
     session: Session, _transaction: SessionTransaction, connection: Connection
 ) -> None:

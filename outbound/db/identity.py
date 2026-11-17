@@ -23,8 +23,10 @@ from outbound.db.models import (
     NotificationRow,
     SessionRow,
     UserRow,
+    WorkspaceRow,
 )
 from outbound.db.repositories.base import snapshot
+from outbound.db.session import bind_workspace
 from outbound.db.types import utcnow
 from outbound.domain.entities import (
     AuthToken,
@@ -41,6 +43,7 @@ from outbound.domain.enums import (
     NotificationKind,
     PlatformRole,
     UserStatus,
+    WorkspaceStatus,
 )
 
 
@@ -637,6 +640,18 @@ class IdentityUnitOfWork:
 
     def commit(self) -> None:
         self.session.commit()
+
+    def workspace_status(self, workspace_id: str) -> WorkspaceStatus | None:
+        """The status of one workspace, or None if there is none, read in this transaction.
+
+        The workspace row is behind row-level security, so the key is set first, to this one
+        workspace. Used by the sign-in check so a request does not open a second transaction
+        just to ask whether its workspace is closed.
+        """
+        bind_workspace(self.session, workspace_id)
+        return self.session.scalars(
+            select(WorkspaceRow.status).where(WorkspaceRow.id == workspace_id)
+        ).one_or_none()
 
 
 class IdentityUnitOfWorkFactory:
