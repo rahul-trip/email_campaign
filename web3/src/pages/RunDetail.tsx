@@ -127,7 +127,7 @@ export function RunDetailPage() {
                   <tr key={stage}>
                     <Td className="font-medium">{STAGE_LABEL[stage] ?? words(stage)}</Td>
                     {outcomeColumns.map((o) => (
-                      <Td key={o} className={cx("text-right font-mono text-small", !outcomes[o] && "text-muted", o === "failed" && outcomes[o] ? "font-semibold text-error" : "")}>
+                      <Td key={o} className={cx("tnum text-right text-small", !outcomes[o] && "text-muted", o === "failed" && outcomes[o] ? "font-semibold text-error" : "")}>
                         {outcomes[o] ?? 0}
                       </Td>
                     ))}
@@ -217,21 +217,21 @@ export function RunDetailPage() {
                       <tr key={`${c.provider}:${c.operation}`}>
                         <Td className="font-medium">{c.provider}</Td>
                         <Td className="text-muted">{words(c.operation)}</Td>
-                        <Td className="text-right font-mono text-small">{c.calls}</Td>
-                        <Td className="text-right font-mono text-small">{c.found}</Td>
-                        <Td className="text-right font-mono text-small">{c.nothing}</Td>
-                        <Td className="text-right font-mono text-small">{c.reused}</Td>
-                        <Td className={cx("text-right font-mono text-small", c.errors > 0 && "font-semibold text-error")}>{c.errors}{c.blocked ? ` (+${c.blocked} blocked)` : ""}</Td>
-                        <Td className="text-right font-mono text-small text-muted">{c.avg_latency_ms == null ? "–" : `${c.avg_latency_ms} ms`}</Td>
-                        <Td className="text-right font-mono text-small">{usd(c.cost_micro_usd)}</Td>
+                        <Td className="tnum text-right text-small">{c.calls}</Td>
+                        <Td className="tnum text-right text-small">{c.found}</Td>
+                        <Td className="tnum text-right text-small">{c.nothing}</Td>
+                        <Td className="tnum text-right text-small">{c.reused}</Td>
+                        <Td className={cx("tnum text-right text-small", c.errors > 0 && "font-semibold text-error")}>{c.errors}{c.blocked ? ` (+${c.blocked} blocked)` : ""}</Td>
+                        <Td className="tnum text-right text-small text-muted">{c.avg_latency_ms == null ? "–" : `${c.avg_latency_ms} ms`}</Td>
+                        <Td className="tnum text-right text-small">{usd(c.cost_micro_usd)}</Td>
                       </tr>
                     ))}
                     <tr className="border-t border-line font-semibold">
                       <Td>Total</Td>
                       <Td />
-                      <Td className="text-right font-mono text-small">{rows.reduce((n, c) => n + c.calls, 0)}</Td>
+                      <Td className="tnum text-right text-small">{rows.reduce((n, c) => n + c.calls, 0)}</Td>
                       <Td colSpan={5} />
-                      <Td className="text-right font-mono text-small">{usd(rows.reduce((n, c) => n + c.cost_micro_usd, 0))}</Td>
+                      <Td className="tnum text-right text-small">{usd(rows.reduce((n, c) => n + c.cost_micro_usd, 0))}</Td>
                     </tr>
                   </tbody>
                 </Table>
@@ -337,7 +337,7 @@ function CandidateRow({ candidate: c, runId }: { candidate: Candidate; runId: st
         {(c.evidence || c.description) && <p className="mt-0.5 line-clamp-2 max-w-xl text-small text-muted">{c.evidence || c.description}</p>}
       </Td>
       <Td className="text-small text-muted">{c.sources.map((src) => discoverySource[src] ?? words(src)).join(", ")}</Td>
-      <Td className="text-right font-mono text-small">{c.screen_score ?? "–"}</Td>
+      <Td className="tnum text-right text-small">{c.screen_score ?? "–"}</Td>
       <Td>
         <StatusBadge status={describe(candidateVerdict, c.verdict)} title={c.reason} />
         {c.reason && <p className="mt-0.5 max-w-xs text-small text-muted">{c.reason}</p>}

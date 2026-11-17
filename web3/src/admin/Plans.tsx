@@ -52,12 +52,12 @@ export function PlansPage() {
                     {STEPS.map((s) => (
                       <tr key={s}>
                         <Td>{stepName(s)}</Td>
-                        <Td className="text-right font-mono">{plan.limits[s] ?? "∞"} / month</Td>
+                        <Td className="tnum text-right">{plan.limits[s] ?? "∞"} / month</Td>
                       </tr>
                     ))}
                     <tr>
                       <Td>People · mailboxes · campaigns</Td>
-                      <Td className="text-right font-mono">
+                      <Td className="tnum text-right">
                         {plan.seats ?? "∞"} · {plan.mailboxes ?? "∞"} · {plan.active_campaigns ?? "∞"}
                       </Td>
                     </tr>

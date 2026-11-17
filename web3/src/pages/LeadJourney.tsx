@@ -240,7 +240,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
                     <Td>
                       <StatusBadge status={describe(callOutcome, call.outcome)} />
                     </Td>
-                    <Td className="text-right font-mono text-small">{usd(call.cost_micro_usd)}</Td>
+                    <Td className="tnum text-right text-small">{usd(call.cost_micro_usd)}</Td>
                   </tr>
                 ))}
               </tbody>

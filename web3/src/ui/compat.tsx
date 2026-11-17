@@ -172,12 +172,12 @@ export function Card({
 
 export function PageHeader({ title, subtitle, actions, crumbs }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
   return (
-    <div className="mb-5">
+    <div className="mb-6 animate-rise">
       {crumbs && <div className="mb-2 text-small text-muted">{crumbs}</div>}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-title font-semibold tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-0.5 text-muted">{subtitle}</p>}
+          <h1 className="text-title font-semibold text-ink">{title}</h1>
+          {subtitle && <div className="mt-1 max-w-[75ch] text-body text-muted">{subtitle}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -193,11 +193,13 @@ export const Label = ({ children, className }: { children: ReactNode; className?
 /** One number with its label, for the summary rows at the top of a page. */
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "attention" | "error" | "good" | "primary" }) {
   const colour = { attention: "text-attention", error: "text-error", good: "text-good", primary: "text-primary" };
+  const bar = { attention: "from-attention-dot", error: "from-error-dot", good: "from-good-dot", primary: "from-primary" };
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      <Label>{label}</Label>
-      <div className={cx("mt-1 text-[26px] font-semibold leading-8", tone && colour[tone])}>{value}</div>
-      {hint && <div className="mt-0.5 text-small text-muted">{hint}</div>}
+    <div className="card card-hover relative overflow-hidden p-5">
+      <span aria-hidden className={cx("absolute inset-x-0 top-0 h-1 bg-gradient-to-r to-transparent", tone ? bar[tone] : "from-primary-line")} />
+      <div className="text-small font-medium text-muted">{label}</div>
+      <div className={cx("tnum mt-1.5 text-[1.75rem] leading-9 font-semibold tracking-tight", tone ? colour[tone] : "text-ink")}>{value}</div>
+      {hint && <div className="mt-1 text-small text-muted">{hint}</div>}
     </div>
   );
 }
@@ -283,13 +285,13 @@ export function Problem({ error, className }: { error: unknown; className?: stri
 /** A coloured note: an explanation, a warning or a success, inside a page. */
 export function Callout({ tone = "info", title, children, icon, className }: { tone?: "info" | "attention" | "error" | "good"; title?: ReactNode; children?: ReactNode; icon?: ReactNode; className?: string }) {
   const tones = {
-    info: "border-primary/25 bg-primary-soft/50 text-ink",
+    info: "border-primary-line bg-primary-soft text-ink",
     attention: "border-attention/40 bg-attention-soft text-attention",
     error: "border-error/30 bg-error-soft text-error",
     good: "border-good/30 bg-good-soft text-good",
   };
   return (
-    <div className={cx("flex gap-2.5 rounded-lg border px-3 py-2.5 text-small leading-relaxed", tones[tone], className)}>
+    <div className={cx("flex gap-3 rounded-xl border px-4 py-3 text-body", tones[tone], className)}>
       {icon && <span className="mt-0.5 shrink-0">{icon}</span>}
       <div className="min-w-0">
         {title && <div className="font-semibold">{title}</div>}
@@ -372,12 +374,12 @@ export const Table = ({ children, className }: { children: ReactNode; className?
   </div>
 );
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => (
-  <th scope="col" className={cx("border-b border-line bg-surface-2 px-3 py-2 text-label font-semibold uppercase tracking-wider text-muted", className)}>
+  <th scope="col" className={cx("border-b border-line px-4 py-3 text-label font-semibold tracking-wide text-faint uppercase", className)}>
     {children}
   </th>
 );
 export const Td = ({ children, className, colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) => (
-  <td colSpan={colSpan} className={cx("border-b border-line px-3 py-2.5 align-middle", className)}>
+  <td colSpan={colSpan} className={cx("border-b border-line px-4 py-3 align-middle", className)}>
     {children}
   </td>
 );
@@ -411,7 +413,7 @@ export function Tabs<T extends string>({
   };
   return (
     <div>
-      <div role="tablist" aria-label={label} data-tour={tour} className="mb-5 flex flex-wrap gap-1 border-b border-line">
+      <div role="tablist" aria-label={label} data-tour={tour} className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
         {tabs.map(([id, text], index) => (
           <button
             key={id}
@@ -424,8 +426,8 @@ export function Tabs<T extends string>({
             onClick={() => onChange(id)}
             onKeyDown={(event) => move(event, index)}
             className={cx(
-              "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-body font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
-              value === id ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink",
+              "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-body font-semibold whitespace-nowrap outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
+              value === id ? "border-primary text-ink" : "border-transparent text-muted hover:text-ink",
             )}
           >
             {text}
@@ -442,7 +444,7 @@ export function Tabs<T extends string>({
 /** A row of mutually exclusive choices, for filters and periods. */
 export function Segmented<T extends string | number>({ value, options, onChange, label }: { value: T; options: readonly (readonly [T, ReactNode])[]; onChange: (value: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg border border-line bg-surface-2 p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex flex-wrap rounded-xl bg-surface-3 p-1">
       {options.map(([id, text]) => (
         <button
           key={String(id)}
@@ -450,7 +452,7 @@ export function Segmented<T extends string | number>({ value, options, onChange,
           role="radio"
           aria-checked={value === id}
           onClick={() => onChange(id)}
-          className={cx("rounded-md px-2.5 py-1 text-small font-medium transition-colors", value === id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}
+          className={cx("press rounded-lg px-3 py-1.5 text-small font-semibold transition", value === id ? "bg-surface text-ink shadow-1" : "text-muted hover:text-ink")}
         >
           {text}
         </button>
@@ -606,7 +608,7 @@ export function Menu({ label, button, items, header, align = "right", tour, butt
         {button}
       </button>
       {open && (
-        <div id={id} role="menu" aria-label={label} className={cx("absolute top-full z-50 mt-1 min-w-56 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg", align === "right" ? "right-0" : "left-0")}>
+        <div id={id} role="menu" aria-label={label} className={cx("glass absolute top-full z-50 mt-2 min-w-56 animate-rise overflow-hidden rounded-xl border border-line p-1.5 shadow-3", align === "right" ? "right-0" : "left-0")}>
           {header && <div className="border-b border-line px-3 py-2 text-small">{header}</div>}
           {items.map((item, index) => (
             <button
@@ -618,7 +620,7 @@ export function Menu({ label, button, items, header, align = "right", tour, butt
                 setOpen(false);
                 item.onSelect();
               }}
-              className={cx("flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-body outline-none hover:bg-surface-2 focus:bg-surface-2", item.tone === "danger" ? "text-error" : "text-ink", item.current && "font-semibold")}
+              className={cx("flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-body outline-none hover:bg-surface-2 focus:bg-surface-2", item.tone === "danger" ? "text-error" : "text-ink", item.current && "font-semibold")}
             >
               <span className="flex items-center gap-2">{item.label}</span>
               {item.hint && <span className="text-label text-muted">{item.hint}</span>}

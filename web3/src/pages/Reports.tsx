@@ -88,7 +88,7 @@ export function ReportsPage() {
                   <li key={reason}>
                     <div className="flex justify-between text-small">
                       <span>{describeHold(reason).label}</span>
-                      <span className="font-mono font-semibold">{n}</span>
+                      <span className="tnum font-semibold">{n}</span>
                     </div>
                     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
                       <div className="h-full bg-attention" style={{ width: `${(n / widestHold) * 100}%` }} />
@@ -123,10 +123,10 @@ export function ReportsPage() {
                       return (
                         <tr key={vendor}>
                           <Td className="font-medium">{vendor}</Td>
-                          <Td className="text-right font-mono text-small">{n}</Td>
-                          <Td className="text-right font-mono text-small">{usd(spent)}</Td>
-                          <Td className="text-right font-mono text-small">{n ? usd(spent / n) : "–"}</Td>
-                          <Td className="text-right font-mono text-small">{c?.total ? percent(spent / c.total) : "–"}</Td>
+                          <Td className="tnum text-right text-small">{n}</Td>
+                          <Td className="tnum text-right text-small">{usd(spent)}</Td>
+                          <Td className="tnum text-right text-small">{n ? usd(spent / n) : "–"}</Td>
+                          <Td className="tnum text-right text-small">{c?.total ? percent(spent / c.total) : "–"}</Td>
                         </tr>
                       );
                     })}
@@ -138,7 +138,7 @@ export function ReportsPage() {
                 {Object.entries(outcomes).map(([outcome, n]) => (
                   <span key={outcome} className="inline-flex items-center gap-1.5">
                     <StatusBadge status={describe(callOutcome, outcome)} />
-                    <span className="font-mono text-small">{n}</span>
+                    <span className="tnum text-small">{n}</span>
                   </span>
                 ))}
               </div>
@@ -170,7 +170,7 @@ export function ReportsPage() {
                       .map(([verdict, n]) => (
                         <li key={verdict} className="flex justify-between gap-2">
                           <span>{describe(candidateVerdict, verdict).label}</span>
-                          <span className="font-mono text-small">{n}</span>
+                          <span className="tnum text-small">{n}</span>
                         </li>
                       ))}
                   </ul>
@@ -182,7 +182,7 @@ export function ReportsPage() {
                     {Object.entries(funnel.data.outcomes).map(([key, n]) => (
                       <li key={key} className="flex justify-between gap-2">
                         <span>{leadOutcome(key)}</span>
-                        <span className="font-mono text-small">{n}</span>
+                        <span className="tnum text-small">{n}</span>
                       </li>
                     ))}
                   </ul>
@@ -194,7 +194,7 @@ export function ReportsPage() {
                     {funnel.data.vendors.map((v) => (
                       <li key={v.provider} className="flex justify-between gap-2">
                         <span>{v.provider}</span>
-                        <span className={`font-mono text-small ${v.error_rate >= 0.25 ? "text-error" : ""}`}>
+                        <span className={`tnum text-small ${v.error_rate >= 0.25 ? "text-error" : ""}`}>
                           {v.errors} of {v.calls} ({percent(v.error_rate)})
                         </span>
                       </li>
@@ -232,10 +232,10 @@ export function ReportsPage() {
                   {sources.data.map((row) => (
                     <tr key={row.source}>
                       <Td className="font-medium">{discoverySource[row.source] ?? row.source}</Td>
-                      <Td className="text-right font-mono text-small">{row.found}</Td>
-                      <Td className="text-right font-mono text-small">{row.leads}</Td>
-                      <Td className="text-right font-mono text-small">{row.qualified}</Td>
-                      <Td className="text-right font-mono text-small">{percent(row.rate)}</Td>
+                      <Td className="tnum text-right text-small">{row.found}</Td>
+                      <Td className="tnum text-right text-small">{row.leads}</Td>
+                      <Td className="tnum text-right text-small">{row.qualified}</Td>
+                      <Td className="tnum text-right text-small">{percent(row.rate)}</Td>
                     </tr>
                   ))}
                 </tbody>

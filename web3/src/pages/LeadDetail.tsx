@@ -383,7 +383,7 @@ export function LeadDetailPage() {
                               <StatusBadge status={describe(callOutcome, step.outcome)} />
                               {step.got && <div className="mt-0.5 text-label text-muted">{step.got}</div>}
                             </Td>
-                            <Td className="text-right font-mono text-small">{usd(step.cost_micro_usd)}</Td>
+                            <Td className="tnum text-right text-small">{usd(step.cost_micro_usd)}</Td>
                           </tr>
                         ))}
                       </tbody>

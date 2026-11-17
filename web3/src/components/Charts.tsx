@@ -6,7 +6,7 @@ export function BudgetMeter({ spent, ceiling }: { spent: number; ceiling: number
   const used = Math.min(100, Math.round((spent / ceiling) * 100));
   return (
     <div className="col-span-2">
-      <div className="mb-1 flex justify-between font-mono text-label text-muted">
+      <div className="mb-1 flex justify-between tnum text-label text-muted">
         <span>Average spend against the ceiling</span>
         <span className={cx("font-semibold", used > 90 ? "text-error" : used > 70 ? "text-attention" : "text-good")}>{used}% used</span>
       </div>
@@ -27,7 +27,7 @@ export function ProviderBars({ byProvider, calls, total }: { byProvider: Record<
         const share = total > 0 ? Math.round((micro / total) * 100) : 0;
         return (
           <li key={vendor}>
-            <div className="flex items-center justify-between gap-2 font-mono text-small">
+            <div className="flex items-center justify-between gap-2 tnum text-small">
               <span className="font-medium">{vendor}</span>
               <span className="text-muted">
                 {calls[vendor] ?? 0} calls · {usd(micro)} {total > 0 && `(${share}%)`}
