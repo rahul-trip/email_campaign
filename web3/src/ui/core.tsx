@@ -253,7 +253,11 @@ export function Segmented<T extends string | number>({ value, options, onChange,
 }
 
 export function Kbd({ children }: { children: ReactNode }) {
-  return <kbd className="kbd">{children}</kbd>;
+  return (
+    <kbd aria-hidden className="kbd">
+      {children}
+    </kbd>
+  );
 }
 
 export function Avatar({ name, className }: { name: string; className?: string }) {

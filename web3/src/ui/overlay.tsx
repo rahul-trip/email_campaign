@@ -84,7 +84,6 @@ export function Drawer({ title, subtitle, children, onClose, footer, width = 480
         style={{ maxWidth: width }}
         className="absolute inset-y-0 right-0 flex w-full flex-col rounded-l-2xl border-l border-line bg-surface shadow-3 [animation:drawer-in_0.36s_cubic-bezier(0.2,0.9,0.3,1.05)_both]"
       >
-        <style>{"@keyframes drawer-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}"}</style>
         <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
           <div>
             <h2 id={labelId} className="text-title font-semibold text-ink">

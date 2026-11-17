@@ -7,6 +7,12 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number];
 export type LeadsSearch = { q?: string; status?: string; hold?: string; page?: number; view?: string; sort?: string; source?: string; country?: string; fit?: number };
 
 const root = createRootRoute({
+  notFoundComponent: () => (
+    <div className="card mx-auto mt-10 max-w-lg p-8 text-center">
+      <div className="text-heading font-semibold text-ink">This page does not exist</div>
+      <p className="mt-1 text-body text-muted">The address may be old or mistyped. Use the menu, or press ⌘K to find what you need.</p>
+    </div>
+  ),
   component: () => (
     <Shell>
       <Outlet />

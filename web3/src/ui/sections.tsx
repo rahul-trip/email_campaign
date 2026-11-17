@@ -120,14 +120,16 @@ export function Section({
       )}
     >
       <div className={cx("flex items-center gap-3 px-5 py-4", tone === "attention" && open && "bg-attention-soft/60")}>
-        <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="group flex min-w-0 flex-1 items-center gap-3 text-left">
+        <h2 className="min-w-0 flex-1">
+        <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="group flex w-full min-w-0 items-center gap-3 text-left">
           <ChevronDown aria-hidden className={cx("size-5 shrink-0 text-faint transition-transform duration-300 group-hover:text-ink", !open && "-rotate-90")} />
           {icon && <span className="shrink-0 text-primary">{icon}</span>}
           <span className="min-w-0">
             <span className="block text-heading font-semibold text-ink">{title}</span>
-            {summary && <span className="block truncate text-small text-muted">{summary}</span>}
+            {summary && <span className="block truncate text-small font-normal text-muted">{summary}</span>}
           </span>
         </button>
+        </h2>
         {chip && <div className="hidden shrink-0 sm:block">{chip}</div>}
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>

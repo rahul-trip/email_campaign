@@ -249,7 +249,7 @@ const SOURCE_LABEL: Record<string, string> = { yc_directory: "YC directory", com
  * the sources the brief will use (chosen by the engine, shown read-only), and the one switch the
  * plan allows. Sends exactly what web2's form sent. */
 function StartRunDrawer({ canSkip, campaign, ceiling, busy, onClose, onStarted }: { canSkip: boolean; campaign?: string; ceiling?: number | null; busy: boolean; onClose: () => void; onStarted: (id: string) => void }) {
-  const [mode, setMode] = useState<Mode>("discovery");
+  const [mode, setMode] = useState<Mode>("manual");
   const [discover, setDiscover] = useState(25);
   const [skipDirectory, setSkipDirectory] = useState(false);
   const plan = useQuery({ queryKey: ["run-plan"], queryFn: () => ok(client.GET("/api/runs/plan")) });

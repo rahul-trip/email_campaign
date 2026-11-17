@@ -16,6 +16,8 @@ import { day, nearLimit, STEP_LABEL, useUsage, waitingTotal, type Usage } from "
 import { Avatar, buttonClass, Kbd } from "../ui/core";
 import { Menu } from "../ui/overlay";
 import { Ring } from "../ui/viz";
+import { TourProvider, useTour } from "../tour/Tour";
+import { useSetup } from "../lib/setup";
 import { NotificationBell } from "./Bell";
 import { CampaignGate } from "./CampaignGate";
 import { CommandPalette, useCommandPalette } from "./Palette";
@@ -42,7 +44,29 @@ export function useCounts() {
   };
 }
 
+/** The tour waits until setup is done, so it never opens on top of onboarding or the campaign gate. */
 export function Shell({ children }: { children: ReactNode }) {
+  const viewing = isViewing(useCurrent().workspace);
+  const gated = useNeedsCampaign() && !viewing;
+  const setupDone = useSetup().data?.done === true;
+  return (
+    <TourProvider autoStart={!gated && setupDone}>
+      <Frame>{children}</Frame>
+    </TourProvider>
+  );
+}
+
+/** The account menu asks for the tour with an event, so it needs no import cycle. */
+function TourListener() {
+  const { start } = useTour();
+  useEffect(() => {
+    window.addEventListener("outbound:tour", start);
+    return () => window.removeEventListener("outbound:tour", start);
+  }, [start]);
+  return null;
+}
+
+function Frame({ children }: { children: ReactNode }) {
   const current = useCurrent();
   const viewing = isViewing(current.workspace);
   const gated = useNeedsCampaign() && !viewing;
@@ -70,7 +94,7 @@ export function Shell({ children }: { children: ReactNode }) {
       ? [{ key: "stuck", tone: "error" as const, node: <>A run has waited {ago(active?.created_at)} and nothing picked it up. The worker is probably not running: start it with <code className="font-mono">uv run outbound worker</code>.</> }]
       : []),
     ...(settings.data?.country_policy_enabled === false
-      ? [{ key: "rules", tone: "error" as const, node: <>Country rules are off for this workspace: no lead is held or blocked by its country. The do-not-contact list still applies. <Link to="/compliance" className="font-semibold underline">Switch them back on</Link>.</> }]
+      ? [{ key: "rules", tone: "error" as const, node: <>Country rules are switched off for this workspace: no lead is held or blocked by its country. The do-not-contact list still applies. <Link to="/compliance" className="font-semibold underline">Switch them back on</Link>.</> }]
       : []),
     ...(unconfirmed
       ? [{ key: "unconfirmed", tone: "attention" as const, node: <>Your sender profile is not confirmed, so no emails are written yet. <Link to="/settings" className="font-semibold underline">Review and confirm it</Link>.</> }]
@@ -163,6 +187,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </main>
       {palette.isOpen && <CommandPalette onClose={palette.close} />}
+      <TourListener />
     </div>
   );
 }

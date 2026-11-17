@@ -1,0 +1,350 @@
+/**
+ * The guided tour: one place to edit when a screen or feature changes.
+ *
+ * Add a section when you add a screen, add a step when you add something worth pointing at, and
+ * give the element `data-tour="name"` (or `tour="name"` on a Card or Tabs) matching `target` here.
+ * The tour test in e2e/tour.spec.ts fails if a step points at something that no longer exists.
+ * Also update the "Guided tour" part of docs/USER_MANUAL.md.
+ */
+
+/** Where a section lives. The two lead pages need a real lead, so the tour opens the newest one. */
+export type Place = "/" | "/onboarding" | "/targets" | "/campaigns" | "/runs" | "/review" | "/attention" | "/linkedin" | "/leads" | "/reports" | "/settings" | "/compliance" | "lead" | "journey";
+
+export type Step = {
+  /** The `data-tour` name of the element to point at; none means a centred message. */
+  target?: string;
+  title: string;
+  body: string;
+};
+
+export type Section = {
+  id: string;
+  title: string;
+  place: Place;
+  steps: Step[];
+};
+
+export const SECTIONS: Section[] = [
+  {
+    id: "welcome",
+    title: "Welcome",
+    place: "/",
+    steps: [
+      {
+        title: "Welcome to Outbound",
+        body: "This short tour shows each screen. Move on with Next, jump to the next screen with Skip section, or end it at any time. Start it again from your account menu at the top right. Press ⌘K (Ctrl+K) at any time to find a lead or jump to a page.",
+      },
+      {
+        target: "nav",
+        title: "The main menu",
+        body: "Work is Today and what waits for you: emails to review and leads that need a decision. Leads is where companies go in, the engine runs, and your campaigns say who to reach. Workspace holds reports, policies and settings.",
+      },
+      {
+        target: "workspace-switcher",
+        title: "Your workspace",
+        body: "Everything you see belongs to this workspace. If you work in several, switch here; the address bar always shows which one you are in, so a link you share opens the right one.",
+      },
+      {
+        target: "user-menu",
+        title: "Your account",
+        body: "Take the tour again, switch between light and dark, change your password, sign out other devices, or sign out.",
+      },
+      {
+        target: "notifications",
+        title: "Notifications",
+        body: "The bell lists what the engine did, newest first, and each line opens the page it is about: drafts waiting for review, a hot lead, leads that need you, a run that finished or failed, automatic discovery paused, credit warnings, and someone asking to join your workspace (an admin approves or rejects that under Settings, Team). An unread line is updated, not repeated.",
+      },
+      {
+        target: "search",
+        title: "Find any lead",
+        body: "Type a company or domain and press Enter. Ctrl+K (Cmd+K on a Mac) jumps here from anywhere.",
+      },
+      {
+        target: "needs-you",
+        title: "What needs you",
+        body: "Emails to review, leads on hold, failures and websites to confirm. Each card opens the list behind it. When everything shows 0, nothing is waiting on you.",
+      },
+      {
+        target: "pipeline",
+        title: "The pipeline",
+        body: "How many companies sit at each of the eight stages, and how many left the main path. Click a stage to see its leads.",
+      },
+    ],
+  },
+  {
+    id: "targets",
+    title: "Add leads",
+    place: "/targets",
+    steps: [
+      {
+        target: "add-target",
+        title: "Add a company",
+        body: "One detail is enough: a website, a company name, a work email or a LinkedIn profile. What you type is marked as yours and never overwritten. Tick Check only to see what would happen first.",
+      },
+      {
+        target: "target-tabs",
+        title: "Upload a list, confirm websites",
+        body: "Upload a CSV or Excel file: preview it first, nothing is saved until you import. When a company name could mean more than one website, it waits under Websites to confirm.",
+      },
+    ],
+  },
+  {
+    id: "campaigns",
+    title: "Campaigns",
+    place: "/campaigns",
+    steps: [
+      {
+        target: "campaign-active",
+        title: "One campaign is active",
+        body: "A workspace keeps several campaigns but one is active: discovery, new leads and runs follow it. Switch on makes another campaign the active one and pauses this one, whose leads wait where they are until it is switched on again. Until a workspace has an active campaign with job titles and an ideal customer, the app asks for one first.",
+      },
+      {
+        target: "campaign-brief",
+        title: "Who we look for",
+        body: "The brief turns your ideal customer into parts the engine can use: what these companies do, where, what rules one out and where such companies are listed. Discovery searches from it and drops companies that do not fit, and research checks every lead against it. Draft it from the campaign and your sender profile, then correct it and save. A yellow note lists what is missing (must-haves, rule-outs, keywords): the thinner the brief, the looser the fit score.",
+      },
+    ],
+  },
+  {
+    id: "runs",
+    title: "Discovery runs",
+    place: "/runs",
+    steps: [
+      {
+        target: "start-run",
+        title: "Start the engine",
+        body: "A run researches each company, finds and checks an email address, and writes the email. Discovery also looks for new companies: in start-up directories such as Y Combinator when your campaign is after start-ups, and in pages that list many companies like the ones in its brief. It screens every company it finds against the brief and adds only those that fit, taking new angles each run. If your plan allows it, a box lets you take emails from the vendors instead of the shared directory. The worker process does the work, so you can leave the page.",
+      },
+      {
+        target: "auto-discovery",
+        title: "Discovery by itself",
+        body: "The worker searches for new companies for the active campaign about four times a day, and stops while Review holds 50 drafts (both numbers are under Settings, Limits and budget). This line says when the next search is, or why it is paused.",
+      },
+      {
+        target: "recent-runs",
+        title: "Watch it work",
+        body: "Each run shows what it did in words: leads moved on, held, failed or waiting, how many new companies discovery found, and a progress bar while it is going. Spend updates live. Cancel stops it between companies. If a run stays queued, the worker is not running. Open a run for the step-by-step table, where it looked, every company it found with why it was or was not added (Make a lead adds one the screening left out), what each vendor cost, and every lead it touched; click a lead to go to it.",
+      },
+    ],
+  },
+  {
+    id: "review",
+    title: "Review",
+    place: "/review",
+    steps: [
+      {
+        target: "review-queue",
+        title: "Emails waiting for you",
+        body: "Every email the engine writes waits here, hot leads (a flame, fit above 80) first. Nothing reaches your mailbox until you approve it, unless you switched on automatic approval for cold leads in Settings, Limits and budget; hot leads always wait. J and K move through the queue.",
+      },
+      {
+        target: "review-editor",
+        title: "Read, edit, approve",
+        body: "The email exactly as it will be drafted, footer included, with when it was written. Beside it, History lists every step of its life (written, edited, approved, drafted, sent). Edit it if you like: your changes are shown and kept, and the writer learns from them. If it relies on a check you skipped, tick that you know before Approve works. Approve makes a draft on the next run; Write it again throws this one away and the next run writes a fresh one; Reject needs a reason.",
+      },
+      {
+        target: "review-opening",
+        title: "What it opens with",
+        body: "The dated news item the email starts from, linked to its source, so you can check it is real and right before approving. Without recent news it opens with a fact from their own site.",
+      },
+      {
+        target: "review-checks",
+        title: "Why this lead, and the checks",
+        body: "The research behind the email, your notes, and every quality check with the country rule that applies. Read any flag before approving.",
+      },
+    ],
+  },
+  {
+    id: "attention",
+    title: "Needs attention",
+    place: "/attention",
+    steps: [
+      {
+        target: "attention-filter",
+        title: "Holds, failures, websites",
+        body: "Everything that waits on a decision other than review. Each group says why in plain words and offers the action that fixes it, such as adding a person who has given consent, or Find email again for a catch-all address the resolver could not prove (one lead, or all of them at once). Failures are grouped by the step that failed, each with Retry all, and Retry every failed lead does them all in one run; leads you held after messaging them on LinkedIn have Release all.",
+      },
+    ],
+  },
+  {
+    id: "linkedin",
+    title: "LinkedIn",
+    place: "/linkedin",
+    steps: [
+      {
+        target: "linkedin-filter",
+        title: "Messages to paste into LinkedIn",
+        body: "Every connection note and first message written for your confirmed people, newest first, so you can work through them in one sitting: Open their LinkedIn, Copy the note, Copy the message, then Mark sent. To send is what is still waiting; Sent and Skipped keep the record. Marking one sent holds that lead's email until you release it.",
+      },
+    ],
+  },
+  {
+    id: "leads",
+    title: "Leads",
+    place: "/leads",
+    steps: [
+      {
+        target: "leads-list",
+        title: "Every company",
+        body: "Search and filter by status or hold reason. The filters are part of the address, so a filtered view can be bookmarked. The stage bar shows how far each lead has come.",
+      },
+      {
+        target: "leads-journey",
+        title: "Open a lead's journey",
+        body: "Journey opens the story of one company, as a tab on its page. The next section shows it.",
+      },
+    ],
+  },
+  {
+    id: "journey",
+    title: "A lead's journey",
+    place: "journey",
+    steps: [
+      {
+        target: "journey-header",
+        title: "Where this lead is",
+        body: "Its state and what happens next, including whether the next move is yours.",
+      },
+      {
+        target: "journey-stages",
+        title: "The eight stages",
+        body: "Green is done, blue is next for the engine, amber is held or waiting for you, red is failed or stopped. Click a stage, or use the arrow keys, to read it.",
+      },
+      {
+        target: "journey-stage",
+        title: "What happened at a stage",
+        body: "The details found, any holds or failures, and every vendor call made with its cost. Where a country rule held the lead, you can skip the rule for it from this stage.",
+      },
+      {
+        target: "journey-origin",
+        title: "How it arrived",
+        body: "Typed in, imported from a file, sent by the webhook or found by search: who added it, when, and exactly what was supplied.",
+      },
+    ],
+  },
+  {
+    id: "lead",
+    title: "Acting on a lead",
+    place: "lead",
+    steps: [
+      {
+        target: "lead-header",
+        title: "Status and next actions",
+        body: "A failed lead can be retried. A held lead explains why and offers the fix. A disqualified lead can be overridden unless a country rule blocks it. Research again reads the site and the news afresh and rewrites the email (a waiting email is cancelled). An email waiting for review has Open in Review, under Emails.",
+      },
+      {
+        target: "lead-people",
+        title: "People and consent",
+        body: "Each person with their addresses, where each came from and who checked it, and who the email is to. Someone you gave an address or consent to is always first. Find LinkedIn looks up a missing profile link; Find email again searches for a person's address afresh. The card starts closed; press its title to open it, and it opens by itself when the lead needs you here. You can also edit a person, record consent, write to someone else instead, remove a wrong match or suppress someone. A person whose profile says they work at another company is set aside under \"found who work elsewhere\"; Doesn't work here does the same by hand and They do work here undoes it. Check who works here, under the list, looks again at everyone a search found.",
+      },
+      {
+        target: "lead-linkedin",
+        title: "LinkedIn message",
+        body: "For each confirmed decision-maker with a LinkedIn profile, a connection note (200 characters, the most a free account allows) and a first message to send once they accept, written before their email is found. Copy them into LinkedIn yourself; nothing is sent from here. Edit, Rewrite or Skip them. Mark sent on LinkedIn once you have sent one: the lead's email then waits, so the person is not contacted twice at once, until you release the hold.",
+      },
+      {
+        target: "lead-directory",
+        title: "Shared directory",
+        body: "An address another customer's run already verified is used first, at no cost, and still checked once before it is used. Report a wrong detail and the directory stops using that address until the team has checked it. If your plan allows it, tick the box to find this lead's email with the vendors instead.",
+      },
+      {
+        target: "lead-add-person",
+        title: "Add a person",
+        body: "Someone you know at the company, with a first and last name or their work email. Tick that they have consented and say where it came from, and a lead held for consent is released and carries on.",
+      },
+      {
+        target: "lead-research",
+        title: "What research found",
+        body: "Everything research found, in sections: what the company does, how well it fits (with a campaign brief, each must-have, sign and rule-out with what research found for it and its source, why they might buy now, and the risks), products, findings worth mentioning, recent news about the company and its market (each a link to its source), hiring, technology, and your research questions' answers. Nothing is cut short. The email opens with one of them when there is one.",
+      },
+      {
+        target: "lead-activity",
+        title: "Activity",
+        body: "What happened to the lead in plain sentences, newest first, grouped by day: draft written, put on hold, email approved, saved to the mailbox. Show details adds the small events. The Vendor calls card next to it says what each call asked, such as the search text or the pages read.",
+      },
+      {
+        target: "lead-policy",
+        title: "Country rule",
+        body: "Skip the country's rule for this lead from a step onward, with a reason that is kept. A lead it held goes straight on. The do-not-contact list still applies, and approving the email asks you to confirm.",
+      },
+      {
+        target: "lead-edit",
+        title: "Edit a lead",
+        body: "Change the name, country, priority or campaign. What you set is marked as yours and kept.",
+      },
+      {
+        target: "lead-danger",
+        title: "Suppress or delete",
+        body: "Suppress stops all contact with the domain. Delete removes the lead for good: you type its domain to confirm, and a lead that has been emailed cannot be deleted.",
+      },
+    ],
+  },
+  {
+    id: "reports",
+    title: "Reports",
+    place: "/reports",
+    steps: [
+      {
+        target: "reports-quality",
+        title: "Is it working?",
+        body: "The share of first emails sent without an edit (the target is 8 of 10), how many were flagged, and spend per prospect against the budget.",
+      },
+      {
+        target: "reports-funnel",
+        title: "From a company found to a draft",
+        body: "Follow what discovery found: how many companies it named, how many the model actually read, how many became leads, and where those leads are now (waiting, disqualified, failed at a step, held, or a draft ready). The last column shows each vendor's failure rate: a vendor that fails most calls explains leads that stall.",
+      },
+      {
+        target: "reports-sources",
+        title: "Where good leads come from",
+        body: "For each place discovery looks (the Y Combinator directory, Companies House, Exa, lists and articles): how many companies it named, how many became leads and how many passed the fit check. Discovery asks the sources whose leads pass most often first, and for more of them.",
+      },
+    ],
+  },
+  {
+    id: "settings",
+    title: "Settings",
+    place: "/settings",
+    steps: [
+      {
+        target: "settings-tabs",
+        title: "Setup, profile, mailboxes, limits, team",
+        body: "The setup check lists what is missing. The sender profile is who you are in every email. Mailboxes is where you connect Microsoft 365, Google or any IMAP mailbox: approved emails are saved as drafts there. Limits hold the budget per prospect, the email length and the footer switch. Under Sender profile, How you write sets the greeting, what you want from the emails and past emails of yours to learn your voice from. Team is who works here: admins invite people, set their roles, share the workspace's join code and approve or reject requests to join. Integrations holds the signed address other systems use to add targets, the request body to send, and a complete example. Plan and usage shows your allowances, what is used, when they renew, and lets you ask for more credits. Your account changes your password, signs out other devices and can delete your account.",
+      },
+      {
+        target: "setup-check",
+        title: "Confirm your sender profile",
+        body: "Every statement in the profile ends up in emails under your name. Read it, keep only what is true, and press Confirm and save: no email is written until you do. You can also fill it from a file: download the empty file at the top, fill it in, and upload it back.",
+      },
+    ],
+  },
+  {
+    id: "onboarding",
+    title: "Setting up",
+    place: "/onboarding",
+    steps: [
+      {
+        target: "onboarding-steps",
+        title: "Five steps to your first leads",
+        body: "A new workspace starts empty, but you do not type it all. Press Read my website and your company is drafted for you to check; your campaign is suggested from it. Then who signs, your first leads (the engine can find ten for you now), and a mailbox for the drafts. Nothing is saved until you confirm it. A tick appears as soon as a step is done, wherever you did it; Today shows Finish setting up until the essentials are in place.",
+      },
+    ],
+  },
+  {
+    id: "compliance",
+    title: "Policies and privacy",
+    place: "/compliance",
+    steps: [
+      {
+        target: "compliance-tabs",
+        title: "Rules and requests",
+        body: "The rule and footer for each country, the do-not-contact list, and Forget a person for erasure requests. Have the country rules reviewed and record who did.",
+      },
+      {
+        target: "compliance-switch",
+        title: "Switch country rules on or off",
+        body: "Off means no lead is held or blocked because of its country, for the whole workspace; a red banner says so on every page. Suppression still applies. Add any country with any rule below, or remove one.",
+      },
+    ],
+  },
+];

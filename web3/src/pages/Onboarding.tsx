@@ -112,7 +112,8 @@ export function OnboardingPage() {
     return step.items.every((key) => status.get(key) === "ok" || (!step.required && status.get(key) === "warning"));
   };
   const doneCount = STEPS.filter((s) => doneStep(s.id)).length;
-  const nothingYet = setup.isSuccess && doneCount === 0;
+  // Optional steps count as done when they only warn, so a new workspace is judged by the required ones.
+  const nothingYet = setup.isSuccess && STEPS.filter((s) => s.required).every((s) => !doneStep(s.id));
 
   // First visit with nothing done: the welcome; otherwise straight to the steps.
   useEffect(() => {
@@ -403,7 +404,7 @@ function Celebration({ name, onBack }: { name: string; onBack: () => void }) {
               <Compass className="size-4" aria-hidden /> Take the guided tour
             </Button>
           </div>
-          <button type="button" onClick={onBack} className="mt-4 text-small font-semibold text-muted hover:text-ink">
+          <button type="button" data-tour="onboarding-steps" onClick={onBack} className="mt-4 text-small font-semibold text-muted hover:text-ink">
             Back to the setup steps
           </button>
         </div>
@@ -440,7 +441,6 @@ function Confetti() {
   const colours = ["var(--primary)", "var(--violet)", "var(--good-dot)", "var(--attention-dot)", "var(--working-dot)", "var(--error-dot)"];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden" aria-hidden>
-      <style>{"@keyframes fall{0%{transform:translate3d(0,-20px,0) rotate(0);opacity:1}100%{transform:translate3d(var(--dx),110vh,0) rotate(540deg);opacity:0}}"}</style>
       {Array.from({ length: 48 }, (_, i) => (
         <span
           key={i}

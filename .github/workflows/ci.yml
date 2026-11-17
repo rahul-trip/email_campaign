@@ -132,6 +132,10 @@ jobs:
       - name: Every API route web2 uses is used by web3
         working-directory: web3
         run: npm run check:parity
+      - run: npx playwright install --with-deps chromium
+        working-directory: web3
+      - run: npx playwright test
+        working-directory: web3
 
   image:
     name: production image builds

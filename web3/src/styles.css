@@ -343,6 +343,17 @@
   }
 }
 
+/* Keyframes used by inline animation styles. They live here because the server's
+   Content-Security-Policy forbids inline <style> elements. */
+@keyframes drawer-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes fall {
+  0% { transform: translate3d(0, -20px, 0) rotate(0); opacity: 1; }
+  100% { transform: translate3d(var(--dx), 110vh, 0) rotate(540deg); opacity: 0; }
+}
+
 /* Every effect switches off for people who ask the system for less motion. */
 @media (prefers-reduced-motion: reduce) {
   *,
