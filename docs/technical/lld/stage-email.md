@@ -146,7 +146,7 @@ The stage reads contacts and addresses in one short read, runs the waterfall wit
 
 ## Configuration
 
-`FINDER_CHAIN`, `VERIFIER`, `CATCH_ALL_RESOLVER` and their keys; the workspace's `safe_to_send_only` (default on). See the [configuration reference](../operations/configuration-reference.md) and [integrations](../integrations/README.md).
+`FINDER_CHAIN`, `VERIFIER`, `CATCH_ALL_RESOLVER` and their keys (the other verifiers and resolvers with keys are backups: `stages/email/fallback.py`; an address records the vendor that actually answered in `verified_by`, and a queued catch-all the resolver that took it, which the poller asks); the workspace's `safe_to_send_only` (default on). See the [configuration reference](../operations/configuration-reference.md) and [integrations](../integrations/README.md).
 
 ## Observability
 

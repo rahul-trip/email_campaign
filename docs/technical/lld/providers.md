@@ -70,7 +70,11 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 |---|---|---|
 | `build_finder_chain(settings)` | Finders in `FINDER_CHAIN` order | `ProviderAuthError` |
 | `build_verifier(settings)` | The `VERIFIER` | `ProviderAuthError` |
-| `build_resolver(settings)` | The `CATCH_ALL_RESOLVER` | `ProviderAuthError`; `pipeline.real_providers` turns that into "no resolver" |
+| `build_resolver(settings)` | The `CATCH_ALL_RESOLVER` | `ProviderAuthError`; `pipeline.real_providers` then uses the first other resolver with a key, or none |
+
+`pipeline.real_providers` also fills `Providers.backup_verifiers` and `backup_resolvers` with every other configured vendor, in `_VERIFIERS` / `_RESOLVERS` order (the verify-only vendors first). `pipeline.assemble` meters each one separately and wraps them in `outbound/stages/email/fallback.py::VerifierChain` / `ResolverChain`, which move on only when a call raises `ProviderError`.
+
+**Several keys per vendor.** When `Settings.vendor_key_pools` (laid on by `VendorService.effective_settings` from the console's key slots) holds two or more keys for a vendor, `registry._pooled` builds one adapter per key behind `outbound/providers/keypool.py::KeyPool` (`ResolverKeyPool` for a catch-all resolver). Each call shuffles the keys and moves to the next on `ProviderAuthError`, `RateLimited` or `BudgetExceeded` (Tavily's 432/433); any other `ProviderError` is raised at once. `ResolverKeyPool.submit` prefixes a queued ticket's reference with `k<n>:` so `poll` asks the same account; an unprefixed reference goes to the first key. The pool takes the vendor's name, so the meter and the ledger see one vendor.
 | `build_llm(settings)` | `OpenAiCompatibleLlm` for `LLM_PROVIDER` and `LLM_MODEL`. The key comes from the vendor's own variable (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `COPILOT_API_KEY`), else `LLM_API_KEY` | — |
 | `build_search(settings)` | Tavily | `ProviderAuthError` |
 | `build_company_registry(settings)` | Companies House, or `None` without a key | — |

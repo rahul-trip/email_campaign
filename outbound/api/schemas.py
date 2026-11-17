@@ -1199,6 +1199,15 @@ class PlatformRoleIn(In):
     role: Literal["admin", "superadmin"] | None
 
 
+class VendorKeyOut(Out):
+    slot: int
+    key: str  # masked, never the key
+    version: int
+    set_at: datetime
+    set_by: str | None
+    can_roll_back: bool
+
+
 class VendorOut(Out):
     code: str
     name: str
@@ -1214,6 +1223,7 @@ class VendorOut(Out):
     cap_micro_usd: int | None
     key_refusals: int
     can_test: bool
+    keys: list[VendorKeyOut]  # every live key in the database; each call uses one at random
 
 
 class VendorsOut(Out):

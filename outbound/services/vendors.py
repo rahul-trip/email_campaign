@@ -30,6 +30,18 @@ Stamp = tuple[int, tuple[tuple[str, int], ...]]
 
 
 @dataclass(frozen=True)
+class KeyView:
+    """One live key of a vendor, as the console may show it."""
+
+    slot: int
+    key: str  # masked
+    version: int
+    set_at: datetime
+    set_by: str | None
+    can_roll_back: bool
+
+
+@dataclass(frozen=True)
 class VendorStatus:
     code: str
     name: str
@@ -45,6 +57,7 @@ class VendorStatus:
     cap_micro_usd: int | None
     key_refusals: int  # calls the vendor refused our key for in the last day
     can_test: bool
+    keys: list[KeyView]  # every live key in the database, in slot order
 
 
 class VendorService:
@@ -72,11 +85,15 @@ class VendorService:
             keys = p.vendor_keys.current()
             stamp: Stamp = (version, p.vendor_keys.stamp())
         update: dict[str, Any] = dict(platform_settings.llm)
+        pools: dict[str, list[SecretStr]] = {}
         for vendor in VENDORS:
             if vendor.code in platform_settings.paused_vendors:
                 update[vendor.setting] = SecretStr("")
             elif vendor.code in keys:
-                update[vendor.setting] = SecretStr(keys[vendor.code])
+                update[vendor.setting] = SecretStr(keys[vendor.code][0])
+                if len(keys[vendor.code]) > 1:
+                    pools[vendor.code] = [SecretStr(k) for k in keys[vendor.code]]
+        update["vendor_key_pools"] = pools
         update["finder_chain"] = [
             f for f in self._base.finder_chain if f not in platform_settings.paused_vendors
         ]
@@ -92,7 +109,8 @@ class VendorService:
             refused = self._refusals(p)
         out: list[VendorStatus] = []
         for vendor in VENDORS:
-            found = stored.get(vendor.code)
+            live = stored.get(vendor.code, [])
+            found = live[0] if live else None
             env = getattr(self._base, vendor.setting).get_secret_value()
             if found:
                 key, source, version = mask(found.last4), "database", found.version
@@ -105,9 +123,14 @@ class VendorService:
                     vendor.code, vendor.name, vendor.role, key, source, version,
                     found.set_at if found else None, found.set_by if found else None,
                     vendor.code in settings.paused_vendors,
-                    bool(found and found.can_roll_back),
+                    any(k.can_roll_back for k in live),
                     spent.get(vendor.code, 0), settings.vendor_caps.get(vendor.code),
                     refused.get(vendor.code, 0), can_test(vendor.code),
+                    [
+                        KeyView(k.slot, mask(k.last4), k.version, k.set_at, k.set_by,
+                                k.can_roll_back)
+                        for k in live
+                    ],
                 )
             )  # fmt: skip
         return out
@@ -166,13 +189,28 @@ class VendorService:
         return out
 
     def test_key(
-        self, vendor: str, *, by: str | None, client: httpx.Client | None = None
+        self,
+        vendor: str,
+        *,
+        by: str | None,
+        slot: int = 1,
+        client: httpx.Client | None = None,
     ) -> KeyCheck:
-        """One small real call with the key as stored (even if the vendor is paused)."""
+        """One small real call with the slot's key as stored (even if the vendor is paused).
+        Slot 1 with nothing stored tests the environment's key."""
         _known(vendor)
         with self._platform() as p:
             platform_settings, _ = p.settings.get()
-            stored = p.vendor_keys.current().get(vendor)
+            stored = next(
+                (
+                    p.vendor_keys.reveal(vendor, slot)
+                    for k in p.vendor_keys.summaries().get(vendor, [])
+                    if k.slot == slot
+                ),
+                None,
+            )
+        if stored is None and slot != 1:
+            raise InvalidInput(f"{vendor} has no key in slot {slot}")
         update: dict[str, Any] = dict(platform_settings.llm)
         if stored is not None:
             update[BY_CODE[vendor].setting] = SecretStr(stored)
@@ -180,7 +218,7 @@ class VendorService:
         with self._platform() as p:
             p.audit.record(
                 "vendor_key_tested", actor_user_id=by, target_type="vendor", target_id=vendor,
-                data={"ok": result.ok},
+                data={"ok": result.ok, "slot": slot},
             )  # fmt: skip
             p.commit()
         return result
@@ -203,40 +241,55 @@ class VendorService:
             overrides, _ = p.settings.get()
         return {name: getattr(self._base, name) for name in LLM_FIELDS} | overrides.llm
 
-    def replace_key(self, vendor: str, key: str, *, by: str | None) -> int:
+    def replace_key(self, vendor: str, key: str, *, by: str | None, slot: int = 1) -> int:
+        """Set the key in ``slot`` (1 to ``MAX_KEYS``); a vendor with several keys uses one at
+        random for each call."""
         _known(vendor)
         key = key.strip()
         if len(key) < 8:
             raise InvalidInput("that does not look like an API key")
         with self._platform() as p:
-            version = p.vendor_keys.put(vendor, key, by=by)
+            version = p.vendor_keys.put(vendor, key, by=by, slot=slot)
             p.audit.record(
                 "vendor_key_replaced", actor_user_id=by, target_type="vendor", target_id=vendor,
-                data={"version": version},
+                data={"version": version, "slot": slot},
             )  # fmt: skip
             p.commit()
-        log.info("vendor_key_replaced", vendor=vendor, version=version)
+        log.info("vendor_key_replaced", vendor=vendor, version=version, slot=slot)
         return version
 
-    def roll_back(self, vendor: str, *, by: str | None) -> int:
+    def remove_key(self, vendor: str, slot: int, *, by: str | None) -> None:
+        """Stop using the slot's key. It is retired, so it can be rolled back for 30 days."""
         _known(vendor)
         with self._platform() as p:
-            version = p.vendor_keys.roll_back(vendor)
+            p.vendor_keys.remove(vendor, slot)
+            p.audit.record(
+                "vendor_key_removed", actor_user_id=by, target_type="vendor", target_id=vendor,
+                data={"slot": slot},
+            )  # fmt: skip
+            p.commit()
+        log.info("vendor_key_removed", vendor=vendor, slot=slot)
+
+    def roll_back(self, vendor: str, *, by: str | None, slot: int = 1) -> int:
+        _known(vendor)
+        with self._platform() as p:
+            version = p.vendor_keys.roll_back(vendor, slot)
             p.audit.record(
                 "vendor_key_rolled_back", actor_user_id=by, target_type="vendor",
-                target_id=vendor, data={"version": version},
+                target_id=vendor, data={"version": version, "slot": slot},
             )  # fmt: skip
             p.commit()
         return version
 
-    def reveal(self, vendor: str, *, by: str | None) -> str:
+    def reveal(self, vendor: str, *, by: str | None, slot: int = 1) -> str:
         """The key in full. Written to the audit log every time."""
         _known(vendor)
         with self._platform() as p:
-            key = p.vendor_keys.reveal(vendor)
+            key = p.vendor_keys.reveal(vendor, slot)
             p.audit.record(
-                "vendor_key_revealed", actor_user_id=by, target_type="vendor", target_id=vendor
-            )
+                "vendor_key_revealed", actor_user_id=by, target_type="vendor", target_id=vendor,
+                data={"slot": slot},
+            )  # fmt: skip
             p.commit()
         return key
 

@@ -62,12 +62,13 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `ORBISEARCH_API_KEY` | str | — | yes | D | `VERIFIER=orbisearch` |
 | `ENRICHLEY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=enrichley` |
 | `SCRUBBY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=scrubby` (default) |
+| `VENDOR_KEY_POOLS` | JSON | `{}` | yes | D | Not set by hand: the admin console's extra key slots fill it (`{"tavily": ["key1", "key2"]}`); a vendor with two or more keys uses one at random per call (PLAN decision 37) |
 | `SCRUBBY_BASE_URL` | str | `https://api.scrubby.io` | | D | Optional; Scrubby's documented address |
 | `COMPANIES_HOUSE_API_KEY` | str | — | yes | D | Optional: UK incorporation checks, and UK companies by industry code for discovery |
 | `EXA_API_KEY` | str | — | yes | D | Optional: Exa company search and lookalikes for discovery ([exa](../integrations/exa.md)) |
 | `FINDER_CHAIN` | comma list | `hunter,zerobounce` | | D | Finders, in order (provisional) |
-| `VERIFIER` | str | `myemailverifier` | | D | The verifier |
-| `CATCH_ALL_RESOLVER` | str | `scrubby` | | D | The resolver; with no key, catch-alls are held as unverified |
+| `VERIFIER` | str | `myemailverifier` | | D | The verifier asked first; every other verifier with a key is a backup (PLAN decision 36) |
+| `CATCH_ALL_RESOLVER` | str | `scrubby` | | D | The resolver asked first; the other one, if it has a key, is the backup (or takes its place when this one has none). With neither, catch-alls are held as unverified |
 
 ## Language model
 

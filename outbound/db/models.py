@@ -184,12 +184,17 @@ class MailboxRow(Mutable, Base):
 class PlatformCredentialRow(Identified, Base):
     """A vendor API key the platform pays for, encrypted. A platform table: only the platform
     role may touch it. Replacing a key adds a version and retires the old one, which is kept for
-    30 days so a bad key can be rolled back."""
+    30 days so a bad key can be rolled back. A vendor may have up to three live keys, one per
+    ``slot``; each call uses one of them at random."""
 
     __tablename__ = "platform_credentials"
-    __table_args__ = (UniqueConstraint("vendor", "version"),)
+    __table_args__ = (
+        UniqueConstraint("vendor", "version"),
+        CheckConstraint("slot BETWEEN 1 AND 3", name="slot_range"),
+    )
 
     vendor: Mapped[str] = mapped_column(String(60), index=True)
+    slot: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
     version: Mapped[int] = mapped_column(Integer)
     key_version: Mapped[int] = mapped_column(Integer)  # which SECRETS_KEYS entry sealed it
     nonce: Mapped[bytes] = mapped_column(LargeBinary(12))

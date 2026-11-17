@@ -7677,6 +7677,52 @@
         "title": "VendorKeyIn",
         "type": "object"
       },
+      "VendorKeyOut": {
+        "properties": {
+          "can_roll_back": {
+            "title": "Can Roll Back",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "set_at": {
+            "format": "date-time",
+            "title": "Set At",
+            "type": "string"
+          },
+          "set_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Set By"
+          },
+          "slot": {
+            "title": "Slot",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "slot",
+          "key",
+          "version",
+          "set_at",
+          "set_by",
+          "can_roll_back"
+        ],
+        "title": "VendorKeyOut",
+        "type": "object"
+      },
       "VendorOut": {
         "properties": {
           "can_roll_back": {
@@ -7709,6 +7755,13 @@
           "key_refusals": {
             "title": "Key Refusals",
             "type": "integer"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/VendorKeyOut"
+            },
+            "title": "Keys",
+            "type": "array"
           },
           "name": {
             "title": "Name",
@@ -7772,7 +7825,8 @@
           "spend_micro_usd",
           "cap_micro_usd",
           "key_refusals",
-          "can_test"
+          "can_test",
+          "keys"
         ],
         "title": "VendorOut",
         "type": "object"
@@ -10294,6 +10348,57 @@
       }
     },
     "/api/admin/vendors/{vendor}/key": {
+      "delete": {
+        "operationId": "remove_vendor_key_api_admin_vendors__vendor__key_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": true,
+            "schema": {
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Slot",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      },
       "put": {
         "operationId": "replace_vendor_key_api_admin_vendors__vendor__key_put",
         "parameters": [
@@ -10304,6 +10409,18 @@
             "schema": {
               "title": "Vendor",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Slot",
+              "type": "integer"
             }
           }
         ],
@@ -10409,6 +10526,18 @@
               "title": "Vendor",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Slot",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -10451,6 +10580,18 @@
               "title": "Vendor",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Slot",
+              "type": "integer"
+            }
           }
         ],
         "responses": {
@@ -10483,7 +10624,7 @@
     },
     "/api/admin/vendors/{vendor}/test": {
       "post": {
-        "description": "One small real call with the stored key, to show whether it works.",
+        "description": "One small real call with the slot's stored key, to show whether it works.",
         "operationId": "test_vendor_key_api_admin_vendors__vendor__test_post",
         "parameters": [
           {
@@ -10493,6 +10634,18 @@
             "schema": {
               "title": "Vendor",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slot",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 3,
+              "minimum": 1,
+              "title": "Slot",
+              "type": "integer"
             }
           }
         ],

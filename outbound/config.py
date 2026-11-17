@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     myemailverifier_api_key: SecretStr = SecretStr("")
     enrichley_api_key: SecretStr = SecretStr("")
     scrubby_api_key: SecretStr = SecretStr("")
+    # Every live key of a vendor that has more than one, by vendor code (the admin console's
+    # slots, laid on by ``VendorService.effective_settings``). Each call picks one at random.
+    vendor_key_pools: dict[str, list[SecretStr]] = {}
     scrubby_base_url: str = ""  # empty: Scrubby's documented https://api.scrubby.io
     tavily_api_key: SecretStr = SecretStr("")
     companies_house_api_key: SecretStr = SecretStr("")  # free key from Companies House

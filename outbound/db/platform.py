@@ -22,6 +22,7 @@ from outbound.db.identity import AuditRepository
 from outbound.db.models import (
     CompanyRow,
     MailboxRow,
+    PlatformCredentialRow,
     ProviderCallRow,
     RunRow,
     UsageEventRow,
@@ -40,6 +41,7 @@ from outbound.domain.enums import (
     UsageStep,
     WorkspaceStatus,
 )
+from outbound.domain.vendors import BY_CODE
 
 
 class SchedulerQueries:
@@ -130,17 +132,32 @@ class AdminQueries:
         return {name: int(total) for name, total in self._session.execute(stmt)}
 
     def key_failures(self, since: datetime) -> dict[str, int]:
-        """How many calls each provider refused our key for since ``since`` (all workspaces)."""
-        stmt = (
-            select(ProviderCallRow.provider, func.count())
-            .where(
-                ProviderCallRow.created_at >= since,
-                ProviderCallRow.outcome == CallOutcome.ERROR,
-                ProviderCallRow.response["error"].as_string() == "ProviderAuthError",
-            )
-            .group_by(ProviderCallRow.provider)
+        """How many calls each provider refused our key for since ``since`` (all workspaces).
+
+        A refusal made before the vendor's live key was saved was a refusal of the old key, so
+        it is not counted: replacing a refused key clears the warning at once. The language
+        model's ledger name is its provider preset, so any provider that is not a vendor code
+        goes by the ``llm`` key's time."""
+        # With several keys, a call is refused only once every key was; any key saved since
+        # may be the fix, so the newest one decides.
+        live = (
+            select(PlatformCredentialRow.vendor, func.max(PlatformCredentialRow.created_at))
+            .where(PlatformCredentialRow.active.is_(True))
+            .group_by(PlatformCredentialRow.vendor)
         )
-        return {name: int(n) for name, n in self._session.execute(stmt)}
+        key_set_at: dict[str, datetime] = dict(self._session.execute(live).tuples().all())
+        stmt = select(ProviderCallRow.provider, ProviderCallRow.created_at).where(
+            ProviderCallRow.created_at >= since,
+            ProviderCallRow.outcome == CallOutcome.ERROR,
+            ProviderCallRow.response["error"].as_string() == "ProviderAuthError",
+        )
+        out: dict[str, int] = {}
+        for provider, at in self._session.execute(stmt):
+            set_at = key_set_at.get(provider if provider in BY_CODE else "llm")
+            if set_at is not None and at < set_at:
+                continue
+            out[provider] = out.get(provider, 0) + 1
+        return out
 
     def leads_added(self, start: datetime, end: datetime) -> int:
         """New leads (manual and discovered) charged in ``[start, end)``, all workspaces."""
