@@ -107,8 +107,10 @@ Each gets a permission (`require(...)`), tests on SQLite and Postgres, workspace
 doc updates the repo rules ask for. **No database migration is needed for anything in the
 mockups** once the ✕ items are dropped.
 
-## 4. Decisions for the operator
+## 4. Decisions (operator, 2026-11-17)
 
-- Drop the ✕ items (reply rate, worker heartbeat, $ budget ring, goals, signature style,
-  address autocomplete, requests log, drafts-ready email, sample-data mode)?
-- Build optional changes 4 and 5, or leave those columns/hints out?
+- **All ✕ items are dropped or reworded** to real data: Sent and Approved unedited replace reply
+  rate; last discovery and latest run replace the worker heartbeat; a credits ring replaces the
+  $ budget; no goals, signature-style picker, address autocomplete, requests log, drafts-ready
+  email, or sample-data mode.
+- **All five backend additions are built** (1–5 above), read-only, no migration, web2 unaffected.
