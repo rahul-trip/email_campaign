@@ -27,13 +27,13 @@ function Layout() {
   return (
     <div className="min-h-screen">
       <div className="fixed inset-x-0 top-0 z-40">
-        <div className="flex h-7 items-center justify-center gap-2 bg-attention text-label font-bold uppercase tracking-widest text-white" role="status">
-          <ShieldCheck size={13} aria-hidden /> Admin · Alpha
+        <div className="flex h-7 items-center justify-center gap-2 bg-gradient-to-r from-[#3b0764] via-[#5b21b6] to-[#3b0764] text-label font-bold uppercase tracking-widest text-white" role="status">
+          <ShieldCheck size={13} aria-hidden /> Admin console · platform staff
           <span className="font-normal normal-case tracking-normal opacity-90">— you are changing other companies' accounts</span>
         </div>
-        <header className="flex h-12 items-center gap-3 border-b border-line bg-surface px-4">
+        <header className="glass flex h-12 items-center gap-3 border-b border-line px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-primary-ink">
+            <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#5b21b6] to-primary text-white">
               <Zap size={14} aria-hidden />
             </span>
             <span className="text-lg font-bold tracking-tight">Outbound</span>

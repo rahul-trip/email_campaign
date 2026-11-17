@@ -8,8 +8,9 @@ FastAPI app), `web2/src`, and the backend code read through CodeGraph.
 ## 1. Feature parity
 
 - web2 calls **181 distinct API routes**; every one exists in the API (none dead).
-- The API has exactly **one route web2 never calls**: `GET /api/admin/audit.csv` — web3 adds it
-  as "Export CSV" on the admin Audit log.
+- `GET /api/admin/audit.csv` looked unused, but both apps call it through a plain download link
+  ("Export CSV" on the admin Audit log), which the parity script does not count. Nothing is
+  unused.
 - `node web3/scripts/check-parity.mjs` fails while web3 is missing any route web2 calls. It runs
   in CI for the whole migration; web2 is retired only when it passes. Every row of
   `FEATURE_MAP.md` gives the feature's web3 home.
