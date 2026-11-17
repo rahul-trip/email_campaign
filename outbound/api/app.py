@@ -117,8 +117,15 @@ def create_app(
         response = await call_next(request)
         for name, value in SECURITY_HEADERS.items():
             response.headers.setdefault(name, value)
-        if request.url.path.startswith("/api/"):
+        path = request.url.path
+        if path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
+        elif path.startswith("/assets/") and response.status_code == 200:
+            # File names carry a content hash, so a changed file has a new name: cache for good.
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif response.status_code == 200 and "Cache-Control" not in response.headers:
+            # The page itself names the current hashed files, so it is always revalidated.
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     # Added last, so it is outermost: the request id exists before anything else runs.
