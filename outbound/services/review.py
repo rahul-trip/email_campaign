@@ -357,7 +357,9 @@ def _skips(
         )
         skips.append(Skip("email_verification", f"the address is used without proof ({said})"))
     confirmed = any(
-        e.type == "status_changed" and e.data.get("from") == ContactStatus.UNCONFIRMED.value
+        e.type == "status_changed"
+        and e.data.get("from") in (ContactStatus.UNCONFIRMED.value, ContactStatus.NOT_HERE.value)
+        and e.data.get("to") == ContactStatus.CANDIDATE.value
         for e in uow.events.for_entities([(EntityType.CONTACT, contact.id)])
     )
     if confirmed:

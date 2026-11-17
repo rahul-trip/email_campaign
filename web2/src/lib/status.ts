@@ -135,6 +135,12 @@ export const holdReason: Record<string, HoldInfo> = {
     fix: "Find email again checks it once more with fresh answers from the vendors; otherwise leave it held.",
     action: "decide",
   },
+  linkedin_contacted: {
+    label: "Messaged on LinkedIn",
+    why: "You messaged this person on LinkedIn, so the email waits instead of reaching them at the same time.",
+    fix: "Release the hold when you want the email written and sent as well; otherwise leave it.",
+    action: "decide",
+  },
   needs_operator: {
     label: "Needs you",
     why: "The rules for this country are missing or incomplete.",

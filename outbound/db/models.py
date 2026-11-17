@@ -54,6 +54,7 @@ from outbound.domain.enums import (
     InboundCategory,
     JoinRequestStatus,
     LegalEntityType,
+    LinkedInState,
     MailboxGateway,
     MailboxStatus,
     MembershipRole,
@@ -467,6 +468,8 @@ class ContactRow(Mutable, Base):
     linkedin_url: Mapped[str | None] = mapped_column(String(500))
     # Set by "Find email again": the email step tries this person with fresh vendor answers.
     refresh_email: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Why a person is unconfirmed or not here (what the check found).
+    placement_note: Mapped[str | None] = mapped_column(String(500))
     rank: Mapped[int] = mapped_column(Integer)
     source: Mapped[ContactSource] = mapped_column(enum_type(ContactSource, "contact_source"))
     status: Mapped[ContactStatus] = mapped_column(
@@ -886,6 +889,31 @@ class DiscoveryCandidateRow(Mutable, Base):
     )
     reason: Mapped[str] = mapped_column(Text, default="")
     company_id: Mapped[str | None] = mapped_column(String(36))
+
+
+class LinkedInMessageRow(Mutable, Base):
+    """The connection note and follow-up written for one person to paste into LinkedIn
+    (migration 0026). One row per person; nothing here is ever sent by the engine."""
+
+    __tablename__ = "linkedin_messages"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "contact_id"),
+        _tenant_fk("linkedin_messages", "company_id", "companies", ondelete="CASCADE"),
+        _tenant_fk("linkedin_messages", "contact_id", "contacts", ondelete="CASCADE"),
+        Index("ix_linkedin_messages_state", "workspace_id", "state"),
+    )
+
+    company_id: Mapped[str] = mapped_column(String(36))
+    contact_id: Mapped[str] = mapped_column(String(36))
+    note: Mapped[str] = mapped_column(Text)
+    message: Mapped[str] = mapped_column(Text)
+    state: Mapped[LinkedInState] = mapped_column(
+        enum_type(LinkedInState, "linkedin_state"), default=LinkedInState.DRAFTED
+    )
+    issues: Mapped[list[str]] = mapped_column(Json, default=list)
+    edited: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    sent_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
+    sent_by: Mapped[str | None] = mapped_column(String(100))
 
 
 class UsageEventRow(AppendOnly, Base):

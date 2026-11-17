@@ -34,6 +34,7 @@ from outbound.services.directory import LeadDirectory
 from outbound.services.identity import CurrentUser, IdentityService
 from outbound.services.intake import IntakeService
 from outbound.services.leads import LeadService
+from outbound.services.linkedin import LinkedInService
 from outbound.services.mailboxes import MailboxService
 from outbound.services.privacy import PrivacyService
 from outbound.services.quota import QuotaService
@@ -59,6 +60,7 @@ class Services:
     intake: IntakeService
     review: ReviewService
     leads: LeadService
+    linkedin: LinkedInService
     runs: RunService
     candidates: CandidateService
     settings: SettingsService
@@ -95,7 +97,8 @@ def build_services(
         workspace_id=workspace_id,
         intake=intake,
         review=ReviewService(uow, workspace_id, writer, actor=actor),
-        leads=LeadService(uow, workspace_id, actor=actor, search=search),
+        leads=LeadService(uow, workspace_id, actor=actor, search=search, llm=writer),
+        linkedin=LinkedInService(uow, workspace_id, llm=writer, actor=actor),
         runs=RunService(uow, workspace_id),
         candidates=CandidateService(uow, workspace_id, intake, actor=actor),
         settings=settings_service or SettingsService(uow, workspace_id, actor=actor, llm=writer),

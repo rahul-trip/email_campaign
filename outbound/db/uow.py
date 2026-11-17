@@ -31,6 +31,7 @@ from outbound.db.repositories.contacts import (
 from outbound.db.repositories.directory import DirectoryRepository
 from outbound.db.repositories.erasure import ErasureRepository
 from outbound.db.repositories.imports import ImportRepository
+from outbound.db.repositories.linkedin import LinkedInRepository
 from outbound.db.repositories.messages import InboundRepository, MessageRepository
 from outbound.db.repositories.plans import PlatformSettingsRepository, UsageRepository
 from outbound.db.repositories.policies import CountryPolicyRepository
@@ -74,6 +75,7 @@ class UnitOfWork:
         self.notes = NoteRepository(*args)
         self.consents = ConsentRepository(*args)
         self.messages = MessageRepository(*args)
+        self.linkedin = LinkedInRepository(*args)
         self.inbound = InboundRepository(*args)
         self.directory = DirectoryRepository(self.session, self.workspace_id)
         self.imports = ImportRepository(*args)

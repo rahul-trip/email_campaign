@@ -280,6 +280,7 @@ class ContactOut(Out):
     status: str
     created_at: datetime | None = None
     refresh_email: bool = False  # "Find email again" is waiting for the next run
+    placement_note: str | None = None  # why they are unconfirmed or not here
     emails: list[EmailOut]
 
 
@@ -1305,6 +1306,17 @@ class LinkedInOut(Out):
     url: str | None  # None: nothing clearly fit, so nothing was saved
 
 
+class PeopleCheckOut(Out):
+    checked: int
+    works_here: int
+    not_here: int
+    unsure: int
+
+
+class NotHereIn(In):
+    note: str = ""
+
+
 class RetryEmailOut(Out):
     queued_run_id: str
 
@@ -1384,3 +1396,45 @@ class DirectoryCompanyIn(In):
 class KeyCheckOut(Out):
     ok: bool | None  # None: this vendor cannot be tested from here
     message: str
+
+
+# ------------------------------------------------------------------ LinkedIn messages
+
+
+class LinkedInDraftOut(Out):
+    id: str
+    company_id: str
+    contact_id: str
+    note: str
+    message: str
+    state: str
+    issues: list[str]
+    edited: bool
+    sent_at: datetime | None = None
+    created_at: datetime | None = None
+
+
+class LinkedInDraftRowOut(Out):
+    """A message with who it is for, for the LinkedIn page."""
+
+    item: LinkedInDraftOut
+    company_name: str | None
+    domain: str
+    person: str | None
+    title: str | None
+    profile: str | None
+
+
+class LinkedInDraftPage(Out):
+    items: list[LinkedInDraftRowOut]
+    total: int
+
+
+class LinkedInEditIn(In):
+    note: str
+    message: str
+
+
+class LinkedInSentOut(Out):
+    item: LinkedInDraftOut
+    email_held: bool

@@ -110,7 +110,7 @@ Waiting work continues **by itself** as soon as credits exist: when the month re
 
 ### 3.4 The guided tour
 
-The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Campaigns, Runs, Review, Needs attention, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
+The first time you sign in on a browser, a short tour opens by itself. It walks through each screen in order (Welcome, which also shows the workspace switcher, your account button and the notifications bell, Add leads, Campaigns, Runs, Review, Needs attention, LinkedIn, Leads, a lead's journey, acting on a lead, Reports, Settings, Policies and privacy), dimming the page and outlining the part it is explaining.
 
 Every step has these buttons:
 
@@ -241,6 +241,19 @@ Other fields: job title, country (for example `UK`, `DE`, or a name like `German
 
 Things that always apply: a company or address on the do-not-contact list is never added; the same website is never added twice; values you type (name, country, priority) are marked as yours and the engine will not overwrite them.
 
+### 5.4a LinkedIn
+
+For each confirmed decision-maker who has a LinkedIn profile, the engine writes two texts **right after people are found and before any email address is looked for**, so you can reach them without waiting for an email to be found and checked: a **connection note** (200 characters at most, the limit of a free LinkedIn account) and a **first message** of 60 to 100 words to send once they accept. Only people confirmed to work at the company get one, and only decision-makers (the campaign's job titles, a founder, a C-level, a vice president, a director, or someone you added). A person you want to write to who is not on the list: **Write LinkedIn message** on the lead page.
+
+**Nothing is ever sent from this application**: you copy the text into LinkedIn yourself.
+
+- The **LinkedIn** page lists every message, newest first, in three tabs: *To send*, *Sent* and *Skipped*. For each: **Open their LinkedIn**, **Copy** the note, **Copy** the message, then **Mark sent on LinkedIn**. The lead's name links to the lead page.
+- The lead page has the same messages in its **LinkedIn** card, under *People and addresses*.
+- **Edit** changes the words; what you save is yours and the checks no longer apply. **Rewrite** writes a fresh pair. **Skip** sets one aside (**Use it again** undoes it).
+- A message the checks still object to (too long, a link, a leftover placeholder, wording that reads like a template) shows what is wrong in a yellow note, so you edit it before you use it.
+- **Mark sent on LinkedIn** is final and holds the lead's email: the lead goes on hold as *Messaged on LinkedIn*, so the person is not contacted twice at once, and an email waiting for review is withdrawn. Release the hold (on the lead page, or under Needs attention) when you want the email found and written as well; it then says in one clause that you already wrote on LinkedIn. A lead whose email is already in the mailbox or sent is not held: the message is only recorded.
+- Forgetting a person (Policies and privacy) deletes their messages.
+
 ### 5.5 Leads
 
 Every company, 25 to a page. Search by name or domain; filter by status or by hold reason. The filters are part of the page address, so a filtered list can be bookmarked or shared. Each row shows the status (and the hold reason or error), a small bar of the eight stages with the next one named, country, fit, priority and when it last changed, and a **Journey** link.
@@ -254,12 +267,14 @@ Every company, 25 to a page. Search by name or domain; filter by status or by ho
 - for a **held** lead, a panel that says why and what fixes it, with **Release hold**. If the research only *suggested* a country, **Use XX and release** sets it and releases in one step. A hold that needs your decision asks where to resume. For consent and company-type holds it points you to **Add a person with consent**;
 - **People and addresses:** each person in rank order, each address with its status, where it came from, which vendor found it and which one checked it. *The email is to this person* marks who the waiting email is written to. A person you added, gave an address to, or recorded consent for always comes first, whatever the campaign's job titles prefer, and only that person's own consent lets them be written to. Each person has:
   - **Edit:** correct the name or title, or give a work email. A new address replaces the old one as the one written to; the old one stays as history. On a lead whose email step failed, saving also retries that step;
-  - **Confirm they work here:** shown on a person marked *Unconfirmed: check they work here*. A public search found them, but their profile does not clearly say they work at this company, so they are never looked up or written to until you confirm them. Remove them if they do not;
+  - **Confirm they work here:** shown on a person marked *Unconfirmed: check they work here*. A public search found them, but their profile does not clearly say they work at this company, so they are never looked up or written to until you confirm them. The small line under their name says why (for example, only their own name matches the company's). Open their LinkedIn link to check;
+  - **Doesn't work here:** for a person you found does not work at this company (a namesake, or they moved on). They are kept on the lead, set aside under *N found who work elsewhere*, and never looked up or written to; a new search does not add them again. **They do work here** brings them back. It is refused once anything has been written to them (suppress them instead);
   - **Record consent:** choose the basis and write where it came from. Recording the same basis twice keeps one record;
   - **Write to this person instead:** when the email is going to the wrong person. The waiting (or approved, not yet drafted) email is cancelled, this person is put first and the lead goes back to the email step;
   - **Remove:** for someone who does not work here, such as a wrong match from a search. It is refused once anything has been written to them;
   - **Skip the check** (next to an address the check could not prove: *unknown*, *invalid*, a catch-all, or not checked yet): if you know the address works, write why and confirm. It becomes the address written to, no more checks are paid for it, and a lead stopped at the email step goes on. An *invalid* address will probably bounce, so use it only when you are sure. **Check it again** undoes it until the email is approved. The same button is in the journey's *Email address* stage when the lead is stuck there;
   - **Suppress:** never contact them again; their unsent emails are cancelled;
+  - **Check who works here** (under the list): look again at who a search found. One search per person reads their current profile headline, free rules place the clear cases, and one model call reads the rest; people whose profile says they work elsewhere are set aside. Anyone you confirmed, added or wrote to is never touched. Research does the same check by itself when it finds people, so a person shown as *Works elsewhere* was set aside because their profile names another company, or only their own name matches the company's;
 - **Shared directory:** when another customer's run already verified this person's address, it is used first, at no cost, and still checked once before it is used. The card shows the month it was last verified. **Report wrong detail** (the address, that they have left, their title, LinkedIn, the company name or country) stops the directory using that address until the platform team has checked it. **Report wrong detail** also marks that address invalid in your own workspace, so the engine looks for another. If your plan allows it, tick *Find this lead's email with the vendors instead* to skip the directory for this lead; what the vendors find still updates the directory. Forgetting a person removes them from the directory too, and they are never added again;
 - **Find LinkedIn:** on a person with no profile link, one search for their LinkedIn profile. The link is kept only when the profile's headline names the same person; otherwise nothing is saved and it says so. Research also looks for each person it finds (up to ten per lead).
 - **Find email again:** on a person, searches for their address afresh, with new answers from the vendors rather than stored ones, and starts a run. It is offered while no email has been written to the lead (it failed at the email step, is waiting at it, or is held on a catch-all address). Once an email exists, use *Write to this person instead*.
@@ -415,6 +430,7 @@ For the three holds that come from the country rule (*country unknown*, *entity 
 | catch all resolving | The address is on a server that accepts anything, so it cannot be proven by a normal check. It has been sent to a resolver, which answers in 1–3 days | Wait. `outbound tick` collects the answer and releases the company by itself |
 | catch all unverified | The resolver could not decide, or there is none | Normally leave it. An unproven address risks a bounce |
 | needs operator | The rules for the country are missing or incomplete | Add or review the country's rule under Policies and privacy → Country rules |
+| messaged on linkedin | You marked a LinkedIn message to someone at this lead as sent, so the email waits | Release the hold when you want the email found and written too; leave it if LinkedIn is enough |
 
 ### 7.2 Disqualified
 

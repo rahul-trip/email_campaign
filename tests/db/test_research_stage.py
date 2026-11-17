@@ -131,7 +131,7 @@ def test_an_operator_given_contact_means_no_candidates_are_searched_for(
         uow.commit()
     llm = FakeLlm()
     runner_for(factory, ws, FakeSearch(PAGES), llm).run_pipeline()
-    assert "persona" not in llm.calls
+    assert "## Team pages" not in llm.users["site"]  # no people read from the pages
     with factory(ws) as uow:
         assert [c.full_name for c in uow.contacts.for_company(cid)] == ["Sam Lee"]
 
@@ -219,7 +219,14 @@ def test_a_person_a_search_could_not_place_here_is_saved_unconfirmed(
     runner_for(factory, ws, search).run_pipeline()
     with factory(ws) as uow:
         people = uow.contacts.for_company(cid)
-    assert [(p.full_name, p.status) for p in people] == [("Sam Lee", ContactStatus.UNCONFIRMED)]
+    # Sam Lee is unsure (only the snippet names Volue); Dan Roth works elsewhere and is kept,
+    # set aside, so a rerun of research does not find him again as new.
+    assert sorted((p.full_name or "", p.status) for p in people) == [
+        ("Dan Roth", ContactStatus.NOT_HERE),
+        ("Sam Lee", ContactStatus.UNCONFIRMED),
+    ]
+    by_name = {p.full_name: p for p in people}
+    assert "G&W Electric" in (by_name["Dan Roth"].placement_note or "")
 
 
 def test_dated_news_found_by_search_is_saved_with_the_research(
@@ -284,4 +291,4 @@ def test_a_lead_the_operator_typed_is_researched_in_full_against_the_brief(
     add(factory, ws, "acme.co.uk", brief=BRIEF)
     llm = FakeLlm(RULED_OUT)
     runner_for(factory, ws, FakeSearch(PAGES), llm=llm).run_pipeline()
-    assert "qualify" in llm.calls and "persona" in llm.calls
+    assert "qualify" in llm.calls and "news_signals" in llm.calls  # researched in full

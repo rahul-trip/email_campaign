@@ -36,10 +36,12 @@ from outbound.domain.enums import (
     UsageStep,
 )
 from outbound.domain.errors import InvalidInput
-from outbound.domain.names import same_person, split_name
+from outbound.domain.names import read_profile_title, same_person, split_name
+from outbound.domain.placement import Placement, place_by_rules
 from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
     COMPANY,
+    CONTACT,
     POLICY_STAGE_AT,
     RESUME_AFTER_SKIP,
     IllegalTransition,
@@ -48,10 +50,12 @@ from outbound.domain.state_machines import (
 )
 from outbound.metering.metered import call_scope
 from outbound.metering.quota import credit_left
-from outbound.providers.ports import SearchProvider
+from outbound.providers.errors import ProviderError
+from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.services.journey import Journey, JourneyData, build_journey
 from outbound.stages.policy import policy_decision_for
-from outbound.stages.research.linkedin import find_linkedin
+from outbound.stages.research.employment import Candidate, judge_people
+from outbound.stages.research.linkedin import NAMES_PER_SEARCH, find_linkedin
 
 EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 
@@ -107,6 +111,16 @@ class LeadError(Exception):
 
 
 @dataclass(frozen=True)
+class PeopleCheck:
+    """What "Check who works here" found out about a lead's people."""
+
+    checked: int
+    works_here: int
+    not_here: int
+    unsure: int
+
+
+@dataclass(frozen=True)
 class ContactWithEmails:
     contact: Contact
     emails: list[ContactEmail]
@@ -154,11 +168,13 @@ class LeadService:
         *,
         actor: str = OPERATOR,
         search: SearchProvider | None = None,
+        llm: LlmClient | None = None,
     ) -> None:
         self._uow = uow_factory
         self._workspace_id = workspace_id
         self._actor = actor
         self._search = search  # behind the meter; finds a person's LinkedIn profile
+        self._llm = llm  # behind the meter; settles who works at the company
 
     def search(
         self,
@@ -545,14 +561,15 @@ class LeadService:
         """Say that a person a search could not place here does work here.
 
         Until then they are never looked up or written to. The confirmation is recorded with
-        your name, and approving an email to them asks you to acknowledge it.
+        your name, and approving an email to them asks you to acknowledge it. Also undoes a
+        person being set aside as not working here.
         """
         actor = actor or self._actor
         with self._uow(self._workspace_id) as uow:
             contact = uow.contacts.get(
                 contact_id
             )  # NotFound unless the person is in this workspace
-            if contact.status is not ContactStatus.UNCONFIRMED:
+            if contact.status not in (ContactStatus.UNCONFIRMED, ContactStatus.NOT_HERE):
                 raise LeadError(
                     f"this person is {contact.status.value}, not waiting to be confirmed"
                 )
@@ -561,6 +578,155 @@ class LeadService:
             )
             uow.commit()
             return ContactWithEmails(confirmed, uow.emails.for_contact(contact_id))
+
+    def mark_not_here(
+        self, contact_id: str, *, actor: str | None = None, note: str = ""
+    ) -> ContactWithEmails:
+        """Say that a person does not work at this lead (a namesake, or they moved on).
+
+        They stay on the lead, greyed out, so a new search does not find them again; they are
+        never looked up or written to. Refused once an email was written to them.
+        """
+        actor = actor or self._actor
+        why = " ".join(note.split()) or "marked by the operator: does not work here"
+        with self._uow(self._workspace_id) as uow:
+            contact = uow.contacts.get(contact_id)
+            if uow.messages.for_contact(contact_id):
+                raise LeadError(
+                    "An email has already been written to this person, so they stay on the lead."
+                    " Suppress them instead if they must not be contacted."
+                )
+            if not CONTACT.allows(contact.status, ContactStatus.NOT_HERE):
+                raise LeadError(f"this person is {contact.status.value}")
+            moved = uow.contacts.transition(
+                contact_id,
+                ContactStatus.NOT_HERE,
+                actor=actor,
+                reason="marked by the operator: does not work here",
+                placement_note=why,
+            )
+            self._drop_recipient(uow, contact.company_id, actor)
+            uow.commit()
+            return ContactWithEmails(moved, uow.emails.for_contact(contact_id))
+
+    @staticmethod
+    def _drop_recipient(uow: UnitOfWork, company_id: str, actor: str) -> None:
+        """A lead waiting at the copy step goes back to the email step to pick someone else."""
+        company = uow.companies.get(company_id)
+        if company.status is CompanyStatus.EMAIL_READY:
+            uow.companies.transition(
+                company.id,
+                CompanyStatus.CONTACTS_FOUND,
+                expected_version=company.row_version,
+                actor=actor,
+                reason="a person was found not to work here",
+                next_action_at=None,
+            )
+
+    def check_people(self, company_id: str, *, actor: str | None = None) -> PeopleCheck:
+        """Look again at who a search found for this lead and set aside those who work elsewhere.
+
+        One search per person (their profile's current headline), the free rules, then one
+        model call for the rest. Nobody you confirmed, added, or wrote to is touched. Someone
+        confirmed by mistake before is set aside; someone unsure stays for you to check.
+        """
+        actor = actor or self._actor
+        if self._search is None:
+            raise LeadError("searching is not set up (no Tavily key), so people cannot be checked")
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            people = [
+                c
+                for c in uow.contacts.for_company(company_id)
+                if c.source is ContactSource.SEARCH
+                and c.status in (ContactStatus.UNCONFIRMED, ContactStatus.CANDIDATE)
+                and c.linkedin_url
+                and not uow.messages.for_contact(c.id)
+                and not _confirmed_by_operator(uow, c.id)
+            ]
+        name = company.name or company.domain
+        seen: list[tuple[Contact, Placement, str, str]] = []
+        headlines = self._profile_headlines(people, company)
+        for person in people:
+            headline, employer, snippet = headlines.get(person.id, (person.title or "", "", ""))
+            placed = place_by_rules(
+                name=person.full_name or "",
+                headline=headline,
+                employer=employer,
+                snippet=snippet,
+                company=name,
+                domain=company.domain,
+            )
+            seen.append((person, placed.placement, placed.reason, f"{headline} {snippet}"))
+        open_ = [i for i, row in enumerate(seen) if row[1] is Placement.UNSURE]
+        if open_ and self._llm is not None:
+            summary = str((company.research or {}).get("summary") or "")
+            with call_scope(company_id=company.id):
+                verdicts = judge_people(
+                    self._llm,
+                    name,
+                    company.domain,
+                    summary,
+                    [Candidate(seen[i][0].full_name or "", seen[i][3]) for i in open_],
+                )
+            for i, (placement, reason) in zip(open_, verdicts, strict=True):
+                seen[i] = (seen[i][0], placement, reason, seen[i][3])
+        counts = {Placement.WORKS_HERE: 0, Placement.NOT_HERE: 0, Placement.UNSURE: 0}
+        with self._uow(self._workspace_id) as uow:
+            for person, placement, reason, _ in seen:
+                now = uow.contacts.get(person.id)
+                counts[placement] += 1
+                if placement is Placement.NOT_HERE and CONTACT.allows(
+                    now.status, ContactStatus.NOT_HERE
+                ):
+                    uow.contacts.transition(
+                        person.id,
+                        ContactStatus.NOT_HERE,
+                        actor=actor,
+                        reason="checked: does not work here",
+                        placement_note=reason,
+                    )
+                elif now.status is ContactStatus.UNCONFIRMED and now.placement_note != reason:
+                    uow.contacts.set_placement_note(person.id, reason)
+            if counts[Placement.NOT_HERE]:
+                self._drop_recipient(uow, company_id, actor)
+            uow.commit()
+        return PeopleCheck(
+            checked=len(seen),
+            works_here=counts[Placement.WORKS_HERE],
+            not_here=counts[Placement.NOT_HERE],
+            unsure=counts[Placement.UNSURE],
+        )
+
+    def _profile_headlines(
+        self, people: list[Contact], company: Company
+    ) -> dict[str, tuple[str, str, str]]:
+        """(job title, employer, snippet) from each person's public profile result, a few people
+        per search; a person whose profile was not in the results is left out."""
+        search = self._search
+        if search is None or not people:
+            return {}
+        slugs = {
+            (p.linkedin_url or "").rstrip("/").rsplit("/", 1)[-1].lower(): p.id for p in people
+        }
+        found: dict[str, tuple[str, str, str]] = {}
+        for start in range(0, len(people), NAMES_PER_SEARCH):
+            chunk = people[start : start + NAMES_PER_SEARCH]
+            names = " OR ".join(f'"{p.full_name}"' for p in chunk if p.full_name)
+            with call_scope(company_id=company.id):
+                try:
+                    hits = search.search(
+                        f"site:linkedin.com/in ({names})", max_results=4 * len(chunk) + 1
+                    )
+                except ProviderError:
+                    continue
+            for hit in hits:
+                slug = hit.url.split("?")[0].rstrip("/").rsplit("/", 1)[-1].lower()
+                contact_id = slugs.get(slug)
+                if contact_id and contact_id not in found and "/in/" in hit.url.lower():
+                    _, title, employer = read_profile_title(hit.title)
+                    found[contact_id] = (title, employer, hit.snippet)
+        return found
 
     def remove_person(self, contact_id: str, *, actor: str | None = None) -> None:
         """Take a person off a lead, such as someone a search matched by mistake.
@@ -859,6 +1025,13 @@ class LeadService:
         )
         uow.commit()
         return updated
+
+
+def _confirmed_by_operator(uow: UnitOfWork, contact_id: str) -> bool:
+    return any(
+        e.type == "status_changed" and e.data.get("reason") == CONFIRMED_WORKS_HERE
+        for e in uow.events.for_entities([(EntityType.CONTACT, contact_id)])
+    )
 
 
 def _held_at(uow: UnitOfWork, company: Company) -> PolicyStage | None:

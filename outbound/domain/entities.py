@@ -25,6 +25,7 @@ from outbound.domain.enums import (
     HoldReason,
     JoinRequestStatus,
     LegalEntityType,
+    LinkedInState,
     MembershipRole,
     MessageState,
     NoteSource,
@@ -110,6 +111,7 @@ class Contact:
     manual_fields: tuple[str, ...] = field(default=())
     created_at: datetime | None = None  # when the person was found or added
     refresh_email: bool = False  # "Find email again" was pressed and the step has not run yet
+    placement_note: str | None = None  # why the person is unconfirmed or not here
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "manual_fields", tuple(self.manual_fields))
@@ -158,6 +160,29 @@ class Message:
         None  # when it last changed; for a drafted message, the draft time
     )
     created_at: datetime | None = None  # when the engine wrote it
+
+
+@dataclass(frozen=True)
+class LinkedInMessage:
+    """What to paste into LinkedIn for one person: a connection note and a follow-up message.
+    Nothing here is ever sent by the engine."""
+
+    id: str
+    workspace_id: str
+    company_id: str
+    contact_id: str
+    note: str
+    message: str
+    state: LinkedInState
+    issues: tuple[str, ...] = ()  # what the check still objects to after the rewrite
+    edited: bool = False
+    sent_at: datetime | None = None
+    sent_by: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "issues", tuple(self.issues))
 
 
 @dataclass(frozen=True)

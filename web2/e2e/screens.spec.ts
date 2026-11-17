@@ -126,7 +126,7 @@ test("connecting an IMAP server on our own network is refused", async ({ page })
 test("every screen opens without errors, on a laptop and a phone", async ({ page }) => {
   await signIn(page);
   await addTarget(page, { website: unique("smoke"), country: "US" });
-  const screens = ["/", "/review", "/attention", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/settings?tab=mailboxes", "/compliance", "/settings", "/settings?tab=team", "/settings?tab=account"];
+  const screens = ["/", "/review", "/attention", "/linkedin", "/leads", "/targets", "/runs", "/reports", "/campaigns", "/settings?tab=mailboxes", "/compliance", "/settings", "/settings?tab=team", "/settings?tab=account"];
   const routes = ["/sign-in", "/forgot-password", ...screens.map((route) => `/w/default${route}`)];
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 });

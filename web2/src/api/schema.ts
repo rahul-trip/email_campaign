@@ -1090,6 +1090,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/check-people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check People
+         * @description Look again at who works here: set aside people whose profile says otherwise.
+         */
+        post: operations["check_people_api_companies__company_id__check_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/delete": {
         parameters: {
             query?: never;
@@ -1170,6 +1190,23 @@ export interface paths {
         };
         /** Journey */
         get: operations["journey_api_companies__company_id__journey_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/{company_id}/linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company Drafts */
+        get: operations["company_drafts_api_companies__company_id__linkedin_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1442,6 +1479,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/contacts/{contact_id}/linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write Draft
+         * @description Write (or rewrite) the connection note and message for one person who works here.
+         */
+        post: operations["write_draft_api_contacts__contact_id__linkedin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/contacts/{contact_id}/not-here": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Not Here
+         * @description Say this person does not work at the lead: kept, greyed out, never written to.
+         */
+        post: operations["not_here_api_contacts__contact_id__not_here_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/contacts/{contact_id}/retry-email": {
         parameters: {
             query?: never;
@@ -1552,6 +1629,97 @@ export interface paths {
          * @description A new secret, shown this once. Senders using the old one are refused from now on.
          */
         post: operations["rotate_webhook_secret_api_integrations_webhook_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/linkedin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Drafts
+         * @description Every message in one state, newest first, with who it is for.
+         */
+        get: operations["drafts_api_linkedin_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/linkedin/{linkedin_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Draft */
+        patch: operations["edit_draft_api_linkedin__linkedin_id__patch"];
+        trace?: never;
+    };
+    "/api/linkedin/{linkedin_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Draft */
+        post: operations["restore_draft_api_linkedin__linkedin_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/linkedin/{linkedin_id}/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Sent
+         * @description Say you sent it on LinkedIn. The lead's email then waits until you release it.
+         */
+        post: operations["mark_sent_api_linkedin__linkedin_id__sent_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/linkedin/{linkedin_id}/skip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skip Draft */
+        post: operations["skip_draft_api_linkedin__linkedin_id__skip_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3174,6 +3342,8 @@ export interface components {
             id: string;
             /** Linkedin Url */
             linkedin_url: string | null;
+            /** Placement Note */
+            placement_note?: string | null;
             /** Rank */
             rank: number;
             /**
@@ -3752,7 +3922,7 @@ export interface components {
          * HoldReason
          * @enum {string}
          */
-        HoldReason: "catch_all_unverified" | "catch_all_resolving" | "consent_required" | "country_unknown" | "entity_unknown" | "needs_operator";
+        HoldReason: "catch_all_unverified" | "catch_all_resolving" | "consent_required" | "country_unknown" | "entity_unknown" | "needs_operator" | "linkedin_contacted";
         /** ImapIn */
         ImapIn: {
             /** Address */
@@ -3874,11 +4044,76 @@ export interface components {
             /** Notes */
             notes: components["schemas"]["NoteOut"][];
         };
+        /** LinkedInDraftOut */
+        LinkedInDraftOut: {
+            /** Company Id */
+            company_id: string;
+            /** Contact Id */
+            contact_id: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Edited */
+            edited: boolean;
+            /** Id */
+            id: string;
+            /** Issues */
+            issues: string[];
+            /** Message */
+            message: string;
+            /** Note */
+            note: string;
+            /** Sent At */
+            sent_at?: string | null;
+            /** State */
+            state: string;
+        };
+        /** LinkedInDraftPage */
+        LinkedInDraftPage: {
+            /** Items */
+            items: components["schemas"]["LinkedInDraftRowOut"][];
+            /** Total */
+            total: number;
+        };
+        /**
+         * LinkedInDraftRowOut
+         * @description A message with who it is for, for the LinkedIn page.
+         */
+        LinkedInDraftRowOut: {
+            /** Company Name */
+            company_name: string | null;
+            /** Domain */
+            domain: string;
+            item: components["schemas"]["LinkedInDraftOut"];
+            /** Person */
+            person: string | null;
+            /** Profile */
+            profile: string | null;
+            /** Title */
+            title: string | null;
+        };
+        /** LinkedInEditIn */
+        LinkedInEditIn: {
+            /** Message */
+            message: string;
+            /** Note */
+            note: string;
+        };
         /** LinkedInOut */
         LinkedInOut: {
             /** Url */
             url: string | null;
         };
+        /** LinkedInSentOut */
+        LinkedInSentOut: {
+            /** Email Held */
+            email_held: boolean;
+            item: components["schemas"]["LinkedInDraftOut"];
+        };
+        /**
+         * LinkedInState
+         * @enum {string}
+         */
+        LinkedInState: "drafted" | "sent" | "skipped";
         /** LlmSettingsIn */
         LlmSettingsIn: {
             /** Llm Base Url */
@@ -4044,6 +4279,14 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** NotHereIn */
+        NotHereIn: {
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+        };
         /** NoteOut */
         NoteOut: {
             /** Author */
@@ -4201,6 +4444,17 @@ export interface components {
              * @enum {string}
              */
             role: "admin" | "member";
+        };
+        /** PeopleCheckOut */
+        PeopleCheckOut: {
+            /** Checked */
+            checked: number;
+            /** Not Here */
+            not_here: number;
+            /** Unsure */
+            unsure: number;
+            /** Works Here */
+            works_here: number;
         };
         /** PersonIn */
         PersonIn: {
@@ -7385,6 +7639,37 @@ export interface operations {
             };
         };
     };
+    check_people_api_companies__company_id__check_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeopleCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_lead_api_companies__company_id__delete_post: {
         parameters: {
             query?: never;
@@ -7537,6 +7822,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JourneyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_drafts_api_companies__company_id__linkedin_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftOut"][];
                 };
             };
             /** @description Validation Error */
@@ -8130,6 +8446,72 @@ export interface operations {
             };
         };
     };
+    write_draft_api_contacts__contact_id__linkedin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    not_here_api_contacts__contact_id__not_here_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                contact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotHereIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     retry_email_api_contacts__contact_id__retry_email_post: {
         parameters: {
             query?: never;
@@ -8283,6 +8665,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WebhookSecretOut"];
+                };
+            };
+        };
+    };
+    drafts_api_linkedin_get: {
+        parameters: {
+            query?: {
+                state?: components["schemas"]["LinkedInState"];
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_draft_api_linkedin__linkedin_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkedin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkedInEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_draft_api_linkedin__linkedin_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkedin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_sent_api_linkedin__linkedin_id__sent_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkedin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInSentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    skip_draft_api_linkedin__linkedin_id__skip_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                linkedin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LinkedInDraftOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

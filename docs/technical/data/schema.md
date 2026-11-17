@@ -364,12 +364,29 @@ CREATE TABLE contacts (
   rank          INTEGER NOT NULL,                  -- 0 = referral, 1 = top choice
   source        TEXT NOT NULL CHECK (source IN ('operator','site','search','database','referral','ooo_alternate')),
   status        TEXT NOT NULL DEFAULT 'candidate'
-                CHECK (status IN ('unconfirmed','candidate','active','bounced','referred_away','opted_out','forgotten')),
+                CHECK (status IN ('unconfirmed','not_here','candidate','active','bounced','referred_away','opted_out','forgotten')),
                 -- unconfirmed (migration 0003): found by a public search whose employer did not
                 -- clearly match the company; never worked on until the operator confirms them
+                -- not_here (migration 0025): found to work elsewhere (a namesake, a profile that
+                -- names another company, or the operator said so); kept so research does not add
+                -- them again, never worked on; "They do work here" makes them a candidate
+  placement_note TEXT,                             -- 0025: why a person is unconfirmed or not here
   manual_fields JSON NOT NULL DEFAULT '[]'
 );
 CREATE UNIQUE INDEX ux_contacts_linkedin ON contacts (workspace_id, linkedin_url) WHERE linkedin_url IS NOT NULL;
+
+CREATE TABLE linkedin_messages (                  -- migration 0026
+  company_id   TEXT NOT NULL,                      -- tenant-bound FKs, ON DELETE CASCADE
+  contact_id   TEXT NOT NULL,                      -- one row per person (UNIQUE workspace_id, contact_id)
+  note         TEXT NOT NULL,                      -- connection note, at most 200 characters
+  message      TEXT NOT NULL,                      -- follow-up, 60-100 words
+  state        TEXT NOT NULL CHECK (state IN ('drafted','sent','skipped')),  -- sent is final
+  issues       JSON NOT NULL DEFAULT '[]',         -- what the lint still objects to after one rewrite
+  edited       BOOLEAN NOT NULL DEFAULT false,     -- the operator's own words
+  sent_at      TIMESTAMP, sent_by TEXT             -- the operator says they sent it; nothing is sent from here
+);
+-- companies.hold_reason gains 'linkedin_contacted' and events.entity_type gains 'linkedin_message'
+-- (migration 0026). Row-level security as for every tenant table.
 
 CREATE TABLE contact_emails (
   contact_id     TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,

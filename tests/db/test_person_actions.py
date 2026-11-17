@@ -156,3 +156,21 @@ def test_find_email_again_for_many_leads_reopens_each_held_one_and_skips_the_res
         assert uow.companies.get(held_company).status is C.CONTACTS_FOUND
         assert uow.contacts.get(person).refresh_email is True
         assert uow.contacts.get(other).refresh_email is False
+
+
+def test_several_people_are_looked_up_a_few_names_per_search() -> None:
+    from outbound.stages.research.linkedin import find_linkedin_many
+
+    names = ["Ann Ames", "Bob Bell", "Cy Cole", "Dee Dunn", "Eve Ens", "Fay Ford", "Gus Gale"]
+    hits = [
+        SearchHit(url="https://www.linkedin.com/in/p0", title="Ann Ames - CTO - Acme"),
+        SearchHit(url="https://www.linkedin.com/in/p6", title="Gus Gale - CEO - Acme"),
+        SearchHit(url="https://www.linkedin.com/in/x", title="Dee Dunn - CTO - Rival Ltd"),
+    ]
+    search = FakeSearch({}, hits)
+    found = find_linkedin_many(search, names, "Acme", "acme.com")
+    assert len(search.searches) == 2  # seven people, five names a search
+    assert found == {
+        "Ann Ames": "https://www.linkedin.com/in/p0",
+        "Gus Gale": "https://www.linkedin.com/in/p6",
+    }  # Dee Dunn's namesake works at another company

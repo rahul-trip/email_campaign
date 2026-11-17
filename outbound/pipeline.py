@@ -188,7 +188,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     stages: list[Stage] = [
         ResearchStage(ResearchDeps(search, llm, registry)),
         GateStage(),
-        ContactsStage(),
+        ContactsStage(writer),
         EmailStage(EmailDeps(finders, verifier, resolver)),
         CopyStage(writer),
     ]

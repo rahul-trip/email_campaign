@@ -24,6 +24,8 @@ from outbound.domain.enums import (
 )
 from outbound.domain.state_machines import CONTACT, EMAIL
 
+_PLACED = frozenset({ContactStatus.UNCONFIRMED, ContactStatus.NOT_HERE})
+
 CONTACT_EDITABLE = frozenset(
     {"full_name", "first_name", "last_name", "title", "seniority", "linkedin_url", "rank"}
 )
@@ -43,6 +45,7 @@ class ContactRepository(ScopedRepository):
         seniority: str | None = None,
         linkedin_url: str | None = None,
         status: ContactStatus = ContactStatus.CANDIDATE,
+        placement_note: str | None = None,
         actor: str = SYSTEM,
     ) -> Contact:
         row = ContactRow(
@@ -57,6 +60,7 @@ class ContactRepository(ScopedRepository):
             seniority=seniority,
             linkedin_url=linkedin_url,
             status=status,
+            placement_note=placement_note,
             manual_fields=[],
         )
         self._session.add(row)
@@ -87,12 +91,22 @@ class ContactRepository(ScopedRepository):
         return [snapshot(row, Contact) for row in self._session.scalars(stmt)]
 
     def transition(
-        self, contact_id: str, to: ContactStatus, *, actor: str = SYSTEM, reason: str | None = None
+        self,
+        contact_id: str,
+        to: ContactStatus,
+        *,
+        actor: str = SYSTEM,
+        reason: str | None = None,
+        placement_note: str | None = None,
     ) -> Contact:
+        """``placement_note`` replaces the note on the person (None clears it) when the move
+        is into or out of the placement statuses."""
         row = self._row(ContactRow, contact_id)
         CONTACT.check(row.status, to)
         previous = row.status
         row.status = to
+        if to in _PLACED or previous in _PLACED:
+            row.placement_note = placement_note
         self._flush()
         detail: dict[str, Any] = {"from": previous.value, "to": to.value}
         if reason:
@@ -117,6 +131,12 @@ class ContactRepository(ScopedRepository):
                 entity_type=EntityType.CONTACT,
             )
         self._flush()
+
+    def set_placement_note(self, contact_id: str, note: str | None) -> None:
+        row = self._row(ContactRow, contact_id)
+        if row.placement_note != note:
+            row.placement_note = note
+            self._flush()
 
     def set_refresh_email(self, contact_id: str, refresh: bool) -> None:
         row = self._row(ContactRow, contact_id)

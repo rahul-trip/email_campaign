@@ -33,6 +33,7 @@ EXPECTED_TABLES = {
     "join_requests",
     "notifications",
     "discovery_candidates",
+    "linkedin_messages",
 }  # fmt: skip
 
 
@@ -47,9 +48,9 @@ def table_names(url: str) -> set[str]:
 def test_the_models_describe_exactly_the_tables_of_the_spec() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES
     assert (
-        len(EXPECTED_TABLES) == 38
+        len(EXPECTED_TABLES) == 39
     )  # schema v1's 17, 6b's five identity tables, 6c's one, 6d's six, 6g's six, 6h's two,
-    # discovery's one (0019)
+    # discovery's one (0019), LinkedIn messages' one (0026)
 
 
 def test_upgrade_builds_every_table_and_records_the_head_revision(fresh_url: str) -> None:
@@ -97,7 +98,7 @@ def _enum_columns() -> list[tuple[str, sa.Enum, str]]:
 
 
 def test_there_is_a_check_constraint_for_every_enum_column() -> None:
-    assert len(_enum_columns()) == 47
+    assert len(_enum_columns()) == 48
 
 
 @pytest.fixture(scope="module")

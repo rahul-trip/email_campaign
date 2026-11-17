@@ -1480,6 +1480,17 @@
             ],
             "title": "Linkedin Url"
           },
+          "placement_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placement Note"
+          },
           "rank": {
             "title": "Rank",
             "type": "integer"
@@ -3207,7 +3218,8 @@
           "consent_required",
           "country_unknown",
           "entity_unknown",
-          "needs_operator"
+          "needs_operator",
+          "linkedin_contacted"
         ],
         "title": "HoldReason",
         "type": "string"
@@ -3582,6 +3594,189 @@
         "title": "LeadOut",
         "type": "object"
       },
+      "LinkedInDraftOut": {
+        "properties": {
+          "company_id": {
+            "title": "Company Id",
+            "type": "string"
+          },
+          "contact_id": {
+            "title": "Contact Id",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "sent_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "company_id",
+          "contact_id",
+          "note",
+          "message",
+          "state",
+          "issues",
+          "edited"
+        ],
+        "title": "LinkedInDraftOut",
+        "type": "object"
+      },
+      "LinkedInDraftPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LinkedInDraftRowOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "LinkedInDraftPage",
+        "type": "object"
+      },
+      "LinkedInDraftRowOut": {
+        "description": "A message with who it is for, for the LinkedIn page.",
+        "properties": {
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Name"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/LinkedInDraftOut"
+          },
+          "person": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Person"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "item",
+          "company_name",
+          "domain",
+          "person",
+          "title",
+          "profile"
+        ],
+        "title": "LinkedInDraftRowOut",
+        "type": "object"
+      },
+      "LinkedInEditIn": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "maxLength": 10000,
+            "title": "Message",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 10000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "note",
+          "message"
+        ],
+        "title": "LinkedInEditIn",
+        "type": "object"
+      },
       "LinkedInOut": {
         "properties": {
           "url": {
@@ -3601,6 +3796,32 @@
         ],
         "title": "LinkedInOut",
         "type": "object"
+      },
+      "LinkedInSentOut": {
+        "properties": {
+          "email_held": {
+            "title": "Email Held",
+            "type": "boolean"
+          },
+          "item": {
+            "$ref": "#/components/schemas/LinkedInDraftOut"
+          }
+        },
+        "required": [
+          "item",
+          "email_held"
+        ],
+        "title": "LinkedInSentOut",
+        "type": "object"
+      },
+      "LinkedInState": {
+        "enum": [
+          "drafted",
+          "sent",
+          "skipped"
+        ],
+        "title": "LinkedInState",
+        "type": "string"
       },
       "LlmSettingsIn": {
         "additionalProperties": false,
@@ -4134,6 +4355,19 @@
         "title": "MyWorkspace",
         "type": "object"
       },
+      "NotHereIn": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "default": "",
+            "maxLength": 10000,
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "NotHereIn",
+        "type": "object"
+      },
       "NoteOut": {
         "properties": {
           "author": {
@@ -4606,6 +4840,34 @@
           "expires_at"
         ],
         "title": "PendingInviteOut",
+        "type": "object"
+      },
+      "PeopleCheckOut": {
+        "properties": {
+          "checked": {
+            "title": "Checked",
+            "type": "integer"
+          },
+          "not_here": {
+            "title": "Not Here",
+            "type": "integer"
+          },
+          "unsure": {
+            "title": "Unsure",
+            "type": "integer"
+          },
+          "works_here": {
+            "title": "Works Here",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checked",
+          "works_here",
+          "not_here",
+          "unsure"
+        ],
+        "title": "PeopleCheckOut",
         "type": "object"
       },
       "PersonIn": {
@@ -11124,6 +11386,49 @@
         ]
       }
     },
+    "/api/companies/{company_id}/check-people": {
+      "post": {
+        "description": "Look again at who works here: set aside people whose profile says otherwise.",
+        "operationId": "check_people_api_companies__company_id__check_people_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeopleCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check People",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/{company_id}/delete": {
       "post": {
         "description": "Permanently delete a lead. The body must repeat the lead's domain to confirm.",
@@ -11355,6 +11660,52 @@
         "summary": "Journey",
         "tags": [
           "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/linkedin": {
+      "get": {
+        "operationId": "company_drafts_api_companies__company_id__linkedin_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LinkedInDraftOut"
+                  },
+                  "title": "Response Company Drafts Api Companies  Company Id  Linkedin Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Drafts",
+        "tags": [
+          "linkedin"
         ]
       }
     },
@@ -12171,6 +12522,102 @@
         ]
       }
     },
+    "/api/contacts/{contact_id}/linkedin": {
+      "post": {
+        "description": "Write (or rewrite) the connection note and message for one person who works here.",
+        "operationId": "write_draft_api_contacts__contact_id__linkedin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Draft",
+        "tags": [
+          "linkedin"
+        ]
+      }
+    },
+    "/api/contacts/{contact_id}/not-here": {
+      "post": {
+        "description": "Say this person does not work at the lead: kept, greyed out, never written to.",
+        "operationId": "not_here_api_contacts__contact_id__not_here_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contact_id",
+            "required": true,
+            "schema": {
+              "title": "Contact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotHereIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Not Here",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/contacts/{contact_id}/retry-email": {
       "post": {
         "description": "Look for this person's email again, with fresh vendor answers, in a run queued now.",
@@ -12364,6 +12811,251 @@
         "summary": "Rotate Webhook Secret",
         "tags": [
           "integrations"
+        ]
+      }
+    },
+    "/api/linkedin": {
+      "get": {
+        "description": "Every message in one state, newest first, with who it is for.",
+        "operationId": "drafts_api_linkedin_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/LinkedInState",
+              "default": "drafted"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInDraftPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Drafts",
+        "tags": [
+          "linkedin"
+        ]
+      }
+    },
+    "/api/linkedin/{linkedin_id}": {
+      "patch": {
+        "operationId": "edit_draft_api_linkedin__linkedin_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkedin_id",
+            "required": true,
+            "schema": {
+              "title": "Linkedin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkedInEditIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Draft",
+        "tags": [
+          "linkedin"
+        ]
+      }
+    },
+    "/api/linkedin/{linkedin_id}/restore": {
+      "post": {
+        "operationId": "restore_draft_api_linkedin__linkedin_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkedin_id",
+            "required": true,
+            "schema": {
+              "title": "Linkedin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Draft",
+        "tags": [
+          "linkedin"
+        ]
+      }
+    },
+    "/api/linkedin/{linkedin_id}/sent": {
+      "post": {
+        "description": "Say you sent it on LinkedIn. The lead's email then waits until you release it.",
+        "operationId": "mark_sent_api_linkedin__linkedin_id__sent_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkedin_id",
+            "required": true,
+            "schema": {
+              "title": "Linkedin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInSentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Sent",
+        "tags": [
+          "linkedin"
+        ]
+      }
+    },
+    "/api/linkedin/{linkedin_id}/skip": {
+      "post": {
+        "operationId": "skip_draft_api_linkedin__linkedin_id__skip_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "linkedin_id",
+            "required": true,
+            "schema": {
+              "title": "Linkedin Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkedInDraftOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Skip Draft",
+        "tags": [
+          "linkedin"
         ]
       }
     },

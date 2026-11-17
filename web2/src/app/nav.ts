@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3, ClipboardCheck, LayoutDashboard, Megaphone, PlayCircle, Settings, ShieldCheck,
+  BarChart3, ClipboardCheck, LayoutDashboard, Megaphone, MessageSquareText, PlayCircle, Settings, ShieldCheck,
   TriangleAlert, UserPlus, Users,
 } from "lucide-react";
 
@@ -25,6 +25,7 @@ export const NAV: NavGroup[] = [
     label: "Leads",
     items: [
       { to: "/leads", label: "Leads", icon: Users },
+      { to: "/linkedin", label: "LinkedIn", icon: MessageSquareText },
       { to: "/targets", label: "Add leads", icon: UserPlus },
       { to: "/runs", label: "Runs", icon: PlayCircle },
       { to: "/campaigns", label: "Campaigns", icon: Megaphone },
