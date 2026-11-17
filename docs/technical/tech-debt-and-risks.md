@@ -274,6 +274,12 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-46 · P3 · Admin console: a replaced key kept showing "key refused" for a day — closed 2026-11-17
+
+- **Was:** on 17 Nov the Vendors page showed Scrubby as *key refused* although its key worked: 14 of 14 submits that morning were accepted. All three refusals were of the previous key (16 Nov, 13:17–14:22 UTC), replaced at 16:27. `AdminQueries.key_failures` counted every refusal in the last 24 hours, whichever key it was for, so the flag, and the once-a-day staff email, outlived the key that caused them.
+- **Fixed by:** `outbound/db/platform.py::AdminQueries.key_failures` counts a refusal only if it came after the vendor's live key was saved (the language model goes by the `llm` key, since its ledger name is its provider preset). The console and `NoticeService` both read it.
+- **Evidence:** `tests/api/test_vendors.py::test_refusals_of_a_replaced_key_no_longer_count`.
+
 ### R-44 · P3 · Changes of 2026-11-16 to watch after the first deploy (open note)
 
 - **Campaign gate:** a workspace whose active campaign has no job titles or no ideal customer now sees only the "Create your campaign" form (and Settings). On the deployed workspaces the three near-empty ones will show it to their admins. Migration 0022 pauses all but one active campaign per workspace (the one with the most leads is kept).

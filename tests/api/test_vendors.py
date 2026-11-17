@@ -229,3 +229,41 @@ def test_staff_hear_once_a_day_when_a_vendor_keeps_refusing_the_key(
     before = len(outbox.sent)
     notices.run()
     assert len(outbox.sent) == before
+
+
+def test_refusals_of_a_replaced_key_no_longer_count(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    """The old key was refused; once a new one is saved the warning clears at once, and only
+    the new key's own refusals count."""
+    from datetime import UTC, datetime, timedelta
+
+    from outbound.db.models import ProviderCallRow
+    from outbound.domain.enums import CallOutcome
+
+    _, services = app_and_services
+    c = services.container
+    earlier = datetime.now(UTC) - timedelta(hours=2)
+
+    def refused(n: int, at: datetime) -> None:
+        with c.uow(services.workspace_id) as uow:
+            for i in range(n):
+                uow.session.add(
+                    ProviderCallRow(
+                        workspace_id=services.workspace_id, provider="scrubby",
+                        operation="submit", request_hash=f"{at.timestamp()}{i}".ljust(64, "0"),
+                        outcome=CallOutcome.ERROR, response={"error": "ProviderAuthError"},
+                        created_at=at,
+                    )
+                )  # fmt: skip
+            uow.commit()
+
+    refused(3, earlier)
+    assert vendor(staff.get("/api/admin/vendors").json(), "scrubby")["key_refusals"] == 3
+
+    put = staff.put("/api/admin/vendors/scrubby/key", json={"key": "a-new-working-key"})
+    assert put.status_code == 200
+    assert vendor(put.json(), "scrubby")["key_refusals"] == 0
+
+    refused(1, datetime.now(UTC) + timedelta(seconds=1))
+    assert vendor(staff.get("/api/admin/vendors").json(), "scrubby")["key_refusals"] == 1
