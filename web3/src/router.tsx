@@ -4,7 +4,7 @@ import { TodayPage } from "./pages/Today";
 
 export const SETTINGS_TABS = ["setup", "profile", "mailboxes", "limits", "plan", "team", "integrations", "account"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
-export type LeadsSearch = { q?: string; status?: string; hold?: string; page?: number; view?: string; sort?: string };
+export type LeadsSearch = { q?: string; status?: string; hold?: string; page?: number; view?: string; sort?: string; source?: string; country?: string; fit?: number };
 
 const root = createRootRoute({
   component: () => (
@@ -30,6 +30,9 @@ const leads = createRoute({
     hold: text(s.hold),
     view: text(s.view),
     sort: text(s.sort),
+    source: text(s.source),
+    country: text(s.country),
+    fit: Number(s.fit) > 0 ? Math.min(100, Math.floor(Number(s.fit))) : undefined,
     page: Number(s.page) > 1 ? Math.floor(Number(s.page)) : undefined,
   }),
 });
