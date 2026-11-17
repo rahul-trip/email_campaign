@@ -1982,6 +1982,21 @@
         "title": "DefaultPlanIn",
         "type": "object"
       },
+      "DeleteAccountIn": {
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "maxLength": 256,
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password"
+        ],
+        "title": "DeleteAccountIn",
+        "type": "object"
+      },
       "DeleteLeadIn": {
         "additionalProperties": false,
         "properties": {
@@ -9704,6 +9719,42 @@
         ]
       }
     },
+    "/api/admin/users/{user_id}": {
+      "delete": {
+        "description": "Delete a person for good. Superadmin only; people delete themselves in their settings.",
+        "operationId": "delete_user_api_admin_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete User",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/users/{user_id}/disable": {
       "post": {
         "operationId": "disable_user_api_admin_users__user_id__disable_post",
@@ -10208,6 +10259,40 @@
         "summary": "Test Vendor Key",
         "tags": [
           "admin"
+        ]
+      }
+    },
+    "/api/auth/account/delete": {
+      "post": {
+        "operationId": "delete_account_api_auth_account_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteAccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Account",
+        "tags": [
+          "auth"
         ]
       }
     },

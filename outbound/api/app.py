@@ -100,6 +100,9 @@ def create_app(
         email,
         base_url=config.app_base_url,
         terms_version=config.terms_version,
+        disconnect_mailbox=lambda workspace_id, mailbox_id: source.for_tenant(
+            workspace_id
+        ).mailboxes.disconnect(mailbox_id),
     )
     app.state.superadmin_enabled = config.superadmin_enabled
     app.state.superadmin_views = set()

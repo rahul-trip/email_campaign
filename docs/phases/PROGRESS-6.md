@@ -111,6 +111,10 @@ Done, on branch `phase-6/operator-experience` (one commit per point): the Runs f
 
 Not checked live: nothing here has been deployed or run against the real vendors. Open: a migration test for the "keep the campaign with the most leads" rule (0022); the Journey page does not show the new "what was asked" text yet (its API carries it); only Review sorts hot leads first.
 
+## Account deletion (2026-11-17, branch `phase-6/delete-account`)
+
+Done: a person deletes their own account (Settings → Your account, password required) and a superadmin deletes any account (console → Users). Hard delete; mailboxes disconnected; a sole member's workspace suspended; the last admin of a shared workspace and the last superadmin are refused. No migration. Not checked live: a Google mailbox's grant revocation on delete. Open: no purge of a suspended workspace left behind.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

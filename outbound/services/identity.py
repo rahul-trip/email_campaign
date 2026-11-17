@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -87,6 +88,12 @@ class SignedIn:
 
 
 @dataclass(frozen=True)
+class DeletedAccount:
+    mailboxes: int  # disconnected
+    workspaces_suspended: tuple[str, ...]  # ids of workspaces they were the only member of
+
+
+@dataclass(frozen=True)
 class InvitationView:
     email: str
     workspace_name: str | None  # None: an invitation to the platform; they pick a workspace after
@@ -144,7 +151,9 @@ class IdentityService:
         base_url: str,
         terms_version: str,
         throttle: AccountThrottle | None = None,
+        disconnect_mailbox: Callable[[str, str], None] | None = None,
     ) -> None:
+        self._disconnect_mailbox = disconnect_mailbox  # (workspace id, mailbox id)
         self._identity = identity
         self._platform = platform
         self._uow = uow
@@ -518,6 +527,92 @@ class IdentityService:
                 "A workspace needs at least one admin. Make someone else admin first.",
             )
 
+    # ------------------------------------------------------------------ deleting an account
+
+    def delete_account(
+        self, user_id: str, *, by: str, password: str | None = None
+    ) -> DeletedAccount:
+        """Delete a person for good. A person deleting themselves gives their ``password``;
+        a superadmin deleting someone gives none. Their mailboxes are disconnected, a workspace
+        they alone belong to is suspended (its data stays), and the audit log keeps only the id."""
+        with self._identity() as ids:
+            user = ids.users.get(user_id)
+            if password is not None and not verify_password(
+                ids.users.password_hash(user_id), password
+            ):
+                raise IdentityError(400, "bad_credentials", "That password is not right.")
+            alone = self._check_can_leave(ids, user)
+        owned = []
+        with self._platform() as p:
+            owned = p.figures.mailboxes_owned_by(user_id)
+        disconnect = self._disconnect_mailbox
+        if owned and disconnect is None:
+            raise IdentityError(500, "not_configured", "Mailboxes cannot be disconnected here.")
+        for workspace_id, mailbox_id in owned:
+            if disconnect is not None:
+                disconnect(workspace_id, mailbox_id)
+        suspended = self._suspend_workspaces(alone, by=by)
+        with self._identity() as ids:
+            user = ids.users.get(user_id)
+            self._check_can_leave(ids, user)  # nothing changed since the first look
+            ids.tokens.delete_for_email(user.email)
+            ids.users.delete(user_id)
+            ids.audit.record(
+                "account_deleted" if by == user_id else "user_deleted",
+                actor_user_id=by, target_type="user", target_id=user_id,
+                data={"mailboxes": len(owned), "workspaces_suspended": list(suspended)},
+            )  # fmt: skip
+            ids.commit()
+        log.info("account_deleted", user_id=user_id, by=by, mailboxes=len(owned))
+        self._send(user.email, "Your Outbound account was deleted", _DELETED)
+        return DeletedAccount(len(owned), suspended)
+
+    def _check_can_leave(self, ids: IdentityUnitOfWork, user: User) -> list[str]:
+        """Refuse what would strand someone; return the workspaces only this person is in."""
+        if user.platform_role is PlatformRole.SUPERADMIN:
+            supers = [u for u in ids.users.all() if u.platform_role is PlatformRole.SUPERADMIN]
+            if len(supers) <= 1:
+                raise IdentityError(
+                    409, "last_superadmin", "There must be at least one superadmin."
+                )
+        alone = []
+        for membership in ids.memberships.for_user(user.id):
+            workspace_id = membership.workspace_id
+            if ids.memberships.count(workspace_id) <= 1:
+                alone.append(workspace_id)
+            elif (
+                membership.role is MembershipRole.ADMIN
+                and ids.memberships.count(workspace_id, MembershipRole.ADMIN) <= 1
+            ):
+                name = self._workspace(workspace_id).name
+                raise IdentityError(
+                    409,
+                    "last_admin",
+                    f"{name} needs at least one admin. Make someone else admin first.",
+                )
+        return alone
+
+    def _suspend_workspaces(self, workspace_ids: list[str], *, by: str) -> tuple[str, ...]:
+        done = []
+        with self._platform() as p:
+            for workspace_id in workspace_ids:
+                found = p.workspaces.get(workspace_id)
+                if found is None or found.status not in (
+                    WorkspaceStatus.ACTIVE,
+                    WorkspaceStatus.PAUSED,
+                ):
+                    continue
+                p.workspaces.set_status(workspace_id, WorkspaceStatus.SUSPENDED)
+                p.audit.record(
+                    "status_changed", actor_user_id=by, workspace_id=workspace_id,
+                    target_type="workspace", target_id=workspace_id,
+                    note="its only member's account was deleted",
+                    data={"from": found.status.value, "to": WorkspaceStatus.SUSPENDED.value},
+                )  # fmt: skip
+                done.append(workspace_id)
+            p.commit()
+        return tuple(done)
+
     # ------------------------------------------------------------------ platform invitations
 
     def invite_to_platform(self, email: str, *, by: str | None) -> AuthToken:
@@ -776,3 +871,6 @@ If it was not you, ignore this email: your password stays as it is."""
 
 _CHANGED = """The password for your Outbound account was just changed, and other browsers were
 signed out. If this was not you, reset your password now from the sign-in page."""
+
+_DELETED = """Your Outbound account was deleted, and its mailboxes were disconnected. If this was
+not you, contact support."""

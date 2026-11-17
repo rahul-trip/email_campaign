@@ -84,6 +84,10 @@ class ChangePasswordIn(In):
     new_password: str = Field(max_length=256)
 
 
+class DeleteAccountIn(In):
+    password: str = Field(max_length=256)
+
+
 class InvitationOut(Out):
     email: str
     workspace_name: str | None  # None: an invitation to Outbound itself, not to a workspace

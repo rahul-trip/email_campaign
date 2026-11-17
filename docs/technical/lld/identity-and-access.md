@@ -103,6 +103,10 @@ One permission, `MAILBOXES_OWN`, is owner-checked rather than role-checked: a `m
 
 One table, `auth_tokens`, serves three `AuthTokenPurpose`s with the same shape: a purpose, the target email, a token **hash** (the email link carries the raw token; only the hash is stored), an expiry, and optional `workspace_id`/`role` (set only for an invite, so accepting it creates the right membership). `revoke_open(purpose, email)` retires every still-open token of that purpose for that address before a new one is issued, so a second "forgot password" email invalidates the first link rather than leaving two valid at once. Accepting consumes the token (`use`) rather than deleting the row, so the audit trail of "this address was invited/reset on this date" survives.
 
+### Deleting an account
+
+`IdentityService.delete_account` serves both the person (`POST /api/auth/account/delete`, password checked) and a superadmin (`DELETE /api/admin/users/{user_id}`). It checks first (`_check_can_leave`: not the last superadmin, not the only admin of a workspace with other members), then disconnects every mailbox the person owns in any workspace (`AdminQueries.mailboxes_owned_by` finds them; the injected `disconnect_mailbox` is `MailboxService.disconnect`, so the credential is erased and a Google grant revoked), suspends workspaces where they were the only member (`_suspend_workspaces`), and finally deletes the `users` row and the address's tokens in one short transaction, repeating the checks there. Memberships, sessions, notifications and join requests go by `ON DELETE CASCADE`. The steps run in that order so a failure part-way leaves an account that can be deleted again. The audit row (`account_deleted` or `user_deleted`) holds the id and counts only.
+
 ### Audit log
 
 `audit_log` (platform table, no RLS) gets one row per: sign-in, sign-out, invite sent/accepted, role changed, member removed, mailbox connected/disconnected, a superadmin's first view of a workspace in a session, workspace deleted. Written in the same transaction as the action it records, through `outbound/services/identity.py`, never by a route handler directly.

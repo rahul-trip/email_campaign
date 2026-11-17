@@ -291,3 +291,75 @@ def test_a_disabled_account_is_signed_out_and_cannot_sign_in(app: FastAPI, api: 
         "/api/auth/login", json={"email": ADMIN, "password": PASSWORD}, headers=HEADERS
     )
     assert again.status_code == 403 and again.json()["code"] == "account_disabled"
+
+
+# ------------------------------------------------------------------ deleting your own account
+
+
+def _mailboxes(services: Services, workspace_id: str) -> list[str]:
+    with services.container.uow(workspace_id) as uow:
+        return [m.address for m in uow.mailboxes.all()]
+
+
+def test_deleting_your_account_needs_the_password_and_frees_the_address(
+    app: FastAPI, outbox: LogEmail, services: Services, ws: str, other_ws: str
+) -> None:
+    add_user(app, "boss@customer.example", ws, MembershipRole.ADMIN)  # keeps ws from being alone
+    me = sign_in(app, ADMIN, ws)
+    with services.container.uow(ws) as uow:
+        uow.mailboxes.create(
+            "sam@customer.example", "customer.example",
+            owner_user_id=me.get("/api/auth/me").json()["user"]["id"],
+        )  # fmt: skip
+        uow.commit()
+
+    wrong = me.post("/api/auth/account/delete", json={"password": "not the password at all"})
+    assert wrong.status_code == 400 and wrong.json()["code"] == "bad_credentials"
+    assert me.get("/api/auth/me").status_code == 200
+
+    assert me.post("/api/auth/account/delete", json={"password": PASSWORD}).status_code == 204
+    assert me.get("/api/auth/me").status_code == 401  # signed out
+    assert _mailboxes(services, ws) == []  # disconnected, not just orphaned
+    assert outbox.sent[-1].to == ADMIN and "deleted" in outbox.sent[-1].subject
+    # The workspace still has its other admin, so it was not suspended.
+    with services.container.platform() as p:
+        w = p.workspaces.get(ws)
+        assert w is not None and w.status.value == "active"
+    # The address can be invited again.
+    boss = sign_in(app, "boss@customer.example", ws)
+    assert boss.post("/api/team/invitations", json={"email": ADMIN}).status_code == 201
+    with services.container.identity() as ids:
+        entries = [e for e in ids.audit.recent(limit=500) if e["action"] == "account_deleted"]
+    assert len(entries) == 1 and ADMIN not in str(entries[0])
+
+
+def test_the_only_member_deleting_their_account_suspends_the_workspace(
+    app: FastAPI, services: Services, ws: str
+) -> None:
+    me = sign_in(app, ADMIN, ws)
+    assert me.post("/api/auth/account/delete", json={"password": PASSWORD}).status_code == 204
+    with services.container.platform() as p:
+        w = p.workspaces.get(ws)
+        assert w is not None and w.status.value == "suspended"
+
+
+def test_the_only_admin_of_a_shared_workspace_cannot_delete_until_another_is_named(
+    app: FastAPI, ws: str
+) -> None:
+    member = add_user(app, "second@customer.example", ws, MembershipRole.MEMBER)
+    me = sign_in(app, ADMIN, ws)
+    refused = me.post("/api/auth/account/delete", json={"password": PASSWORD})
+    assert refused.status_code == 409 and refused.json()["code"] == "last_admin"
+    assert me.get("/api/auth/me").status_code == 200  # nothing happened
+    assert me.patch(f"/api/team/members/{member}", json={"role": "admin"}).status_code == 200
+    assert me.post("/api/auth/account/delete", json={"password": PASSWORD}).status_code == 204
+
+
+def test_a_members_deletion_leaves_the_workspace_and_the_others_alone(
+    app: FastAPI, services: Services, ws: str
+) -> None:
+    add_user(app, "second@customer.example", ws, MembershipRole.MEMBER)
+    second = sign_in(app, "second@customer.example", ws)
+    assert second.post("/api/auth/account/delete", json={"password": PASSWORD}).status_code == 204
+    admin = sign_in(app, ADMIN, ws)
+    assert [m["email"] for m in admin.get("/api/team").json()["members"]] == [ADMIN]
