@@ -4,7 +4,11 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Checkbox, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Stat, Table, Td, Th, buttonClass } from "../ui/compat";
+import { Button, Callout, Card, Empty, PageHeader, Problem, QueryState, Stat, Table, Td, Th, buttonClass } from "../ui/compat";
+import { Chip, Segmented, Toggle } from "../ui/core";
+import { Drawer, useToast } from "../ui/overlay";
+import { cx } from "../lib/cx";
+import { percent } from "../lib/format";
 import { ago, duration, usd, when } from "../lib/format";
 import { describe, runStatus } from "../lib/status";
 import { useUsage } from "../lib/usage";
@@ -20,9 +24,9 @@ const WORKER_SILENT_MS = 45_000;
 
 export function RunsPage() {
   const queryClient = useQueryClient();
-  const [mode, setMode] = useState<Mode>("manual");
-  const [discover, setDiscover] = useState(10);
-    const [skipDirectory, setSkipDirectory] = useState(false);
+  const [drawer, setDrawer] = useState(false);
+  const [fresh, setFresh] = useState<string | null>(null);
+  const toast = useToast();
   const usage = useUsage();
   const canSkip = usage.data?.features.includes("directory_bypass") ?? false;
 
@@ -37,10 +41,6 @@ export function RunsPage() {
   const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
-  const start = useMutation({
-    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
-    onSuccess: refresh,
-  });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
 
   const queuedTooLong = runs.data?.some((r) => r.status === "queued" && Date.now() - new Date(r.created_at).getTime() > WORKER_SILENT_MS);
@@ -48,56 +48,34 @@ export function RunsPage() {
 
   return (
     <>
-      <PageHeader title="Runs" subtitle="A run moves every company that is due as far as it can go, step by step, and records what it spent." />
+      <PageHeader
+        title="Discovery runs"
+        subtitle="A run moves every company that is due as far as it can go, step by step, and records what it spent."
+        actions={
+          <Button data-tour="start-run" onClick={() => setDrawer(true)}>
+            <Play className="size-4 fill-current" aria-hidden /> Start a run now
+          </Button>
+        }
+      />
+      {drawer && (
+        <StartRunDrawer
+          canSkip={canSkip}
+          campaign={(campaigns.data ?? []).find((c) => c.status === "active")?.name}
+          ceiling={ceiling}
+          busy={!!busy && !queuedTooLong}
+          onClose={() => setDrawer(false)}
+          onStarted={(id) => {
+            setDrawer(false);
+            setFresh(id);
+            refresh();
+            toast({ tone: "good", title: "Run started", body: "We'll show what it finds here as it goes.", action: { label: "Cancel run", onClick: () => cancel.mutate(id) } });
+          }}
+        />
+      )}
+      <Problem error={cancel.error} className="mb-3" />
 
       <RunStats runs={runs.data ?? []} />
       <AutoDiscoveryLine />
-
-      <Card tour="start-run" title="Start a run" className="mb-5">
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
-          <Field label="What to run" hint={MODES.find(([m]) => m === mode)?.[2]}>
-            <Select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
-              {MODES.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          {mode !== "manual" ? (
-            <>
-              <Field label="Companies to discover">
-                <Input type="number" min={1} max={50} value={discover} onChange={(e) => setDiscover(Number(e.target.value))} className="w-28" />
-              </Field>
-              <Field label="Campaign to search for">
-                <div className="flex h-8 items-center text-body font-medium">{(campaigns.data ?? []).find((c) => c.status === "active")?.name ?? "None active"}</div>
-              </Field>
-            </>
-          ) : (
-            <div className="hidden md:col-span-2 md:block" />
-          )}
-        </div>
-        {canSkip && (
-          <div className="mt-3">
-            <Checkbox
-              label="Find emails with the vendors, not the shared directory"
-              hint="For the leads this run works on. Costs credits at the vendors; what they find still updates the directory."
-              checked={skipDirectory}
-              onChange={setSkipDirectory}
-            />
-          </div>
-        )}
-        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-line pt-3">
-          <Button busy={start.isPending} onClick={() => start.mutate()}>
-            <Play className="size-3.5 fill-current" aria-hidden /> Start run
-          </Button>
-          <span className="text-small text-muted">
-            A run works on up to 50 leads at each step; the rest wait for the next run. Runs are carried out by the worker process. Budget per prospect: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
-          </span>
-        </div>
-        {busy && !queuedTooLong && <p className="mt-2 text-small text-muted">A run is already queued or running; a new one waits for it.</p>}
-        <Problem error={start.error ?? cancel.error} className="mt-3" />
-      </Card>
 
       {queuedTooLong && (
         <Callout tone="error" title="Nothing is picking up queued runs" className="mb-5">
@@ -129,11 +107,12 @@ export function RunsPage() {
                     const live = run.status === "queued" || run.status === "running";
                     const params = (run.params ?? {}) as { mode?: string; campaign?: string; discover?: number; limit?: number };
                     return (
-                      <tr key={run.id} className="align-top hover:bg-surface-2">
+                      <tr key={run.id} className={cx("align-top hover:bg-surface-2", run.id === fresh && "bg-primary-soft outline outline-2 -outline-offset-2 outline-primary")}>
                         <Td className="whitespace-nowrap">
                           <Link to="/runs/$runId" params={{ runId: run.id }} className="text-body font-semibold text-primary hover:underline">
                             {ago(run.started_at ?? run.created_at)}
                           </Link>
+                          {run.id === fresh && <Chip tone="primary" className="ml-2 animate-pop">New</Chip>}
                           <div className="text-label text-muted" title={when(run.created_at)}>
                             {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
                           </div>
@@ -145,7 +124,7 @@ export function RunsPage() {
                           <RunSummary run={run} />
                         </Td>
                         <Td className="hidden whitespace-nowrap text-small text-muted md:table-cell">{run.started_at ? duration(run.started_at, run.finished_at) : "not started"}</Td>
-                        <Td className="text-right font-mono text-small">{usd(run.cost_micro_usd)}</Td>
+                        <Td className="tnum text-right text-small">{usd(run.cost_micro_usd)}</Td>
                         <Td className="whitespace-nowrap text-right">
                           {live && (
                             <Button variant="danger-ghost" size="sm" busy={cancel.isPending && cancel.variables === run.id} onClick={() => cancel.mutate(run.id)}>
@@ -261,5 +240,113 @@ function AutoDiscoveryLine() {
         {text}
       </Callout>
     </div>
+  );
+}
+
+const SOURCE_LABEL: Record<string, string> = { yc_directory: "YC directory", companies_house: "Companies House", exa: "Exa", articles: "Web lists" };
+
+/** The start-run slide-over: what to run, how many companies to find (1–50, as the API takes),
+ * the sources the brief will use (chosen by the engine, shown read-only), and the one switch the
+ * plan allows. Sends exactly what web2's form sent. */
+function StartRunDrawer({ canSkip, campaign, ceiling, busy, onClose, onStarted }: { canSkip: boolean; campaign?: string; ceiling?: number | null; busy: boolean; onClose: () => void; onStarted: (id: string) => void }) {
+  const [mode, setMode] = useState<Mode>("discovery");
+  const [discover, setDiscover] = useState(25);
+  const [skipDirectory, setSkipDirectory] = useState(false);
+  const plan = useQuery({ queryKey: ["run-plan"], queryFn: () => ok(client.GET("/api/runs/plan")) });
+  const start = useMutation({
+    mutationFn: () => ok(client.POST("/api/runs", { body: { mode, discover, ...(canSkip && skipDirectory ? { skip_directory: true } : {}) } })),
+    onSuccess: (run) => onStarted(run.id),
+  });
+  const searching = mode !== "manual";
+  const suited = (plan.data?.sources ?? []).filter((s) => s.suited);
+  const rated = suited.filter((s) => s.rate != null);
+  const rate = rated.length ? rated.reduce((a, s) => a + (s.rate ?? 0), 0) / rated.length : null;
+  return (
+    <Drawer
+      title="Start a run"
+      subtitle={campaign ? `Looks for companies that fit “${campaign}”` : "No campaign is active: only the leads you added can move."}
+      onClose={onClose}
+      footer={
+        <div className="space-y-3">
+          {searching && (
+            <div className="rounded-xl bg-primary-soft px-3 py-2 text-small text-ink-2">
+              ≈ {discover} companies named{rate != null ? ` · about ${Math.max(1, Math.round(discover * rate))} likely fits (from your ${percent(rate)} recent pass rate)` : ""} · a discovery credit only for each fit
+            </div>
+          )}
+          {busy && <p className="text-small text-muted">A run is already queued or running; this one waits for it.</p>}
+          <Problem error={start.error} />
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button busy={start.isPending} onClick={() => start.mutate()}>
+              <Play className="size-4 fill-current" aria-hidden /> Start run
+            </Button>
+          </div>
+        </div>
+      }
+    >
+      <div className="space-y-7">
+        <section>
+          <div className="mb-2 text-body font-semibold text-ink">What to run</div>
+          <div className="space-y-2">
+            {MODES.map(([value, label, hint]) => (
+              <label key={value} className={cx("press flex cursor-pointer gap-3 rounded-xl border p-3", mode === value ? "border-primary bg-primary-soft" : "border-line hover:border-line-strong")}>
+                <input type="radio" name="mode" className="mt-1 accent-[var(--primary)]" checked={mode === value} onChange={() => setMode(value)} />
+                <span>
+                  <span className="block font-semibold text-ink">{label}</span>
+                  <span className="block text-small text-muted">{hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </section>
+        {searching && (
+          <>
+            <section>
+              <div className="mb-2 text-body font-semibold text-ink">How many companies to find</div>
+              <Segmented label="Companies to find" value={discover} onChange={setDiscover} options={[[10, "10"], [25, "25"], [50, "50"]]} />
+              <p className="mt-2 text-small text-muted">Up to 50 a run. Only companies that pass your brief become leads.</p>
+            </section>
+            <section>
+              <div className="mb-1 flex items-baseline justify-between">
+                <span className="text-body font-semibold text-ink">Where it will look</span>
+                <span className="text-label text-muted">chosen for your brief</span>
+              </div>
+              <ul className="space-y-2">
+                {(plan.data?.sources ?? []).map((s) => (
+                  <li key={s.source} className={cx("rounded-xl border border-line p-3", !s.suited && "opacity-55")}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-ink">{SOURCE_LABEL[s.source] ?? s.source}</span>
+                      {s.rate != null ? <Chip tone="good">{percent(s.rate)} pass · 90 days</Chip> : s.suited ? <Chip>new</Chip> : null}
+                    </div>
+                    {s.suited ? (
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3" title={`Asked for ${s.share}× the usual amount`}>
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, s.share * 50)}%` }} />
+                      </div>
+                    ) : (
+                      <div className="mt-1 text-small text-muted">Skipped: {s.why_not}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-small text-muted">
+                A source whose key is not set is skipped when the run starts. To sharpen what it finds,{" "}
+                <Link to="/campaigns" className="font-semibold text-primary hover:underline">
+                  edit the brief in Campaigns
+                </Link>
+                .
+              </p>
+            </section>
+          </>
+        )}
+        {canSkip && (
+          <Toggle label="Find emails with the vendors, not the shared directory" hint="For the leads this run works on. Costs vendor credits; what they find still updates the directory." checked={skipDirectory} onChange={setSkipDirectory} />
+        )}
+        <p className="text-small text-muted">
+          A run works on up to 50 leads at each step. Budget per lead: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
+        </p>
+      </div>
+    </Drawer>
   );
 }
