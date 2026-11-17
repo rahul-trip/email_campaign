@@ -590,7 +590,7 @@ CREATE TABLE platform_settings (
 CREATE TABLE platform_credentials (
   id TEXT PRIMARY KEY,
   vendor TEXT NOT NULL,        -- a code in outbound/domain/vendors.py
-  slot INTEGER NOT NULL DEFAULT 1, -- 1..3 (CHECK); a vendor's live keys, one per slot (migration 0025)
+  slot INTEGER NOT NULL DEFAULT 1, -- 1..3 (CHECK); a vendor's live keys, one per slot (migration 0027)
   version INTEGER NOT NULL,    -- 1, 2, ...; UNIQUE (vendor, version)
   key_version INTEGER NOT NULL, -- the SECRETS_KEYS entry that sealed it
   nonce BLOB NOT NULL,
