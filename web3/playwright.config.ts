@@ -13,7 +13,7 @@ export default defineConfig({
   fullyParallel: false,
   use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure" },
   webServer: {
-    command: `cd .. && E2E_PORT=${PORT} E2E_WEB_DIST=web3/dist uv run python -m scripts.e2e_server`,
+    command: `cd .. && E2E_PORT=${PORT} uv run python -m scripts.e2e_server`,
     url: `http://127.0.0.1:${PORT}/api/health`,
     reuseExistingServer: Boolean(process.env.E2E_REUSE), // set it to run against a server you started (to read its log)
     timeout: 60_000,

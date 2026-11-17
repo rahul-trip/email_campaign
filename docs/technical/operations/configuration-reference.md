@@ -120,7 +120,7 @@ Accounts, sessions and permissions replaced the single operator password in Phas
 | `APP_BASE_URL` | str | `http://127.0.0.1:8000` | | C/D (the real host) | The host invitation, reset and OAuth-redirect links start with |
 | `SUPERADMIN_ENABLED` | bool | true | | D (`false` to disable) | Alpha-only: lets a platform superadmin read any workspace, read-only |
 | `TERMS_VERSION` | str | `2026-10` | | D if changed | The Terms version a person accepts when they set a password |
-| `WEB_APP` | `web2` \| `web3` | `web2` | | D if changed | Which built web app `outbound serve` hands out: `web2/dist` (current) or `web3/dist` (the redesign, same API and data). Build it first with `npm --prefix web3 run build` |
+| `WEB_APP` | `web3` \| `web2` | `web3` | | D if changed | Which built web app `outbound serve` hands out: `web3/dist` (the app; the Docker image builds it) or `web2/dist` (the old app, kept in the repo but no longer used or built). |
 | `EMAIL_FROM` | str | `Outbound <no-reply@localhost>` | | D | From-address on invitation/reset emails |
 | `SMTP_HOST` | str | — (blank: log instead of send) | | D in production | The platform's own outbound mail relay for invites and resets — never a customer's mailbox |
 | `SMTP_PORT` | int | 587 | | — | — |

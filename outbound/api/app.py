@@ -50,9 +50,9 @@ from outbound.services.directory import DirectoryService, finder_price
 from outbound.services.identity import IdentityService
 from outbound.services.vendors import VendorService
 
-# The built web apps; ``WEB_APP`` picks one (web2 until web3 replaces it).
+# The built web apps; ``WEB_APP`` picks one. web3 is the app; web2 stays in the repo, unused.
 ROOT = Path(__file__).resolve().parents[2]
-WEB_DIST = ROOT / "web2" / "dist"
+WEB_DIST = ROOT / "web3" / "dist"
 
 
 def web_dist_for(app_name: str) -> Path:

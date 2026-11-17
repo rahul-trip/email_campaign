@@ -3,10 +3,10 @@
 
 # ---- the web app -------------------------------------------------------------------------------
 FROM node:22-slim AS web
-WORKDIR /web2
-COPY web2/package.json web2/package-lock.json ./
+WORKDIR /web3
+COPY web3/package.json web3/package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY web2/ ./
+COPY web3/ ./
 RUN npm run build
 
 # ---- uv, pinned to the version the lockfile was made with --------------------------------------
@@ -44,9 +44,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-default-groups --no-install-project
 COPY outbound/ ./outbound/
-# Installed in place (editable), so outbound/api/app.py finds the web app at /app/web2/dist.
+# Installed in place (editable), so outbound/api/app.py finds the web app at /app/web3/dist.
 RUN uv sync --frozen --no-default-groups
-COPY --from=web /web2/dist ./web2/dist
+COPY --from=web /web3/dist ./web3/dist
 
 RUN useradd --create-home --uid 10001 outbound \
     && mkdir -p /doppler && chown outbound /doppler
