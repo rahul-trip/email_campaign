@@ -1257,10 +1257,58 @@ class LlmChargeOut(Out):
     per_million_output: float
 
 
+class LlmProviderOut(Out):
+    """A kind of model endpoint the engine can call, for the Add a model form."""
+
+    code: str
+    needs_key: bool
+    needs_base_url: bool
+    default_base_url: str
+
+
+class LlmModelOut(Out):
+    code: str
+    label: str
+    provider: str
+    model: str
+    base_url: str
+    temperature: float
+    max_tokens: int
+    reasoning_effort: str
+    input_credits: float  # AI credits per million input tokens
+    output_credits: float
+    key: str  # masked, or "" when it has none (it then uses the Language model vendor's key)
+
+
+class LlmModelIn(In):
+    label: str = Field(min_length=1, max_length=100)
+    provider: Literal[
+        "openai_compatible", "openai", "anthropic", "gemini", "ollama", "github_copilot"
+    ]
+    model: str = Field(min_length=1, max_length=200)
+    base_url: str = Field(default="", max_length=500)
+    temperature: float = Field(default=0.7, ge=0, le=2)
+    max_tokens: int = Field(default=4_000, ge=16, le=200_000)
+    reasoning_effort: Literal["", "low", "medium", "high"] = ""
+    input_credits: float = Field(default=0, ge=0, le=1_000_000)
+    output_credits: float = Field(default=0, ge=0, le=1_000_000)
+    # None keeps the stored key; "" removes it; anything else replaces it. Never echoed back.
+    api_key: str | None = Field(default=None, max_length=2_000)
+
+
+class ChooseModelsIn(In):
+    default_model: str = Field(default="", max_length=60)  # "": the LLM_* settings
+    writer_model: str = Field(default="", max_length=60)  # "": the default model writes too
+
+
 class VendorsOut(Out):
     vendors: list[VendorOut]
     llm: dict[str, str | int | float]
     llm_charges: list[LlmChargeOut]  # what each model's calls use, in AI credits
+    models: list[LlmModelOut]
+    default_model: str
+    writer_model: str
+    providers: list[LlmProviderOut]
 
 
 class VendorKeyIn(In):

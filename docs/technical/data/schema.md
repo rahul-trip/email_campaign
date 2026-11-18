@@ -598,7 +598,10 @@ CREATE TABLE platform_settings (
 -- `credit_value_micro_usd` (what one AI credit stands for; default 10000), `vendor_caps_credits`
 -- (AI credits a month per vendor; read from the old micro-USD `vendor_caps` if absent) and `llm_charges`
 -- ({model: [credits per million input tokens, per million output tokens]}). 0029 adds Starter and Pro
--- to a saved catalog that lacks them.
+-- to a saved catalog that lacks them. Also `models` (the AI models staff added: code, label, provider,
+-- model, base_url, temperature, max_tokens, reasoning_effort, input_credits, output_credits; each
+-- model's key is a platform_credentials row with vendor 'model:<code>'), `default_model` and
+-- `writer_model` (codes; "" means the LLM_* settings apply).
 
 -- A platform table (migration 0013): only outbound_platform holds a grant. Replacing a key adds a
 -- version and retires the old one, which is kept 30 days for a rollback.

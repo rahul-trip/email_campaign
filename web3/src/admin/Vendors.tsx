@@ -4,6 +4,7 @@ import { client, ok, type Schemas } from "../api/client";
 import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, QueryState, Table, Td, Th } from "../ui/compat";
 import { credits, usd, wholeCredits } from "../lib/format";
 import { Pill, When } from "./bits";
+import { ModelsCard } from "./Models";
 
 type Vendor = Schemas["VendorOut"];
 type Slot = { vendor: Vendor; slot: number };
@@ -152,6 +153,7 @@ export function VendorsPage() {
                 </tbody>
               </Table>
             </div>
+            <ModelsCard data={data} onSaved={refresh} />
             <LlmCard llm={data.llm} charges={data.llm_charges} onSaved={refresh} />
           </div>
         )}
@@ -245,7 +247,7 @@ function LlmCard({ llm, charges, onSaved }: { llm: Record<string, string | numbe
     onSuccess: onSaved,
   });
   return (
-    <Card title="Language model" subtitle="DeepSeek on DeepInfra uses the OpenAI-compatible provider. The key is the Language model row above.">
+    <Card collapsible defaultOpen={false} title="Environment settings and other charges" subtitle="Used only while no default model is chosen above, and for charges of models not in the list. The key is the Language model row above.">
       <div className="grid gap-3 sm:grid-cols-2">
         {LLM_LABELS.map(([name, label]) => (
           <Field key={name} label={label}>

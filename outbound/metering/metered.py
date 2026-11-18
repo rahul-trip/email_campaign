@@ -203,7 +203,7 @@ class Meter:
             if cost or tokens:
                 # AI credits at the charges in force now, stamped on the row.
                 settings, _ = uow.platform_settings.get()
-                charge = settings.llm_charges.get(tokens[0]) if tokens else None
+                charge = settings.charge(tokens[0]) if tokens else None
                 if tokens and charge:
                     credits = llm_credits(tokens[1], tokens[2], *charge)
                 else:

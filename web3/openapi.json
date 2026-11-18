@@ -1007,6 +1007,25 @@
         "title": "ChangePasswordIn",
         "type": "object"
       },
+      "ChooseModelsIn": {
+        "additionalProperties": false,
+        "properties": {
+          "default_model": {
+            "default": "",
+            "maxLength": 60,
+            "title": "Default Model",
+            "type": "string"
+          },
+          "writer_model": {
+            "default": "",
+            "maxLength": 60,
+            "title": "Writer Model",
+            "type": "string"
+          }
+        },
+        "title": "ChooseModelsIn",
+        "type": "object"
+      },
       "CompanyOut": {
         "properties": {
           "campaign_id": {
@@ -4450,6 +4469,191 @@
           "per_million_output"
         ],
         "title": "LlmChargeOut",
+        "type": "object"
+      },
+      "LlmModelIn": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          },
+          "base_url": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Base Url",
+            "type": "string"
+          },
+          "input_credits": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Input Credits",
+            "type": "number"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "max_tokens": {
+            "default": 4000,
+            "maximum": 200000.0,
+            "minimum": 16.0,
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "output_credits": {
+            "default": 0,
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Output Credits",
+            "type": "number"
+          },
+          "provider": {
+            "enum": [
+              "openai_compatible",
+              "openai",
+              "anthropic",
+              "gemini",
+              "ollama",
+              "github_copilot"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "default": "",
+            "enum": [
+              "",
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "temperature": {
+            "default": 0.7,
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "provider",
+          "model"
+        ],
+        "title": "LlmModelIn",
+        "type": "object"
+      },
+      "LlmModelOut": {
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "input_credits": {
+            "title": "Input Credits",
+            "type": "number"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "max_tokens": {
+            "title": "Max Tokens",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "output_credits": {
+            "title": "Output Credits",
+            "type": "number"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "reasoning_effort": {
+            "title": "Reasoning Effort",
+            "type": "string"
+          },
+          "temperature": {
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "provider",
+          "model",
+          "base_url",
+          "temperature",
+          "max_tokens",
+          "reasoning_effort",
+          "input_credits",
+          "output_credits",
+          "key"
+        ],
+        "title": "LlmModelOut",
+        "type": "object"
+      },
+      "LlmProviderOut": {
+        "description": "A kind of model endpoint the engine can call, for the Add a model form.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "default_base_url": {
+            "title": "Default Base Url",
+            "type": "string"
+          },
+          "needs_base_url": {
+            "title": "Needs Base Url",
+            "type": "boolean"
+          },
+          "needs_key": {
+            "title": "Needs Key",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "needs_key",
+          "needs_base_url",
+          "default_base_url"
+        ],
+        "title": "LlmProviderOut",
         "type": "object"
       },
       "LlmSettingsIn": {
@@ -8566,6 +8770,10 @@
       },
       "VendorsOut": {
         "properties": {
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
           "llm": {
             "additionalProperties": {
               "anyOf": [
@@ -8590,18 +8798,40 @@
             "title": "Llm Charges",
             "type": "array"
           },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/LlmModelOut"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LlmProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
           "vendors": {
             "items": {
               "$ref": "#/components/schemas/VendorOut"
             },
             "title": "Vendors",
             "type": "array"
+          },
+          "writer_model": {
+            "title": "Writer Model",
+            "type": "string"
           }
         },
         "required": [
           "vendors",
           "llm",
-          "llm_charges"
+          "llm_charges",
+          "models",
+          "default_model",
+          "writer_model",
+          "providers"
         ],
         "title": "VendorsOut",
         "type": "object"
@@ -10515,6 +10745,184 @@
           }
         },
         "summary": "Revoke Platform Invitation",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/models/default": {
+      "put": {
+        "description": "The model every call uses, and the one that writes emails.",
+        "operationId": "choose_models_api_admin_models_default_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChooseModelsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Choose Models",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/models/{code}": {
+      "delete": {
+        "operationId": "remove_model_api_admin_models__code__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Model",
+        "tags": [
+          "admin"
+        ]
+      },
+      "put": {
+        "description": "Add a model, or change one; the key is kept unless a new one (or \"\") is sent.",
+        "operationId": "save_model_api_admin_models__code__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VendorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Model",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/models/{code}/test": {
+      "post": {
+        "description": "One tiny real call to the model, with its own settings and key.",
+        "operationId": "test_model_api_admin_models__code__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "title": "Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Test Model",
         "tags": [
           "admin"
         ]

@@ -8,6 +8,7 @@ never the content of its leads.
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import datetime
 from typing import Annotated, Any
 
@@ -23,6 +24,7 @@ from outbound.api.schemas import (
     AdminUserOut,
     AttentionOut,
     AuditOut,
+    ChooseModelsIn,
     CreditValueIn,
     CustomerDetailOut,
     CustomerIn,
@@ -47,6 +49,9 @@ from outbound.api.schemas import (
     GrantOut,
     KeyCheckOut,
     LlmChargeOut,
+    LlmModelIn,
+    LlmModelOut,
+    LlmProviderOut,
     LlmSettingsIn,
     MemberOut,
     OverrideIn,
@@ -79,8 +84,9 @@ from outbound.domain.enums import (
 )
 from outbound.domain.permissions import PLATFORM_PERMISSIONS
 from outbound.domain.permissions import Permission as P
-from outbound.domain.platform_settings import PlatformSettings
+from outbound.domain.platform_settings import LLM_PROVIDERS, LlmModel, PlatformSettings
 from outbound.domain.vendors import MAX_KEYS
+from outbound.providers.adapters.llm import PRESETS
 from outbound.services.admin import (
     AdminError,
     AdminService,
@@ -554,7 +560,22 @@ def audit_csv(
 
 
 def _vendors(service: VendorService) -> VendorsOut:
+    catalog, keys = service.models()
     return VendorsOut(
+        models=[
+            LlmModelOut(**asdict(m), key=keys.get(m.code, "")) for m in catalog.models.values()
+        ],
+        default_model=catalog.default_model,
+        writer_model=catalog.writer_model,
+        providers=[
+            LlmProviderOut(
+                code=code,
+                needs_key=PRESETS[code].needs_key,
+                needs_base_url=not PRESETS[code].base_url,
+                default_base_url=PRESETS[code].base_url,
+            )
+            for code in LLM_PROVIDERS
+        ],
         vendors=[VendorOut.model_validate(v) for v in service.statuses()],
         llm=service.llm_settings(),
         llm_charges=[
@@ -621,6 +642,35 @@ def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> Vendo
             by=staff.user.id,
         )
     return _vendors(service)
+
+
+@router.put("/models/default", response_model=VendorsOut)
+def choose_models(body: ChooseModelsIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
+    """The model every call uses, and the one that writes emails."""
+    service.choose_models(body.default_model, body.writer_model, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.put("/models/{code}", response_model=VendorsOut)
+def save_model(code: str, body: LlmModelIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
+    """Add a model, or change one; the key is kept unless a new one (or "") is sent."""
+    fields = body.model_dump(exclude={"api_key"})
+    model = LlmModel(code=code.strip(), **{**fields, "base_url": body.base_url.strip()})
+    service.save_model(model, api_key=body.api_key, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.delete("/models/{code}", response_model=VendorsOut)
+def remove_model(code: str, staff: KeyHolder, service: Vendors) -> VendorsOut:
+    service.remove_model(code, by=staff.user.id)
+    return _vendors(service)
+
+
+@router.post("/models/{code}/test", response_model=KeyCheckOut)
+def test_model(code: str, staff: KeyHolder, service: Vendors) -> KeyCheckOut:
+    """One tiny real call to the model, with its own settings and key."""
+    result = service.test_model(code, by=staff.user.id)
+    return KeyCheckOut(ok=result.ok, message=result.message)
 
 
 @router.put("/vendors/{vendor}/cap", response_model=VendorsOut)
