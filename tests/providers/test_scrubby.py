@@ -58,21 +58,52 @@ class TestScrubbyResolver(CatchAllResolverContract):
 
     def test_risky_and_unknown_are_unresolved_never_valid(self) -> None:
         for word in ("Risky", "Unknown"):
-            body = {"status": "completed", "results": {EMAIL: {"result": word}}}
+            body = {"status": "completed", "results_72": {EMAIL: {"result": word}}}
             adapter = self.build(finished(body))
             result = adapter.poll(adapter.submit(EMAIL))
             assert result is not None and result.status is ResolutionStatus.UNRESOLVED
 
     def test_a_finished_batch_with_no_answer_for_the_address_is_unresolved(self) -> None:
-        adapter = self.build(finished({"status": "completed", "results": {}}))
+        empty = {"status": "completed", "results_24": {}, "results_48": {}, "results_72": {}}
+        adapter = self.build(finished(empty))
         result = adapter.poll(adapter.submit(EMAIL))
         assert result is not None and result.status is ResolutionStatus.UNRESOLVED
 
     def test_the_address_is_found_in_the_results_whatever_its_case(self) -> None:
-        body = {"status": "completed", "results": {EMAIL.upper(): {"result": "Valid"}}}
+        body = {"status": "completed", "results_72": {EMAIL.upper(): {"result": "Valid"}}}
         adapter = self.build(finished(body))
         result = adapter.poll(adapter.submit(EMAIL))
         assert result is not None and result.status is ResolutionStatus.VALID
+
+    def test_the_answer_is_read_from_the_deep_windows_the_latest_final_one_first(self) -> None:
+        # The shape a live poll returned on 2026-11-18, finished: results_24/48/72, no "results".
+        body = {
+            "status": "completed",
+            "results_24": {EMAIL: {"result": "Valid"}},
+            "results_48": {EMAIL: {"result": "Valid"}},
+            "results_72": {EMAIL: {"result": "Invalid"}},
+        }
+        answer = self.build(finished(body)).poll(self.build(finished(body)).submit(EMAIL))
+        assert answer is not None and answer.status is ResolutionStatus.INVALID
+
+    def test_a_later_window_still_pending_falls_back_to_the_earlier_final_one(self) -> None:
+        body = {
+            "status": "completed",
+            "results_24": {EMAIL: {"result": "Valid"}},
+            "results_48": {EMAIL: {"result": "pending"}},
+            "results_72": {EMAIL: {"result": "pending"}},
+        }
+        answer = self.build(finished(body)).poll(self.build(finished(body)).submit(EMAIL))
+        assert answer is not None and answer.status is ResolutionStatus.VALID
+
+    def test_a_batch_still_processing_is_no_answer_even_with_an_early_window(self) -> None:
+        body = {"status": "processing", "results_24": {EMAIL: {"result": "Valid"}}}
+        assert self.build(finished(body)).poll(self.build(finished(body)).submit(EMAIL)) is None
+
+    def test_the_quick_checks_results_map_is_still_read(self) -> None:
+        body = {"status": "completed", "results": {EMAIL: {"result": "Valid"}}}
+        answer = self.build(finished(body)).poll(self.build(finished(body)).submit(EMAIL))
+        assert answer is not None and answer.status is ResolutionStatus.VALID
 
     def test_a_batch_accepted_without_an_identifier_is_an_error(self) -> None:
         adapter = self.build(always(httpx.Response(200, json={"status": "processing"})))

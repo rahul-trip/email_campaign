@@ -274,6 +274,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-48 · P1 · Catch-all resolver: a finished Scrubby batch would have proven nothing — closed 2026-11-18
+
+- **Was:** `ScrubbyResolver.poll` read the verdict from a `results` map. That is the quick bulk check's shape; deep verification answers in three windows, `results_24`, `results_48` and `results_72`, and is `completed` only when all three are final, about 72 hours after the submit. A live poll of production's oldest ticket on 2026-11-18 returned exactly that (`processing`, the three windows, `retry_after_seconds: 259200`). Once a batch completed, the adapter would have found no entry for the address and recorded `unresolved`, so every catch-all lead, even one Scrubby proved valid, would have ended `catch_all_unverified` and never reached the lead directory. The fixtures had been written in the quick check's shape, so the tests agreed with the bug. None of production's 30 queued tickets had completed yet, so no lead was mis-recorded.
+- **Fixed by:** `outbound/providers/adapters/scrubby.py::_verdict` reads the latest final window (`results_72`, then `results_48`, then `results_24`, then a plain `results`); an early window is not used while the batch is `processing`. The fixtures follow the deep endpoint's documented examples.
+- **Evidence:** `tests/providers/test_scrubby.py` (the latest final window wins; a still-pending later window falls back to an earlier final one; `processing` is no answer; the quick check's map is still read).
+- **Still open:** a *completed* deep batch has still not been seen live (the first finish about 72 hours after 2026-11-17 09:00 UTC). Leads wait about three days on a catch-all, not one. The 19 addresses on 9 leads that the old adapter left `catch_all_unverified` (13–16 Nov) are retried only by *Find email again* on Needs attention.
+
 ### R-47 · P2 · Email: a refused verifier or resolver key stopped the step although other vendors had keys — closed 2026-11-17
 
 - **Was:** only `VERIFIER` and `CATCH_ALL_RESOLVER` were ever built. From 13 to 16 Nov every Scrubby submit failed (19 errors, then 3 refusals of its key) while Enrichley had a working key and was never asked; OrbiSearch's key likewise sat unused behind MyEmailVerifier. A catch-all lead failed with "the catch-all resolver is not answering" instead.

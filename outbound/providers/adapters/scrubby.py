@@ -4,9 +4,15 @@ Docs: https://docs.scrubby.io, whose OpenAPI file is https://docs.scrubby.io/scr
 (read 2026-11-16). The key goes in the ``x-api-key`` header. Deep verification is the part of
 Scrubby that settles an address on a catch-all domain: ``POST /validate_bulk_emails/deep/`` with
 ``{"email": [address]}`` queues it and returns an ``identifier``; ``POST /fetch_bulk_results/deep``
-with that identifier says ``processing`` until the batch is ``completed`` (up to 24 hours), then
-maps each address to ``Valid``, ``Invalid``, ``Risky`` or ``Unknown``. It costs more credits per
-address than a plain check.
+with that identifier says ``processing`` until the batch is ``completed``. Its answer comes in
+three windows, ``results_24``, ``results_48`` and ``results_72``, each mapping an address to
+``Valid``, ``Invalid``, ``Risky``, ``Unknown`` or ``pending``; the batch is ``completed`` once
+all three are final, about 72 hours after the submit (``retry_after_seconds`` says 259200). The
+latest final window is the answer. It costs more credits per address than a plain check.
+
+A plain ``results`` map belongs to the quick bulk check (``/fetch_bulk_results``). This adapter
+read only that map until 2026-11-18, so a completed deep batch had no answer for the address and
+every catch-all would have ended unproven (R-48, seen in a live poll).
 
 The first version of this adapter used ``POST /add_email`` and ``GET /fetch_email/{email}``, which
 the API does not have: every submit was a 404 and every catch-all lead ended unproven.
@@ -23,6 +29,9 @@ from outbound.providers.ports import ResolutionResult, ResolutionStatus, Resolut
 BASE_URL = "https://api.scrubby.io"
 _VALID = {"valid"}
 _INVALID = {"invalid"}
+# Latest first: a later window has watched the address for longer. ``results`` is the quick
+# check's map, kept for an answer in that shape.
+_WINDOWS = ("results_72", "results_48", "results_24", "results")
 
 
 class ScrubbyResolver:
@@ -54,16 +63,7 @@ class ScrubbyResolver:
         payload = self._http.post_object("/fetch_bulk_results/deep", {"identifier": ticket.ref})
         if str(payload.get("status") or "processing").strip().lower() != "completed":
             return None
-        results = payload.get("results")
-        item = next(
-            (
-                v
-                for k, v in (results.items() if isinstance(results, dict) else ())
-                if str(k).lower() == ticket.email.lower() and isinstance(v, dict)
-            ),
-            {},
-        )
-        raw = str(item.get("result") or "unknown").strip().lower()
+        raw = _verdict(payload, ticket.email)
         if raw == "pending":
             return None
         if raw in _VALID:
@@ -75,3 +75,29 @@ class ScrubbyResolver:
         return ResolutionResult(
             email=ticket.email, status=status, provider=self.name, raw_status=raw
         )
+
+
+def _verdict(payload: dict[str, object], email: str) -> str:
+    """The latest final word on ``email`` across the windows: ``pending`` while any window that
+    holds the address still waits and none has answered, ``unknown`` when none holds it."""
+    seen_pending = False
+    for window in _WINDOWS:
+        results = payload.get(window)
+        if not isinstance(results, dict):
+            continue
+        item = next(
+            (
+                v
+                for k, v in results.items()
+                if str(k).lower() == email.lower() and isinstance(v, dict)
+            ),
+            None,
+        )
+        if item is None:
+            continue
+        raw = str(item.get("result") or "unknown").strip().lower()
+        if raw == "pending":
+            seen_pending = True
+            continue
+        return raw
+    return "pending" if seen_pending else "unknown"

@@ -28,13 +28,15 @@ Documentation: `https://docs.scrubby.io`; the OpenAPI file it renders is `https:
 | `submit(email)` | `POST /validate_bulk_emails/deep/` with `{"email": [address]}`; answers **202** with an `identifier` | `x-api-key` header |
 | `poll(ticket)` | `POST /fetch_bulk_results/deep` with `{"identifier": ...}`; `status` is `processing` or `completed` | `x-api-key` |
 
-Deep verification is the part of Scrubby that settles an address on a catch-all domain, and takes up to 24 hours. `submit` never carries a result: the lead is held as `catch_all_resolving`, and the [poller](../lld/stage-email.md#the-poller) asks every 6 hours from `tick`. The 202 is Scrubby's success, so its `HttpClient` is built with `accepted_is_final=True`; the default would retry it and submit, and bill, the batch again. Scrubby's instant `POST /validate_email` (a plain check, 100-second timeout) is not used: it does not settle catch-alls.
+Deep verification is the part of Scrubby that settles an address on a catch-all domain, and takes about 72 hours: the answer comes in three windows, `results_24`, `results_48` and `results_72`, and the batch is `completed` once all three are final (a live poll on 2026-11-18 said `retry_after_seconds: 259200`). `submit` never carries a result: the lead is held as `catch_all_resolving`, and the [poller](../lld/stage-email.md#the-poller) asks every 6 hours from `tick`. The 202 is Scrubby's success, so its `HttpClient` is built with `accepted_is_final=True`; the default would retry it and submit, and bill, the batch again. Scrubby's instant `POST /validate_email` (a plain check, 100-second timeout) is not used: it does not settle catch-alls.
 
 ## Mapping
 
-| Scrubby `results[address].result` | Ours |
+The answer is the latest final window: `results_72`, else `results_48`, else `results_24` (a plain `results` map, the quick check's shape, is read last). An early window is never used while the batch is still `processing`.
+
+| Scrubby `results_72` / `_48` / `_24` `[address].result` | Ours |
 |---|---|
-| `pending`, or the batch `status` is `processing` | No answer yet |
+| the batch `status` is `processing`, or every window says `pending` | No answer yet |
 | `Valid` | `valid` |
 | `Invalid` | `invalid` |
 | `Risky`, `Unknown`, or no entry for the address | `unresolved` |
