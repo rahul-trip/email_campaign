@@ -6,7 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
@@ -84,6 +84,8 @@ export function LeadsPage() {
   const total = leads.data?.total ?? 0;
   const items = leads.data?.items ?? [];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const advancedCount = [search.hold, search.source, search.fit, search.country].filter(Boolean).length;
+  const [moreOpen, setMore] = useState(advancedCount > 0);
   const filtered = Boolean(search.q || search.status || search.hold || search.view || search.source || search.country || search.fit);
   const activeView = VIEWS.find((v) => Object.entries(v.filters).every(([k, val]) => search[k as keyof LeadsSearch] === val) && (v.key !== "all" || !filtered))?.key;
   const by = status.data?.by_status ?? {};
@@ -136,8 +138,8 @@ export function LeadsPage() {
       )}
 
       <Card data-tour="leads-list" className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 p-3">
-          <div className="relative max-w-sm min-w-[220px] flex-1">
+        <div className="grid grid-cols-2 items-center gap-2 border-b border-line bg-surface-2 p-3 sm:flex sm:flex-wrap">
+          <div className="relative col-span-2 min-w-[220px] flex-1 sm:max-w-sm">
             <Search className="absolute top-3 left-3 size-4 text-faint" aria-hidden />
             <input
               aria-label="Search by company or domain"
@@ -155,6 +157,22 @@ export function LeadsPage() {
               </option>
             ))}
           </Select>
+          <Button variant="secondary" aria-expanded={moreOpen} onClick={() => setMore(!moreOpen)} className="h-10">
+            <SlidersHorizontal className="size-4" aria-hidden /> Filters
+            {advancedCount > 0 && <span className="tnum rounded-full bg-primary px-1.5 text-label text-primary-ink">{advancedCount}</span>}
+          </Button>
+          <Select aria-label="Sort" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value })} className="ml-auto w-auto">
+            <option value="newest">Newest first</option>
+            <option value="fit">Best fit first</option>
+            <option value="updated">Recently changed</option>
+            <option value="name">Name A–Z</option>
+          </Select>
+          {filtered && (
+            <Button variant="ghost" size="sm" onClick={() => void navigate({ search: {}, replace: true })}>
+              <X className="size-3.5" aria-hidden /> Clear
+            </Button>
+          )}
+          {moreOpen && <div className="col-span-2 grid grid-cols-2 items-center gap-2 border-t border-line pt-3 sm:flex sm:basis-full sm:flex-wrap">
           <Select aria-label="Hold reason" value={search.hold ?? ""} onChange={(e) => set({ hold: e.target.value || undefined, status: e.target.value ? "held" : search.status })} className="w-auto">
             <option value="">Any hold</option>
             {HOLD_REASONS.map((h) => (
@@ -187,23 +205,13 @@ export function LeadsPage() {
             onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
             className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
           />
-          <Select aria-label="Sort" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value })} className="ml-auto w-auto">
-            <option value="newest">Newest first</option>
-            <option value="fit">Best fit first</option>
-            <option value="updated">Recently changed</option>
-            <option value="name">Name A–Z</option>
-          </Select>
-          {filtered && (
-            <Button variant="ghost" size="sm" onClick={() => void navigate({ search: {}, replace: true })}>
-              <X className="size-3.5" aria-hidden /> Clear
-            </Button>
-          )}
+          </div>}
         </div>
 
         <Problem error={leads.error} className="m-3" />
         {leads.isPending ? (
           <div className="p-5">
-            <Skeleton rows={8} />
+            <Skeleton rows={8} shape="table" />
           </div>
         ) : items.length === 0 ? (
           <Empty
@@ -224,7 +232,7 @@ export function LeadsPage() {
               <thead className="text-label font-semibold tracking-wide text-faint uppercase">
                 <tr className="border-b border-line">
                   <th className="px-4 py-3">Company</th>
-                  <th className="px-3 py-3">Status</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Status</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Stage</th>
                   <th className="px-3 py-3 text-center">Fit</th>
                   <th className="hidden px-3 py-3 md:table-cell">Contact</th>
@@ -251,14 +259,18 @@ export function LeadsPage() {
                               {company.name ?? company.domain}
                             </Link>
                             <div className="flex items-center gap-1.5 text-small text-muted">
-                              <Mono>{company.domain}</Mono>
-                              {company.country_code && <span>· {company.country_code}</span>}
+                              {company.name && <Mono>{company.domain}</Mono>}
+                              {company.country_code && <span>{company.name ? "· " : ""}{company.country_code}</span>}
                               {company.priority !== 5 && <span title="Priority (1 is first)">· P{company.priority}</span>}
+                            </div>
+                            <div className="mt-1 sm:hidden">
+                              <Chip tone={info.family}>{info.label}</Chip>
+                              {hold && <span className="ml-2 text-small text-attention">{hold.label}</span>}
                             </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3.5">
+                      <td className="hidden px-3 py-3.5 sm:table-cell">
                         <Chip tone={info.family}>{info.label}</Chip>
                         {hold && <div className="mt-1 text-small text-attention">{hold.label}</div>}
                         {company.status === "failed" && company.last_error && (

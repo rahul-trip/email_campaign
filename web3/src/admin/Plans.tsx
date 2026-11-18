@@ -21,7 +21,7 @@ export function PlansPage() {
     <>
       <PageHeader title="Plans" subtitle="The catalog. A change applies to every customer on the plan at once." actions={<Button onClick={() => setEditing("new")}>New plan</Button>} />
       <Problem error={makeDefault.error} className="mb-3" />
-      <QueryState query={plans} rows={4}>
+      <QueryState query={plans} rows={4} shape="table">
         {(catalog) => (
           <div className="grid gap-4 lg:grid-cols-2">
             {catalog.plans.map((plan) => (

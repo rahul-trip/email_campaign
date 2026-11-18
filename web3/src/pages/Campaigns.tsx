@@ -39,7 +39,7 @@ export function CampaignsPage() {
             />
           </Card>
         )}
-        <QueryState query={campaigns}>
+        <QueryState query={campaigns} shape="cards" rows={3}>
           {(all) =>
             all.length === 0 && !adding ? (
               <Card>

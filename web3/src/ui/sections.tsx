@@ -55,13 +55,13 @@ export function SectionGroup({ storageKey, children, className, toolbar = true }
 
   return (
     <GroupContext.Provider value={value}>
-      <div className={cx("space-y-4", className)}>
+      <div className={cx("space-y-6", className)}>
         {toolbar && (
-          <div className="-mb-1 flex justify-end gap-1 text-small">
-            <button type="button" onClick={() => all(true)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-primary hover:bg-primary-soft">
+          <div className="-mb-2 flex justify-end gap-1 text-label">
+            <button type="button" onClick={() => all(true)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-muted hover:bg-surface-2 hover:text-ink">
               <ChevronsUpDown className="size-3.5" aria-hidden /> Expand all
             </button>
-            <button type="button" onClick={() => all(false)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-muted hover:bg-surface-2 hover:text-ink">
+            <button type="button" onClick={() => all(false)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-muted hover:bg-surface-2 hover:text-ink">
               <ChevronsDownUp className="size-3.5" aria-hidden /> Collapse all
             </button>
           </div>
@@ -112,14 +112,13 @@ export function Section({
     <section
       data-tour={tour}
       className={cx(
-        "card overflow-hidden transition-shadow",
-        open && "shadow-2",
+        "card overflow-hidden",
         tone === "attention" && "border-attention-dot/40",
         tone === "primary" && "border-primary-line",
         className,
       )}
     >
-      <div className={cx("flex items-center gap-3 px-5 py-4", tone === "attention" && open && "bg-attention-soft/60")}>
+      <div className={cx("flex items-center gap-3 px-6 py-4", tone === "attention" && open && "bg-attention-soft/60")}>
         <h2 className="min-w-0 flex-1">
         <button type="button" onClick={toggle} aria-expanded={open} aria-controls={bodyId} className="group flex w-full min-w-0 items-center gap-3 text-left">
           <ChevronDown aria-hidden className={cx("size-5 shrink-0 text-faint transition-transform duration-300 group-hover:text-ink", !open && "-rotate-90")} />
@@ -135,7 +134,7 @@ export function Section({
       </div>
       <div id={bodyId} className={cx("grid transition-[grid-template-rows] duration-300 ease-out", open ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
         <div className="min-h-0 overflow-hidden">
-          <div className={cx("border-t border-line px-5 py-5", open && "animate-fade")} hidden={!open}>
+          <div className={cx("border-t border-line px-6 py-6", open && "animate-fade")} hidden={!open}>
             {children}
           </div>
         </div>

@@ -193,7 +193,7 @@ export function RunDetailPage() {
         )}
 
         <Card collapsible tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
-          <QueryState query={calls}>
+          <QueryState query={calls} shape="table">
             {(rows) =>
               rows.length === 0 ? (
                 <p className="text-small text-muted">No vendor was called in this run.</p>
@@ -241,7 +241,7 @@ export function RunDetailPage() {
         </Card>
 
         <Card tour="run-leads" title="Leads this run touched" subtitle="Each lead it moved on, held, failed or will retry, with every step. Click a lead to open it." className="p-0 [&>header]:px-4 [&>header]:pt-4">
-          <QueryState query={leads}>
+          <QueryState query={leads} shape="table">
             {(rows) =>
               rows.length === 0 ? (
                 <Empty title={live ? "Nothing yet" : "No lead changed"}>{live ? "Leads appear here as the run moves them." : "This run found nothing due, or left every lead where it was."}</Empty>

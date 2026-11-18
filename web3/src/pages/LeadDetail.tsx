@@ -1222,7 +1222,7 @@ function EditLead({ company, campaigns, onSaved }: { company: Company; campaigns
   });
   const stale = save.error instanceof ApiProblem && save.error.status === 409;
   return (
-    <Card tour="lead-edit" title="Edit this lead" subtitle="What you save is marked as yours and kept.">
+    <Card collapsible tour="lead-edit" title="Edit this lead" subtitle="What you save is marked as yours and kept.">
       <div className="space-y-3">
         <Field label="Name">
           <Input value={name} onChange={(e) => setName(e.target.value)} />

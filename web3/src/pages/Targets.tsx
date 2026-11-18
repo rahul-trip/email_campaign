@@ -37,7 +37,7 @@ export function TargetsPage() {
             {tab === "upload" && <UploadFile campaigns={list} />}
             {tab === "confirm" && (
               <Card title="Websites to confirm" subtitle="Added by name, and the website found is not certain (below 80% sure). Confirm it or give the right one.">
-                <QueryState query={waiting}>
+                <QueryState query={waiting} shape="table">
                   {(rows) =>
                     rows.length === 0 ? (
                       <Empty icon={<CheckCircle2 className="size-7 text-good" />}>Nothing is waiting for confirmation.</Empty>

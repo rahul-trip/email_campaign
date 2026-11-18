@@ -170,7 +170,7 @@ function Frame({ children }: { children: ReactNode }) {
         <EngineChip run={active} stuck={stuck} />
         <div className="ml-auto flex items-center gap-1.5">
           {!viewing && (
-            <Link to="/targets" className={buttonClass("primary", "md", "hidden sm:inline-flex")}>
+            <Link to="/targets" className={buttonClass("primary", "md", "max-sm:hidden")}>
               <Plus className="size-4" aria-hidden /> Add leads
             </Link>
           )}

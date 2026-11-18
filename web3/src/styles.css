@@ -20,7 +20,14 @@
   --ink: #18181b;
   --ink-2: #3f3f46;
   --muted: #5b5b66;
-  --faint: #8a8a96;
+  --faint: #6a6a77;
+
+  /* Semantic names for the neutral canvas. They point at the base tokens, so both themes follow. */
+  --surface-base: var(--bg);
+  --surface-elevated: var(--surface);
+  --border-subtle: var(--line);
+  --text-primary: var(--ink);
+  --text-muted: var(--muted);
 
   --primary: #4f46e5;
   --primary-hover: #4338ca;
@@ -50,9 +57,9 @@
   --shadow-3: 0 24px 48px -12px rgb(24 24 27 / 0.18), 0 8px 16px -8px rgb(24 24 27 / 0.08);
   --glass: rgb(255 255 255 / 0.78);
   --scrim: rgb(24 24 27 / 0.32);
-  --aurora-a: rgb(99 102 241 / 0.22);
-  --aurora-b: rgb(167 139 250 / 0.2);
-  --aurora-c: rgb(56 189 248 / 0.14);
+  --aurora-a: rgb(99 102 241 / 0.12);
+  --aurora-b: rgb(167 139 250 / 0.1);
+  --aurora-c: rgb(56 189 248 / 0.07);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -68,7 +75,7 @@
     --ink: #e9ebf0;
     --ink-2: #c9ccd6;
     --muted: #a0a6b4;
-    --faint: #757c8c;
+    --faint: #8b92a3;
     --primary: #818cf8;
     --primary-hover: #a5b4fc;
     --primary-ink: #0f1117;
@@ -113,7 +120,7 @@
   --ink: #e9ebf0;
   --ink-2: #c9ccd6;
   --muted: #a0a6b4;
-  --faint: #757c8c;
+  --faint: #8b92a3;
   --primary: #818cf8;
   --primary-hover: #a5b4fc;
   --primary-ink: #0f1117;
@@ -149,6 +156,9 @@
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
+  --color-surface-base: var(--surface-base);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border-subtle: var(--border-subtle);
   --color-bg: var(--bg);
   --color-bg-tint: var(--bg-tint);
   --color-surface: var(--surface);
@@ -261,6 +271,17 @@
     outline-offset: 2px;
     border-radius: 6px;
   }
+  /* Figures and times line up; running text keeps a readable measure (50-75 characters). */
+  table, time, .mono, kbd {
+    font-variant-numeric: tabular-nums;
+  }
+  p {
+    max-width: 75ch;
+    text-wrap: pretty;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
   ::selection {
     background: var(--primary-soft);
   }
@@ -275,15 +296,13 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-card);
-    box-shadow: var(--shadow-1);
   }
   .card-hover {
-    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
   }
   .card-hover:hover {
-    box-shadow: var(--shadow-2);
     border-color: var(--line-strong);
-    transform: translateY(-1px);
+    background: var(--surface-2);
   }
   .glass {
     background: var(--glass);
@@ -352,6 +371,27 @@
 @keyframes fall {
   0% { transform: translate3d(0, -20px, 0) rotate(0); opacity: 1; }
   100% { transform: translate3d(var(--dx), 110vh, 0) rotate(540deg); opacity: 0; }
+}
+
+/* Touch screens: every control is at least 44 x 44 px. */
+@media (pointer: coarse) {
+  button:not([data-bare]),
+  [role="tab"],
+  [role="radio"],
+  [role="menuitem"],
+  select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  a:where([class*="flex"], [class*="block"]) {
+    min-height: 44px;
+  }
+  button[aria-label]:not([data-bare]),
+  [role="switch"] {
+    min-width: 44px;
+  }
+  label:has(> input[type="checkbox"]) {
+    min-height: 44px;
+    align-items: center;
+  }
 }
 
 /* Every effect switches off for people who ask the system for less motion. */

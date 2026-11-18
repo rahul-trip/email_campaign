@@ -219,7 +219,7 @@ export function OnboardingPage() {
               {step.id === "mailbox" && <Mailboxes />}
             </div>
           </div>
-          <div className="sticky bottom-0 mt-5 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/90 px-4 py-3 shadow-2 backdrop-blur">
+          <div className="sticky bottom-0 mt-5 flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/90 px-4 py-3 backdrop-blur">
             <Button variant="ghost" disabled={index === 0} onClick={() => setChosen(STEPS[index - 1]!.id)}>
               <ArrowLeft className="size-4" aria-hidden /> Back
             </Button>
@@ -310,7 +310,7 @@ function Welcome({ name, goal, onGoal, onStart }: { name: string; goal: Goal; on
 
           <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-5">
             {loop.map((s, i) => (
-              <div key={s.title} className="glass card-hover animate-rise rounded-2xl border border-line p-4 text-left shadow-2" style={{ animationDelay: `${i * 90}ms` }}>
+              <div key={s.title} className="glass card-hover animate-rise rounded-2xl border border-line p-4 text-left" style={{ animationDelay: `${i * 90}ms` }}>
                 <span className="flex size-9 items-center justify-center rounded-xl bg-primary-soft text-primary">{s.icon}</span>
                 <div className="mt-3 text-body font-semibold text-ink">{s.title}</div>
                 <div className="mt-1 text-small text-muted">{s.body}</div>

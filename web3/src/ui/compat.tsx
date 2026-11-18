@@ -172,12 +172,12 @@ export function Card({
 
 export function PageHeader({ title, subtitle, actions, crumbs }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; crumbs?: ReactNode }) {
   return (
-    <div className="mb-6 animate-rise">
+    <div className="mb-8 animate-rise">
       {crumbs && <div className="mb-2 text-small text-muted">{crumbs}</div>}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-title font-semibold text-ink">{title}</h1>
-          {subtitle && <div className="mt-1 max-w-[75ch] text-body text-muted">{subtitle}</div>}
+          <h1 className="text-[1.75rem] leading-9 font-semibold tracking-tight text-ink">{title}</h1>
+          {subtitle && <div className="mt-1.5 max-w-[65ch] text-body text-muted">{subtitle}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
@@ -192,13 +192,11 @@ export const Label = ({ children, className }: { children: ReactNode; className?
 
 /** One number with its label, for the summary rows at the top of a page. */
 export function Stat({ label, value, hint, tone }: { label: string; value: ReactNode; hint?: ReactNode; tone?: "attention" | "error" | "good" | "primary" }) {
-  const colour = { attention: "text-attention", error: "text-error", good: "text-good", primary: "text-primary" };
-  const bar = { attention: "from-attention-dot", error: "from-error-dot", good: "from-good-dot", primary: "from-primary" };
+  const colour = { attention: "text-attention", error: "text-error", good: "text-good", primary: "text-ink" };
   return (
     <div className="card card-hover relative overflow-hidden p-5">
-      <span aria-hidden className={cx("absolute inset-x-0 top-0 h-1 bg-gradient-to-r to-transparent", tone ? bar[tone] : "from-primary-line")} />
       <div className="text-small font-medium text-muted">{label}</div>
-      <div className={cx("tnum mt-1.5 text-[1.75rem] leading-9 font-semibold tracking-tight", tone ? colour[tone] : "text-ink")}>{value}</div>
+      <div className={cx("tnum mt-2 text-[2rem] leading-10 font-semibold tracking-tight", tone ? colour[tone] : "text-ink")}>{value}</div>
       {hint && <div className="mt-1 text-small text-muted">{hint}</div>}
     </div>
   );
@@ -329,20 +327,53 @@ export function SaveNote({ mutation, done = "Saved." }: { mutation: Pick<UseMuta
   return null;
 }
 
-/** Grey placeholder bars while something loads. */
-export function Skeleton({ rows = 3, className }: { rows?: number; className?: string }) {
+export type SkeletonShape = "lines" | "cards" | "table" | "stat";
+
+/** Placeholders shaped like what will arrive, so the page does not jump when it loads. */
+export function Skeleton({ rows = 3, className, shape = "lines" }: { rows?: number; className?: string; shape?: SkeletonShape }) {
+  const bar = "shimmer rounded-md";
   return (
-    <div role="status" aria-label="Loading" className={cx("space-y-2 py-2", className)}>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-4 animate-pulse rounded bg-surface-3" style={{ width: `${92 - i * 11}%` }} />
-      ))}
+    <div role="status" aria-label="Loading" className={cx(shape === "lines" && "space-y-3", className)}>
+      {shape === "cards" && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: Math.max(rows, 3) }, (_, i) => (
+            <div key={i} className="rounded-2xl border border-line p-5">
+              <div className={cx(bar, "h-3 w-1/3")} />
+              <div className={cx(bar, "mt-4 h-7 w-1/2")} />
+              <div className={cx(bar, "mt-4 h-3 w-5/6")} />
+            </div>
+          ))}
+        </div>
+      )}
+      {shape === "stat" && (
+        <>
+          <div className={cx(bar, "h-3 w-2/5")} />
+          <div className={cx(bar, "mt-3 h-8 w-1/3")} />
+        </>
+      )}
+      {shape === "table" && (
+        <div className="divide-y divide-line">
+          {Array.from({ length: rows }, (_, i) => (
+            <div key={i} className="flex items-center gap-4 py-3">
+              <div className={cx(bar, "size-9 shrink-0 rounded-xl")} />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className={cx(bar, "h-3.5")} style={{ width: `${55 - ((i * 13) % 25)}%` }} />
+                <div className={cx(bar, "h-3 w-1/4")} />
+              </div>
+              <div className={cx(bar, "hidden h-6 w-20 rounded-full sm:block")} />
+            </div>
+          ))}
+        </div>
+      )}
+      {shape === "lines" &&
+        Array.from({ length: rows }, (_, i) => <div key={i} className={cx(bar, "h-4")} style={{ width: `${92 - ((i * 17) % 35)}%` }} />)}
     </div>
   );
 }
 
 /** Loading and error handling for a query, so no page shows a blank screen while it waits or fails. */
-export function QueryState<T>({ query, children, rows }: { query: UseQueryResult<T>; children: (data: T) => ReactNode; rows?: number }) {
-  if (query.isPending) return <Skeleton rows={rows} />;
+export function QueryState<T>({ query, children, rows, shape }: { query: UseQueryResult<T>; children: (data: T) => ReactNode; rows?: number; shape?: SkeletonShape }) {
+  if (query.isPending) return <Skeleton rows={rows} shape={shape} />;
   if (query.isError)
     return (
       <div className="space-y-2">
@@ -358,10 +389,10 @@ export function QueryState<T>({ query, children, rows }: { query: UseQueryResult
 export function Empty({ icon, title, children, action }: { icon?: ReactNode; title?: ReactNode; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-10 text-center">
-      {icon && <div className="mb-2 text-muted">{icon}</div>}
-      {title && <div className="text-sm font-semibold">{title}</div>}
+      {icon && <div className="mb-3 text-muted">{icon}</div>}
+      {title && <div className="text-heading font-semibold text-ink">{title}</div>}
       {children && <div className="mt-1 max-w-md text-small text-muted">{children}</div>}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
