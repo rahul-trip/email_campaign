@@ -9,9 +9,17 @@ import { Button, Callout, Confirm, Field, Problem, Textarea } from "../ui/compat
 type Draft = Schemas["LinkedInDraftOut"];
 const NOTE_LIMIT = 200; // a free LinkedIn account's connection note
 
-/** A text with a Copy button. LinkedIn is pasted into by hand: nothing here is ever sent. */
-function Copyable({ label, text, hint }: { label: string; text: string; hint?: string }) {
+/** Only a web address may be opened from a button; a profile link is data a search found. */
+const safeLink = (url?: string | null) => (url && /^https?:\/\//i.test(url) ? url : null);
+
+/**
+ * A text with one button. With the person's LinkedIn profile known, the button copies the text and
+ * opens the profile in a new tab, ready to paste; without it, the button only copies. LinkedIn is
+ * pasted into by hand: nothing here is ever sent.
+ */
+function Copyable({ label, text, hint, open }: { label: string; text: string; hint?: string; open?: string | null }) {
   const [copied, setCopied] = useState(false);
+  const target = safeLink(open);
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -19,16 +27,21 @@ function Copyable({ label, text, hint }: { label: string; text: string; hint?: s
         <span className="flex items-center gap-2">
           {hint && <span className="text-label text-muted">{hint}</span>}
           <Button
-            variant="secondary"
+            variant={target ? "primary" : "secondary"}
             size="sm"
-            aria-label={`Copy the ${label.toLowerCase()}`}
+            aria-label={target ? `Copy the ${label.toLowerCase()} and open their LinkedIn` : `Copy the ${label.toLowerCase()}`}
+            title={target ? "Copies the text, then opens their profile in a new tab: paste it there" : undefined}
             onClick={() => {
               void navigator.clipboard?.writeText(text);
+              // Opened in the same click, so the browser does not block it as a pop-up.
+              if (target) window.open(target, "_blank", "noopener,noreferrer");
               setCopied(true);
               window.setTimeout(() => setCopied(false), 1500);
             }}
           >
-            {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />} {copied ? "Copied" : "Copy"}
+            {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+            {copied ? "Copied" : target ? "Copy & open LinkedIn" : "Copy"}
+            {target && !copied && <ExternalLink className="size-3.5" aria-hidden />}
           </Button>
         </span>
       </div>
@@ -87,8 +100,8 @@ export function LinkedInDraftCard({
     <div className={cx("space-y-3 rounded-lg border border-line p-3", skipped && "opacity-70")}>
       <div className="flex flex-wrap items-center gap-2">
         {person && <span className="font-semibold">{person}</span>}
-        {profile && (
-          <a href={profile} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
+        {safeLink(profile) && (
+          <a href={safeLink(profile)!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
             Open their LinkedIn <ExternalLink className="size-3" aria-hidden />
           </a>
         )}
@@ -130,8 +143,8 @@ export function LinkedInDraftCard({
         </div>
       ) : (
         <>
-          <Copyable label="Connection note" text={draft.note} hint={`${draft.note.length} of ${NOTE_LIMIT} characters`} />
-          <Copyable label="Message after they accept" text={draft.message} />
+          <Copyable label="Connection note" text={draft.note} hint={`${draft.note.length} of ${NOTE_LIMIT} characters`} open={isSent ? null : profile} />
+          <Copyable label="Message after they accept" text={draft.message} open={isSent ? null : profile} />
         </>
       )}
 
