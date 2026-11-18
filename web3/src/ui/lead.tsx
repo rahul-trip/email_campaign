@@ -1,9 +1,26 @@
 /** Pieces about a lead that more than one screen shows: the fit breakdown and email status. */
 import { Check, HelpCircle, X } from "lucide-react";
+import { useState } from "react";
 import type { Schemas } from "../api/client";
 import { cx } from "../lib/cx";
 import { describe, emailStatus, isSafeToSend } from "../lib/status";
-import { Chip } from "./core";
+import { Avatar, Chip } from "./core";
+
+/**
+ * A lead's website icon, from DuckDuckGo's icon service (no cookies; the server's content policy
+ * allows only that host). Only a plain domain is asked for; anything else, or an icon that does
+ * not load, shows the lead's initials instead.
+ */
+export function LeadIcon({ domain, name, className }: { domain: string; name: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  const plain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? domain.toLowerCase() : null;
+  if (!plain || failed) return <Avatar name={name} className={className} />;
+  return (
+    <span aria-hidden className={cx("inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface", className)}>
+      <img src={`https://icons.duckduckgo.com/ip3/${plain}.ico`} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-5" />
+    </span>
+  );
+}
 
 export type Criterion = { id: string; kind: string; criterion: string; weight: number; verdict: string; evidence?: string; source?: string };
 export type QualificationData = { score?: number; reason?: string; ruled_out?: boolean; criteria?: Criterion[]; why_now?: string; risks?: string[] };

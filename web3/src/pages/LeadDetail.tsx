@@ -298,7 +298,7 @@ export function LeadDetailPage() {
                   )}
                 </>
               )}
-              <CheckPeople company={company} onDone={refresh} />
+              <CheckPeople company={company} contacts={contacts} onDone={refresh} />
             </Card>
 
             <LinkedInCard company={company} contacts={contacts} onChanged={refresh} />
@@ -582,18 +582,38 @@ function LinkedInCard({ company, contacts, onChanged }: { company: Company; cont
 
 /** Look again at who a search found: one search per person and one model call, then people whose
  * profile says they work elsewhere are set aside. Nobody you confirmed or wrote to is touched. */
-function CheckPeople({ company, onDone }: { company: Company; onDone: () => void }) {
+function CheckPeople({ company, contacts, onDone }: { company: Company; contacts: Contact[]; onDone: () => void }) {
   const { workspace } = useCurrent();
   const check = useMutation({
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/check-people", { params: { path: { company_id: company.id } } })),
     onSuccess: onDone,
   });
+  const findPeople = useMutation({
+    mutationFn: () => ok(client.POST("/api/companies/{company_id}/find-people", { params: { path: { company_id: company.id } } })),
+    onSuccess: onDone,
+  });
+  // Offered when nobody at the lead can be written to, or the people or email step failed for it.
+  const nobody = !contacts.some((c) => WORKABLE.has(c.status));
+  const stuck = company.status === "failed" && (company.failed_stage === "contacts" || company.failed_stage === "email");
   if (isViewing(workspace)) return null;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3" data-tour="lead-check-people">
+      {(nobody || stuck) && (
+        <Button size="sm" busy={findPeople.isPending} onClick={() => findPeople.mutate()} title="Up to two searches for the people who decide here (the campaign's job titles), and one model call to place them">
+          Find people again
+        </Button>
+      )}
       <Button size="sm" variant="secondary" busy={check.isPending} onClick={() => check.mutate()} title="One search per person and one model call: sets aside people whose profile says they work elsewhere">
         Check who works here
       </Button>
+      {findPeople.data && (
+        <span className="text-small text-muted" role="status">
+          {findPeople.data.added === 0
+            ? `Found ${findPeople.data.found}, nobody new.`
+            : `Added ${findPeople.data.added}: ${findPeople.data.works_here} work here, ${findPeople.data.unsure} to confirm.${findPeople.data.retried ? " The lead goes on at the next run." : ""}`}
+        </span>
+      )}
+      <Problem error={findPeople.error} />
       {check.data && (
         <span className="text-small text-muted" role="status">
           {check.data.checked === 0
@@ -660,11 +680,16 @@ function Person({
     },
   });
   const gone = contact.status === "forgotten";
+  const { workspace } = useCurrent();
   const findLinkedin = useMutation({
     mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/find-linkedin", { params: { path: { contact_id: contact.id } } })),
     onSuccess: (found) => {
       if (found.url) onChanged();
     },
+  });
+  const removeLinkedin = useMutation({
+    mutationFn: () => ok(client.PATCH("/api/contacts/{contact_id}", { params: { path: { contact_id: contact.id } }, body: { linkedin_url: "" } })),
+    onSuccess: onChanged,
   });
   const retryEmail = useMutation({
     mutationFn: () => ok(client.POST("/api/contacts/{contact_id}/retry-email", { params: { path: { contact_id: contact.id } } })),
@@ -691,9 +716,22 @@ function Person({
             {!unconfirmed && !notHere && contact.status !== "active" && contact.status !== "candidate" && <span className="rounded bg-surface-3 px-1.5 text-label">{words(contact.status)}</span>}
             {recipient && <span className="rounded-full bg-primary-soft px-2 py-0.5 text-label font-medium text-primary">The email is to this person</span>}
             {contact.linkedin_url ? (
-              <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
-                LinkedIn <ExternalLink className="size-3" aria-hidden />
-              </a>
+              <span className="inline-flex items-center gap-2">
+                <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
+                  LinkedIn <ExternalLink className="size-3" aria-hidden />
+                </a>
+                {!gone && !isViewing(workspace) && (
+                  <button
+                    type="button"
+                    onClick={() => removeLinkedin.mutate()}
+                    disabled={removeLinkedin.isPending}
+                    className="text-label text-muted hover:text-error hover:underline disabled:opacity-60"
+                    title="Wrong person? Remove this profile. You can add the right one under Edit."
+                  >
+                    {removeLinkedin.isPending ? "Removing…" : "Remove"}
+                  </button>
+                )}
+              </span>
             ) : (
               !gone && (
                 <button
@@ -707,7 +745,7 @@ function Person({
                 </button>
               )
             )}
-            {findLinkedin.isSuccess && !findLinkedin.data.url && <span className="text-label text-muted">No clear match found</span>}
+            {findLinkedin.isSuccess && !findLinkedin.data.url && <span className="text-label text-muted">No clear match found: add it by hand under Edit</span>}
             {contact.created_at && (
               <span className="text-label text-muted" title={when(contact.created_at)}>
                 found {ago(contact.created_at)}
@@ -823,6 +861,7 @@ function EditPerson({ contact, retry, onSaved }: { contact: Contact; retry?: () 
   const [name, setName] = useState(contact.full_name ?? "");
   const [title, setTitle] = useState(contact.title ?? "");
   const [email, setEmail] = useState("");
+  const [linkedin, setLinkedin] = useState(contact.linkedin_url ?? "");
   const hasAddress = contact.emails.some((e) => e.email);
   const current = contact.emails.find((e) => e.is_primary)?.email;
   const save = useMutation({
@@ -830,7 +869,13 @@ function EditPerson({ contact, retry, onSaved }: { contact: Contact; retry?: () 
       await ok(
         client.PATCH("/api/contacts/{contact_id}", {
           params: { path: { contact_id: contact.id } },
-          body: { full_name: name.trim(), title: title.trim(), email: email.trim() || undefined },
+          body: {
+            full_name: name.trim(),
+            title: title.trim(),
+            email: email.trim() || undefined,
+            // Sent only when changed, so saving a name does not mark the profile as yours.
+            linkedin_url: linkedin.trim() !== (contact.linkedin_url ?? "") ? linkedin.trim() : undefined,
+          },
         }),
       );
       if (retry) await retry();
@@ -851,6 +896,9 @@ function EditPerson({ contact, retry, onSaved }: { contact: Contact; retry?: () 
           hint={hasAddress ? `Replaces ${current ?? "the current address"} as the one written to; the old one is kept as history.` : "Optional; blank means it is looked up."}
         >
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label="LinkedIn profile" hint="Paste their profile link; empty removes it. Yours is kept: research will not replace it." className="sm:col-span-3">
+          <Input value={linkedin} placeholder="https://www.linkedin.com/in/…" onChange={(e) => setLinkedin(e.target.value)} />
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">

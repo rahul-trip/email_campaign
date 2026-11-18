@@ -449,6 +449,8 @@ class PersonPatch(In):
     full_name: str | None = Field(default=None, max_length=200)
     title: str | None = Field(default=None, max_length=200)
     email: str | None = Field(default=None, max_length=320)
+    # A LinkedIn profile address; "" removes the one held. Left out: unchanged.
+    linkedin_url: str | None = Field(default=None, max_length=500)
 
 
 class ConsentIn(In):
@@ -1444,6 +1446,14 @@ class PeopleCheckOut(Out):
     works_here: int
     not_here: int
     unsure: int
+
+
+class PeopleFoundOut(Out):
+    found: int  # profiles the search returned
+    added: int  # new people at the lead (the rest were already there)
+    works_here: int  # of those added, placed at the company
+    unsure: int  # of those added, waiting for you to confirm
+    retried: bool  # the lead had failed for want of a person and goes back to the people step
 
 
 class NotHereIn(In):

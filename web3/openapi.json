@@ -5828,6 +5828,39 @@
         "title": "PeopleCheckOut",
         "type": "object"
       },
+      "PeopleFoundOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "retried": {
+            "title": "Retried",
+            "type": "boolean"
+          },
+          "unsure": {
+            "title": "Unsure",
+            "type": "integer"
+          },
+          "works_here": {
+            "title": "Works Here",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "found",
+          "added",
+          "works_here",
+          "unsure",
+          "retried"
+        ],
+        "title": "PeopleFoundOut",
+        "type": "object"
+      },
       "PersonIn": {
         "additionalProperties": false,
         "properties": {
@@ -5916,6 +5949,18 @@
               }
             ],
             "title": "Full Name"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
           },
           "title": {
             "anyOf": [
@@ -12890,10 +12935,34 @@
                 "newest",
                 "fit",
                 "updated",
-                "name"
+                "name",
+                "status",
+                "country",
+                "source",
+                "priority"
               ],
               "title": "Sort",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
             }
           },
           {
@@ -13512,6 +13581,49 @@
           }
         },
         "summary": "Directory Skip",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
+    "/api/companies/{company_id}/find-people": {
+      "post": {
+        "description": "Search again for the people who decide at this lead (up to two searches, one model call).",
+        "operationId": "find_people_api_companies__company_id__find_people_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "company_id",
+            "required": true,
+            "schema": {
+              "title": "Company Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PeopleFoundOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find People",
         "tags": [
           "leads"
         ]

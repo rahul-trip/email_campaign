@@ -58,6 +58,17 @@ def test_leads_filter_by_fit_hot_source_and_country_and_sort_by_fit(
     assert domains("source=discovery") == ["hot.io"]
     assert sorted(domains("country=gb")) == ["edge.io", "hot.io"]
     assert domains("sort=fit") == ["hot.io", "edge.io", "warm.io", "fresh.io"]
+    # Any column, either way; empty values last both ways.
+    assert domains("sort=fit&direction=asc") == ["warm.io", "edge.io", "hot.io", "fresh.io"]
+    by_country = domains("sort=country")  # GB, GB, IE, then the one with no country
+    assert sorted(by_country[:2]) == ["edge.io", "hot.io"] and by_country[2:] == [
+        "warm.io",
+        "fresh.io",
+    ]
+    assert domains("sort=country&direction=desc")[0] == "warm.io"
+    assert domains("sort=country&direction=desc")[-1] == "fresh.io"
+    assert domains("sort=source")[0] == "hot.io"  # discovery before manual
+    assert api.get("/api/companies?sort=name&direction=up").status_code == 422
     assert api.get("/api/companies?sort=sideways").status_code == 422
     assert api.get("/api/companies?min_fit=101").status_code == 422
 

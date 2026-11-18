@@ -1397,6 +1397,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{company_id}/find-people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find People
+         * @description Search again for the people who decide at this lead (up to two searches, one model call).
+         */
+        post: operations["find_people_api_companies__company_id__find_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{company_id}/journey": {
         parameters: {
             query?: never;
@@ -5078,6 +5098,19 @@ export interface components {
             /** Works Here */
             works_here: number;
         };
+        /** PeopleFoundOut */
+        PeopleFoundOut: {
+            /** Added */
+            added: number;
+            /** Found */
+            found: number;
+            /** Retried */
+            retried: boolean;
+            /** Unsure */
+            unsure: number;
+            /** Works Here */
+            works_here: number;
+        };
         /** PersonIn */
         PersonIn: {
             consent_basis?: components["schemas"]["ConsentBasis"] | null;
@@ -5096,6 +5129,8 @@ export interface components {
             email?: string | null;
             /** Full Name */
             full_name?: string | null;
+            /** Linkedin Url */
+            linkedin_url?: string | null;
             /** Title */
             title?: string | null;
         };
@@ -8499,7 +8534,8 @@ export interface operations {
                 hot?: boolean | null;
                 source?: components["schemas"]["CompanySource"] | null;
                 country?: string | null;
-                sort?: "newest" | "fit" | "updated" | "name";
+                sort?: "newest" | "fit" | "updated" | "name" | "status" | "country" | "source" | "priority";
+                direction?: ("asc" | "desc") | null;
                 include?: "summary" | null;
                 limit?: number;
                 offset?: number;
@@ -8924,6 +8960,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DirectoryBadgeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    find_people_api_companies__company_id__find_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                company_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeopleFoundOut"];
                 };
             };
             /** @description Validation Error */

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -37,7 +37,7 @@ from outbound.domain.enums import (
     UsageStep,
 )
 from outbound.domain.errors import InvalidInput
-from outbound.domain.names import read_profile_title, same_person, split_name
+from outbound.domain.names import read_profile_title, same_person, search_name, split_name
 from outbound.domain.placement import Placement, place_by_rules
 from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
@@ -56,7 +56,9 @@ from outbound.providers.ports import LlmClient, SearchProvider
 from outbound.services.journey import Journey, JourneyData, build_journey
 from outbound.stages.policy import policy_decision_for
 from outbound.stages.research.employment import Candidate, judge_people
-from outbound.stages.research.linkedin import NAMES_PER_SEARCH, find_linkedin
+from outbound.stages.research.graph import search_people
+from outbound.stages.research.linkedin import NAMES_PER_SEARCH, find_linkedin, profile_address
+from outbound.stages.research.stage import save_people
 
 EDITABLE = frozenset({"name", "country_code", "priority", "campaign_id"})
 
@@ -112,6 +114,17 @@ _HOW_TO_FIX = {
 
 class LeadError(Exception):
     """The action cannot be done to this lead; the message says why in plain words."""
+
+
+@dataclass(frozen=True)
+class PeopleFound:
+    """What "Find people again" did."""
+
+    found: int
+    added: int
+    works_here: int
+    unsure: int
+    retried: bool
 
 
 @dataclass(frozen=True)
@@ -193,6 +206,7 @@ class LeadService:
         source: CompanySource | None = None,
         country: str | None = None,
         sort: str = "newest",
+        direction: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Company], int]:
@@ -208,6 +222,7 @@ class LeadService:
                 source=source,
                 country=country,
                 sort=sort,
+                direction=direction,
                 limit=limit,
                 offset=offset,
             )
@@ -318,6 +333,68 @@ class LeadService:
             uow.contacts.update_fields(contact_id, {"linkedin_url": link}, actor=actor)
             uow.commit()
         return link
+
+    def find_people_again(self, company_id: str, *, actor: str | None = None) -> PeopleFound:
+        """Search again for people who decide at this lead, by the campaign's job titles (or
+        founder, CEO and CTO without a campaign). Up to two searches and one model call.
+
+        New people are added as research adds them: placed at the company, or unconfirmed for
+        you to check; nobody already at the lead is touched. A lead that had failed because
+        nobody could be written to goes back to the people step.
+        """
+        actor = actor or self._actor
+        if self._search is None:
+            raise LeadError("searching is not set up (no Tavily key), so people cannot be found")
+        with self._uow(self._workspace_id) as uow:
+            company = uow.companies.get(company_id)
+            campaign = uow.campaigns.get(company.campaign_id) if company.campaign_id else None
+        titles = [*(campaign.target_titles if campaign else ())] or list(_FOUNDER_TITLES)
+        name = search_name(company.name or "") or company.name or company.domain
+        site_text = str((company.research or {}).get("summary") or "")
+        with call_scope(company_id=company_id):
+            people = search_people(self._search, name, company.domain, titles, site_text)
+            # The same profile can come back from both searches: once each.
+            people = list({p.linkedin_url or p.name.lower(): p for p in people}.values())
+            open_ = [i for i, p in enumerate(people) if p.placement is Placement.UNSURE]
+            if open_ and self._llm is not None:
+                verdicts = judge_people(
+                    self._llm,
+                    name,
+                    company.domain,
+                    site_text,
+                    [Candidate(people[i].name, people[i].evidence) for i in open_],
+                )
+                for i, (placement, reason) in zip(open_, verdicts, strict=True):
+                    people[i] = replace(people[i], placement=placement, reason=reason)
+        kept = tuple(p for p in people if p.placement is not Placement.NOT_HERE)
+        with self._uow(self._workspace_id) as uow:
+            before = {c.full_name for c in uow.contacts.for_company(company_id)}
+            added = save_people(uow, company_id, kept)
+            fresh = [c for c in uow.contacts.for_company(company_id) if c.full_name not in before]
+            company = uow.companies.get(company_id)
+            # The people step (or the email step, which writes only to someone who decides) failed
+            # for want of a person: with someone new to write to, it runs again.
+            retried = (
+                company.status is CompanyStatus.FAILED
+                and company.failed_stage in ("contacts", "email")
+                and any(c.status in WORKABLE_CONTACT_STATUSES for c in fresh)
+            )
+            if retried and company.failed_stage:
+                self._move(
+                    uow,
+                    company,
+                    retry_status_for(company.failed_stage),
+                    actor,
+                    "people found again",
+                )
+            uow.commit()
+        return PeopleFound(
+            found=len(people),
+            added=added,
+            works_here=sum(c.status in WORKABLE_CONTACT_STATUSES for c in fresh),
+            unsure=sum(c.status is ContactStatus.UNCONFIRMED for c in fresh),
+            retried=retried,
+        )
 
     def retry_email(self, contact_id: str, *, actor: str | None = None) -> Company:
         """Look for this person's email again, with fresh vendor answers, on the next run.
@@ -601,9 +678,13 @@ class LeadService:
         full_name: str | None = None,
         title: str | None = None,
         email: str | None = None,
+        linkedin_url: str | None = None,
         actor: str | None = None,
     ) -> ContactWithEmails:
-        """Correct a person: their name, title or address.
+        """Correct a person: their name, title, address or LinkedIn profile.
+
+        ``linkedin_url`` sets the profile (any LinkedIn profile link, made plain) or, given as
+        ``""``, removes it; left out, it is not touched.
 
         The values become yours (the engine will not overwrite them). A new address becomes the
         one written to, the earlier one stays as history, and the person is put first. A lead
@@ -625,6 +706,8 @@ class LeadService:
             changes: dict[str, Any] = {"full_name": name, "first_name": first, "last_name": last}
             if title is not None:
                 changes["title"] = title.strip() or None
+            if linkedin_url is not None:
+                changes["linkedin_url"] = _clean_profile(uow, contact_id, linkedin_url)
             updated = uow.contacts.update_fields(contact_id, changes, actor=actor)
             if address:
                 _give_address(uow, contact_id, address, actor)
@@ -1155,6 +1238,23 @@ def _give_address(uow: UnitOfWork, contact_id: str, address: str, actor: str) ->
     if uow.suppressions.blocks(address):
         raise InvalidInput("that address or its domain is on the do-not-contact list")
     uow.emails.add(contact_id, address, Provenance.OPERATOR_GIVEN, is_primary=True, actor=actor)
+
+
+# Who is looked for at a lead with no campaign (and so no job titles of its own).
+_FOUNDER_TITLES = ("Founder", "CEO", "CTO")
+
+
+def _clean_profile(uow: UnitOfWork, contact_id: str, url: str) -> str | None:
+    """A LinkedIn profile address made plain, or None for "" (remove it). Refused when it is
+    not a profile link, or another person in this workspace already has it."""
+    if not url.strip():
+        return None
+    plain = profile_address(url.strip() if "://" in url else f"https://{url.strip()}")
+    if plain is None:
+        raise InvalidInput("give a LinkedIn profile link, such as https://www.linkedin.com/in/name")
+    if plain != uow.contacts.get(contact_id).linkedin_url and uow.contacts.linkedin_taken(plain):
+        raise InvalidInput("another person in this workspace already has that LinkedIn profile")
+    return plain
 
 
 def _clean_address(email: str | None) -> str | None:

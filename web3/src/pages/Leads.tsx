@@ -6,14 +6,15 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
 import { cx } from "../lib/cx";
 import { ago, credits, when } from "../lib/format";
 import { HOLD_REASONS, LEAD_STATUSES, STAGES, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
-import { Avatar, Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
+import { Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
+import { LeadIcon } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 
 const PAGE_SIZE = 25;
@@ -30,6 +31,18 @@ const VIEWS: { key: string; label: string; filters: Partial<LeadsSearch> }[] = [
   { key: "held", label: "On hold", filters: { status: "held" } },
   { key: "failed", label: "Failed", filters: { status: "failed" } },
   { key: "disqualified", label: "Disqualified", filters: { status: "disqualified" } },
+];
+type SortKey = "newest" | "fit" | "updated" | "name" | "status" | "country" | "source" | "priority";
+/** Each sortable column and the direction it starts in (the server's natural order). */
+const SORTS: [SortKey, string, "asc" | "desc"][] = [
+  ["newest", "Date added", "desc"],
+  ["updated", "Last changed", "desc"],
+  ["fit", "Fit score", "desc"],
+  ["name", "Name", "asc"],
+  ["status", "Status", "asc"],
+  ["country", "Country", "asc"],
+  ["source", "Source", "asc"],
+  ["priority", "Priority", "asc"],
 ];
 const RIBBON = ["new", "researched", "qualified", "contacts_found", "email_ready", "copy_ready", "approved", "in_sequence", "replied"];
 const SOURCES: [Source, string][] = [
@@ -68,7 +81,8 @@ export function LeadsPage() {
               source: search.source as Source | undefined,
               country: search.country,
               min_fit: search.fit,
-              sort: (search.sort as "newest" | "fit" | "updated" | "name" | undefined) ?? "newest",
+              sort: (search.sort as SortKey | undefined) ?? "newest",
+              direction: search.dir,
               include: "summary",
               limit: PAGE_SIZE,
               offset: (page - 1) * PAGE_SIZE,
@@ -89,6 +103,25 @@ export function LeadsPage() {
   const filtered = Boolean(search.q || search.status || search.hold || search.view || search.source || search.country || search.fit);
   const activeView = VIEWS.find((v) => Object.entries(v.filters).every(([k, val]) => search[k as keyof LeadsSearch] === val) && (v.key !== "all" || !filtered))?.key;
   const by = status.data?.by_status ?? {};
+  const sortNow = (search.sort as SortKey | undefined) ?? "newest";
+  const dirNow = search.dir ?? SORTS.find(([key]) => key === sortNow)![2];
+  /** A column header that sorts by it; pressed again, it reverses. */
+  const SortHead = ({ by: key, children, className }: { by: SortKey; children: string; className?: string }) => {
+    const active = sortNow === key;
+    const Icon = !active ? ArrowUpDown : dirNow === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <th className={className} aria-sort={active ? (dirNow === "asc" ? "ascending" : "descending") : "none"}>
+        <button
+          type="button"
+          onClick={() => set({ sort: key === "newest" ? undefined : key, dir: active ? (dirNow === "asc" ? "desc" : "asc") : undefined })}
+          className={cx("inline-flex items-center gap-1 uppercase hover:text-ink", active && "text-ink")}
+        >
+          {children}
+          <Icon className={cx("size-3", !active && "opacity-50")} aria-hidden />
+        </button>
+      </th>
+    );
+  };
   const ribbonTotal = RIBBON.reduce((a, s) => a + (by[s] ?? 0), 0);
 
   return (
@@ -149,7 +182,7 @@ export function LeadsPage() {
               className="h-10 w-full rounded-[var(--radius-control)] border border-line-strong bg-surface pr-3 pl-9 text-body text-ink outline-none focus:border-primary focus:shadow-[0_0_0_3px_var(--primary-soft)]"
             />
           </div>
-          <Select aria-label="Status" value={search.status ?? ""} onChange={(e) => set({ status: e.target.value || undefined, hold: e.target.value === "held" ? search.hold : undefined })} className="w-auto">
+          <Select aria-label="Status" value={search.status ?? ""} onChange={(e) => set({ status: e.target.value || undefined, hold: e.target.value === "held" ? search.hold : undefined })} className="w-full sm:w-auto">
             <option value="">Any status</option>
             {LEAD_STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -161,19 +194,25 @@ export function LeadsPage() {
             <SlidersHorizontal className="size-4" aria-hidden /> Filters
             {advancedCount > 0 && <span className="tnum rounded-full bg-primary px-1.5 text-label text-primary-ink">{advancedCount}</span>}
           </Button>
-          <Select aria-label="Sort" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value })} className="ml-auto w-auto">
-            <option value="newest">Newest first</option>
-            <option value="fit">Best fit first</option>
-            <option value="updated">Recently changed</option>
-            <option value="name">Name A–Z</option>
-          </Select>
+          <div className="col-span-2 flex items-center gap-1 sm:col-span-1 sm:ml-auto">
+            <Select aria-label="Sort by" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value, dir: undefined })} className="min-w-0 flex-1 sm:w-auto sm:flex-none">
+              {SORTS.map(([key, label]) => (
+                <option key={key} value={key}>
+                  Sort: {label}
+                </option>
+              ))}
+            </Select>
+            <Button variant="secondary" aria-label={`Sort direction: ${dirNow === "asc" ? "ascending" : "descending"}`} title="Reverse the order" onClick={() => set({ dir: dirNow === "asc" ? "desc" : "asc" })} className="h-10 px-3">
+              {dirNow === "asc" ? <ArrowUp className="size-4" aria-hidden /> : <ArrowDown className="size-4" aria-hidden />}
+            </Button>
+          </div>
           {filtered && (
             <Button variant="ghost" size="sm" onClick={() => void navigate({ search: {}, replace: true })}>
               <X className="size-3.5" aria-hidden /> Clear
             </Button>
           )}
           {moreOpen && <div className="col-span-2 grid grid-cols-2 items-center gap-2 border-t border-line pt-3 sm:flex sm:basis-full sm:flex-wrap">
-          <Select aria-label="Hold reason" value={search.hold ?? ""} onChange={(e) => set({ hold: e.target.value || undefined, status: e.target.value ? "held" : search.status })} className="w-auto">
+          <Select aria-label="Hold reason" value={search.hold ?? ""} onChange={(e) => set({ hold: e.target.value || undefined, status: e.target.value ? "held" : search.status })} className="w-full sm:w-auto">
             <option value="">Any hold</option>
             {HOLD_REASONS.map((h) => (
               <option key={h} value={h}>
@@ -181,7 +220,7 @@ export function LeadsPage() {
               </option>
             ))}
           </Select>
-          <Select aria-label="Source" value={search.source ?? ""} onChange={(e) => set({ source: e.target.value || undefined })} className="w-auto">
+          <Select aria-label="Source" value={search.source ?? ""} onChange={(e) => set({ source: e.target.value || undefined })} className="w-full sm:w-auto">
             <option value="">Any source</option>
             {SOURCES.map(([v, label]) => (
               <option key={v} value={v}>
@@ -189,7 +228,7 @@ export function LeadsPage() {
               </option>
             ))}
           </Select>
-          <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })} className="w-auto">
+          <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })} className="w-full sm:w-auto">
             <option value="">Any fit</option>
             {[60, 70, 80, 90].map((n) => (
               <option key={n} value={n}>
@@ -231,14 +270,22 @@ export function LeadsPage() {
             <table className="w-full text-left">
               <thead className="text-label font-semibold tracking-wide text-faint uppercase">
                 <tr className="border-b border-line">
-                  <th className="px-4 py-3">Company</th>
-                  <th className="hidden px-3 py-3 sm:table-cell">Status</th>
+                  <SortHead by="name" className="px-4 py-3">
+                    Company
+                  </SortHead>
+                  <SortHead by="status" className="hidden px-3 py-3 sm:table-cell">
+                    Status
+                  </SortHead>
                   <th className="hidden px-3 py-3 lg:table-cell">Stage</th>
-                  <th className="px-3 py-3 text-center">Fit</th>
+                  <SortHead by="fit" className="px-3 py-3 text-center">
+                    Fit
+                  </SortHead>
                   <th className="hidden px-3 py-3 md:table-cell">Contact</th>
                   <th className="hidden px-3 py-3 xl:table-cell">Email</th>
                   <th className="hidden px-3 py-3 text-right xl:table-cell">AI credits</th>
-                  <th className="hidden px-3 py-3 xl:table-cell">Changed</th>
+                  <SortHead by="updated" className="hidden px-3 py-3 xl:table-cell">
+                    Changed
+                  </SortHead>
                   <th className="px-4 py-3">
                     <span className="sr-only">Links</span>
                   </th>
@@ -253,7 +300,7 @@ export function LeadsPage() {
                     <tr key={company.id} className="group transition-colors hover:bg-surface-2">
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3">
-                          <Avatar name={company.name ?? company.domain} />
+                          <LeadIcon domain={company.domain} name={company.name ?? company.domain} />
                           <div className="min-w-0">
                             <Link to="/leads/$companyId" params={{ companyId: company.id }} className="font-semibold text-ink hover:text-primary">
                               {company.name ?? company.domain}
