@@ -1,0 +1,26 @@
+{
+  "success": true,
+  "items": [
+    {
+      "_id": "kMnquYkBTs8kZM9ND26h",
+      "status": "FOUND",
+      "results": {
+        "firstname": "Jane",
+        "lastname": "Doe",
+        "fullname": "Jane Doe",
+        "emails": [
+          {
+            "email": "jane.doe@acme.com",
+            "certainty": "ultra_sure",
+            "mxProvider": "Google",
+            "mxRecords": [
+              "aspmx.l.google.com"
+            ]
+          }
+        ],
+        "phones": []
+      }
+    }
+  ],
+  "total": 1
+}

@@ -42,6 +42,11 @@ def started(
     finder has a price and whose model has a charge."""
     ws = create_workspace(factory, platform, "Globex Ltd").id
     with factory(ws) as uow:
+        # These tests count paid finder calls; the fake verifier calls every address valid, so a
+        # guessed format would win first and the finder would never be asked.
+        workspace = uow.workspace()
+        assert workspace is not None
+        uow.own_workspace.set_settings({**workspace.settings, "guess_verified_addresses": False})
         uow.own_workspace.set_sender_profile({**PROFILE})
         [campaign] = uow.campaigns.all()
         uow.campaigns.update(

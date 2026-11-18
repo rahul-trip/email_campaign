@@ -30,6 +30,7 @@ from outbound.providers.ports import (
 )
 from outbound.runner.guards import Guards
 from outbound.runner.runner import Runner
+from outbound.stages.email.fallback import ResolverChain
 from outbound.stages.email.poller import CatchAllPoller
 from outbound.stages.email.stage import EmailDeps, EmailStage
 
@@ -84,8 +85,13 @@ class Resolver:
         return ResolutionResult(email=ticket.email, status=self.answer, provider=self.name)
 
 
-def seed(factory: UnitOfWorkFactory, ws: str) -> None:
+def seed(factory: UnitOfWorkFactory, ws: str, *, guess: bool = False) -> None:
+    """Country rules, and the workspace's setting for trying common formats: off here, so these
+    tests are about the finders (the guessing tests turn it on)."""
     with factory(ws) as uow:
+        workspace = uow.workspace()
+        assert workspace is not None
+        uow.own_workspace.set_settings({**workspace.settings, "guess_verified_addresses": guess})
         for policy in DEFAULT_COUNTRY_POLICIES:
             uow.policies.add_if_missing(policy)
         uow.policies.add_if_missing(CountryPolicy("ZA", PolicyRule.ALLOW_WITH_FOOTER))
@@ -101,10 +107,11 @@ def lead(
     domain: str = "acme.com",
     site_emails: list[str] | None = None,
     title: str | None = "Chief Executive Officer",
+    guess: bool = False,
 ) -> str:
     """A company at ``contacts_found`` with ranked contacts given as (first, last), each a
     decision-maker unless ``title`` says otherwise."""
-    seed(factory, ws)
+    seed(factory, ws, guess=guess)
     with factory(ws) as uow:
         company = uow.companies.create(
             domain=domain, source=CompanySource.MANUAL, country_code=country, name="Acme"
@@ -237,6 +244,146 @@ def test_when_every_finder_misses_the_lead_fails_with_a_reason(
     after = company(factory, ws, cid)
     assert (after.status, after.failed_stage) == (C.FAILED, "email")
     assert "no valid email found" in (after.last_error or "")
+
+
+# ------------------------------------------------------------------ guessing the format
+
+
+def test_a_common_format_is_used_only_when_the_verifier_proves_it_and_wrong_ones_leave_nothing(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")], guess=True)
+    finder = Finder("hunter", {})
+    verifier = Verifier({"janedoe@acme.com": V.VALID})
+    run_stage(factory, ws, [finder], verifier)
+    after = company(factory, ws, cid)
+    assert after.status is C.EMAIL_READY
+    assert verifier.checked == [  # in order, stopping at the first the verifier proves
+        "jane.doe@acme.com", "jane@acme.com", "jdoe@acme.com", "janedoe@acme.com",
+    ]  # fmt: skip
+    assert finder.calls == []  # no paid finder was needed
+    assert addresses(factory, ws, cid) == {"janedoe@acme.com": EmailStatus.VALID}
+    assert after.email_pattern == "{first}{last}"  # learned: colleagues take one check
+    with factory(ws) as uow:
+        (held,) = [a for c in uow.contacts.for_company(cid) for a in uow.emails.for_contact(c.id)]
+        assert held.provenance is Provenance.PATTERN_INFERRED
+
+
+def test_when_no_format_is_proven_the_finders_go_on_and_nothing_is_saved_for_the_guesses(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")], guess=True)
+    finder = Finder("hunter", {"Doe": "j.doe@acme.com"})
+    run_stage(factory, ws, [finder], Verifier({"j.doe@acme.com": V.VALID}))
+    assert addresses(factory, ws, cid) == {"j.doe@acme.com": EmailStatus.VALID}
+    assert finder.calls == ["Doe"]
+
+
+def test_a_catch_all_domain_stops_the_guessing_after_one_check_and_the_finder_still_runs(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")], guess=True)
+    verifier = Verifier({"jane.doe@acme.com": V.CATCH_ALL})
+    resolver = Resolver()
+    run_stage(factory, ws, [Finder("hunter", {"Doe": "jane.doe@acme.com"})], verifier, resolver)
+    assert verifier.checked.count("jane@acme.com") == 0  # no second format was tried
+    assert resolver.submitted == ["jane.doe@acme.com"]  # asked once, not once per format
+    assert company(factory, ws, cid).status is C.HELD
+    assert addresses(factory, ws, cid) == {"jane.doe@acme.com": EmailStatus.CATCH_ALL_PENDING}
+
+
+def test_guessing_is_off_where_the_countrys_rule_forbids_a_guessed_address(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")], country="CA", guess=True)
+    verifier = Verifier({"jane.doe@acme.com": V.VALID})
+    run_stage(factory, ws, [Finder("hunter", {"Doe": "jane.doe@acme.com"})], verifier)
+    assert verifier.checked == ["jane.doe@acme.com"]  # the finder's address only: no formats
+    assert company(factory, ws, cid).status in (C.EMAIL_READY, C.HELD)
+
+
+def test_guessing_can_be_switched_off_for_the_workspace(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    lead(factory, ws, [("Jane", "Doe")], guess=False)
+    verifier = Verifier({"janedoe@acme.com": V.VALID})
+    run_stage(factory, ws, [Finder("hunter", {})], verifier)
+    assert verifier.checked == []  # nothing is guessed: the finder found nothing
+
+
+def test_a_guess_that_cannot_be_checked_makes_the_lead_wait_not_fail(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")], guess=True)
+    run_stage(factory, ws, [Finder("hunter", {})], DeadVerifier())  # type: ignore[arg-type]
+    after = company(factory, ws, cid)
+    assert after.attempts == 0 and "no email verifier is answering" in (after.last_error or "")
+
+
+# ------------------------------------------------------------------ real-time catch-all answers
+
+
+class RealTime:
+    """Answers at once, like OrbiSearch or Enrichley."""
+
+    realtime = True
+
+    def __init__(self, status: ResolutionStatus, name: str = "orbisearch") -> None:
+        self.name, self.status = name, status
+        self.submitted: list[str] = []
+
+    def submit(self, email: str) -> ResolutionTicket:
+        self.submitted.append(email)
+        result = ResolutionResult(email=email, status=self.status, provider=self.name)
+        return ResolutionTicket(ref=email, email=email, provider=self.name, result=result)
+
+    def poll(self, ticket: ResolutionTicket) -> ResolutionResult | None:
+        return ticket.result
+
+
+def held_unverified(factory: UnitOfWorkFactory, ws: str) -> str:
+    """A lead whose only address is a catch-all that could not be proven (released by hand)."""
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    with factory(ws) as uow:
+        (person,) = uow.contacts.for_company(cid)
+        uow.emails.add(
+            person.id, "jane.doe@acme.com", Provenance.API_DATABASE, found_by="hunter",
+            status=EmailStatus.CATCH_ALL_UNVERIFIED,
+        )  # fmt: skip
+        uow.commit()
+    return cid
+
+
+def test_a_held_unproven_catch_all_is_settled_by_a_real_time_resolver_when_asked_again(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = held_unverified(factory, ws)
+    realtime = RealTime(ResolutionStatus.VALID)
+    run_stage(factory, ws, [Finder("hunter", {})], Verifier({}), realtime)  # type: ignore[arg-type]
+    assert company(factory, ws, cid).status is C.EMAIL_READY
+    assert addresses(factory, ws, cid) == {"jane.doe@acme.com": EmailStatus.CATCH_ALL_RESOLVED}
+
+
+def test_a_real_time_invalid_answer_means_the_held_address_is_not_used(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = held_unverified(factory, ws)
+    realtime = RealTime(ResolutionStatus.INVALID)
+    run_stage(factory, ws, [Finder("hunter", {})], Verifier({}), realtime)  # type: ignore[arg-type]
+    after = company(factory, ws, cid)
+    assert (after.status, after.failed_stage) == (C.FAILED, "email")
+    assert "no valid email found" in (after.last_error or "")  # the finders had nothing else
+
+
+def test_the_poller_releases_a_waiting_catch_all_the_moment_a_real_time_resolver_settles_it(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid, scrubby = hold_on_catch_all(factory, ws)
+    chain = ResolverChain([scrubby, RealTime(ResolutionStatus.VALID)])
+    poller = CatchAllPoller(factory, ws, chain, now=lambda: NOW + timedelta(hours=7))
+    assert poller.run()["released"] == 1
+    assert scrubby.polls == 0  # no waiting for the asynchronous resolver
+    assert company(factory, ws, cid).status is C.CONTACTS_FOUND
 
 
 class DeadFinder:

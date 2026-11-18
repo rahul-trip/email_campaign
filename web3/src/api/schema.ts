@@ -6218,6 +6218,8 @@ export interface components {
             few_shot_examples?: number | null;
             /** Footer Enabled */
             footer_enabled?: boolean | null;
+            /** Guess Verified Addresses */
+            guess_verified_addresses?: boolean | null;
             /** Safe To Send Only */
             safe_to_send_only?: boolean | null;
             /** Timezone */

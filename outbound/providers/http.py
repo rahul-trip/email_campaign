@@ -207,7 +207,9 @@ class HttpClient:
                 self._provider, f"{where}: {status}", status_code=status, retryable=True
             )
         if status >= 400:
-            raise ProviderError(self._provider, f"{where}: {status}", status_code=status)
+            raise ProviderError(
+                self._provider, f"{where}: {status}", status_code=status, body=response.text[:400]
+            )
         if status == 204 or not response.content:
             return None
         try:

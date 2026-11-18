@@ -9368,6 +9368,17 @@
             ],
             "title": "Footer Enabled"
           },
+          "guess_verified_addresses": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guess Verified Addresses"
+          },
           "safe_to_send_only": {
             "anyOf": [
               {

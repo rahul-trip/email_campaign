@@ -13,19 +13,25 @@ import httpx
 
 from outbound.config import Settings
 from outbound.providers.errors import ProviderAuthError, ProviderError
+from outbound.providers.ports import PersonQuery
 from outbound.providers.registry import (
     build_company_registry,
+    build_finder_named,
     build_llm,
     build_search,
     build_verifier_named,
 )
 
 VERIFIERS = ("hunter", "zerobounce", "orbisearch", "myemailverifier")
+# Finders with no verifier of their own: tested by asking for a person who cannot be found,
+# which none of them charges for.
+FINDERS = ("anymailfinder", "prospeo", "icypeas", "generect")
 WHAT = {
     "llm": "one very short model reply",
     "tavily": "one search for one result",
     "companies_house": "one company-name search",
     **dict.fromkeys(VERIFIERS, "one email address checked"),
+    **dict.fromkeys(FINDERS, "one lookup that finds nothing, which is free"),
 }
 
 
@@ -54,6 +60,10 @@ def check_key(vendor: str, settings: Settings, client: httpx.Client | None = Non
             if registry is None:
                 return KeyCheck(False, "There is no key to test.")
             registry.search("Tesco", max_results=1)
+        elif vendor in FINDERS:
+            build_finder_named(vendor, settings, client).find(
+                PersonQuery(first_name="Key", last_name="Test"), "example.com"
+            )
         else:
             build_verifier_named(vendor, settings, client).verify("key-test@example.com")
     except ProviderAuthError:

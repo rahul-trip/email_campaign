@@ -3,9 +3,9 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from outbound.providers.adapters.orbisearch import OrbiSearchVerifier
+from outbound.providers.adapters.orbisearch import OrbiSearchResolver, OrbiSearchVerifier
 from outbound.providers.errors import ProviderAuthError
-from outbound.providers.ports import VerificationStatus
+from outbound.providers.ports import ResolutionStatus, VerificationStatus
 from tests.contract._shared import SECRET
 from tests.contract.verifier_contract import EmailVerifierContract
 from tests.providers.helpers import Handler, always, mock_client, respond
@@ -41,3 +41,33 @@ class TestOrbiSearchVerifier(EmailVerifierContract):
     def test_insufficient_credits_is_reported_as_a_credential_problem(self) -> None:
         with pytest.raises(ProviderAuthError):
             self.build(always(httpx.Response(403))).verify("a@b.com")
+
+
+class TestOrbiSearchResolver:
+    """The same check, asked of an address a verifier called catch-all: answered with the call."""
+
+    def build(self, answer: dict[str, object]) -> OrbiSearchResolver:
+        return OrbiSearchResolver(
+            SECRET, client=mock_client(always(httpx.Response(200, json=answer)))
+        )
+
+    def test_safe_is_valid_and_invalid_is_invalid_with_the_answer_on_the_ticket(self) -> None:
+        for vendor, ours in (
+            ("safe", ResolutionStatus.VALID),
+            ("invalid", ResolutionStatus.INVALID),
+        ):
+            ticket = self.build({"status": vendor}).submit("jane@acme.com")
+            assert ticket.result is not None and ticket.result.status is ours
+            assert ticket.provider == "orbisearch" and ticket.result.billed
+
+    def test_risky_and_unknown_are_unresolved_so_the_chain_asks_the_next(self) -> None:
+        for vendor in ("risky", "unknown", "something-new"):
+            ticket = self.build({"status": vendor, "substatus": "catch_all"}).submit("a@b.co")
+            assert ticket.result is not None
+            assert ticket.result.status is ResolutionStatus.UNRESOLVED
+
+    def test_it_is_marked_real_time_and_never_leaves_a_ticket_pending(self) -> None:
+        resolver = self.build({"status": "safe"})
+        assert resolver.realtime is True
+        ticket = resolver.submit("a@b.co")
+        assert resolver.poll(ticket) == ticket.result

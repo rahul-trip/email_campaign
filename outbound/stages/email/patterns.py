@@ -1,7 +1,8 @@
 """Company email patterns such as ``first.last``, learned once and applied to colleagues.
 
-Only one address is ever built from a learned pattern. Guessing several permutations and
-verifying each would burn verifier credits and risk bounces, which the plan forbids.
+Only one address is ever built from a learned pattern. Without one, the commonest few formats
+are tried one by one (``GUESS_PATTERNS``), but an address is used only when a verifier proves
+the mailbox exists: nothing is ever written to an unverified guess (PLAN rule 9, ADR 0034).
 """
 
 from __future__ import annotations
@@ -20,6 +21,11 @@ PATTERNS = (
     "{first}{l}",
     "{last}.{first}",
 )
+
+
+# The formats tried, in this order, when a company's own is not known (``Waterfall._guess``). Each
+# is only used if a verifier proves the mailbox exists, so a wrong guess costs one cheap check.
+GUESS_PATTERNS = PATTERNS[:4]
 
 
 def _ascii(name: str) -> str:

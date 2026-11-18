@@ -14,10 +14,17 @@ from datetime import datetime, timedelta
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.actors import SYSTEM
+from outbound.domain.entities import ContactEmail
 from outbound.domain.enums import CompanyStatus, EmailStatus, HoldReason
 from outbound.domain.state_machines import resume_status_for
 from outbound.logging import get_logger
-from outbound.providers.ports import CatchAllResolver, ResolutionStatus, ResolutionTicket
+from outbound.providers.ports import (
+    CatchAllResolver,
+    ResolutionResult,
+    ResolutionStatus,
+    ResolutionTicket,
+)
+from outbound.stages.email.fallback import realtime_answer
 from outbound.stages.email.stage import POLL_DELAY
 
 log = get_logger(__name__)
@@ -68,9 +75,11 @@ class CatchAllPoller:
     def _poll_company(self, company_id: str, moment: datetime) -> bool:
         with self._uow(self._workspace_id) as uow:
             pending = uow.emails.pending_for_company(company_id)
-        answers = []
+        answers: list[tuple[ContactEmail, ResolutionResult | None]] = []
         for email in pending:
-            if email.email and email.resolution_ref:
+            if email.email and (early := realtime_answer(self._resolver, email.email)):
+                answers.append((email, early))  # a real-time resolver settled it: no more waiting
+            elif email.email and email.resolution_ref:
                 ticket = ResolutionTicket(
                     ref=email.resolution_ref,
                     email=email.email,

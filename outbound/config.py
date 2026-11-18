@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # --- provider keys (blank means "not configured") ---
     hunter_api_key: SecretStr = SecretStr("")
     zerobounce_api_key: SecretStr = SecretStr("")
+    # Pay-as-you-go finders: charged only for an address found (see docs/technical/integrations).
+    anymailfinder_api_key: SecretStr = SecretStr("")
+    prospeo_api_key: SecretStr = SecretStr("")
+    icypeas_api_key: SecretStr = SecretStr("")
+    generect_api_key: SecretStr = SecretStr("")
     orbisearch_api_key: SecretStr = SecretStr("")
     myemailverifier_api_key: SecretStr = SecretStr("")
     enrichley_api_key: SecretStr = SecretStr("")

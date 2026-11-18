@@ -34,6 +34,11 @@ from outbound.stages.email.patterns import infer_pattern
 from outbound.stages.email.waterfall import Record, Target, Verdict, Waterfall
 from outbound.stages.policy import policy_decision_for
 
+_CATCH_ALL = (
+    EmailStatus.CATCH_ALL_PENDING,
+    EmailStatus.CATCH_ALL_UNVERIFIED,
+    EmailStatus.CATCH_ALL_RESOLVED,
+)
 MAX_CONTACTS = 3
 POLL_DELAY = timedelta(hours=6)  # asynchronous resolvers answer in a day or three
 
@@ -63,6 +68,24 @@ class EmailStage:
             return None
         return ctx.read(lambda uow: uow.directory.pattern(company.domain))
 
+    @staticmethod
+    def _may_guess(ctx: StageContext, company: Company, contact_id: str, catch_all: bool) -> bool:
+        """Whether the commonest formats may be tried: the workspace allows it (setting
+        ``guess_verified_addresses``, on by default), the domain is not known to accept
+        everything, and the country's rule allows an address built from a company format."""
+        if catch_all or not bool(ctx.workspace.settings.get("guess_verified_addresses", True)):
+            return False
+        decision = ctx.read(
+            lambda uow: policy_decision_for(
+                uow,
+                company,
+                stage=EmailStage.name,
+                email_provenance=Provenance.PATTERN_INFERRED,
+                recipient_id=contact_id,
+            )
+        )
+        return decision.outcome is PolicyOutcome.ALLOW
+
     def handle(self, ctx: StageContext) -> StageResult:
         company = ctx.company
         people = ctx.read(
@@ -72,6 +95,9 @@ class EmailStage:
                 if c.status in WORKABLE_CONTACT_STATUSES
             ]
         )
+        # An address held at this company that is a catch-all means every format would say the
+        # same: guessing proves nothing there.
+        catch_all_known = any(e.status in _CATCH_ALL for _, held in people for e in held if e.email)
         # "Find email again" on a person: only they are tried, with fresh vendor answers.
         asked = [(c, e) for c, e in people if c.refresh_email]
         if not asked:
@@ -89,6 +115,7 @@ class EmailStage:
             )
         people = (asked or people)[:MAX_CONTACTS]
         target = Target(
+            allow_guesses=self._may_guess(ctx, company, people[0][0].id, catch_all_known),
             domain=company.domain,
             name=display_name(company.name, company.domain),
             pattern=company.email_pattern or self._directory_pattern(ctx, company),

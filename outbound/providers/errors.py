@@ -18,11 +18,15 @@ class ProviderError(Exception):
         *,
         status_code: int | None = None,
         retryable: bool = False,
+        body: str = "",
     ) -> None:
         super().__init__(f"{provider}: {message}")
         self.provider = provider
         self.status_code = status_code
         self.retryable = retryable
+        # The start of the vendor's error answer, for an adapter that reads a code out of it
+        # (Prospeo reports "no match" as HTTP 400). Never in the message and never logged.
+        self.body = body
 
 
 class ProviderAuthError(ProviderError):

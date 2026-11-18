@@ -70,6 +70,7 @@ SETTING_FIELDS = frozenset(
         "auto_discovery_per_day",  # searches a day, 1 to 6
         "auto_discovery_review_limit",  # no search while Review holds this many drafts
         "auto_approve_cold",  # on: emails to cold leads (fit 80 or lower) skip Review
+        "guess_verified_addresses",  # on: try common address formats, kept only if verified
     }
 )
 

@@ -573,6 +573,7 @@ class WorkspaceSettingsIn(In):
     email_max_words: int | None = Field(default=None, ge=40, le=600)
     auto_discovery: bool | None = None
     auto_approve_cold: bool | None = None
+    guess_verified_addresses: bool | None = None
     auto_discovery_per_day: int | None = Field(default=None, ge=1, le=6)
     auto_discovery_review_limit: int | None = Field(default=None, ge=1, le=500)
 

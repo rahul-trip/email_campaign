@@ -315,7 +315,11 @@ def test_a_person_verified_for_one_customer_costs_the_next_no_finder_call(
 
     # A lead set to skip the directory goes to the vendors, and its result feeds the directory.
     with platform() as p:
-        third = p.workspaces.create("third", {"legal_name": "third"}, {"safe_to_send_only": True})
+        third = p.workspaces.create(
+            "third",
+            {"legal_name": "third"},
+            {"safe_to_send_only": True, "guess_verified_addresses": False},
+        )
         p.commit()
     pipeline, _ = build(engine, factory, third.id, third_world)
     pipeline.intake.run(row)

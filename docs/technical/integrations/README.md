@@ -19,6 +19,10 @@ Every outside system Outbound depends on: what it is for, how it is reached, wha
 | Y Combinator directory | Start-up directory for discovery (public yc-oss mirror) | `LeadSource` | — (always on) | none | the directory in memory for a day; `find` (30 days) | Not yet | [yc-directory](yc-directory.md) |
 | Hunter | Finder and verifier | `EmailFinder`, `EmailVerifier` | `hunter` | `HUNTER_API_KEY` | `find`, `verify` (90 days) | Verifier works | [hunter](hunter.md) |
 | ZeroBounce | Finder and verifier | `EmailFinder`, `EmailVerifier` | `zerobounce` | `ZEROBOUNCE_API_KEY` | `find`, `verify` (90 days) | Verifier works | [zerobounce](zerobounce.md) |
+| Anymail Finder | Finder (pay per valid address) | `EmailFinder` | `anymailfinder` | `ANYMAILFINDER_API_KEY` | `find` (90 days) | Built from docs; not checked live | [anymailfinder](anymailfinder.md) |
+| Prospeo | Finder (pay per address found) | `EmailFinder` | `prospeo` | `PROSPEO_API_KEY` | `find` (90 days) | Built from docs; not checked live | [prospeo](prospeo.md) |
+| Icypeas | Finder (pay per address found) | `EmailFinder` | `icypeas` | `ICYPEAS_API_KEY` | `find` (90 days) | Built from docs; not checked live | [icypeas](icypeas.md) |
+| Generect | Finder (pay per valid address) | `EmailFinder` | `generect` | `GENERECT_API_KEY` | `find` (90 days) | Built from docs; not checked live | [generect](generect.md) |
 | MyEmailVerifier | Verifier (the default) | `EmailVerifier` | `myemailverifier` | `MYEMAILVERIFIER_API_KEY` | `verify` (90 days) | Works | [myemailverifier](myemailverifier.md) |
 | OrbiSearch | Verifier only (no finder API) | `EmailVerifier` | `orbisearch` | `ORBISEARCH_API_KEY` | `verify` (90 days) | Works | [orbisearch](orbisearch.md) |
 | Enrichley | Catch-all resolver, answers at once | `CatchAllResolver` | `enrichley` | `ENRICHLEY_API_KEY` | `resolve` (90 days) | Not checked | [enrichley](enrichley.md) |
@@ -45,6 +49,11 @@ The meter records each paid call at these prices: `outbound/providers/pricing.py
 | `hunter:verify` | 12,250 | $0.01225 | Assumed half a credit; the docs do not state it |
 | `zerobounce:find` | 160,000 | $0.16 | 20 credits per address found |
 | `zerobounce:verify` | 8,000 | $0.008 | `unknown` results are free |
+| `anymailfinder:find` | 29,000 | $0.029 | Estimate; charged only for a valid address |
+| `prospeo:find` | 39,000 | $0.039 | Estimate; charged only for an address found |
+| `icypeas:find` | 19,000 | $0.019 | Estimate; charged only for an address found |
+| `generect:find` | 20,000 | $0.02 | Its documented example; charged only for a valid address |
+| `orbisearch:resolve` | 200 | $0.0002 | The same check as its verifier, asked of a catch-all |
 | `myemailverifier:verify` | 2,500 | $0.0025 | After 100 free requests a day (the free ones are still recorded at this price) |
 | `orbisearch:verify` | 200 | $0.0002 | 0.2 credit |
 | `enrichley:resolve` | 11,800 | $0.0118 | One credit; not billed when the vendor says so |

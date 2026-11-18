@@ -207,6 +207,7 @@ function Limits() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const [safe, setSafe] = useState(true);
+  const [guess, setGuess] = useState(true);
   const [budget, setBudget] = useState("50");
   const [examples, setExamples] = useState(5);
   const [footer, setFooter] = useState(true);
@@ -220,6 +221,7 @@ function Limits() {
     const s = settings.data;
     if (!s) return;
     setSafe(Boolean(s.safe_to_send_only));
+    setGuess(s.guess_verified_addresses !== false);
     // No stored ceiling means "no limit", which is a blank box, not zero.
     setBudget(s.budget_per_prospect_credits == null ? "" : String(s.budget_per_prospect_credits));
     setExamples(Number(s.few_shot_examples ?? 5));
@@ -237,6 +239,7 @@ function Limits() {
         client.PUT("/api/settings/workspace", {
           body: {
             safe_to_send_only: safe,
+            guess_verified_addresses: guess,
             budget_per_prospect_credits: budget.trim() === "" ? null : Math.round(Number(budget)),
             few_shot_examples: examples,
             footer_enabled: footer,
@@ -274,6 +277,7 @@ function Limits() {
           </div>
           <div className="mt-4">
             <Checkbox checked={safe} onChange={setSafe} label="Only send to proven addresses (recommended)" hint="Catch-all addresses that could not be proven are held instead of drafted, because they bounce more often." />
+            <Checkbox checked={guess} onChange={setGuess} label="Try common address formats first" hint="When a company's email format is not known, try first.last@, first@, flast@ and firstlast@ before paying a finder. An address is used only if a verifier proves the mailbox exists; nothing unverified is ever written to." />
           </div>
           <div className="mt-3" data-tour="settings-footer">
             <Checkbox

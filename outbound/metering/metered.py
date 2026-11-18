@@ -420,6 +420,7 @@ class MeteredResolver:
         self._meter = meter
         self._ttl = ttl
         self.name = inner.name
+        self.realtime = bool(getattr(inner, "realtime", False))  # its answer comes with the call
 
     def submit(self, email: str) -> ResolutionTicket:
         known: ResolutionResult | None = self._meter.lookup(
