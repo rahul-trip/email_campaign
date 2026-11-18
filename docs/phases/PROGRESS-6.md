@@ -144,6 +144,10 @@ Done: Vendors → AI models adds a model with provider type, model name, base UR
 - [x] Fixed: 204 answers no longer show an error in web3 (deleting a user or an account).
 - [ ] Live check on the VM: delete a test customer with *now*, confirm the Supabase role may delete every purged table.
 
+## Outcomes first (2026-11-19, branch `phase-6/outcomes-first`, migration 0030, ADR 0036, R-53)
+
+Normal drop-outs ("no decision-maker found", "no email we could prove") are no longer shown as failures. `failure_kind` on a failed lead; outcomes are asked again 24 hours later, 3 tries, then screened out; a broken step gets 5 tries. Every lead is in one bucket (`domain/outcomes.py`). Sidebar: Emails ready, Hot leads, Needs a decision (neutral badge, only what a person can unblock). Today leads with the emails ready (approvable there) and the hot leads, with a grey "Behind the scenes" bar. Hot leads list best fit first and includes a hot lead nobody could email. Open: look at it with real data on the deployed workspace; the Today mockup is in Stitch (see [phase 6i](phase-6i-outcomes-first.md)).
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

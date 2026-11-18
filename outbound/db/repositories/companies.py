@@ -6,7 +6,7 @@ from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 
 from outbound.db.models import CampaignRow, CompanyRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
@@ -19,8 +19,16 @@ from outbound.domain.enums import (
     CompanySource,
     CompanyStatus,
     EntityType,
+    FailureKind,
     HoldReason,
     UsageStep,
+)
+from outbound.domain.outcomes import (
+    ERROR_TRIES,
+    OUTCOME_TRIES,
+    SELF_RESOLVING_HOLDS,
+    Bucket,
+    bucket_of,
 )
 from outbound.domain.qualification import HOT_ABOVE
 from outbound.domain.state_machines import COMPANY, STAGE_INPUT_STATUS
@@ -53,6 +61,52 @@ EDITABLE_FIELDS = frozenset(
 
 
 # What the leads list may be sorted by, and each column's natural direction.
+def _bucket_filter(bucket: Bucket) -> ColumnElement[bool]:
+    """The rows ``domain.outcomes.bucket_of`` puts in ``bucket`` (a test keeps the two equal)."""
+    failed = CompanyRow.status == CompanyStatus.FAILED
+    parked = CompanyRow.credit_wait_step.is_not(None)
+    outcome = CompanyRow.failure_kind.in_((FailureKind.NO_PERSON, FailureKind.NO_EMAIL))
+    gave_up = and_(failed, ~parked, outcome, CompanyRow.attempts >= OUTCOME_TRIES)
+    hot = CompanyRow.fit_score > HOT_ABOVE
+    ready = or_(CompanyRow.status == CompanyStatus.COPY_READY, and_(gave_up, hot))
+    done = CompanyRow.status.in_(
+        (
+            CompanyStatus.APPROVED,
+            CompanyStatus.IN_SEQUENCE,
+            CompanyStatus.REPLIED,
+            CompanyStatus.COMPLETED,
+        )
+    )
+    screened = or_(
+        CompanyRow.status.in_(
+            (CompanyStatus.DISQUALIFIED, CompanyStatus.REJECTED, CompanyStatus.SUPPRESSED)
+        ),
+        and_(gave_up, or_(CompanyRow.fit_score.is_(None), CompanyRow.fit_score <= HOT_ABOVE)),
+    )
+    stuck = and_(
+        failed,
+        ~parked,
+        ~outcome,
+        CompanyRow.attempts >= ERROR_TRIES,
+    )
+    decision = or_(
+        and_(
+            CompanyRow.status == CompanyStatus.HELD,
+            CompanyRow.hold_reason.not_in(tuple(SELF_RESOLVING_HOLDS)),
+        ),
+        stuck,
+    )
+    if bucket is Bucket.READY:
+        return ready
+    if bucket is Bucket.DONE:
+        return done
+    if bucket is Bucket.SCREENED_OUT:
+        return screened
+    if bucket is Bucket.DECISION:
+        return and_(~ready, ~done, ~screened, decision)
+    return and_(~ready, ~done, ~screened, ~decision)
+
+
 _SORTS: dict[str, tuple[Any, str]] = {
     "newest": (CompanyRow.created_at, "desc"),
     "fit": (CompanyRow.fit_score, "desc"),
@@ -193,6 +247,7 @@ class CompanyRepository(ScopedRepository):
         hot: bool | None = None,
         source: CompanySource | None = None,
         country: str | None = None,
+        bucket: Bucket | None = None,
         sort: str = "newest",
         direction: str | None = None,
         limit: int = 50,
@@ -218,6 +273,8 @@ class CompanyRepository(ScopedRepository):
         if waiting_for_credits is not None:
             parked = CompanyRow.credit_wait_step.is_not(None)
             filters.append(parked if waiting_for_credits else ~parked)
+        if bucket is not None:
+            filters.append(_bucket_filter(bucket))
         if status is not None:
             filters.append(CompanyRow.status == status)
         if hold_reason is not None:
@@ -270,6 +327,29 @@ class CompanyRepository(ScopedRepository):
             counts[status] = counts.get(status, 0) + 1
         return counts
 
+    def count_buckets(self) -> dict[Bucket, int]:
+        """How many leads are in each bucket (``domain.outcomes``)."""
+        stmt = select(
+            CompanyRow.status,
+            CompanyRow.hold_reason,
+            CompanyRow.failure_kind,
+            CompanyRow.attempts,
+            CompanyRow.fit_score,
+            CompanyRow.credit_wait_step,
+        ).where(CompanyRow.workspace_id == self._workspace_id)
+        counts = dict.fromkeys(Bucket, 0)
+        for status, hold, kind, attempts, fit, parked in self._session.execute(stmt):
+            bucket = bucket_of(
+                status,
+                hold_reason=hold,
+                failure_kind=kind,
+                attempts=attempts,
+                fit_score=fit,
+                waiting_for_credit=parked is not None,
+            )
+            counts[bucket] += 1
+        return counts
+
     def transition(
         self,
         company_id: str,
@@ -281,6 +361,7 @@ class CompanyRepository(ScopedRepository):
         hold_reason: HoldReason | None = None,
         failed_stage: str | None = None,
         last_error: str | None = None,
+        failure_kind: FailureKind = FailureKind.ERROR,
         next_action_at: datetime | Unset | None = UNSET,
         run_id: str | None = None,
         vendor_wait: bool = False,
@@ -311,10 +392,12 @@ class CompanyRepository(ScopedRepository):
         if to is CompanyStatus.FAILED:
             row.failed_stage = failed_stage
             row.last_error = last_error
+            row.failure_kind = failure_kind
             row.attempts = 0 if vendor_wait else row.attempts + 1
         else:
             row.failed_stage = None
             row.last_error = None
+            row.failure_kind = None
         if not isinstance(next_action_at, Unset):
             row.next_action_at = next_action_at
         self._flush()
@@ -327,6 +410,7 @@ class CompanyRepository(ScopedRepository):
         if row.failed_stage:
             detail["failed_stage"] = row.failed_stage
             detail["error"] = last_error
+            detail["kind"] = failure_kind.value
         if run_id:
             detail["run_id"] = run_id
         self._events.append(EntityType.COMPANY, row.id, "status_changed", actor, detail)

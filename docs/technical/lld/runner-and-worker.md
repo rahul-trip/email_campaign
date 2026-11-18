@@ -128,13 +128,13 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 | The lead could not even be loaded | Logged as `lead_unreadable`; skipped |
 | Anything else | `undo()`; logged as `stage_failed` with the error (≤ 300 characters). If the lead's status has moved meanwhile: skipped. Otherwise a stage in `STAGE_INPUT_STATUS` (research, gate, contacts, email, copy) → **failed**; deliver → **deferred** |
 
-- **Failed:** `failed_stage` and `last_error` are set, `attempts` is incremented, and `next_action_at = now + 15 min × (attempts + 1)`.
+- **Failed:** `failed_stage`, `last_error` and `failure_kind` are set, `attempts` is incremented, and `next_action_at = now + 15 min × (attempts + 1)` for a broken step (`StageFailure.kind = error`, the default) or `now + 24 h` when the stage said `no_person` or `no_email` (`outcome_delay`).
 - **Deferred:** the status is unchanged, `next_action_at = now + 1 h`, and a `deferred` event is written only when the reason differs from the last one, so an hourly retry does not fill the timeline.
 - **Undo errors** are logged (`undo_failed`) and do not hide the original error.
 
 ### Retries
 
-`retry_failed(limit)` moves due `failed` leads with fewer than 3 attempts (a lead that failed because no vendor could answer, `VendorUnavailable`, is not counted and waits two hours: see [the email stage](stage-email.md)) back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
+`retry_failed(limit)` moves due `failed` leads with fewer attempts than their kind allows (`domain/outcomes.py::tries_allowed`: 5 for a broken step, 3 for `no_person` and `no_email`) (a lead that failed because no vendor could answer, `VendorUnavailable`, is not counted and waits two hours: see [the email stage](stage-email.md)) back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
 
 ### The tick
 
@@ -212,7 +212,7 @@ Per lead: a read and guard transaction, an admin read, then one write transactio
 
 ## Configuration
 
-`--threads` (4), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 3 attempts) are constructor defaults, not settings.
+`--threads` (4), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 24 h for an outcome) and the tries (5 for a broken step, 3 for an outcome) are constructor defaults, not settings.
 
 ## Observability
 

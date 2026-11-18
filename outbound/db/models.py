@@ -46,6 +46,7 @@ from outbound.domain.enums import (
     EmailStatus,
     EmploymentStatus,
     EntityType,
+    FailureKind,
     FlagStatus,
     HoldReason,
     ImportAnchor,
@@ -430,6 +431,8 @@ class CompanyRow(Mutable, Base):
     # Set while the lead waits, in place, for a credit on this step (Phase 6d).
     credit_wait_step: Mapped[UsageStep | None] = mapped_column(enum_type(UsageStep, "usage_step"))
     last_error: Mapped[str | None] = mapped_column(Text)
+    # Why it failed: a broken step, or "nobody to write to" (see domain/outcomes.py).
+    failure_kind: Mapped[FailureKind | None] = mapped_column(enum_type(FailureKind, "failure_kind"))
     attempts: Mapped[int] = mapped_column(Integer, default=0)
     next_action_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     fit_score: Mapped[int | None] = mapped_column(Integer)

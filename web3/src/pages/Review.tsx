@@ -79,7 +79,7 @@ export function ReviewPage() {
   return (
     <>
       <PageHeader
-        title="Review"
+        title="Emails ready"
         subtitle={queue.isSuccess ? (items.length ? `${items.length} email${items.length === 1 ? "" : "s"} waiting. Nothing reaches your mailbox until you approve it.` : "Nothing is waiting for you.") : "Loading…"}
         actions={
           items.length > 0 && (

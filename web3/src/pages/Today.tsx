@@ -1,36 +1,28 @@
 /**
- * Today: what waits on you, how the engine is doing, and what changed — every number from the
- * live API (status, review queue, daily counts, quality, auto-discovery, credits, notifications,
- * fit bands, source yields, the active campaign). Sections fold; the first is open.
+ * Today: wins first. The emails ready to approve (with the top few right here), then the hot
+ * leads to message on LinkedIn, then the week's results. Only after that does it say what the
+ * engine screened out (normal) and what needs a decision. Every number is from the live API.
+ * Sections fold; the first is open.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, CheckCircle2, Flame, Inbox, Play, Radar, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, Filter, Flame, Play, Radar, Sparkles, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { describe as describeNotice } from "../app/Bell";
 import { useCounts } from "../app/Shell";
 import { useCurrent } from "../app/session";
 import { cx } from "../lib/cx";
-import { ago, percent, credits } from "../lib/format";
-import { describeHold, leadStatus } from "../lib/status";
+import { ago, percent } from "../lib/format";
+import { describeHold } from "../lib/status";
 import { useSetup } from "../lib/setup";
-import { buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
+import { LinkedInDraftCard } from "../components/LinkedInDraft";
+import { isViewing } from "../app/session";
+import { Avatar, Button, buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
+import { useToast } from "../ui/overlay";
 import { Section, SectionGroup } from "../ui/sections";
 import { CountUp, Delta, Ring, Sparkline } from "../ui/viz";
 
-const STAGES = ["new", "researched", "qualified", "contacts_found", "email_ready", "copy_ready", "approved", "in_sequence", "replied"] as const;
-const STAGE_COLOR: Record<string, string> = {
-  new: "var(--stopped-dot)",
-  researched: "var(--working-dot)",
-  qualified: "var(--primary)",
-  contacts_found: "var(--violet)",
-  email_ready: "#14b8a6",
-  copy_ready: "var(--attention-dot)",
-  approved: "var(--good-dot)",
-  in_sequence: "#22c55e",
-  replied: "#16a34a",
-};
 const SOURCE_LABEL: Record<string, string> = { yc_directory: "YC directory", companies_house: "Companies House", exa: "Exa", articles: "Web lists" };
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
@@ -50,6 +42,9 @@ export function TodayPage() {
   const quality = useQuery({ queryKey: ["quality"], queryFn: () => ok(client.GET("/api/reports/quality")) });
   const auto = useQuery({ queryKey: ["auto-discovery"], queryFn: () => ok(client.GET("/api/runs/auto-discovery")), refetchInterval: 30000 });
   const setup = useSetup();
+  const { workspace } = useCurrent();
+  const viewing = isViewing(workspace);
+  const hotLeads = useQuery({ queryKey: ["linkedin", "drafted", "hot", 3], queryFn: () => ok(client.GET("/api/linkedin", { params: { query: { state: "drafted", hot: true, limit: 3 } } })), refetchInterval: 30000 });
 
   const days = daily.data?.days ?? [];
   const thisWeek = days.slice(-7);
@@ -57,8 +52,9 @@ export function TodayPage() {
   const pick = (k: keyof Schemas["DayOut"]) => (rows: Schemas["DayOut"][]) => rows.map((r) => Number(r[k]));
   const reviewedToday = days.at(-1)?.reviewed ?? 0;
   const waiting = review.data ?? [];
-  const oldest = waiting.map((i) => i.message.created_at).filter((t): t is string => !!t).sort()[0] ?? null;
   const hot = waiting.filter((i) => i.company.hot).length;
+  // The best three first: hot leads, then by fit. Anything with a skipped check is approved in Review.
+  const top = [...waiting].sort((a, b) => Number(b.company.hot) - Number(a.company.hot) || (b.company.fit_score ?? 0) - (a.company.fit_score ?? 0)).slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -81,31 +77,40 @@ export function TodayPage() {
           <div className="aurora opacity-80" aria-hidden />
           <div className="relative flex h-full flex-col">
             <div className="text-body font-medium text-muted">{greeting(me.user.name)}</div>
-            <h1 className="mt-2 max-w-[24ch] text-display font-semibold text-ink">
+            <h1 className="mt-2 max-w-[26ch] text-display font-semibold text-ink">
               {counts.review > 0 ? (
                 <>
-                  <CountUp value={counts.review} /> {counts.review === 1 ? "draft is" : "drafts are"} waiting for you
+                  <CountUp value={counts.review} /> {counts.review === 1 ? "email is" : "emails are"} ready for you
+                </>
+              ) : hotLeads.data?.total ? (
+                <>
+                  <CountUp value={hotLeads.data.total} /> hot {hotLeads.data.total === 1 ? "lead is" : "leads are"} ready to message
                 </>
               ) : (
-                "Review is clear. Nice work."
+                "You are all caught up."
               )}
             </h1>
             <p className="mt-3 max-w-[60ch] text-[1.0625rem] text-muted">
               {counts.review > 0 ? (
                 <>
-                  The oldest has waited <strong className="text-ink">{ago(oldest).replace(" ago", "")}</strong>
                   {hot > 0 && (
                     <>
-                      {" "}
-                      · <Flame className="inline size-4 text-attention-dot" aria-hidden /> {hot} hot (fit above 80)
+                      <Flame className="inline size-4 text-attention-dot" aria-hidden /> {hot} {hot === 1 ? "is a hot lead" : "are hot leads"} (fit above 80) ·{" "}
                     </>
                   )}
-                  . Approved emails land in your mailbox as drafts; nothing is sent without you.
+                  Approve them and they land in your mailbox as drafts. Nothing is sent without you.
                 </>
               ) : (
-                <>New drafts appear here as the engine writes them. {auto.data?.next_search ? `Next discovery ${relative(auto.data.next_search)}.` : ""}</>
+                <>New emails appear here as the engine writes them. {auto.data?.next_search ? `Next discovery ${relative(auto.data.next_search)}.` : ""}</>
               )}
             </p>
+            {top.length > 0 && (
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-tour="ready-drafts">
+                {top.map((item) => (
+                  <DraftPreview key={item.message.id} item={item} readOnly={viewing} />
+                ))}
+              </div>
+            )}
             <div className="mt-auto flex flex-wrap items-center gap-3 pt-6">
               {counts.review > 0 ? (
                 <Link to="/review" className={buttonClass("primary", "lg")} data-tour="start-reviewing">
@@ -119,7 +124,7 @@ export function TodayPage() {
               )}
               {counts.attention > 0 && (
                 <Link to="/attention" className={buttonClass("ghost", "lg")}>
-                  <TriangleAlert className="size-4 text-attention-dot" aria-hidden /> {counts.attention} need{counts.attention === 1 ? "s" : ""} attention
+                  {counts.attention} need{counts.attention === 1 ? "s" : ""} a decision <ArrowRight className="size-4" aria-hidden />
                 </Link>
               )}
             </div>
@@ -145,14 +150,17 @@ export function TodayPage() {
         </div>
       </div>
 
-      {/* KPIs with the last two weeks behind them. */}
-      <div data-tour="kpis" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      <HotLeads data={hotLeads.data} loading={hotLeads.isPending} readOnly={viewing} />
+
+      {/* The week's wins, with the last two weeks behind them. */}
+      <div data-tour="kpis" className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <Kpi
-          label="Drafts approved this week"
+          label="Emails approved this week"
           value={sum(pick("approved")(thisWeek))}
           before={sum(pick("approved")(lastWeek))}
           series={pick("approved")(days)}
-          why="Each approved draft is one email in your mailbox, ready to send."
+          why="Each approved email is one draft in your mailbox, ready to send."
+          tone="good"
           loading={daily.isPending}
         />
         <Kpi
@@ -165,29 +173,18 @@ export function TodayPage() {
           loading={quality.isPending}
         />
         <Kpi
-          label="Leads added this week"
+          label="New leads this week"
           value={sum(pick("leads")(thisWeek))}
           before={sum(pick("leads")(lastWeek))}
           series={pick("leads")(days)}
           why="Companies that became leads, by discovery or by you."
           loading={daily.isPending}
         />
-        <Kpi
-          label="AI credits used this week"
-          value={sum(pick("credits_milli")(thisWeek))}
-          before={sum(pick("credits_milli")(lastWeek))}
-          format={(n) => credits(n)}
-          series={pick("credits_milli")(days)}
-          invert
-          why="What finders, verifiers, search and the AI model used, from the call ledger."
-          tone="attention"
-          loading={daily.isPending}
-        />
       </div>
 
       <SectionGroup storageKey="today">
+        <BehindTheScenes status={status} />
         <NeedsYou status={status} />
-        <Pipeline status={status} />
         <ActiveCampaign />
         <Sources />
         <Activity />
@@ -294,30 +291,31 @@ function Kpi({
 function NeedsYou({ status }: { status?: Schemas["StatusOut"] }) {
   const usage = useQuery({ queryKey: ["usage"], queryFn: () => ok(client.GET("/api/usage")) });
   const waitingRows = useQuery({ queryKey: ["waiting"], queryFn: () => ok(client.GET("/api/targets/waiting")) });
-  const held = Object.entries(status?.held ?? {}).filter(([, n]) => n > 0);
-  const failed = status?.by_status?.failed ?? 0;
+  // A catch-all being resolved waits for the resolver, not for you.
+  const held = Object.entries(status?.held ?? {}).filter(([reason, n]) => n > 0 && reason !== "catch_all_resolving");
+  const heldCount = held.reduce((a, [, n]) => a + n, 0);
+  const stopped = Math.max(0, (status?.buckets?.decision ?? 0) - heldCount);
   const credit = Object.values(usage.data?.waiting_leads ?? {}).reduce((a, b) => a + b, 0) + (usage.data?.waiting_rows ?? 0);
   const sites = waitingRows.data?.length ?? 0;
   const items = [
-    ...(failed ? [{ key: "failed", tone: "error" as const, label: "Failed", text: `${failed} lead${failed === 1 ? "" : "s"} stopped at a step. Most need one click to retry.`, to: "/attention" }] : []),
-    ...held.map(([reason, n]) => ({ key: reason, tone: "attention" as const, label: describeHold(reason).label, text: `${n} lead${n === 1 ? "" : "s"}. ${describeHold(reason).why || "Waiting for your decision."}`, to: "/attention" })),
-    ...(sites ? [{ key: "sites", tone: "attention" as const, label: "Websites to confirm", text: `${sites} uploaded row${sites === 1 ? "" : "s"} need${sites === 1 ? "s" : ""} a website before research.`, to: "/attention" }] : []),
-    ...(credit ? [{ key: "credit", tone: "attention" as const, label: "Waiting for credits", text: `${credit} lead${credit === 1 ? "" : "s"} paused until credits renew or more are granted.`, to: "/attention" }] : []),
+    ...held.map(([reason, n]) => ({ key: reason, tone: "stopped" as const, label: describeHold(reason).label, text: `${n} lead${n === 1 ? "" : "s"}. ${describeHold(reason).why || "Waiting for your decision."}`, to: "/attention" })),
+    ...(stopped ? [{ key: "stopped", tone: "error" as const, label: "Stopped", text: `${stopped} lead${stopped === 1 ? "" : "s"} stopped after every try. Check the cause, then retry.`, to: "/attention" }] : []),
+    ...(sites ? [{ key: "sites", tone: "stopped" as const, label: "Websites to confirm", text: `${sites} uploaded row${sites === 1 ? "" : "s"} need${sites === 1 ? "s" : ""} a website before research.`, to: "/attention" }] : []),
+    ...(credit ? [{ key: "credit", tone: "stopped" as const, label: "Waiting for credits", text: `${credit} lead${credit === 1 ? "" : "s"} paused until credits renew or more are granted.`, to: "/attention" }] : []),
   ];
-  const total = failed + held.reduce((a, [, n]) => a + n, 0) + sites + credit;
+  const total = heldCount + stopped + sites + credit;
   return (
     <Section
       id="needs"
       tour="needs-you"
-      tone={items.length ? "attention" : undefined}
       icon={<TriangleAlert className="size-5" />}
-      title="Needs you"
-      summary={items.length ? items.map((i) => i.label).join(" · ") : "Nothing is waiting on you."}
-      chip={items.length ? <Chip tone="attention">{total} waiting</Chip> : <Chip tone="good">All clear</Chip>}
+      title="Needs a decision"
+      summary={items.length ? items.map((i) => i.label).join(" · ") : "Nothing needs a decision."}
+      chip={items.length ? <Chip tone="stopped">{total} to decide</Chip> : <Chip tone="good">All clear</Chip>}
     >
       {items.length === 0 ? (
-        <Empty art={<CheckCircle2 className="size-10 text-good-dot" />} title="All clear ✨">
-          No holds, failures or credit waits. New ones show up here the moment they happen.
+        <Empty art={<CheckCircle2 className="size-10 text-good-dot" />} title="Nothing needs a decision ✨">
+          Holds and stopped steps show up here the moment they need you.
         </Empty>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -336,43 +334,55 @@ function NeedsYou({ status }: { status?: Schemas["StatusOut"] }) {
   );
 }
 
-function Pipeline({ status }: { status?: Schemas["StatusOut"] }) {
-  const by = status?.by_status ?? {};
-  const counts = STAGES.map((s) => by[s] ?? 0);
-  const total = sum(counts);
-  const max = Math.max(1, ...counts);
-  const stopped = (by.disqualified ?? 0) + (by.rejected ?? 0) + (by.suppressed ?? 0) + (by.failed ?? 0) + (by.held ?? 0) + (by.completed ?? 0);
+/**
+ * Where the companies went, in plain words. Most are meant to drop out: screening them out is
+ * how the list stays sharp, so it is grey, not red.
+ */
+function BehindTheScenes({ status }: { status?: Schemas["StatusOut"] }) {
+  const b = status?.buckets ?? {};
+  const total = sum(Object.values(b));
+  const reached = (b.ready ?? 0) + (b.done ?? 0);
+  const parts = [
+    { key: "ready", label: "Reached you", n: reached, bucket: undefined as string | undefined, color: "var(--good-dot)" },
+    { key: "working", label: "Being worked on", n: b.working ?? 0, bucket: "working", color: "var(--working-dot)" },
+    { key: "decision", label: "Needs a decision", n: b.decision ?? 0, bucket: "decision", color: "var(--attention-dot)" },
+    { key: "screened_out", label: "Screened out", n: b.screened_out ?? 0, bucket: "screened_out", color: "var(--surface-3)" },
+  ];
   return (
     <Section
-      id="pipeline"
+      id="behind"
       tour="pipeline"
-      icon={<Inbox className="size-5" />}
-      title="Lead pipeline"
-      summary={`${total} moving · ${by.copy_ready ?? 0} waiting for review · ${by.approved ?? 0} approved`}
-      chip={<Chip tone="primary">{total + stopped} leads</Chip>}
+      icon={<Filter className="size-5" />}
+      title="Behind the scenes"
+      summary={total ? `${total} companies looked at · ${reached} reached you · ${b.screened_out ?? 0} screened out (normal)` : "Nothing looked at yet."}
+      chip={<Chip tone="primary">{total} looked at</Chip>}
     >
-      {/* A river: each band's height is how many leads sit at that stage. */}
-      <div className="overflow-x-auto">
-        <div className="flex min-w-[720px] items-end gap-1.5">
-          {STAGES.map((stage, i) => {
-            const n = counts[i]!;
-            const h = 28 + (n / max) * 120;
-            return (
-              <Link key={stage} to="/leads" search={{ status: stage }} className="group flex flex-1 flex-col items-center gap-2" title={`${leadStatus[stage]?.label}: ${n}`}>
-                <span className="tnum text-heading font-semibold text-ink">{n}</span>
-                <span
-                  className="w-full rounded-xl transition-[height,filter] duration-700 group-hover:brightness-110"
-                  style={{ height: h, background: `linear-gradient(180deg, ${STAGE_COLOR[stage]}, color-mix(in oklab, ${STAGE_COLOR[stage]} 55%, transparent))` }}
-                />
-                <span className={cx("text-center text-label font-semibold", stage === "copy_ready" ? "text-attention" : "text-muted")}>{stage === "copy_ready" ? "Waiting review" : leadStatus[stage]?.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-      <p className="mt-4 text-small text-muted">
-        Plus {stopped} stopped (disqualified, rejected, suppressed, held, failed or completed). Click a stage to see its leads.
-      </p>
+      {total === 0 ? (
+        <Empty title="Nothing yet">Companies you add or discovery finds appear here as they are looked at.</Empty>
+      ) : (
+        <>
+          <div className="flex h-3 overflow-hidden rounded-full bg-surface-3" aria-label="Where the companies went">
+            {parts.filter((p) => p.n > 0).map((p) => (
+              <span key={p.key} style={{ width: `${(p.n / total) * 100}%`, background: p.color }} title={`${p.label}: ${p.n}`} />
+            ))}
+          </div>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {parts.map((p) => (
+              <li key={p.key}>
+                <Link to="/leads" search={p.bucket ? { bucket: p.bucket } : { bucket: "done" }} className="block rounded-xl border border-line p-3 hover:bg-surface-2">
+                  <div className="flex items-center gap-2 text-small text-muted">
+                    <span className="size-2.5 rounded-full" style={{ background: p.color }} aria-hidden /> {p.label}
+                  </div>
+                  <div className="tnum mt-1 text-[1.5rem] font-semibold text-ink">{p.n}</div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 max-w-[70ch] text-small text-muted">
+            Most companies are meant to drop out: they do not fit your brief, nobody suitable works there, or no address could be proven. Screening them out is how the engine keeps your list sharp, so a long grey bar is a sign it works.
+          </p>
+        </>
+      )}
     </Section>
   );
 }
@@ -506,5 +516,84 @@ function Activity() {
         </ol>
       )}
     </Section>
+  );
+}
+
+
+/** One email ready to approve: who, why it is worth sending, the start of it, and one click. */
+function DraftPreview({ item, readOnly }: { item: Schemas["ReviewItemOut"]; readOnly: boolean }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const name = item.company.name ?? item.company.domain;
+  const body = item.message.final_body ?? item.message.generated_body;
+  // A check that was skipped needs a deliberate "approve anyway", which Review asks for.
+  const needsReview = (item.skips ?? []).length > 0 || item.flagged;
+  const approve = useMutation({
+    mutationFn: () => ok(client.POST("/api/review/{message_id}/approve", { params: { path: { message_id: item.message.id } }, body: { edited_body: null, row_version: item.message.row_version, acknowledge_skips: false } })),
+    onSuccess: () => {
+      toast({ tone: "good", title: `Approved · ${name}`, body: "It will be saved to your mailbox as a draft within 15 minutes." });
+      for (const key of ["review", "status", "daily", "quality", "companies"]) void queryClient.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  return (
+    <Card className="flex flex-col gap-2 p-4">
+      <div className="flex items-center gap-2.5">
+        <Avatar name={name} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold text-ink">{name}</div>
+          <div className="truncate text-small text-muted">{item.contact.title ?? "Decision-maker"}</div>
+        </div>
+        {item.company.hot && (
+          <Chip tone="attention" title="A fit score above 80">
+            <Flame className="size-3.5" aria-hidden /> {item.company.fit_score}
+          </Chip>
+        )}
+      </div>
+      <div className="font-semibold text-ink">{item.message.subject}</div>
+      <p className="line-clamp-2 text-small text-muted">{body}</p>
+      <div className="mt-auto flex gap-2 pt-1">
+        {!readOnly && !needsReview && (
+          <Button size="sm" busy={approve.isPending} onClick={() => approve.mutate()}>
+            <Check className="size-4" aria-hidden /> Approve
+          </Button>
+        )}
+        <Link to="/review" search={{ message: item.message.id }} className={buttonClass(needsReview ? "primary" : "secondary", "sm")}>
+          {needsReview ? "Check and approve" : "Open"}
+        </Link>
+      </div>
+    </Card>
+  );
+}
+
+/** The hot leads whose LinkedIn message is written, with the same copy-and-open buttons as the LinkedIn page. */
+function HotLeads({ data, loading, readOnly }: { data?: Schemas["LinkedInDraftPage"]; loading: boolean; readOnly: boolean }) {
+  const queryClient = useQueryClient();
+  const refresh = () => {
+    for (const key of ["linkedin", "companies", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
+  };
+  if (loading) return <Skeleton shape="stat" />;
+  if (!data || data.items.length === 0) return null;
+  return (
+    <section data-tour="hot-leads" aria-labelledby="hot-leads-title">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <h2 id="hot-leads-title" className="flex items-center gap-2 text-heading font-semibold text-ink">
+          <Flame className="size-5 text-attention-dot" aria-hidden /> Hot leads: reach them on LinkedIn
+        </h2>
+        <Chip tone="attention">
+          {data.total} message{data.total === 1 ? "" : "s"} written
+        </Chip>
+        <Link to="/linkedin" className="ml-auto text-small font-semibold text-primary hover:underline">
+          See all <ArrowRight className="inline size-3.5" aria-hidden />
+        </Link>
+      </div>
+      <p className="mb-3 max-w-[70ch] text-small text-muted">A connection note is ready for each. Some have no email we could prove, so LinkedIn is the way in. Copy it and paste it into their profile yourself: nothing is sent from here.</p>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {data.items.map((row) => (
+          <Card key={row.item.id} title={<Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="hover:underline">{row.company_name ?? row.domain}</Link>} subtitle={[row.person, row.title].filter(Boolean).join(" · ") || undefined}>
+            <LinkedInDraftCard draft={row.item} person={row.person} profile={row.profile} readOnly={readOnly} onChanged={refresh} />
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }

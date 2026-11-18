@@ -40,7 +40,7 @@ import { ago, credits, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
 import { isViewing, useCurrent } from "../app/session";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
-import { callOutcome, describe, describeHold, emailStatus, leadStatus, messageState } from "../lib/status";
+import { callOutcome, companyStatus, describe, describeHold, emailStatus, leadStatus, messageState } from "../lib/status";
 
 type Company = Schemas["CompanyOut"];
 type Contact = Schemas["ContactOut"];
@@ -188,7 +188,7 @@ export function LeadDetailPage() {
         )}
 
         <div data-tour="lead-header" className="mb-5 flex flex-wrap items-center gap-2">
-          <StatusBadge status={describe(leadStatus, company.status)} />
+          <StatusBadge status={companyStatus(company)} />
           {hold && <span className="rounded-full bg-attention-soft px-2 py-0.5 text-small font-medium text-attention">{hold.label}</span>}
           <span className="rounded-full bg-surface-3 px-2 py-0.5 text-small">company type: {words(company.legal_entity_type)}</span>
           {company.created_at && (

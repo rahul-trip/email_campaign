@@ -21,7 +21,7 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
   await expect(page.getByText("Succeeded").first()).toBeVisible({ timeout: 30_000 });
 
   // 3. Both emails wait for review. Approve one with an edit: the diff shows the change.
-  await page.getByRole("link", { name: /^Review/ }).click();
+  await page.getByRole("link", { name: /^Emails ready/ }).click();
   await page.getByRole("navigation", { name: "Emails waiting" }).getByRole("button", { name: new RegExp(approved) }).click();
   const text = page.getByLabel("Email text");
   const original = await text.inputValue();
@@ -35,7 +35,7 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
   await page.goto(`/leads?q=${approved}`);
   await expect(page.getByRole("row", { name: /In sequence/ })).toHaveCount(1);
   await page.goto(`/leads?q=${waiting}`);
-  await expect(page.getByRole("row", { name: /Copy ready/ })).toHaveCount(1);
+  await expect(page.getByRole("row", { name: /Ready to approve/ })).toHaveCount(1);
 
   // 5. The drafted lead's page shows its emails, vendor calls and timeline.
   await page.goto(`/leads/${await leadId(page, approved)}`);
@@ -151,7 +151,7 @@ test("Research again sends a lead back to the start and cancels its waiting emai
   await expect(page.locator("[data-tour=lead-header]")).toContainText("New");
   await runEngine(page);
   await page.reload();
-  await expect(page.locator("[data-tour=lead-header]")).toContainText("Copy ready");
+  await expect(page.locator("[data-tour=lead-header]")).toContainText("Ready to approve");
 });
 
 test("on Review the operator asks for changes, sees them, and approves the rewritten email", async ({ page }) => {

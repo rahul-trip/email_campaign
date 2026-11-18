@@ -12,25 +12,26 @@ import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
 import { cx } from "../lib/cx";
 import { ago, credits, when } from "../lib/format";
-import { HOLD_REASONS, LEAD_STATUSES, STAGES, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
+import { HOLD_REASONS, LEAD_STATUSES, STAGES, companyStatus, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
 import { Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
 import { LeadIcon } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 
 const PAGE_SIZE = 25;
 type Status = Schemas["CompanyOut"]["status"];
+type Bucket = Schemas["CompanyOut"]["bucket"];
 type Hold = NonNullable<Schemas["CompanyOut"]["hold_reason"]>;
 type Source = "discovery" | "manual" | "import" | "referral";
 
 /** Saved views: each is a set of filters, so the view and the URL always agree. */
-const VIEWS: { key: string; label: string; filters: Partial<LeadsSearch> }[] = [
-  { key: "all", label: "All", filters: {} },
+const VIEWS: { key: string; label: string; filters: Partial<LeadsSearch>; count?: string }[] = [
+  { key: "ready", label: "Ready for you", filters: { bucket: "ready" }, count: "ready" },
   { key: "hot", label: "Hot", filters: { view: "hot", sort: "fit" } },
-  { key: "review", label: "Waiting review", filters: { status: "copy_ready" } },
-  { key: "approved", label: "Approved", filters: { status: "approved" } },
-  { key: "held", label: "On hold", filters: { status: "held" } },
-  { key: "failed", label: "Failed", filters: { status: "failed" } },
-  { key: "disqualified", label: "Disqualified", filters: { status: "disqualified" } },
+  { key: "working", label: "Working on it", filters: { bucket: "working" }, count: "working" },
+  { key: "decision", label: "Needs a decision", filters: { bucket: "decision" }, count: "decision" },
+  { key: "done", label: "Approved & sent", filters: { bucket: "done" }, count: "done" },
+  { key: "screened", label: "Screened out", filters: { bucket: "screened_out" }, count: "screened_out" },
+  { key: "all", label: "All", filters: {} },
 ];
 type SortKey = "newest" | "fit" | "updated" | "name" | "status" | "country" | "source" | "priority";
 /** Each sortable column and the direction it starts in (the server's natural order). */
@@ -78,6 +79,7 @@ export function LeadsPage() {
               status: search.status as Status | undefined,
               hold_reason: search.hold as Hold | undefined,
               hot: search.view === "hot" ? true : undefined,
+              bucket: search.bucket as Bucket | undefined,
               source: search.source as Source | undefined,
               country: search.country,
               min_fit: search.fit,
@@ -100,7 +102,7 @@ export function LeadsPage() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const advancedCount = [search.hold, search.source, search.fit, search.country].filter(Boolean).length;
   const [moreOpen, setMore] = useState(advancedCount > 0);
-  const filtered = Boolean(search.q || search.status || search.hold || search.view || search.source || search.country || search.fit);
+  const filtered = Boolean(search.q || search.bucket || search.status || search.hold || search.view || search.source || search.country || search.fit);
   const activeView = VIEWS.find((v) => Object.entries(v.filters).every(([k, val]) => search[k as keyof LeadsSearch] === val) && (v.key !== "all" || !filtered))?.key;
   const by = status.data?.by_status ?? {};
   const sortNow = (search.sort as SortKey | undefined) ?? "newest";
@@ -149,7 +151,7 @@ export function LeadsPage() {
           >
             {v.key === "hot" && <Flame className="size-3.5" aria-hidden />}
             {v.label}
-            {v.filters.status && <span className="tnum text-muted">{by[v.filters.status] ?? 0}</span>}
+            {v.count && <span className="tnum text-muted">{status.data?.buckets?.[v.count] ?? 0}</span>}
           </button>
         ))}
       </div>
@@ -294,7 +296,7 @@ export function LeadsPage() {
               <tbody className={cx("divide-y divide-line", leads.isFetching && leads.isPlaceholderData && "opacity-60")}>
                 {items.map((company, row) => {
                   const hold = company.hold_reason ? describeHold(company.hold_reason) : null;
-                  const info = describe(leadStatus, company.status);
+                  const info = companyStatus(company);
                   const s = company.summary;
                   return (
                     <tr key={company.id} className="group transition-colors hover:bg-surface-2">
@@ -321,7 +323,7 @@ export function LeadsPage() {
                         <Chip tone={info.family}>{info.label}</Chip>
                         {hold && <div className="mt-1 text-small text-attention">{hold.label}</div>}
                         {company.status === "failed" && company.last_error && (
-                          <div className="mt-1 max-w-[16rem] truncate text-small text-error" title={company.last_error}>
+                          <div className={cx("mt-1 max-w-[16rem] truncate text-small", info.family === "error" ? "text-error" : "text-muted")} title={company.last_error}>
                             {company.last_error}
                           </div>
                         )}

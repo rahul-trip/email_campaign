@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
+import { Flame } from "lucide-react";
+import { Chip } from "../ui/core";
 import { buttonClass, Card, Empty, PageHeader, QueryState, Segmented } from "../ui/compat";
 import { isViewing, useCurrent } from "../app/session";
 
@@ -23,8 +25,8 @@ export function LinkedInPage() {
   return (
     <>
       <PageHeader
-        title="LinkedIn"
-        subtitle="A connection note and a first message for each confirmed decision-maker, written before their email is found. Copy them into LinkedIn yourself: nothing is sent from here."
+        title="Hot leads"
+        subtitle="Hot leads first. A connection note and a first message for each confirmed decision-maker, written before their email is found, so a lead with no email we could prove still has a way in. Copy them into LinkedIn yourself: nothing is sent from here."
       />
       <div className="mb-5" data-tour="linkedin-filter">
         <Segmented
@@ -52,11 +54,18 @@ export function LinkedInPage() {
                 <Card
                   key={row.item.id}
                   title={
-                    <Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="hover:underline">
-                      {row.company_name ?? row.domain}
-                    </Link>
+                    <span className="inline-flex flex-wrap items-center gap-2">
+                      <Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="hover:underline">
+                        {row.company_name ?? row.domain}
+                      </Link>
+                      {row.hot && (
+                        <Chip tone="attention" title="A fit score above 80">
+                          <Flame className="size-3.5" aria-hidden /> Fit {row.fit_score}
+                        </Chip>
+                      )}
+                    </span>
                   }
-                  subtitle={row.title ?? undefined}
+                  subtitle={[row.title, row.company_bucket === "ready" && state === "drafted" ? "No email we could prove, so start here" : null].filter(Boolean).join(" · ") || undefined}
                 >
                   <LinkedInDraftCard draft={row.item} person={row.person} profile={row.profile} readOnly={isViewing(workspace)} onChanged={refresh} />
                 </Card>

@@ -29,14 +29,13 @@ function useRefresh() {
 
 export function AttentionPage() {
   const [filter, setFilter] = useState<Filter>("all");
+  // Only what a person can unblock: holds the engine is not working on, and steps that broke on
+  // every try. Leads still being retried, and normal "nobody to write to" outcomes, are not here.
   const lists = useQuery({
     queryKey: ["companies", "attention"],
     queryFn: async () => {
-      const [held, failed] = await Promise.all([
-        ok(client.GET("/api/companies", { params: { query: { status: "held", limit: 200 } } })),
-        ok(client.GET("/api/companies", { params: { query: { status: "failed", limit: 200 } } })),
-      ]);
-      return { held: held.items, failed: failed.items };
+      const decision = await ok(client.GET("/api/companies", { params: { query: { bucket: "decision", limit: 200 } } }));
+      return { held: decision.items.filter((c) => c.status === "held"), failed: decision.items.filter((c) => c.status === "failed") };
     },
     refetchInterval: 10000,
   });
@@ -60,14 +59,14 @@ export function AttentionPage() {
   return (
     <>
       <PageHeader
-        title="Needs attention"
-        subtitle={total ? `${total} item${total === 1 ? "" : "s"} wait on you. Most take one click.` : "Holds, failures, websites to confirm and leads waiting for AI credits land here."}
+        title="Needs a decision"
+        subtitle={total ? `${total} lead${total === 1 ? "" : "s"} need a choice only you can make. Everything else runs by itself.` : "Holds, websites to confirm and leads waiting for AI credits land here. Companies that do not fit are not a problem: the engine screens most out."}
         actions={
           filter !== "credits" &&
           failed.length > 1 &&
           byStage.length > 1 && (
             <span data-tour="attention-retry-all">
-              <BulkAction ids={failed.map((c) => c.id)} kind="retry" label="Retry every failed lead" />
+              <BulkAction ids={failed.map((c) => c.id)} kind="retry" label="Retry every stopped lead" />
             </span>
           )
         }
@@ -80,7 +79,7 @@ export function AttentionPage() {
           onChange={setFilter}
           tabs={[
             { key: "all", label: "All", count: total },
-            { key: "failed", label: "Failed", count: failed.length },
+            { key: "failed", label: "Stopped", count: failed.length },
             { key: "held", label: "On hold", count: held.length },
             { key: "confirm", label: "Websites to confirm", count: confirm.length },
             { key: "credits", label: "Waiting for AI credits", count: parked.length + rows },
@@ -92,8 +91,8 @@ export function AttentionPage() {
       <Problem error={lists.error ?? waiting.error} />
       {!loading && total === 0 && (
         <Card>
-          <Empty art={<CheckCircle2 className="size-12 text-good-dot" />} title="All clear — nothing waits on you ✨">
-            Held leads, failures and websites to confirm appear here the moment they happen.
+          <Empty art={<CheckCircle2 className="size-12 text-good-dot" />} title="Nothing needs a decision ✨">
+            Holds, stopped steps and websites to confirm appear here the moment they need you.
           </Empty>
         </Card>
       )}
@@ -105,12 +104,12 @@ export function AttentionPage() {
               key={`f-${stage}`}
               id={`failed-${stage}`}
               tone="attention"
-              title={`Failed at ${STEP_NAMES[stage] ?? words(stage)}`}
+              title={`Stopped at ${STEP_NAMES[stage] ?? words(stage)}`}
               summary={`${list.length} lead${list.length === 1 ? "" : "s"} · ${list[0]?.last_error ?? "a step failed"}`}
-              chip={<Chip tone="error">{list.length} failed</Chip>}
+              chip={<Chip tone="error">{list.length} stopped</Chip>}
               actions={<BulkAction ids={list.map((c) => c.id)} kind="retry" label="Retry all" />}
             >
-              <p className="mb-3 text-small text-muted">A step failed. Each lead retries itself up to 3 times, waiting longer each time; you can retry at once.</p>
+              <p className="mb-3 text-small text-muted">This step broke on every try (each lead is tried up to 5 times, waiting longer each time). Retry once the cause is fixed.</p>
               <ul className="divide-y divide-line">
                 {list.map((c) => (
                   <FailedRow key={c.id} company={c} />

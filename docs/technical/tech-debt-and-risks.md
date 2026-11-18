@@ -276,6 +276,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-53 · P2 · Normal drop-outs were shown as failures, so the few wins were buried — closed 2026-11-19
+
+- **Was:** "no decision-maker found" and "no valid email found" were `failed`, like a real error; they were retried three times in under an hour, counted in the amber *Needs attention* badge and the bell, and shown as a red *Failed* card first on Today. An operator saw mostly red and amber.
+- **Fixed by:** `FailureKind`, `domain/outcomes.py` and [ADR 0036](adr/0036-outcomes-are-not-failures.md); the web app's Today, Emails ready, Hot leads and Needs a decision.
+- **Evidence:** `tests/domain/test_outcomes.py`, `tests/db/test_buckets.py`, `tests/db/test_runner.py` (a day's wait and three tries; five tries for a break), `tests/db/test_linkedin.py` (hot first).
+- **Still open:** leads that failed before migration 0030 are classified from their error text, so an unusual wording reads as a broken step; the limits (5 and 3) are constants, not settings.
+
 ### R-52 · P1 · Email: an out-of-credit vendor looked like "no address", failed leads for good, and nobody was told — closed 2026-11-18
 
 - **Was:** on 2026-11-18 Hunter's free plan (50 searches) was used up and ZeroBounce had 0 credits, so no finder worked. (1) Hunter answers an exhausted plan with `429` and the text "reached the limit for the number of searches per billing period included in your plan"; `HttpClient` read every 429 as a short rate limit, retried it three times, and 279 calls failed with "hunter: 429". (2) ZeroBounce answers an empty account with HTTP 200 and a capitalised `Message` field, which the adapter did not read, so the call counted as "nothing found" (and, as a miss, was cached for 90 days). (3) A lead whose finders all failed used up its three attempts and stayed `failed` ("no valid email found for 3 contact(s) (hunter: 429)"): 49 leads at the email step. (4) Nothing paused the dead finder, showed what was left, or said so.

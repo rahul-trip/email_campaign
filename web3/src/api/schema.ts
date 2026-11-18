@@ -1880,7 +1880,7 @@ export interface paths {
         };
         /**
          * Drafts
-         * @description Every message in one state, newest first, with who it is for.
+         * @description Every message in one state with who it is for: waiting ones best fit first, others newest.
          */
         get: operations["drafts_api_linkedin_get"];
         put?: never;
@@ -3401,6 +3401,11 @@ export interface components {
              */
             preview?: boolean;
         };
+        /**
+         * Bucket
+         * @enum {string}
+         */
+        Bucket: "ready" | "working" | "decision" | "screened_out" | "done";
         /** CallOut */
         CallOut: {
             /**
@@ -3570,6 +3575,13 @@ export interface components {
         };
         /** CompanyOut */
         CompanyOut: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts?: number;
+            /** @description Where the lead stands for a person: ready, working, needs a decision, screened out. */
+            readonly bucket: components["schemas"]["Bucket"];
             /** Campaign Id */
             campaign_id: string | null;
             /** Country Code */
@@ -3582,6 +3594,7 @@ export interface components {
             domain: string;
             /** Failed Stage */
             failed_stage: string | null;
+            failure_kind?: components["schemas"]["FailureKind"] | null;
             /** Fit Reason */
             fit_reason: string | null;
             /** Fit Score */
@@ -3600,6 +3613,11 @@ export interface components {
             legal_entity_type: string;
             /** Manual Fields */
             manual_fields: string[];
+            /**
+             * Max Tries
+             * @description How many tries a failed lead gets in all (shown as "try 2 of 5").
+             */
+            readonly max_tries: number;
             /** Name */
             name: string | null;
             /** Next Action At */
@@ -3650,6 +3668,13 @@ export interface components {
         };
         /** CompanyRowOut */
         CompanyRowOut: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts?: number;
+            /** @description Where the lead stands for a person: ready, working, needs a decision, screened out. */
+            readonly bucket: components["schemas"]["Bucket"];
             /** Campaign Id */
             campaign_id: string | null;
             /** Country Code */
@@ -3662,6 +3687,7 @@ export interface components {
             domain: string;
             /** Failed Stage */
             failed_stage: string | null;
+            failure_kind?: components["schemas"]["FailureKind"] | null;
             /** Fit Reason */
             fit_reason: string | null;
             /** Fit Score */
@@ -3680,6 +3706,11 @@ export interface components {
             legal_entity_type: string;
             /** Manual Fields */
             manual_fields: string[];
+            /**
+             * Max Tries
+             * @description How many tries a failed lead gets in all (shown as "try 2 of 5").
+             */
+            readonly max_tries: number;
             /** Name */
             name: string | null;
             /** Next Action At */
@@ -4289,6 +4320,12 @@ export interface components {
             /** Value */
             value: string;
         };
+        /**
+         * FailureKind
+         * @description Why a lead is in ``failed``: a broken step, or a normal answer of "nobody to write to".
+         * @enum {string}
+         */
+        FailureKind: "error" | "no_person" | "no_email";
         /** FindEmailAgainIn */
         FindEmailAgainIn: {
             /** Company Ids */
@@ -4596,10 +4633,16 @@ export interface components {
          * @description A message with who it is for, for the LinkedIn page.
          */
         LinkedInDraftRowOut: {
+            /** @default working */
+            company_bucket?: components["schemas"]["Bucket"];
             /** Company Name */
             company_name: string | null;
             /** Domain */
             domain: string;
+            /** Fit Score */
+            fit_score?: number | null;
+            /** Hot */
+            readonly hot: boolean;
             item: components["schemas"]["LinkedInDraftOut"];
             /** Person */
             person: string | null;
@@ -5815,6 +5858,10 @@ export interface components {
         };
         /** StatusOut */
         StatusOut: {
+            /** Buckets */
+            buckets: {
+                [key: string]: number;
+            };
             /** By Status */
             by_status: {
                 [key: string]: number;
@@ -8553,6 +8600,7 @@ export interface operations {
                 hot?: boolean | null;
                 source?: components["schemas"]["CompanySource"] | null;
                 country?: string | null;
+                bucket?: components["schemas"]["Bucket"] | null;
                 sort?: "newest" | "fit" | "updated" | "name" | "status" | "country" | "source" | "priority";
                 direction?: ("asc" | "desc") | null;
                 include?: "summary" | null;
@@ -9892,6 +9940,7 @@ export interface operations {
         parameters: {
             query?: {
                 state?: components["schemas"]["LinkedInState"];
+                hot?: boolean | null;
                 limit?: number;
                 offset?: number;
             };

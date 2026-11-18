@@ -338,6 +338,9 @@ CREATE TABLE companies (
   credit_wait_step TEXT CHECK (credit_wait_step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
                     -- set while the lead waits, in place, for a credit on this step (0012)
   last_error        TEXT,
+  failure_kind      TEXT CHECK (failure_kind IN ('error','no_person','no_email')),
+                    -- why it failed, set with failed_stage and cleared on leaving `failed` (0030):
+                    -- a step that broke, or "nobody to write to"; sets the retry schedule
   attempts          INTEGER NOT NULL DEFAULT 0,
   next_action_at    TIMESTAMP,                     -- follow-up due, OOO snooze, soft-bounce retry, resolver poll
   fit_score         INTEGER CHECK (fit_score BETWEEN 0 AND 100),
@@ -712,7 +715,7 @@ Migrations 0006–0009 (Phase 6a) are described above: the run heartbeat and loc
 |---|---|
 | `companies.research` | Keys written by the research stage: `summary`, `products`, `news`, `hooks`, `hiring`, `tech`, `pages` (URLs read), `thin` (true when the site could not be read and search results stood in), `country_evidence`, `legal_evidence`, `workers`, and `site_emails` (addresses on the company's own domain found in its pages; the email stage tries a matching one first) |
 | `companies.policy_decision` | `{outcome, rule, hold_reason, policy_version, reasons}` as written by the gate, or by the email stage when the chosen address's provenance changes the outcome |
-| `companies.next_action_at` | Also the retry back-off for `failed` leads (15 minutes times attempts) and the wake-up time for `catch_all_resolving` holds (six hours) |
+| `companies.next_action_at` | Also the retry back-off for `failed` leads (15 minutes times attempts for `error`; 24 hours for `no_person` and `no_email`) and the wake-up time for `catch_all_resolving` holds (six hours) |
 | `contact_emails` | Every address the waterfall checks is saved, including `invalid` ones, so none is ever verified twice. `resolution_ref` holds an asynchronous resolver's job id while the status is `catch_all_pending` |
 | `messages.remote_draft_id` | `<{message id}.outbound@{mailbox domain}>`, the draft's own Message-ID. Delivery asks the mailbox for it before saving, which makes drafting idempotent |
 | `messages.final_body`, `edit_distance` | Set at review when the operator edits (`edit_distance` 0 to 1, whitespace ignored), and overwritten by the Sent sync with the body that actually went out, measured against `generated_body` |

@@ -17,7 +17,9 @@ from typing import Any
 from outbound.db.identity import IdentityUnitOfWorkFactory
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.entities import Company
 from outbound.domain.enums import NotificationKind, UserStatus
+from outbound.domain.outcomes import Bucket, bucket_of
 from outbound.domain.qualification import is_hot
 from outbound.logging import get_logger
 from outbound.runner.tick import TickReport
@@ -54,11 +56,17 @@ class ActivityNotifier:
         an empty one; the engine's own runs say something only when there is something."""
         leads = RunService(self._uow, workspace_id).leads(run_id)
         drafts = [lead for lead in leads if any(s.to_status == _DRAFT_STATUS for s in lead.steps)]
-        held = sum(1 for lead in leads if lead.outcome == "held")
-        failed = sum(1 for lead in leads if lead.outcome == "failed")
+        held = failed = (
+            0  # only leads that now wait on a person; a retry or a screen-out is not news
+        )
         hot: list[tuple[str, str, int]] = []
         with self._uow(workspace_id) as uow:
             for lead in leads:
+                if lead.outcome in ("held", "failed") and _needs_a_person(
+                    uow.companies.get(lead.company_id)
+                ):
+                    held += lead.outcome == "held"
+                    failed += lead.outcome == "failed"
                 if not any(s.to_status in _SCORED for s in lead.steps):
                     continue
                 company = uow.companies.get(lead.company_id)
@@ -157,6 +165,20 @@ class ActivityNotifier:
                 )
             ids.commit()
         log.debug("activity_notice", workspace_id=workspace_id, kind=kind.value)
+
+
+def _needs_a_person(company: Company) -> bool:
+    return (
+        bucket_of(
+            company.status,
+            hold_reason=company.hold_reason,
+            failure_kind=company.failure_kind,
+            attempts=company.attempts,
+            fit_score=company.fit_score,
+            waiting_for_credit=company.credit_wait_step is not None,
+        )
+        is Bucket.DECISION
+    )
 
 
 def _is_in(company_id: str, hot: list[tuple[str, str, int]]) -> bool:

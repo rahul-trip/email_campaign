@@ -22,9 +22,11 @@ from outbound.domain.enums import (
     CallOutcome,
     CandidateVerdict,
     CompanyStatus,
+    FailureKind,
     HoldReason,
     MessageState,
 )
+from outbound.domain.outcomes import Bucket
 
 CATCH_ALL_HOLDS = (HoldReason.CATCH_ALL_RESOLVING, HoldReason.CATCH_ALL_UNVERIFIED)
 QUALITY_TARGET = 0.8  # the Phase 2 gate: 8 of the first 10 sent without edits
@@ -83,6 +85,7 @@ class StatusReport:
     by_status: dict[CompanyStatus, int]
     held: dict[HoldReason, int]
     waiting_for_review: int
+    buckets: dict[Bucket, int]
 
 
 @dataclass(frozen=True)
@@ -162,12 +165,20 @@ def review_streak(days: list[DayRow]) -> int:
     return streak
 
 
-def outcome(status: CompanyStatus, hold_reason: HoldReason | None, failed_stage: str | None) -> str:
-    """Where a lead is, as one key: ``waiting``, ``failed:<stage>``, ``held:<reason>``, or its
-    status (``disqualified``, ``email_ready``, ``copy_ready``...)."""
+def outcome(
+    status: CompanyStatus,
+    hold_reason: HoldReason | None,
+    failed_stage: str | None,
+    failure_kind: FailureKind | None = None,
+) -> str:
+    """Where a lead is, as one key: ``waiting``, ``failed:<stage>`` (a step broke),
+    ``screened:no_person`` or ``screened:no_email`` (nobody to write to), ``held:<reason>``, or
+    its status (``disqualified``, ``email_ready``, ``copy_ready``...)."""
     if status is CompanyStatus.NEW:
         return "waiting"
     if status is CompanyStatus.FAILED:
+        if failure_kind in (FailureKind.NO_PERSON, FailureKind.NO_EMAIL):
+            return f"screened:{failure_kind.value}"
         return f"failed:{failed_stage or 'unknown'}"
     if status is CompanyStatus.HELD:
         return f"held:{hold_reason.value if hold_reason else 'unknown'}"
@@ -186,6 +197,7 @@ class ReportService:
                 by_status=uow.companies.count_by_status(),
                 held=uow.reports.company_counts()[1],
                 waiting_for_review=uow.messages.count_in_state(MessageState.GENERATED),
+                buckets=uow.companies.count_buckets(),
             )
 
     def quality(self) -> QualityReport:
@@ -204,7 +216,7 @@ class ReportService:
             errors = uow.reports.errors_by_provider(since, utcnow() + timedelta(seconds=1))
         outcomes: dict[str, int] = {}
         for lead in leads:
-            key = outcome(lead.status, lead.hold_reason, lead.failed_stage)
+            key = outcome(lead.status, lead.hold_reason, lead.failed_stage, lead.failure_kind)
             outcomes[key] = outcomes.get(key, 0) + lead.count
         return FunnelReport(
             days=days,

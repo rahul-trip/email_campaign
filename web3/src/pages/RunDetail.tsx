@@ -16,10 +16,10 @@ type Candidate = Schemas["CandidateOut"];
 const OUTCOME: Record<string, { label: string; tone: string }> = {
   moved: { label: "Moved on", tone: "bg-good-soft text-good" },
   held: { label: "Held", tone: "bg-attention-soft text-attention" },
-  failed: { label: "Failed", tone: "bg-error-soft text-error" },
+  failed: { label: "Could not continue", tone: "bg-surface-3 text-ink-2" },
   deferred: { label: "Will retry", tone: "bg-surface-3 text-muted" },
 };
-const ORDER = ["failed", "held", "deferred", "moved"];
+const ORDER = ["moved", "held", "failed", "deferred"];
 // Settings of the run that mean nothing to a reader of its page.
 const HIDDEN_PARAMS = new Set(["limit", "only", "automatic"]);
 
@@ -91,14 +91,19 @@ export function RunDetailPage() {
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5" data-tour="run-numbers">
           <Stat label="Took" value={data.started_at ? duration(data.started_at, data.finished_at) : "—"} hint={live ? "still going" : data.finished_at ? `finished ${ago(data.finished_at)}` : undefined} />
           <Stat label="Steps completed" value={totals.moved} hint={`${totals.newLeads} new lead${totals.newLeads === 1 ? "" : "s"} found`} tone="good" />
-          <Stat label="Held" value={totals.held} hint={totals.held ? "waiting on you or a rule" : "none"} tone={totals.held ? "attention" : undefined} />
-          <Stat label="Failed" value={totals.failed} hint={totals.failed ? "see the list below" : "none"} tone={totals.failed ? "error" : undefined} />
+          <Stat label="Held" value={totals.held} hint={totals.held ? "waiting on you or a rule" : "none"} />
+          <Stat label="Could not continue" value={totals.failed} hint={totals.failed ? "normal: no person or address found, or a step to try again" : "none"} />
           <Stat label="AI credits" value={credits(data.credits_milli)} hint={totals.moved ? `${credits(data.credits_milli / totals.moved)} per step completed` : "no paid calls"} />
         </div>
 
-        {(totals.failed > 0 || data.status === "failed") && (
-          <Callout tone="error" title={data.status === "failed" ? "This run failed" : `${totals.failed} step${totals.failed === 1 ? "" : "s"} failed`} className="mb-5">
-            The leads that failed are listed first below, each with the reason. A failed lead is tried again by the next run, or press Retry on its page.
+        {data.status === "failed" && (
+          <Callout tone="error" title="This run failed" className="mb-5">
+            The run itself stopped. Leads it did not reach are picked up by the next run.
+          </Callout>
+        )}
+        {totals.failed > 0 && data.status !== "failed" && (
+          <Callout tone="info" title={`${totals.failed} step${totals.failed === 1 ? "" : "s"} could not continue`} className="mb-5">
+            This is normal: most companies drop out because nobody suitable or no provable address was found. Each lead is asked again a few times, a day apart; the reason is listed below.
           </Callout>
         )}
         {discovery && (

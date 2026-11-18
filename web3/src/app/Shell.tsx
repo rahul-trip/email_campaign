@@ -35,11 +35,12 @@ export function useCounts() {
   const waiting = useQuery({ queryKey: ["waiting"], queryFn: () => ok(client.GET("/api/targets/waiting")), refetchInterval: 15000 });
   const linkedin = useQuery({ queryKey: ["linkedin", "drafted", "count"], queryFn: () => ok(client.GET("/api/linkedin", { params: { query: { state: "drafted", limit: 1 } } })), refetchInterval: 30000 });
   const usage = useUsage();
-  const held = Object.values(status.data?.held ?? {}).reduce((sum, n) => sum + n, 0);
   return {
     status,
     review: status.data?.waiting_for_review ?? 0,
-    attention: held + (status.data?.by_status?.failed ?? 0) + (waiting.data?.length ?? 0) + waitingTotal(usage.data),
+    // Only what a person can unblock: holds, steps that broke on every try, websites, credits.
+    attention: (status.data?.buckets?.decision ?? 0) + (waiting.data?.length ?? 0) + waitingTotal(usage.data),
+    working: status.data?.buckets?.working ?? 0,
     linkedin: linkedin.data?.total ?? 0,
   };
 }
@@ -148,7 +149,7 @@ function Frame({ children }: { children: ReactNode }) {
                       {count > 0 && (
                         <span
                           aria-label={`${count} waiting`}
-                          className={cx("tnum min-w-6 rounded-full px-1.5 text-center text-label font-bold", item.badge === "attention" ? "bg-attention-soft text-attention" : "bg-primary-soft text-primary")}
+                          className={cx("tnum min-w-6 rounded-full px-1.5 text-center text-label font-bold", item.badge === "attention" ? "bg-surface-3 text-ink-2" : "bg-primary-soft text-primary")}
                         >
                           {count}
                         </span>

@@ -22,6 +22,7 @@ from outbound.domain.enums import (
     ContactStatus,
     EmailStatus,
     EntityType,
+    FailureKind,
     HoldReason,
     JoinRequestStatus,
     LegalEntityType,
@@ -75,6 +76,7 @@ class Company:
     hold_reason: HoldReason | None = None
     failed_stage: str | None = None
     last_error: str | None = None
+    failure_kind: FailureKind | None = None
     attempts: int = 0
     credit_wait_step: UsageStep | None = None  # waiting, in place, for a credit (Phase 6d)
     next_action_at: datetime | None = None

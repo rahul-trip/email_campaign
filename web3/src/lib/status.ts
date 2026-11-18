@@ -18,7 +18,7 @@ export const leadStatus: Vocabulary = {
   qualified: s("Qualified", "working"),
   contacts_found: s("Contacts found", "working"),
   email_ready: s("Email ready", "working"),
-  copy_ready: s("Copy ready", "attention"),
+  copy_ready: s("Ready to approve", "good"),
   held: s("Held", "attention"),
   approved: s("Approved", "good"),
   in_sequence: s("In sequence", "good"),
@@ -166,7 +166,9 @@ export function describeHold(reason: string): HoldInfo {
 /** Where a lead is, from the funnel report's key (``waiting``, ``failed:<stage>``, ``held:<reason>``, a status). */
 export function leadOutcome(key: string): string {
   if (key === "waiting") return "Waiting to start";
-  if (key.startsWith("failed:")) return `Failed at ${humanize(key.slice(7)).toLowerCase()}`;
+  if (key === "screened:no_person") return "Screened out: no decision-maker found";
+  if (key === "screened:no_email") return "Screened out: no email we could prove";
+  if (key.startsWith("failed:")) return `Stopped at ${humanize(key.slice(7)).toLowerCase()}`;
   if (key.startsWith("held:")) return `Held: ${describeHold(key.slice(5)).label.toLowerCase()}`;
   return humanize(key);
 }
@@ -197,3 +199,24 @@ export const stagesDone = (status: string): number | null => STAGES_DONE[status]
 /** Every lead status, in pipeline order, for filters. */
 export const LEAD_STATUSES = Object.keys(leadStatus);
 export const HOLD_REASONS = Object.keys(holdReason);
+
+/** The four groups a lead falls into for a person (server: `domain/outcomes.py`). */
+export type Bucket = "ready" | "working" | "decision" | "screened_out" | "done";
+
+type Lead = { status: string; bucket?: string; failure_kind?: string | null; attempts?: number; max_tries?: number; hot?: boolean };
+
+/**
+ * The status chip for a lead. A lead that "failed" because nobody could be found or proven is
+ * not broken: it reads as a calm grey outcome, a retry in progress says which try it is on, and
+ * only a step that broke on every try is red.
+ */
+export function companyStatus(c: Lead): StatusInfo {
+  if (c.status !== "failed") return describe(leadStatus, c.status);
+  const tries = `${Math.min(c.attempts ?? 0, c.max_tries ?? 0)} of ${c.max_tries ?? 0}`;
+  const person = c.failure_kind === "no_person";
+  if (c.bucket === "screened_out") return s(person ? "No decision-maker found" : "No email we could prove", "stopped");
+  if (c.bucket === "ready") return s(c.hot ? "Hot: message on LinkedIn" : "Message on LinkedIn", "good");
+  if (c.bucket === "decision") return s(`Stopped after ${c.max_tries ?? ""} tries`.replace("  ", " "), "error");
+  if (c.failure_kind === "no_person" || c.failure_kind === "no_email") return s(`Looking again (try ${tries})`, "working");
+  return s(`Trying again (try ${tries})`, "working");
+}

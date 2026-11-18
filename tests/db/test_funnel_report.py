@@ -8,6 +8,7 @@ from outbound.domain.enums import (
     CandidateVerdict,
     CompanySource,
     CompanyStatus,
+    FailureKind,
     HoldReason,
 )
 from outbound.services.reports import ReportService, outcome
@@ -25,6 +26,11 @@ def _candidate(
 def test_a_lead_is_described_by_where_it_is() -> None:
     assert outcome(CompanyStatus.NEW, None, None) == "waiting"
     assert outcome(CompanyStatus.FAILED, None, "contacts") == "failed:contacts"
+    assert (
+        outcome(CompanyStatus.FAILED, None, "contacts", FailureKind.NO_PERSON)
+        == "screened:no_person"
+    )
+    assert outcome(CompanyStatus.FAILED, None, "email", FailureKind.ERROR) == "failed:email"
     assert outcome(CompanyStatus.HELD, HoldReason.CATCH_ALL_UNVERIFIED, None) == (
         "held:catch_all_unverified"
     )
