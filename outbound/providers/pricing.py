@@ -13,9 +13,16 @@ DEFAULT_PRICES: dict[str, int | None] = {
     "hunter:find": 24_500,  # Starter: $49 / 2,000 credits, 1 credit per address found
     "hunter:verify": 12_250,  # assumed 0.5 credit; the verifier docs do not state a cost
     "zerobounce:find": 160_000,  # 20 credits per address found at $0.008 a credit
+    # Estimates from the vendors' public plans, charged only for an address found: set the real
+    # price of your plan in PROVIDER_PRICES once you know it.
+    "anymailfinder:find": 29_000,  # about $29 for 1,000 credits, 1 per valid address
+    "prospeo:find": 39_000,  # about $39 for 1,000 credits, 1 per address found
+    "icypeas:find": 19_000,  # about $19 for 1,000 credits, 1 per address found
+    "generect:find": 20_000,  # $0.02 per valid address (its documented example)
     "zerobounce:verify": 8_000,  # $0.008; unknown results are free (billed=False)
     "myemailverifier:verify": 2_500,  # $0.0025 after the 100 free requests a day
     "orbisearch:verify": 200,  # 0.2 credit at $0.001 a credit
+    "orbisearch:resolve": 200,  # the same check, asked of an address a verifier called catch-all
     "enrichley:resolve": 11_800,  # about $0.0118 a credit
     "scrubby:resolve": None,  # pricing is not public
     "tavily:search": 8_000,  # $0.008 a credit, 1 credit for a basic search

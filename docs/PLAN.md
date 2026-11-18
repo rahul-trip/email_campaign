@@ -110,8 +110,8 @@ Three research findings shaped the design:
 | 5 | Persona-first discovery | Adopt | Tavily over the company's pages and public search. Apollo free tier is optional |
 | 6 | Waterfall with three finders and a verifier | Simplify | Any ordered chain is supported. The research's pay-as-you-go finder (OrbiSearch) has no API, so the candidates are Hunter and ZeroBounce, plus any cheaper API finder the bake-off adds |
 | 7 | Safe-to-send gate; split email statuses | Adopt | Part of schema v1 |
-| 8 | Catch-all resolvers | Adopt | Scrubby first (pay per use, 24–72 h); Enrichley as the real-time alternative |
-| 9 | Never email guessed permutations; cache each domain's pattern | Adopt | `companies.email_pattern` |
+| 8 | Catch-all resolvers | Adopt | Real-time resolvers (OrbiSearch, Enrichley) first; Scrubby (pay per use, about 72 h) for what they cannot settle |
+| 9 | Never email an unverified guess: the commonest formats are tried only when a verifier proves the mailbox, and each domain's pattern is cached ([ADR 0035](technical/adr/0035-verified-guesses-and-real-time-catch-all-answers.md)) | Adopt | `companies.email_pattern`; workspace setting `guess_verified_addresses` |
 | 10 | Bounce breaker: ≥3 hard bounces per 100 sends, or ≥2 in 24 h | Adopt | Hard and soft bounces are handled separately |
 | 11 | Copy limits, subject rules, no links in touch 1 | Adopt | Defaults enforced by the linter; the first-email length is a workspace setting |
 | 12 | Days 1/4/9, just-in-time follow-ups, send window | Adopt | Stored per campaign |

@@ -283,8 +283,13 @@ class CompanyRepository(ScopedRepository):
         last_error: str | None = None,
         next_action_at: datetime | Unset | None = UNSET,
         run_id: str | None = None,
+        vendor_wait: bool = False,
     ) -> Company:
         """Move a company to a new status through the state machine and log the move.
+
+        ``vendor_wait`` marks a failure that is a vendor's, not the lead's (no one could answer):
+        it is not counted as an attempt, and the attempts so far are forgiven, so the lead
+        keeps being retried until a vendor answers.
 
         ``run_id`` is recorded on the event when a run made the move, so a run can list what it
         did to each lead.
@@ -306,7 +311,7 @@ class CompanyRepository(ScopedRepository):
         if to is CompanyStatus.FAILED:
             row.failed_stage = failed_stage
             row.last_error = last_error
-            row.attempts += 1
+            row.attempts = 0 if vendor_wait else row.attempts + 1
         else:
             row.failed_stage = None
             row.last_error = None

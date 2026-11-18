@@ -19,13 +19,17 @@ from outbound.domain.enums import MailboxGateway
 from outbound.domain.errors import ConfigurationError
 from outbound.domain.vendors import BY_CODE
 from outbound.providers import oauth
+from outbound.providers.adapters.anymailfinder import AnymailFinder
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
 from outbound.providers.adapters.exa import ExaSearch
+from outbound.providers.adapters.generect import GenerectFinder
 from outbound.providers.adapters.hunter import HunterFinder, HunterVerifier
+from outbound.providers.adapters.icypeas import IcypeasFinder
 from outbound.providers.adapters.llm import OpenAiCompatibleLlm
 from outbound.providers.adapters.myemailverifier import MyEmailVerifierVerifier
-from outbound.providers.adapters.orbisearch import OrbiSearchVerifier
+from outbound.providers.adapters.orbisearch import OrbiSearchResolver, OrbiSearchVerifier
+from outbound.providers.adapters.prospeo import ProspeoFinder
 from outbound.providers.adapters.scrubby import ScrubbyResolver
 from outbound.providers.adapters.tavily import TavilySearch
 from outbound.providers.adapters.yc_directory import YcDirectory
@@ -64,6 +68,22 @@ _FINDERS: dict[str, _Entry[EmailFinder]] = {
         lambda s, c: ZeroBounceFinder(_key(s.zerobounce_api_key), client=c),
         lambda s: bool(_key(s.zerobounce_api_key)),
     ),
+    "anymailfinder": _Entry(
+        lambda s, c: AnymailFinder(_key(s.anymailfinder_api_key), client=c),
+        lambda s: bool(_key(s.anymailfinder_api_key)),
+    ),
+    "prospeo": _Entry(
+        lambda s, c: ProspeoFinder(_key(s.prospeo_api_key), client=c),
+        lambda s: bool(_key(s.prospeo_api_key)),
+    ),
+    "icypeas": _Entry(
+        lambda s, c: IcypeasFinder(_key(s.icypeas_api_key), client=c),
+        lambda s: bool(_key(s.icypeas_api_key)),
+    ),
+    "generect": _Entry(
+        lambda s, c: GenerectFinder(_key(s.generect_api_key), client=c),
+        lambda s: bool(_key(s.generect_api_key)),
+    ),
 }
 
 _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
@@ -94,6 +114,10 @@ _RESOLVERS: dict[str, _Entry[CatchAllResolver]] = {
     "enrichley": _Entry(
         lambda s, c: EnrichleyResolver(_key(s.enrichley_api_key), client=c),
         lambda s: bool(_key(s.enrichley_api_key)),
+    ),
+    "orbisearch": _Entry(
+        lambda s, c: OrbiSearchResolver(_key(s.orbisearch_api_key), client=c),
+        lambda s: bool(_key(s.orbisearch_api_key)),
     ),
 }
 
@@ -170,6 +194,13 @@ def configured_resolvers(
 
 def build_finder_chain(settings: Settings, client: httpx.Client | None = None) -> list[EmailFinder]:
     return _build(_FINDERS, settings.finder_chain, settings, client)
+
+
+def build_finder_named(
+    name: str, settings: Settings, client: httpx.Client | None = None
+) -> EmailFinder:
+    """One particular finder, whatever the chain is set to (a key test uses it)."""
+    return _build(_FINDERS, [name], settings, client)[0]
 
 
 def build_verifier(settings: Settings, client: httpx.Client | None = None) -> EmailVerifier:

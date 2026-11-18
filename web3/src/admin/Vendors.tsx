@@ -128,13 +128,19 @@ export function VendorsPage() {
                         {credits(v.credits_milli)}
                         {v.cap_credits != null ? ` of ${wholeCredits(v.cap_credits)}` : ""}
                         <span className="block text-label text-muted">{usd(v.cost_micro_usd)} billed</span>
+                        {v.balance != null && (
+                          <span className={v.balance <= 0 ? "block text-label font-semibold text-error" : "block text-label text-muted"} title="From the vendor's own account page: it is free to ask and is checked about every ten minutes">
+                            {v.balance.toLocaleString()} {v.balance_unit} left{v.balance_note ? `, ${v.balance_note}` : ""}
+                          </span>
+                        )}
                         <button type="button" className="ml-2 text-primary hover:underline" onClick={() => setCapping(v)}>
                           {v.cap_credits != null ? "Change cap" : "Set cap"}
                         </button>
                       </Td>
                       <Td>
-                        {v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
+                        {v.paused_for_credit ? <Pill tone="error">out of credit</Pill> : v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
                         {v.key_refusals > 0 && <div className="mt-1 text-label text-error">refused {v.key_refusals}× in the last day</div>}
+                        {v.paused_for_credit && <div className="mt-1 text-label text-muted">paused by itself; resumes when it has credit</div>}
                       </Td>
                       <Td className="space-x-1 text-right whitespace-nowrap">
                         {v.keys.length < MAX_KEYS && (

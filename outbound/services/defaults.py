@@ -61,6 +61,9 @@ def default_workspace_settings() -> dict[str, Any]:
         # Off: every email waits for a person. On: a cold lead's email (fit 80 or lower) is
         # approved, and saved as a draft, without one. Nothing is ever sent by the engine.
         "auto_approve_cold": False,
+        # On: with no known email format, the commonest few are tried and an address is used
+        # only if a verifier proves the mailbox exists. Off: finders only.
+        "guess_verified_addresses": True,
         "auto_discovery_per_day": 4,  # searches a day (about every six hours)
         "auto_discovery_review_limit": 50,  # none while this many drafts wait in Review
     }

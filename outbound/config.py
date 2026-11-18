@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # --- provider keys (blank means "not configured") ---
     hunter_api_key: SecretStr = SecretStr("")
     zerobounce_api_key: SecretStr = SecretStr("")
+    # Pay-as-you-go finders: charged only for an address found (see docs/technical/integrations).
+    anymailfinder_api_key: SecretStr = SecretStr("")
+    prospeo_api_key: SecretStr = SecretStr("")
+    icypeas_api_key: SecretStr = SecretStr("")
+    generect_api_key: SecretStr = SecretStr("")
     orbisearch_api_key: SecretStr = SecretStr("")
     myemailverifier_api_key: SecretStr = SecretStr("")
     enrichley_api_key: SecretStr = SecretStr("")
@@ -113,6 +118,10 @@ class Settings(BaseSettings):
     # Proxies whose X-Forwarded-For is trusted, so the login throttle and logs see the real
     # client. "*" is right in the container, whose port is published on the VM's loopback only.
     forwarded_allow_ips: str = "127.0.0.1"
+
+    # Ask each vendor with a free balance call what its account has left (the admin console
+    # shows it, and a finder with none is paused). The tests turn it off: no test calls a vendor.
+    vendor_balance_checks: bool = True
 
     # --- email waterfall (provisional until the bake-off) ---
     # Finders are tried in this order. OrbiSearch is verify-only, so it cannot be a finder.

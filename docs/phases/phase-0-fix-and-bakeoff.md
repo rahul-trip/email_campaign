@@ -88,7 +88,7 @@ Every run was re-drafting every existing row, because `sync_drafts` called `run_
 Two things only the team can supply:
 
 1. **API keys in `.env`** (copy from [`.env.example`](../../.env.example)): at least one finder and one verifier. For a meaningful comparison, use Hunter and ZeroBounce for finding, and MyEmailVerifier, OrbiSearch and ZeroBounce for verifying, plus Enrichley and Scrubby for catch-alls. Scrubby also needs `SCRUBBY_BASE_URL` from your account.
-2. **The 30 known contacts** in `data/private/bakeoff_contacts.csv` (git-ignored). Use [`data/bakeoff_contacts.example.csv`](../../data/bakeoff_contacts.example.csv) as the template.
+2. **The 30 known contacts** in `data/private/bakeoff_contacts.csv` (git-ignored). Use [`data/bakeoff_contacts.example.csv`](../../data/bakeoff_contacts.example.csv) as the template, or (2026-11-18) build the list from a workspace's own proven addresses: `uv run python -m scripts.bakeoff_contacts --workspace <slug> --limit 30` (people whose address a verifier proved, at their company's own domain). The new pay-as-you-go finders (Anymail Finder, Prospeo, Icypeas, Generect) and OrbiSearch as a catch-all resolver are compared in the same run once their keys are set.
    - Columns: `first_name, last_name, domain, country, known_email` (plus optional `full_name`).
    - At least 10 each from the US, UK and EU, and at least 5 whose domain is catch-all.
 

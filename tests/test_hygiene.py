@@ -25,6 +25,9 @@ def test_the_machines_own_environment_never_reaches_the_settings(
         if name.upper() == "SECRETS_KEYS":
             assert os.environ[name.upper()] == TEST_SECRETS_KEYS  # the tests' own fixed key
             continue
+        if name.upper() == "VENDOR_BALANCE_CHECKS":
+            assert os.environ[name.upper()] == "false"  # the tests' own: no vendor is asked
+            continue
         assert os.environ.get(name.upper()) is None, f"{name.upper()} leaked into the test"
     monkeypatch.setenv("MONTHLY_CAPS_MICRO_USD", '{"zerobounce": 1}')
     assert Settings(_env_file=None).monthly_caps_micro_usd == {"zerobounce": 1}

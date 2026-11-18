@@ -27,6 +27,7 @@ _RESULT_MAP = {
 
 class EnrichleyResolver:
     name = "enrichley"
+    realtime = True  # the answer comes back with the call
 
     def __init__(self, api_key: str, *, client: httpx.Client | None = None) -> None:
         key = require_api_key(self.name, api_key)

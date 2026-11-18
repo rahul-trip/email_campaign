@@ -86,6 +86,7 @@ def update_workspace_settings(
         "email_max_words",
         "auto_discovery",
         "auto_approve_cold",
+        "guess_verified_addresses",
         "auto_discovery_per_day",
         "auto_discovery_review_limit",
     ):

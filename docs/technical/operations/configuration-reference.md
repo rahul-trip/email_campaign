@@ -58,10 +58,12 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `TAVILY_API_KEY` | str | — | yes | D | Research, discovery, name-only intake (the worker refuses to start without it) |
 | `HUNTER_API_KEY` | str | — | yes | D | `hunter` in the chain |
 | `ZEROBOUNCE_API_KEY` | str | — | yes | D | `zerobounce` in the chain |
+| `ANYMAILFINDER_API_KEY`, `PROSPEO_API_KEY`, `ICYPEAS_API_KEY`, `GENERECT_API_KEY` | str | — | yes | D | The pay-as-you-go finders (charged only for an address found); name them in `FINDER_CHAIN` (`anymailfinder`, `prospeo`, `icypeas`, `generect`) once the bake-off has chosen. Also manageable in the admin console |
 | `MYEMAILVERIFIER_API_KEY` | str | — | yes | D | `VERIFIER=myemailverifier` (default) |
 | `ORBISEARCH_API_KEY` | str | — | yes | D | `VERIFIER=orbisearch` |
 | `ENRICHLEY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=enrichley` |
 | `SCRUBBY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=scrubby` (default) |
+| `VENDOR_BALANCE_CHECKS` | bool | `true` | no | D | Ask each vendor that has a free balance call what its account has left: the admin console shows it, and a finder with none is paused by the worker (and resumed when it has credit). The tests set it `false` |
 | `VENDOR_KEY_POOLS` | JSON | `{}` | yes | D | Not set by hand: the admin console's extra key slots fill it (`{"tavily": ["key1", "key2"]}`); a vendor with two or more keys uses one at random per call (PLAN decision 37) |
 | `SCRUBBY_BASE_URL` | str | `https://api.scrubby.io` | | D | Optional; Scrubby's documented address |
 | `COMPANIES_HOUSE_API_KEY` | str | — | yes | D | Optional: UK incorporation checks, and UK companies by industry code for discovery |
@@ -146,6 +148,7 @@ These are stored in `workspaces.settings` and edited in the app (Settings, and P
 | Key | Default | Editable | Purpose |
 |---|---|---|---|
 | `safe_to_send_only` | true | yes | Refuse unverifiable catch-all addresses |
+| `guess_verified_addresses` | true | yes | With no known email format for a company, try the commonest four and use one only if a verifier proves the mailbox exists ([ADR 0035](../adr/0035-verified-guesses-and-real-time-catch-all-answers.md)); off: finders only |
 | `budget_per_prospect_credits` | 50 | yes (`null` means no ceiling; `0` means no paid calls) | The AI credits one lead may use (migration 0029 converted the old `budget_per_prospect_micro_usd`) |
 | `few_shot_examples` | 5 | yes (0–20) | Operator edits shown to the writer |
 | `timezone` | `UTC` | yes | For the Phase 5 send window |

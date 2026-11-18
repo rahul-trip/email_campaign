@@ -58,3 +58,4 @@ An ADR records one architecturally significant decision: the context, what was d
 | [0032](0032-discovery-roles-and-website-picks-by-closed-choice.md) | Discovery decides what a company is, and which site is its own, by closed choice | Accepted | 2026-11-14 |
 | [0033](0033-cold-drafts-may-be-approved-without-a-person.md) | Cold drafts may be approved without a person, when a workspace switches it on | Accepted | 2026-11-16 |
 | [0034](0034-one-ai-credit-balance-metered-per-call.md) | One balance of AI credits per workspace, used by every vendor and model call | Accepted | 2026-11-18 |
+| [0035](0035-verified-guesses-and-real-time-catch-all-answers.md) | Address formats are tried only when a verifier proves them, and real-time resolvers settle catch-alls first | Accepted | 2026-11-18 |

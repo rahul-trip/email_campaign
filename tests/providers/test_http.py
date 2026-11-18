@@ -8,7 +8,12 @@ import httpx
 import pytest
 from tenacity import wait_none
 
-from outbound.providers.errors import ProviderAuthError, ProviderError, RateLimited
+from outbound.providers.errors import (
+    BudgetExceeded,
+    ProviderAuthError,
+    ProviderError,
+    RateLimited,
+)
 from outbound.providers.http import HttpClient
 
 
@@ -135,3 +140,36 @@ def test_error_messages_never_contain_the_api_key() -> None:
     with pytest.raises(ProviderError) as info:
         client.get_json("/find", {"api_key": "SECRET123", "domain": "a.com"})
     assert "SECRET123" not in str(info.value)
+
+
+def test_a_quota_429_is_out_of_credit_and_is_not_retried() -> None:
+    # Hunter, 2026-11-18: 429 "reached the limit ... searches per billing period ... your plan".
+    calls: list[int] = []
+    body = {"errors": [{"id": "too_many_requests", "code": 429, "details": (
+        "You've reached the limit for the number of searches per billing period included in "
+        "your plan.")}]}  # fmt: skip
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(429, json=body)
+
+    with pytest.raises(BudgetExceeded) as info:
+        make_client(handler).get_json("/email-finder")
+    assert len(calls) == 1 and not info.value.retryable
+
+
+def test_a_payment_required_answer_is_out_of_credit() -> None:
+    with pytest.raises(BudgetExceeded):
+        make_client(lambda request: httpx.Response(402)).get_json("/x")
+
+
+def test_a_plain_429_is_still_a_rate_limit_that_is_retried() -> None:
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(429, json={"errors": [{"details": "Too many requests per second"}]})
+
+    with pytest.raises(RateLimited):
+        make_client(handler).get_json("/x")
+    assert len(calls) == 3

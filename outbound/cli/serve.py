@@ -199,6 +199,7 @@ def register(app: typer.Typer) -> None:
             tick_every=tick_every,
             periodic=[
                 lambda: _enforce_caps(vendors, notices),
+                lambda: _credit_check(vendors, notices),
                 notices.run,
                 directory.run,
                 activity.prune,
@@ -211,6 +212,30 @@ def register(app: typer.Typer) -> None:
             engine.run_forever(poll_seconds=poll_seconds)
         except KeyboardInterrupt:
             typer.echo("stopped")
+
+
+def _credit_check(vendors: VendorService, notices: NoticeService) -> None:
+    """Pause a finder that ran out of credit, resume it when it has credit; tell staff."""
+    paused, resumed = vendors.handle_credit()
+    day = f"{utcnow():%Y-%m-%d}"
+    if paused:
+        notices.to_staff(
+            f"{', '.join(paused)} ran out of credit and was paused",
+            f"{', '.join(paused)}: the account has no credit left, so its calls were failing and "
+            "leads were waiting for it. It is paused so nothing calls it; it resumes by itself "
+            "once its balance shows credit. Top it up, or add another finder under Vendors "
+            "and keys.",
+            key=f"credit_paused:{','.join(sorted(paused))}:{day}",
+            link="/admin/vendors",
+        )
+    if resumed:
+        notices.to_staff(
+            f"{', '.join(resumed)} has credit again and was resumed",
+            f"{', '.join(resumed)} answers again. Leads that were waiting for a finder are "
+            "tried again within a couple of hours.",
+            key=f"credit_resumed:{','.join(sorted(resumed))}:{day}",
+            link="/admin/vendors",
+        )
 
 
 def _enforce_caps(vendors: VendorService, notices: NoticeService) -> None:

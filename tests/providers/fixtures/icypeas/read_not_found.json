@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "items": [
+    {
+      "_id": "kMnquYkBTs8kZM9ND26h",
+      "status": "NOT_FOUND",
+      "results": {
+        "emails": []
+      }
+    }
+  ],
+  "total": 1
+}

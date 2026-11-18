@@ -126,8 +126,13 @@ def platform(platform_engine: Engine) -> PlatformUnitOfWorkFactory:
 
 def make_workspace(platform: PlatformUnitOfWorkFactory, name: str = "acme") -> str:
     with platform() as directory:
+        # Guessing is off here: these tests are about the finders, and the fake verifier calls
+        # every address valid, so the first guessed format would always win. The guessing
+        # tests (tests/db/test_email_stage.py) turn it on for their own workspace.
         workspace = directory.workspaces.create(
-            name, {"legal_name": name}, {"safe_to_send_only": True}
+            name,
+            {"legal_name": name},
+            {"safe_to_send_only": True, "guess_verified_addresses": False},
         )
         directory.commit()
     return workspace.id

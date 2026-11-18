@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from outbound.providers.errors import ProviderAuthError, ProviderError
+from outbound.providers.errors import BudgetExceeded, ProviderAuthError, ProviderError
 from outbound.providers.http import HttpClient, require_api_key
 from outbound.providers.ports import (
     FinderResult,
@@ -41,12 +41,22 @@ _VERIFY_MAP = {
 
 
 def _check_error(provider: str, payload: dict[str, Any]) -> None:
-    error = payload.get("error")
+    """ZeroBounce reports trouble in an ``error`` field, or, for a bad key or an empty account,
+    in a ``Message`` field with HTTP 200 (read as "nothing found" until 2026-11-18)."""
+    error = payload.get("error") or payload.get("Error")
     if error:
         text = str(error)
         if "key" in text.lower() or "credit" in text.lower():
             raise ProviderAuthError(provider, text)
         raise ProviderError(provider, text)
+    message = payload.get("Message")
+    if isinstance(message, str) and ("key" in message.lower() or "credit" in message.lower()):
+        raise _KeyOrCredit(provider, message)
+
+
+class _KeyOrCredit(ProviderAuthError):
+    """ZeroBounce uses one sentence for a bad key and for no credits ("Invalid API key or your
+    account ran out of credits"); ``_ZeroBounceBase._get`` settles which with a free call."""
 
 
 class _ZeroBounceBase:
@@ -62,8 +72,23 @@ class _ZeroBounceBase:
         payload = self._http.get_object(path, {**params, "api_key": self._api_key})
         if not isinstance(payload, dict):
             raise ProviderError(self.name, f"GET {path}: unexpected response shape")
-        _check_error(self.name, payload)
+        try:
+            _check_error(self.name, payload)
+        except _KeyOrCredit as unclear:
+            raise self._key_or_credit(str(unclear)) from None
         return payload
+
+    def _key_or_credit(self, message: str) -> ProviderError:
+        """``getcredits`` is free: it answers -1 for a key it does not know, else the balance."""
+        try:
+            credits = self._http.get_object("/getcredits", {"api_key": self._api_key}).get(
+                "Credits"
+            )
+        except ProviderError:
+            return ProviderAuthError(self.name, message)
+        if str(credits).strip() == "-1":
+            return ProviderAuthError(self.name, "the API key is not valid")
+        return BudgetExceeded(self.name, "the account is out of credits")
 
 
 class ZeroBounceFinder(_ZeroBounceBase):

@@ -1,0 +1,11 @@
+{
+  "data": {
+    "valid_email": "jane.doe@acme.com",
+    "result": "valid",
+    "catch_all": false,
+    "source": "generect"
+  },
+  "meta": {
+    "amount_charged": 0.02
+  }
+}

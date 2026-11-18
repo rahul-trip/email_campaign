@@ -36,7 +36,7 @@ from outbound.logging import bind, get_logger, unbind
 from outbound.metering.metered import call_scope
 from outbound.metering.quota import STAGE_CHARGES
 from outbound.runner.guards import Guards, Refusal, RefusalKind
-from outbound.stages.base import Reader, Stage, StageContext, StageResult
+from outbound.stages.base import Reader, Stage, StageContext, StageResult, VendorUnavailable
 
 log = get_logger(__name__)
 
@@ -77,6 +77,7 @@ class Runner:
         *,
         retry_delay: timedelta = timedelta(minutes=15),
         defer_delay: timedelta = timedelta(hours=1),
+        vendor_wait: timedelta = timedelta(hours=2),
         max_attempts: int = 3,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
@@ -85,6 +86,7 @@ class Runner:
         self._stages = tuple(stages)
         self._guards = guards
         self._retry_delay = retry_delay
+        self._vendor_wait = vendor_wait
         self._defer_delay = defer_delay
         self._max_attempts = max_attempts
         self._read = Reader(uow_factory, workspace_id)
@@ -343,7 +345,9 @@ class Runner:
                 if current.status is not stage.input_status:
                     return Outcome.SKIPPED
                 if stage.name in STAGE_INPUT_STATUS:
-                    self._fail(uow, stage, current, message)
+                    self._fail(
+                        uow, stage, current, message, vendor=isinstance(error, VendorUnavailable)
+                    )
                     outcome = Outcome.FAILED
                 else:
                     self._defer(uow, current, message)
@@ -353,9 +357,13 @@ class Runner:
             return Outcome.SKIPPED
         return outcome
 
-    def _fail(self, uow: UnitOfWork, stage: Stage, company: Company, message: str) -> None:
-        # Back off a little longer after each failure so a broken vendor is not hammered.
-        wait = self._retry_delay * (company.attempts + 1)
+    def _fail(
+        self, uow: UnitOfWork, stage: Stage, company: Company, message: str, *, vendor: bool = False
+    ) -> None:
+        # Back off a little longer after each failure so a broken vendor is not hammered. When no
+        # vendor could answer, the lead is not at fault: it waits a fixed while and no attempt
+        # is counted, so it is picked up again whenever a vendor is back.
+        wait = self._vendor_wait if vendor else self._retry_delay * (company.attempts + 1)
         uow.companies.transition(
             company.id,
             CompanyStatus.FAILED,
@@ -364,6 +372,7 @@ class Runner:
             last_error=message,
             next_action_at=self._now() + wait,
             run_id=self._run_id,
+            vendor_wait=vendor,
         )
 
     @staticmethod

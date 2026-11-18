@@ -6,7 +6,10 @@ Each candidate address is verified the moment it is found, because a finder's "f
 1. an address the operator gave (finders are skipped; it is still verified);
 2. an address published on the company's own site that fits the person;
 3. the company's learned pattern, one address only;
-4. each finder in the configured order.
+4. without a learned pattern, the commonest formats one by one, each used only if a verifier
+   proves the mailbox exists (``_guess``; not on a catch-all domain, where a verifier proves
+   nothing);
+5. each finder in the configured order.
 
 ``valid`` stops the search. ``invalid`` or ``unknown`` moves on to the next finder. ``catch_all``
 (the server accepts anything, so the mailbox is unproven) goes to the resolver and ends the
@@ -35,7 +38,8 @@ from outbound.providers.ports import (
     ResolutionStatus,
     VerificationStatus,
 )
-from outbound.stages.email.patterns import build_address, matches_person
+from outbound.stages.email.fallback import realtime_answer
+from outbound.stages.email.patterns import GUESS_PATTERNS, build_address, matches_person
 
 log = get_logger(__name__)
 
@@ -70,6 +74,13 @@ class Outcome:
     # The resolver did not answer (an outage or a refused key), as distinct from answering
     # "cannot prove it": nothing is recorded, so the lead can be tried again.
     resolver_down: bool = False
+    # Whether any vendor answered. A finder that returned "nothing found" answered; one that
+    # raised (out of credit, down, paused and so absent) did not. The email step uses these to
+    # tell "no such address" from "no one could look".
+    finders_reached: bool = False
+    finders_answered: int = 0
+    checks_answered: int = 0
+    checks_failed: int = 0
 
     @property
     def pending(self) -> bool:
@@ -85,6 +96,9 @@ class Target:
     pattern: str | None = None
     site_emails: Sequence[str] = ()
     safe_to_send_only: bool = True
+    # Try the commonest address formats (verified one by one) before the paid finders. Off for a
+    # domain already known to accept everything, and where the country's rule forbids a guess.
+    allow_guesses: bool = False
     # Finders left out for this company (the shared directory, when the lead skips it).
     skip_finders: frozenset[str] = frozenset()
     # True for an address that must never be contacted (the do-not-contact list). Checked
@@ -146,12 +160,20 @@ class Waterfall:
             if outcome.pending or outcome.catch_all_unverified or outcome.resolver_down:
                 return outcome
 
+        if (
+            target.allow_guesses
+            and not target.pattern
+            and self._guess(contact, target, tried, outcome)
+        ):
+            return outcome
+
         query = PersonQuery(
             first_name=first,
             last_name=last,
             company_name=target.name,
             linkedin_url=contact.linkedin_url,
         )
+        outcome.finders_reached = True
         for finder in self._finders:
             if finder.name in target.skip_finders:
                 continue
@@ -160,6 +182,7 @@ class Waterfall:
             except ProviderError as error:
                 outcome.problems.append(f"{finder.name}: {error}")
                 continue
+            outcome.finders_answered += 1
             if not found.email:
                 continue
             address = found.email.lower()
@@ -178,6 +201,40 @@ class Waterfall:
         return outcome
 
     # ------------------------------------------------------------------ helpers
+
+    def _guess(self, contact: Contact, target: Target, tried: set[str], out: Outcome) -> bool:
+        """Verify the commonest formats in turn and use the first the verifier proves valid.
+
+        Nothing is saved for a wrong guess. A catch-all or unknown answer proves nothing about
+        any format at that domain, so guessing stops there (the finders go on); the resolver is
+        not asked, which would spend a check on every format.
+        """
+        first, last = contact.first_name or "", contact.last_name or ""
+        for pattern in GUESS_PATTERNS:
+            address = build_address(pattern, first, last, target.domain)
+            if not address or address in tried or target.is_blocked(address):
+                continue
+            try:
+                checked = self._verifier.verify(address)
+            except ProviderError as error:
+                out.problems.append(f"{self._verifier.name}: {error}")
+                out.checks_failed += 1
+                return False
+            out.checks_answered += 1
+            if checked.status is not VerificationStatus.CATCH_ALL:
+                tried.add(address)  # proven good or bad; a catch-all may still come from a finder
+            if checked.status is VerificationStatus.VALID:
+                made = Record(
+                    address, Provenance.PATTERN_INFERRED, EmailStatus.VALID, None,
+                    checked.provider or self._verifier.name, contact_id=contact.id,
+                )  # fmt: skip
+                out.records.append(made)
+                out.chosen = made
+                out.verdict = Verdict.READY
+                return True
+            if checked.status is not VerificationStatus.INVALID:
+                return False
+        return False
 
     def _reuse(self, held: ContactEmail, contact: Contact, target: Target, out: Outcome) -> bool:
         """Use an address we already have. True when the search is over.
@@ -213,6 +270,26 @@ class Waterfall:
             out.verdict = Verdict.PENDING
             return True
         if held.status is EmailStatus.CATCH_ALL_UNVERIFIED:
+            # It could not be proven when it was found; a real-time resolver may settle it now
+            # (the answer is cached, so asking again costs nothing).
+            answer = realtime_answer(self._resolver, held.email)
+            if answer is not None and answer.status is ResolutionStatus.VALID:
+                made = Record(
+                    held.email, held.provenance, EmailStatus.CATCH_ALL_RESOLVED, held.found_by,
+                    answer.provider, None, existing_id=held.id, contact_id=contact.id,
+                )  # fmt: skip
+                out.records.append(made)
+                out.chosen = made
+                out.verdict = Verdict.READY
+                return True
+            if answer is not None:
+                out.records.append(
+                    Record(
+                        held.email, held.provenance, EmailStatus.INVALID, held.found_by,
+                        answer.provider, None, existing_id=held.id, contact_id=contact.id,
+                    )
+                )  # fmt: skip
+                return False
             out.catch_all_unverified = True
             return False
         if held.status is EmailStatus.UNVERIFIED:  # given by the operator, never checked
@@ -236,7 +313,9 @@ class Waterfall:
             checked = self._verifier.verify(address)
         except ProviderError as error:
             out.problems.append(f"{self._verifier.name}: {error}")
+            out.checks_failed += 1
             return False
+        out.checks_answered += 1
         # The vendor that answered: with backups it may not be the first one.
         verified_by = checked.provider or self._verifier.name
 
