@@ -104,7 +104,7 @@ Your workspace is on a **plan** that gives a number of **AI credits** a month, c
 When the AI credits run out nothing is lost and nothing fails:
 
 - A company you add is saved as **waiting for AI credits** (on **Add leads**), and becomes a lead when credits are back.
-- A lead stops before its next step that uses credits, keeps its status (an approved email stays approved, and is still saved to your mailbox, which uses none) and appears under **Needs attention → Waiting for AI credits**. A step that had already started finishes, so you may go a little past your allowance.
+- A lead stops before its next step that uses credits, keeps its status (an approved email stays approved, and is still saved to your mailbox, which uses none) and appears under **Needs a decision → Waiting for AI credits**. A step that had already started finishes, so you may go a little past your allowance.
 - Search for new companies, **Write it again** and **Ask for changes** wait until credits are back.
 
 Waiting work continues **by itself** as soon as credits are back: when the month renews, when the team who runs the service gives you extra credits or a larger plan, or when they extend your access. **Resume** (on a lead, or **Resume all now**) tries at once; without credits it says when they renew. Past the **access date** the workspace is read-only: you can read everything, but nothing can be added or run until access is extended. **Settings → Plan and usage** has **Ask for more AI credits** (say how many if you know), which works even then.
@@ -112,7 +112,7 @@ Waiting work continues **by itself** as soon as credits are back: when the month
 ### 3.4 The guided tour
 
 The first time you sign in on a browser (once setup is done), a one-minute tour opens by itself:
-nine steps across seven stops — Welcome, Today, ⌘K search, Review, Needs attention, Leads,
+nine steps across seven stops — Welcome, Today, ⌘K search, Emails ready, Needs a decision, Leads,
 Discovery runs, Campaigns, and a send-off. Each step spotlights the part of the screen it is
 about, with a short line on what it does for you; a little rocket moves along the track as you go.
 
@@ -142,7 +142,7 @@ step per screen that matters. Give the element `data-tour="name"` and use that n
 
 ## 5. The screens
 
-The menu on the left groups the screens by what you do there. The numbers next to **Review** and **Needs attention** are how many items wait for you there. **Replies** and **Sending** are marked *Soon*: they arrive in later phases.
+The menu on the left groups the screens by what you do there. The numbers next to **Emails ready** and **Needs a decision** are how many items wait for you there; the second counts only what a person can unblock, so a company the engine screened out is never in it. **Hot leads** (the LinkedIn page) shows how many messages are written. **Replies** and **Sending** are marked *Soon*: they arrive in later phases.
 
 Across the top:
 
@@ -158,13 +158,16 @@ On a narrow screen the menu folds away; open it with the button at the top left.
 
 The first screen after signing in.
 
-**The bell** in the top bar (on every page) lists what the engine did, newest first, and each line opens the page it is about: *drafts waiting for review* (and how many are hot), *a hot lead* (once for each lead), *leads that need you* (held or failed), *cold drafts approved automatically*, *your run finished* (only for runs you started), *a run failed*, *automatic discovery is paused*, and credit and access warnings. A line you have not read is updated instead of repeated, so a busy day is a few lines, not a list. **Mark all read** clears the count; lines older than 90 days are removed.
+**The bell** in the top bar (on every page) lists what the engine did, newest first, and each line opens the page it is about: *drafts waiting for review* (and how many are hot), *a hot lead* (once for each lead), *leads that need a decision* (a hold, or a step that broke on every try), *cold drafts approved automatically*, *your run finished* (only for runs you started), *a run failed*, *automatic discovery is paused*, and credit and access warnings. A line you have not read is updated instead of repeated, so a busy day is a few lines, not a list. **Mark all read** clears the count; lines older than 90 days are removed.
 
-- **Needs you:** emails to review, leads on hold (with the reasons), failed leads and websites to confirm. Each card opens the list behind it.
-- **Pipeline:** how many companies sit at each of the eight stages, from Intake to Drafted, and how many left the main path (held, disqualified, failed, rejected, suppressed). Click a stage to open those leads.
+- **Emails ready:** the big card at the top says how many emails are waiting, and shows the best three (hot leads first) with the subject and the start of the email. **Approve** approves one on the spot (it is saved to your mailbox as a draft within 15 minutes); an email with a skipped check says **Check and approve** and opens it in Review. **Start reviewing** opens the whole queue.
+- **Hot leads: reach them on LinkedIn:** up to three hot leads (fit above 80) whose LinkedIn message is written, with the same buttons as the Hot leads page. Some of these leads have no email we could prove, so LinkedIn is the way in.
+- **This week:** emails approved, how many went out unedited, and new leads.
+- **Behind the scenes:** where every company went: *reached you*, *being worked on*, *needs a decision*, *screened out*. Most companies are meant to drop out (they do not fit your brief, nobody suitable works there, or no address could be proven), so a long grey *screened out* bar means the engine is working, not failing. Each box opens those leads.
+- **Needs a decision:** only what you can unblock: holds (with the reasons), steps that broke on every try, websites to confirm and leads waiting for credits. It is empty on a good day.
 - **AI credits** used over the last 30 days, per vendor and per prospect against your budget; **Quality** (how many sent emails went out without an edit, against the 80% target); and **Engine activity**, the last run and what it did.
 
-### 5.2 Review
+### 5.2 Emails ready (Review)
 
 This is where you spend most of your time.
 
@@ -195,12 +198,28 @@ Good to know:
 - Your edits teach the writer: your most recent corrected emails in the same campaign are shown to it as examples (the number is set in Settings → Limits and budget).
 - A *flagged* email is not an error. It means "look carefully here".
 
-### 5.3 Needs attention
+### Where a lead goes
 
-Everything that waits on you apart from review, grouped by reason, each group saying in plain words why and what fixes it:
+Every lead is in one of five groups, and the app words them calmly:
+
+| Group | What it holds | Where you see it |
+|---|---|---|
+| **Ready for you** | an email waiting for approval; a hot lead nobody could email, with its LinkedIn message | Emails ready, Hot leads |
+| **Working on it** | still being researched, or tried again by itself (*Trying again, try 2 of 5*), or a catch-all being resolved | Leads → Working on it |
+| **Needs a decision** | a hold only you can resolve, or a step that broke on every try (*Stopped after 5 tries*) | Needs a decision |
+| **Approved & sent** | approved, in your mailbox, in a sequence, replied | Leads → Approved & sent |
+| **Screened out** | does not fit, rejected, suppressed, or nobody to write to (*No decision-maker found*, *No email we could prove*) | Leads → Screened out (grey) |
+
+*Nobody to write to* is an answer, not a breakage: the engine asks again **3 times, a day apart**, in case people or addresses turn up, and then the lead is screened out. A step that really broke (a timeout, a refused key) is tried again soon, up to **5 times**. You can always press **Find people again** or **Find email again** on a screened-out lead. A hot lead (fit above 80) that ends this way moves to *Ready for you* so you can message the person on LinkedIn.
+
+### 5.3 Needs a decision
+
+Only what waits on a choice of yours, apart from review, grouped by reason, each group saying in plain words why and what fixes it. A lead that is still being tried again, or that the engine screened out, is not here: see *Where a lead goes* below.
+
+
 
 - **Held** leads, one group per hold reason (section 7.1). Each row offers the action that resolves it: **Use XX and release** when the research suggested a country, **Add a person with consent** for consent and company-type holds, or *Waiting for the resolver* for catch-all addresses. A lead held on a catch-all address the resolver could not prove has **Find email again** (searches that person's address afresh, with new answers from the vendors, in one run started now); **Find again for all (N)** on the group does the same for every lead in it after you confirm that each lookup uses AI credits.
-- **Failed** leads, one group per step that failed (research, qualification, people, the email address, writing the email, the mailbox), with the reason and when the automatic retry is due. **Retry now** retries one lead at once; **Retry all (N)** on a group retries every lead in it, and **Retry every failed lead** (shown when more than one step failed) retries them all. Each lead goes back to its own failed step, in one run started now, after you confirm; a step that pays vendors costs again, while what was already found is reused. A lead that moved on since the page loaded is skipped and counted.
+- **Stopped** leads: a step that broke on every try (5 tries, with longer waits), one group per step (research, qualification, people, the email address, writing the email, the mailbox), with the reason. **Retry now** retries one lead at once; **Retry all (N)** on a group retries every lead in it, and **Retry every stopped lead** (shown when more than one step failed) retries them all. Each lead goes back to its own failed step, in one run started now, after you confirm; a step that pays vendors costs again, while what was already found is reused. A lead that moved on since the page loaded is skipped and counted.
 - Leads held because you **messaged them on LinkedIn** have **Release all (N)**: each goes back to finding and writing its email, in one run.
 - Country, consent and company-type holds have no button for all of them: each needs its own fix first (a country, a person with consent), and releasing them without it would only hold them again.
 - **Websites to confirm:** companies added by name where the website found is not certain. Press **Yes, domain** if the guess is right, or type the right website and press **Use this website**.
@@ -225,7 +244,7 @@ Other fields: job title, country (for example `UK`, `DE`, or a name like `German
 
 **Upload a file.** A CSV or Excel file, up to 2 MB. Column names are matched loosely (for example `Company`, `Website`, `Email`, `Person`, `Title`, `LinkedIn`, `Country`, `Notes`, `Priority`). Press **1. Preview** first: it shows what each row would become and saves nothing. Then **2. Import**.
 
-**Websites to confirm.** The same list as on Needs attention.
+**Websites to confirm.** The same list as on Needs a decision.
 
 **Results for each row**
 
@@ -239,17 +258,17 @@ Other fields: job title, country (for example `UK`, `DE`, or a name like `German
 
 Things that always apply: a company or address on the do-not-contact list is never added; the same website is never added twice; values you type (name, country, priority) are marked as yours and the engine will not overwrite them.
 
-### 5.4a LinkedIn
+### 5.4a Hot leads (LinkedIn)
 
 For each confirmed decision-maker who has a LinkedIn profile, the engine writes two texts **right after people are found and before any email address is looked for**, so you can reach them without waiting for an email to be found and checked: a **connection note** (200 characters at most, the limit of a free LinkedIn account) and a **first message** of 60 to 100 words to send once they accept. Only people confirmed to work at the company get one, and only decision-makers (the campaign's job titles, a founder, a C-level, a vice president, a director, or someone you added). A person you want to write to who is not on the list: **Write LinkedIn message** on the lead page.
 
 **Nothing is ever sent from this application**: you copy the text into LinkedIn yourself.
 
-- The **LinkedIn** page lists every message, newest first, in three tabs: *To send*, *Sent* and *Skipped*. For each, **Copy & open LinkedIn** beside the note copies it and opens the person's profile in a new tab, ready to paste; the same button beside the message does the same once they accept. Then **Mark sent on LinkedIn**. Without a profile link the buttons only **Copy**; **Open their LinkedIn** still opens the profile on its own. The lead's name links to the lead page.
+- The **Hot leads** page (named LinkedIn in the address) lists every message, hot leads first (best fit on top) and then the newest, in three tabs: *To send*, *Sent* and *Skipped*. For each, **Copy & open LinkedIn** beside the note copies it and opens the person's profile in a new tab, ready to paste; the same button beside the message does the same once they accept. Then **Mark sent on LinkedIn**. Without a profile link the buttons only **Copy**; **Open their LinkedIn** still opens the profile on its own. The lead's name links to the lead page.
 - The lead page has the same messages in its **LinkedIn** card, under *People and addresses*.
 - **Edit** changes the words; what you save is yours and the checks no longer apply. **Rewrite** writes a fresh pair. **Skip** sets one aside (**Use it again** undoes it).
 - A message the checks still object to (too long, a link, a leftover placeholder, wording that reads like a template) shows what is wrong in a yellow note, so you edit it before you use it.
-- **Mark sent on LinkedIn** is final and holds the lead's email: the lead goes on hold as *Messaged on LinkedIn*, so the person is not contacted twice at once, and an email waiting for review is withdrawn. Release the hold (on the lead page, or under Needs attention) when you want the email found and written as well; it then says in one clause that you already wrote on LinkedIn. A lead whose email is already in the mailbox or sent is not held: the message is only recorded.
+- **Mark sent on LinkedIn** is final and holds the lead's email: the lead goes on hold as *Messaged on LinkedIn*, so the person is not contacted twice at once, and an email waiting for review is withdrawn. Release the hold (on the lead page, or under Needs a decision) when you want the email found and written as well; it then says in one clause that you already wrote on LinkedIn. A lead whose email is already in the mailbox or sent is not held: the message is only recorded.
 - Forgetting a person (Policies and privacy) deletes their messages.
 
 ### 5.5 Leads
@@ -653,7 +672,7 @@ Platform admins and superadmins open **Admin console** from the user menu (or th
 - **Members and mailboxes of a customer:** on its page, the Members tab changes a person's role or removes them (a workspace always keeps one admin), and the Mailboxes tab can **Force reconnect** a mailbox, so nothing is saved through it until the customer signs in to it again. Both are recorded in the audit log.
 - **Users:** disable or enable an account, sign it out everywhere, and (superadmin) set a platform role or **Delete** an account for good (its mailboxes are disconnected, a workspace with only that person is suspended, and the last superadmin or a workspace's last admin cannot be deleted).
 - **Plans:** Free, Starter and Pro, each with its AI credits a month, budget per lead, people, mailboxes, campaigns and features. **Superadmins** edit the catalog, choose the default for new customers and set **what an AI credit stands for** (one US cent of vendor cost by default; calls already made keep their credits); other staff see it read-only and give extra credits on a customer's page. A saved change applies to every customer on the plan.
-- **Vendors and keys:** the keys of each paid service, always shown as `••••` and their last four characters. A vendor can have up to **three keys**: each call uses one of them at random, and a key that is refused, rate limited or out of credit is skipped for the vendor's next key in the same call, so one bad key never stops work. **Add key** (while there are fewer than three) or **Replace** takes effect on the worker's next run, and the old key is kept 30 days (**Roll back**). **Remove** stops using a key; it too can be rolled back for 30 days. Each key has its own **Reveal** (shown once and recorded in the audit log) and **Test**, which makes one small real call with that key (a one-word model reply, a one-result search, or one address checked: a fraction of a cent) and says whether it works; the two catch-all resolvers have no cheap check and say so. A vendor that rejects our key three or more times in a day shows *key refused* and staff are emailed once a day until it is fixed; only refusals of the key now in use count, so replacing the key clears the flag at once. **Pause** makes the engine ignore a vendor. For Hunter, ZeroBounce, MyEmailVerifier and OrbiSearch the row also shows **what the vendor says the account has left** (searches or credits, and when Hunter's reset; it is free to ask and is checked about every ten minutes). An email finder whose account is empty is **paused by itself** (*out of credit*), staff are told in the bell and by email, and the worker **resumes it by itself** once its balance shows credit again; one staff paused by hand is never resumed for them. While no finder can answer, leads that need an email wait in *Needs attention* with "no email finder is answering", use no attempt, and are tried again every couple of hours, so top up (or add another finder) and they go on without you pressing Retry. Each vendor shows the AI credits its calls used this month and what it billed the platform, and can have a monthly cap in AI credits: when its calls across every customer reach it the vendor is paused and staff are emailed. **AI models** lists the models staff added. **Add a model** asks for everything a model needs: a name and code, the provider type (OpenAI-compatible for DeepInfra, Groq, Together, OpenRouter or your own server; OpenAI; Anthropic; Google Gemini; Ollama; GitHub Copilot), the model's name at the provider, the base URL (required for OpenAI-compatible), its API key (stored encrypted, never shown again; empty uses the Language model key), temperature, max tokens, reasoning effort, and its AI credits per million input and output tokens. **Make default** switches every model call to it from the next call, with no restart; **Use for writing** makes another model of the same provider write emails; **Test** makes one tiny real call; **Go back to the environment's settings** undoes the choice. Below, *Environment settings and other charges* holds the older settings used while no default is chosen, with **what each model's calls use**: AI credits per million tokens read (input) and written (output). A model with no charge set uses no credits, and the card says so.
+- **Vendors and keys:** the keys of each paid service, always shown as `••••` and their last four characters. A vendor can have up to **three keys**: each call uses one of them at random, and a key that is refused, rate limited or out of credit is skipped for the vendor's next key in the same call, so one bad key never stops work. **Add key** (while there are fewer than three) or **Replace** takes effect on the worker's next run, and the old key is kept 30 days (**Roll back**). **Remove** stops using a key; it too can be rolled back for 30 days. Each key has its own **Reveal** (shown once and recorded in the audit log) and **Test**, which makes one small real call with that key (a one-word model reply, a one-result search, or one address checked: a fraction of a cent) and says whether it works; the two catch-all resolvers have no cheap check and say so. A vendor that rejects our key three or more times in a day shows *key refused* and staff are emailed once a day until it is fixed; only refusals of the key now in use count, so replacing the key clears the flag at once. **Pause** makes the engine ignore a vendor. For Hunter, ZeroBounce, MyEmailVerifier and OrbiSearch the row also shows **what the vendor says the account has left** (searches or credits, and when Hunter's reset; it is free to ask and is checked about every ten minutes). An email finder whose account is empty is **paused by itself** (*out of credit*), staff are told in the bell and by email, and the worker **resumes it by itself** once its balance shows credit again; one staff paused by hand is never resumed for them. While no finder can answer, leads that need an email wait with "no email finder is answering", use no attempt, and are tried again every couple of hours, so top up (or add another finder) and they go on without you pressing Retry. Each vendor shows the AI credits its calls used this month and what it billed the platform, and can have a monthly cap in AI credits: when its calls across every customer reach it the vendor is paused and staff are emailed. **AI models** lists the models staff added. **Add a model** asks for everything a model needs: a name and code, the provider type (OpenAI-compatible for DeepInfra, Groq, Together, OpenRouter or your own server; OpenAI; Anthropic; Google Gemini; Ollama; GitHub Copilot), the model's name at the provider, the base URL (required for OpenAI-compatible), its API key (stored encrypted, never shown again; empty uses the Language model key), temperature, max tokens, reasoning effort, and its AI credits per million input and output tokens. **Make default** switches every model call to it from the next call, with no restart; **Use for writing** makes another model of the same provider write emails; **Test** makes one tiny real call; **Go back to the environment's settings** undoes the choice. Below, *Environment settings and other charges* holds the older settings used while no default is chosen, with **what each model's calls use**: AI credits per million tokens read (input) and written (output). A model with no charge set uses no credits, and the card says so.
 - **Lead directory:** how many companies, people and addresses the shared directory holds, how often it answered this month and what that saved, and the reports customers sent about wrong details (**Accept correction** removes the address for good; **Reject** serves it again). A search shows which sources confirmed one address or domain. Nothing here says which customer contributed or asked.
 - **Settings:** stop the engine for everyone (typed confirmation), an announcement banner, and the alpha-only superadmin switch.
 - **Audit log:** every admin change, filterable, with a CSV export.
