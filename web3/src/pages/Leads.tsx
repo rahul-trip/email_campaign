@@ -6,7 +6,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
@@ -84,6 +84,8 @@ export function LeadsPage() {
   const total = leads.data?.total ?? 0;
   const items = leads.data?.items ?? [];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const advancedCount = [search.hold, search.source, search.fit, search.country].filter(Boolean).length;
+  const [moreOpen, setMore] = useState(advancedCount > 0);
   const filtered = Boolean(search.q || search.status || search.hold || search.view || search.source || search.country || search.fit);
   const activeView = VIEWS.find((v) => Object.entries(v.filters).every(([k, val]) => search[k as keyof LeadsSearch] === val) && (v.key !== "all" || !filtered))?.key;
   const by = status.data?.by_status ?? {};
@@ -155,6 +157,22 @@ export function LeadsPage() {
               </option>
             ))}
           </Select>
+          <Button variant="secondary" aria-expanded={moreOpen} onClick={() => setMore(!moreOpen)} className="h-10">
+            <SlidersHorizontal className="size-4" aria-hidden /> Filters
+            {advancedCount > 0 && <span className="tnum rounded-full bg-primary px-1.5 text-label text-primary-ink">{advancedCount}</span>}
+          </Button>
+          <Select aria-label="Sort" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value })} className="ml-auto w-auto">
+            <option value="newest">Newest first</option>
+            <option value="fit">Best fit first</option>
+            <option value="updated">Recently changed</option>
+            <option value="name">Name A–Z</option>
+          </Select>
+          {filtered && (
+            <Button variant="ghost" size="sm" onClick={() => void navigate({ search: {}, replace: true })}>
+              <X className="size-3.5" aria-hidden /> Clear
+            </Button>
+          )}
+          {moreOpen && <div className="flex basis-full flex-wrap items-center gap-2 border-t border-line pt-3">
           <Select aria-label="Hold reason" value={search.hold ?? ""} onChange={(e) => set({ hold: e.target.value || undefined, status: e.target.value ? "held" : search.status })} className="w-auto">
             <option value="">Any hold</option>
             {HOLD_REASONS.map((h) => (
@@ -187,23 +205,13 @@ export function LeadsPage() {
             onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
             className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
           />
-          <Select aria-label="Sort" value={search.sort ?? "newest"} onChange={(e) => set({ sort: e.target.value === "newest" ? undefined : e.target.value })} className="ml-auto w-auto">
-            <option value="newest">Newest first</option>
-            <option value="fit">Best fit first</option>
-            <option value="updated">Recently changed</option>
-            <option value="name">Name A–Z</option>
-          </Select>
-          {filtered && (
-            <Button variant="ghost" size="sm" onClick={() => void navigate({ search: {}, replace: true })}>
-              <X className="size-3.5" aria-hidden /> Clear
-            </Button>
-          )}
+          </div>}
         </div>
 
         <Problem error={leads.error} className="m-3" />
         {leads.isPending ? (
           <div className="p-5">
-            <Skeleton rows={8} />
+            <Skeleton rows={8} shape="table" />
           </div>
         ) : items.length === 0 ? (
           <Empty

@@ -15,7 +15,7 @@ type Variant = "primary" | "secondary" | "ghost" | "danger" | "soft";
 type Size = "sm" | "md" | "lg";
 
 const VARIANT: Record<Variant, string> = {
-  primary: "bg-primary text-primary-ink shadow-1 hover:bg-primary-hover shadow-[inset_0_1px_0_rgb(255_255_255/0.15)]",
+  primary: "bg-primary text-primary-ink hover:bg-primary-hover",
   secondary: "border border-line-strong bg-surface text-ink hover:bg-surface-2",
   ghost: "text-ink-2 hover:bg-surface-2 hover:text-ink",
   danger: "border border-error/20 bg-error-soft text-error hover:border-error/40",
@@ -83,11 +83,11 @@ export function Dot({ tone, pulse }: { tone: Family; pulse?: boolean }) {
 
 export function PageHeader({ title, subtitle, actions, eyebrow }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; eyebrow?: ReactNode }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1 text-label font-semibold tracking-wide text-primary uppercase">{eyebrow}</div>}
-        <h1 className="text-title font-semibold text-ink">{title}</h1>
-        {subtitle && <p className="mt-1 max-w-[75ch] text-body text-muted">{subtitle}</p>}
+        {eyebrow && <div className="mb-1 text-label font-semibold tracking-wide text-muted uppercase">{eyebrow}</div>}
+        <h1 className="text-[1.75rem] leading-9 font-semibold tracking-tight text-ink">{title}</h1>
+        {subtitle && <p className="mt-1.5 max-w-[65ch] text-body text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -124,12 +124,46 @@ export function Callout({ tone = "primary", title, children, icon, className, ac
 
 // ------------------------------------------------------------------ loading, empty, errors
 
-export function Skeleton({ rows = 3, className }: { rows?: number; className?: string }) {
+export type SkeletonShape = "lines" | "cards" | "table" | "stat";
+
+/** Placeholders shaped like what will arrive, so the page does not jump when it loads. */
+export function Skeleton({ rows = 3, className, shape = "lines" }: { rows?: number; className?: string; shape?: SkeletonShape }) {
+  const bar = "shimmer rounded-md";
   return (
-    <div role="status" aria-label="Loading" className={cx("space-y-3", className)}>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="shimmer h-4 rounded-md" style={{ width: `${92 - ((i * 17) % 35)}%` }} />
-      ))}
+    <div role="status" aria-label="Loading" className={cx(shape === "lines" && "space-y-3", className)}>
+      {shape === "cards" && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: Math.max(rows, 3) }, (_, i) => (
+            <div key={i} className="rounded-2xl border border-line p-5">
+              <div className={cx(bar, "h-3 w-1/3")} />
+              <div className={cx(bar, "mt-4 h-7 w-1/2")} />
+              <div className={cx(bar, "mt-4 h-3 w-5/6")} />
+            </div>
+          ))}
+        </div>
+      )}
+      {shape === "stat" && (
+        <>
+          <div className={cx(bar, "h-3 w-2/5")} />
+          <div className={cx(bar, "mt-3 h-8 w-1/3")} />
+        </>
+      )}
+      {shape === "table" && (
+        <div className="divide-y divide-line">
+          {Array.from({ length: rows }, (_, i) => (
+            <div key={i} className="flex items-center gap-4 py-3">
+              <div className={cx(bar, "size-9 shrink-0 rounded-xl")} />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className={cx(bar, "h-3.5")} style={{ width: `${55 - ((i * 13) % 25)}%` }} />
+                <div className={cx(bar, "h-3 w-1/4")} />
+              </div>
+              <div className={cx(bar, "hidden h-6 w-20 rounded-full sm:block")} />
+            </div>
+          ))}
+        </div>
+      )}
+      {shape === "lines" &&
+        Array.from({ length: rows }, (_, i) => <div key={i} className={cx(bar, "h-4")} style={{ width: `${92 - ((i * 17) % 35)}%` }} />)}
     </div>
   );
 }
@@ -157,8 +191,8 @@ export function Problem({ error, className }: { error: unknown; className?: stri
   );
 }
 
-export function QueryState<T>({ query, children, rows }: { query: UseQueryResult<T>; children: (data: T) => ReactNode; rows?: number }) {
-  if (query.isPending) return <Skeleton rows={rows} />;
+export function QueryState<T>({ query, children, rows, shape }: { query: UseQueryResult<T>; children: (data: T) => ReactNode; rows?: number; shape?: SkeletonShape }) {
+  if (query.isPending) return <Skeleton rows={rows} shape={shape} />;
   if (query.isError) return <Problem error={query.error} />;
   return <>{children(query.data as T)}</>;
 }
@@ -169,7 +203,7 @@ export function Empty({ art, title, children, action, className }: { art?: React
       {art && <div className="mb-4 animate-pop">{art}</div>}
       <div className="text-heading font-semibold text-ink">{title}</div>
       {children && <p className="mt-1 max-w-[52ch] text-body text-muted">{children}</p>}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }

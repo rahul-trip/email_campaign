@@ -199,7 +199,7 @@ function Queue({ items, current, onPick }: { items: Item[]; current: string; onP
                 type="button"
                 onClick={() => onPick(item.message.id)}
                 aria-current={active ? "true" : undefined}
-                className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft shadow-2" : "border-line bg-surface hover:border-line-strong hover:shadow-1")}
+                className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2")}
               >
                 <div className="flex items-start gap-3">
                   <FitRing score={item.company.fit_score} size={34} />

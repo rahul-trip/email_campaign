@@ -77,7 +77,7 @@ export function TodayPage() {
 
       {/* Bento: the hero on the left, the engine and progress on the right. */}
       <div className="grid gap-5 lg:grid-cols-3">
-        <section data-tour="today-hero" className="relative overflow-hidden rounded-3xl border border-line bg-surface p-7 shadow-1 lg:col-span-2">
+        <section data-tour="today-hero" className="relative overflow-hidden rounded-2xl border border-line bg-surface p-8 lg:col-span-2">
           <div className="aurora opacity-80" aria-hidden />
           <div className="relative flex h-full flex-col">
             <div className="text-body font-medium text-muted">{greeting(me.user.name)}</div>
@@ -222,7 +222,7 @@ function EngineCard({ auto }: { auto?: Schemas["AutoDiscoveryOut"] }) {
         {auto && <span className="ml-auto text-small text-muted">{auto.per_day}× a day</span>}
       </div>
       {!auto ? (
-        <Skeleton rows={2} className="mt-3" />
+        <Skeleton shape="stat" className="mt-3" />
       ) : (
         <>
           <p className="mt-2 text-small text-ink-2">
@@ -274,7 +274,7 @@ function Kpi({
     <Card hover className="group relative p-5" title={why}>
       <div className="text-small font-medium text-muted">{label}</div>
       {loading ? (
-        <Skeleton rows={2} className="mt-3" />
+        <Skeleton shape="stat" className="mt-3" />
       ) : (
         <>
           <div className="mt-2 flex items-end justify-between gap-3">
@@ -399,7 +399,7 @@ function ActiveCampaign() {
       }
     >
       {!active ? (
-        <Empty title="No active campaign">Create or switch one on under Campaigns.</Empty>
+        <Empty title="No active campaign" action={<Link to="/campaigns" className={buttonClass("primary", "sm")}>Open Campaigns</Link>}>Create one, or switch one on, under Campaigns.</Empty>
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="space-y-4 lg:col-span-3">
@@ -460,7 +460,7 @@ function Sources() {
       summary={best ? `${SOURCE_LABEL[best.source] ?? best.source} leads pass the fit gate most often (${percent(best.rate)}) · last ${best.days} days` : "No discovery history yet."}
     >
       {rows.length === 0 ? (
-        <Empty title="No discovery yet">After the first runs, each source's record shows here, and discovery asks the best ones first.</Empty>
+        <Empty title="No discovery yet" action={<Link to="/runs" className={buttonClass("secondary", "sm")}>Start a run</Link>}>After the first runs, each source's record shows here, and discovery asks the best ones first.</Empty>
       ) : (
         <div className="space-y-3">
           {rows.map((r) => (
@@ -487,7 +487,7 @@ function Activity() {
   return (
     <Section id="activity" title="What happened" summary={items[0] ? `${describeNotice(items[0]).text} · ${ago(items[0].created_at)}` : "Nothing yet."}>
       {items.length === 0 ? (
-        <Empty title="Quiet so far">Runs, drafts and hot leads are reported here as they happen.</Empty>
+        <Empty title="Quiet so far" action={<Link to="/targets" className={buttonClass("secondary", "sm")}>Add leads</Link>}>Runs, drafts and hot leads are reported here as they happen.</Empty>
       ) : (
         <ol className="relative space-y-4 border-l border-line pl-5">
           {items.map((n) => {

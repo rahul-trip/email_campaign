@@ -49,7 +49,7 @@ export function CampaignGate() {
   const admin = useIsAdmin();
   return (
     <div data-tour="campaign-gate" className="animate-rise">
-      <section className="relative mb-6 overflow-hidden rounded-3xl border border-line bg-surface px-6 py-10 text-center shadow-1 sm:px-10">
+      <section className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-surface px-6 py-10 text-center sm:px-10">
         <div className="aurora" aria-hidden />
         <div className="relative">
           <EmptyTrayArt />
