@@ -317,3 +317,56 @@ def test_waiting_messages_list_hot_leads_first_and_can_be_filtered(
         rest, _ = uow.linkedin.page(LinkedInState.DRAFTED, limit=10, offset=0, hot=False)
         assert {r.domain for r in rest} == {"cool.com", "blank.com"}
         assert everyone[0].company_bucket is Bucket.WORKING
+
+
+def test_the_list_can_be_searched_filtered_and_sorted(factory: UnitOfWorkFactory, ws: str) -> None:
+    from outbound.domain.actors import SYSTEM
+    from outbound.domain.enums import FailureKind
+
+    with factory(ws) as uow:
+        for domain, name, fit, country, nobody in (
+            ("alpha.com", "Alpha", 90, "GB", False),
+            ("beta.com", "Beta", 70, "US", True),
+            ("gamma.com", "Gamma", 85, "GB", True),
+        ):
+            company = uow.companies.create(
+                domain=domain, source=CompanySource.MANUAL, name=name, country_code=country
+            )
+            uow.companies.update_fields(
+                company.id, {"fit_score": fit}, actor=SYSTEM, expected_version=company.row_version
+            )
+            if nobody:
+                current = uow.companies.get(company.id)
+                uow.companies.transition(
+                    company.id,
+                    CompanyStatus.FAILED,
+                    expected_version=current.row_version,
+                    failed_stage="research",
+                    last_error="no email",
+                    failure_kind=FailureKind.NO_EMAIL,
+                )
+            contact = uow.contacts.add(
+                company.id, rank=1, source=ContactSource.OPERATOR, full_name=f"{name} Person"
+            )
+            uow.linkedin.create(
+                company_id=company.id, contact_id=contact.id, note="n", message="m", issues=[]
+            )
+        uow.commit()
+
+        def names(**kwargs: object) -> list[str]:
+            rows, _ = uow.linkedin.page(LinkedInState.DRAFTED, limit=10, offset=0, **kwargs)  # type: ignore[arg-type]
+            return [r.company_name or "" for r in rows]
+
+        assert names() == ["Alpha", "Gamma", "Beta"]  # best fit first
+        assert names(sort="fit", direction="asc") == ["Beta", "Gamma", "Alpha"]
+        assert names(sort="company") == ["Alpha", "Beta", "Gamma"]
+        assert names(text="gamma person") == ["Gamma"]
+        assert names(text="BETA.com") == ["Beta"]
+        assert names(min_fit=80) == ["Alpha", "Gamma"]
+        assert names(country="gb") == ["Alpha", "Gamma"]
+        assert names(no_email=True) == ["Gamma", "Beta"]
+        assert names(no_email=False) == ["Alpha"]
+        rows, total = uow.linkedin.page(LinkedInState.DRAFTED, limit=1, offset=0, no_email=True)
+        assert (len(rows), total) == (1, 2)
+        assert rows[0].failure_kind is FailureKind.NO_EMAIL
+        assert rows[0].country_code == "GB"

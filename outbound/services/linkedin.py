@@ -62,10 +62,32 @@ class LinkedInService:
             return uow.linkedin.for_company(company_id)
 
     def page(
-        self, state: LinkedInState, *, limit: int = 50, offset: int = 0, hot: bool | None = None
+        self,
+        state: LinkedInState,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        hot: bool | None = None,
+        text: str | None = None,
+        min_fit: int | None = None,
+        no_email: bool | None = None,
+        country: str | None = None,
+        sort: str | None = None,
+        direction: str | None = None,
     ) -> tuple[list[LinkedInListing], int]:
         with self._uow(self._workspace_id) as uow:
-            return uow.linkedin.page(state, limit=limit, offset=offset, hot=hot)
+            return uow.linkedin.page(
+                state,
+                limit=limit,
+                offset=offset,
+                hot=hot,
+                text=text,
+                min_fit=min_fit,
+                no_email=no_email,
+                country=country,
+                sort=sort,
+                direction=direction,
+            )
 
     # ------------------------------------------------------------------ writing a draft
 

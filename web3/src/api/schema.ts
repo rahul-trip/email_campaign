@@ -4637,8 +4637,15 @@ export interface components {
             company_bucket?: components["schemas"]["Bucket"];
             /** Company Name */
             company_name: string | null;
+            /** @default new */
+            company_status?: components["schemas"]["CompanyStatus"];
+            /** Country Code */
+            country_code?: string | null;
             /** Domain */
             domain: string;
+            failure_kind?: components["schemas"]["FailureKind"] | null;
+            /** Fit Reason */
+            fit_reason?: string | null;
             /** Fit Score */
             fit_score?: number | null;
             /** Hot */
@@ -9941,6 +9948,12 @@ export interface operations {
             query?: {
                 state?: components["schemas"]["LinkedInState"];
                 hot?: boolean | null;
+                q?: string | null;
+                min_fit?: number | null;
+                no_email?: boolean | null;
+                country?: string | null;
+                sort?: ("fit" | "newest" | "company") | null;
+                direction?: ("asc" | "desc") | null;
                 limit?: number;
                 offset?: number;
             };

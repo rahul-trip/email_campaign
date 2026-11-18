@@ -51,6 +51,32 @@ function Copyable({ label, text, hint, open }: { label: string; text: string; hi
 }
 
 /**
+ * One button that copies the connection note and opens the person's LinkedIn profile in a new
+ * tab, ready to paste. Without a profile link it only copies. Nothing is ever sent from here.
+ */
+export function CopyNoteButton({ note, profile, size = "sm", variant = "primary" }: { note: string; profile?: string | null; size?: "sm" | "md"; variant?: "primary" | "secondary" }) {
+  const [copied, setCopied] = useState(false);
+  const target = safeLink(profile);
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      title={target ? "Copies the note, then opens their profile in a new tab: paste it there" : "Copies the note"}
+      onClick={() => {
+        void navigator.clipboard?.writeText(note);
+        // Opened in the same click, so the browser does not block it as a pop-up.
+        if (target) window.open(target, "_blank", "noopener,noreferrer");
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+      {copied ? "Copied" : target ? "Copy note & open" : "Copy note"}
+    </Button>
+  );
+}
+
+/**
  * One person's LinkedIn note and message, to copy and paste into LinkedIn. On the lead page and
  * on the LinkedIn page. ``profile`` opens their LinkedIn page.
  */

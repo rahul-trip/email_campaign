@@ -4,6 +4,7 @@ import { TodayPage } from "./pages/Today";
 
 export const SETTINGS_TABS = ["setup", "profile", "mailboxes", "limits", "plan", "team", "integrations", "account"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
+export type LinkedInSearch = { state?: "drafted" | "sent" | "skipped"; q?: string; hot?: boolean; email?: "none" | "has"; fit?: number; country?: string; sort?: "fit" | "newest" | "company"; dir?: "asc" | "desc" };
 export type LeadsSearch = { q?: string; status?: string; hold?: string; page?: number; view?: string; bucket?: string; sort?: string; dir?: "asc" | "desc"; source?: string; country?: string; fit?: number };
 
 const root = createRootRoute({
@@ -42,6 +43,21 @@ const leads = createRoute({
     country: text(s.country),
     fit: Number(s.fit) > 0 ? Math.min(100, Math.floor(Number(s.fit))) : undefined,
     page: Number(s.page) > 1 ? Math.floor(Number(s.page)) : undefined,
+  }),
+});
+const linkedin = createRoute({
+  getParentRoute: () => root,
+  path: "/linkedin",
+  component: lazy(() => import("./pages/LinkedIn"), "LinkedInPage"),
+  validateSearch: (s: Record<string, unknown>): LinkedInSearch => ({
+    state: s.state === "sent" || s.state === "skipped" ? s.state : undefined,
+    q: text(s.q),
+    hot: s.hot === true || s.hot === "true" || s.hot === 1 || s.hot === "1" ? true : undefined,
+    email: s.email === "none" || s.email === "has" ? s.email : undefined,
+    fit: Number(s.fit) > 0 ? Math.min(100, Math.floor(Number(s.fit))) : undefined,
+    country: text(s.country),
+    sort: s.sort === "newest" || s.sort === "company" || s.sort === "fit" ? s.sort : undefined,
+    dir: s.dir === "asc" || s.dir === "desc" ? s.dir : undefined,
   }),
 });
 const review = createRoute({
@@ -85,7 +101,7 @@ const routeTree = root.addChildren([
   leads,
   lead,
   journey,
-  page("/linkedin", lazy(() => import("./pages/LinkedIn"), "LinkedInPage")),
+  linkedin,
   page("/targets", lazy(() => import("./pages/Targets"), "TargetsPage")),
   page("/runs", lazy(() => import("./pages/Runs"), "RunsPage")),
   page("/runs/$runId", lazy(() => import("./pages/RunDetail"), "RunDetailPage")),

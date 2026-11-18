@@ -11,8 +11,8 @@ export const NAV: NavGroup[] = [
     items: [
       { to: "/", label: "Today", icon: LayoutDashboard },
       { to: "/review", label: "Emails ready", icon: ClipboardCheck, badge: "review" },
-      { to: "/attention", label: "Needs a decision", icon: TriangleAlert, badge: "attention" },
       { to: "/linkedin", label: "Hot leads", icon: Flame, badge: "linkedin" },
+      { to: "/attention", label: "Needs a decision", icon: TriangleAlert, badge: "attention" },
     ],
   },
   {

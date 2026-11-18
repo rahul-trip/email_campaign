@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
@@ -32,11 +32,28 @@ def drafts(
     svc: Svc,
     state: LinkedInState = LinkedInState.DRAFTED,
     hot: bool | None = None,
+    q: str | None = None,
+    min_fit: Annotated[int | None, Query(ge=0, le=100)] = None,
+    no_email: bool | None = None,
+    country: Annotated[str | None, Query(min_length=2, max_length=2)] = None,
+    sort: Literal["fit", "newest", "company"] | None = None,
+    direction: Literal["asc", "desc"] | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LinkedInDraftPage:
     """Every message in one state with who it is for: waiting ones best fit first, others newest."""
-    rows, total = svc.linkedin.page(state, limit=limit, offset=offset, hot=hot)
+    rows, total = svc.linkedin.page(
+        state,
+        limit=limit,
+        offset=offset,
+        hot=hot,
+        text=q,
+        min_fit=min_fit,
+        no_email=no_email,
+        country=country,
+        sort=sort,
+        direction=direction,
+    )
     return LinkedInDraftPage(
         items=[
             LinkedInDraftRowOut(
@@ -48,6 +65,10 @@ def drafts(
                 profile=r.profile,
                 fit_score=r.fit_score,
                 company_bucket=r.company_bucket,
+                company_status=r.company_status,
+                failure_kind=r.failure_kind,
+                country_code=r.country_code,
+                fit_reason=r.fit_reason,
             )
             for r in rows
         ],

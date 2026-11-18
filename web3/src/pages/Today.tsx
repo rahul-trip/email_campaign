@@ -6,8 +6,8 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, Check, CheckCircle2, Filter, Flame, Play, Radar, Sparkles, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Filter, Flame, Play, Radar, Sparkles, TriangleAlert } from "lucide-react";
+import { useRef, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { describe as describeNotice } from "../app/Bell";
 import { useCounts } from "../app/Shell";
@@ -16,12 +16,13 @@ import { cx } from "../lib/cx";
 import { ago, percent } from "../lib/format";
 import { describeHold } from "../lib/status";
 import { useSetup } from "../lib/setup";
-import { LinkedInDraftCard } from "../components/LinkedInDraft";
+import { CopyNoteButton } from "../components/LinkedInDraft";
+import { LeadIcon } from "../ui/lead";
 import { isViewing } from "../app/session";
 import { Avatar, Button, buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
 import { useToast } from "../ui/overlay";
 import { Section, SectionGroup } from "../ui/sections";
-import { CountUp, Delta, Ring, Sparkline } from "../ui/viz";
+import { CountUp, Delta, FitRing, Ring, Sparkline } from "../ui/viz";
 
 const SOURCE_LABEL: Record<string, string> = { yc_directory: "YC directory", companies_house: "Companies House", exa: "Exa", articles: "Web lists" };
 
@@ -44,7 +45,7 @@ export function TodayPage() {
   const setup = useSetup();
   const { workspace } = useCurrent();
   const viewing = isViewing(workspace);
-  const hotLeads = useQuery({ queryKey: ["linkedin", "drafted", "hot", 3], queryFn: () => ok(client.GET("/api/linkedin", { params: { query: { state: "drafted", hot: true, limit: 3 } } })), refetchInterval: 30000 });
+  const hotLeads = useQuery({ queryKey: ["linkedin", "drafted", "hot", 10], queryFn: () => ok(client.GET("/api/linkedin", { params: { query: { state: "drafted", hot: true, limit: 10 } } })), refetchInterval: 30000 });
 
   const days = daily.data?.days ?? [];
   const thisWeek = days.slice(-7);
@@ -565,34 +566,63 @@ function DraftPreview({ item, readOnly }: { item: Schemas["ReviewItemOut"]; read
   );
 }
 
-/** The hot leads whose LinkedIn message is written, with the same copy-and-open buttons as the LinkedIn page. */
+/**
+ * The hot leads whose LinkedIn message is written: a compact strip that scrolls sideways (swipe,
+ * arrow buttons or the keyboard). Each card copies the note and opens the profile; the full
+ * message, editing and "mark sent" are on the Hot leads page.
+ */
 function HotLeads({ data, loading, readOnly }: { data?: Schemas["LinkedInDraftPage"]; loading: boolean; readOnly: boolean }) {
-  const queryClient = useQueryClient();
-  const refresh = () => {
-    for (const key of ["linkedin", "companies", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
-  };
+  const track = useRef<HTMLDivElement>(null);
+  const scroll = (direction: 1 | -1) => track.current?.scrollBy({ left: direction * track.current.clientWidth * 0.8, behavior: "smooth" });
   if (loading) return <Skeleton shape="stat" />;
   if (!data || data.items.length === 0) return null;
   return (
-    <section data-tour="hot-leads" aria-labelledby="hot-leads-title">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+    <section data-tour="hot-leads" aria-labelledby="hot-leads-title" className="min-w-0">
+      <div className="mb-2 flex flex-wrap items-center gap-3">
         <h2 id="hot-leads-title" className="flex items-center gap-2 text-heading font-semibold text-ink">
           <Flame className="size-5 text-attention-dot" aria-hidden /> Hot leads: reach them on LinkedIn
         </h2>
         <Chip tone="attention">
           {data.total} message{data.total === 1 ? "" : "s"} written
         </Chip>
-        <Link to="/linkedin" className="ml-auto text-small font-semibold text-primary hover:underline">
-          See all <ArrowRight className="inline size-3.5" aria-hidden />
-        </Link>
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="ghost" size="sm" aria-label="Scroll hot leads left" onClick={() => scroll(-1)} className="hidden sm:inline-flex">
+            <ChevronLeft className="size-4" aria-hidden />
+          </Button>
+          <Button variant="ghost" size="sm" aria-label="Scroll hot leads right" onClick={() => scroll(1)} className="hidden sm:inline-flex">
+            <ChevronRight className="size-4" aria-hidden />
+          </Button>
+          <Link to="/linkedin" className="text-small font-semibold text-primary hover:underline">
+            See all <ArrowRight className="inline size-3.5" aria-hidden />
+          </Link>
+        </div>
       </div>
-      <p className="mb-3 max-w-[70ch] text-small text-muted">A connection note is ready for each. Some have no email we could prove, so LinkedIn is the way in. Copy it and paste it into their profile yourself: nothing is sent from here.</p>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {data.items.map((row) => (
-          <Card key={row.item.id} title={<Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="hover:underline">{row.company_name ?? row.domain}</Link>} subtitle={[row.person, row.title].filter(Boolean).join(" · ") || undefined}>
-            <LinkedInDraftCard draft={row.item} person={row.person} profile={row.profile} readOnly={readOnly} onChanged={refresh} />
-          </Card>
-        ))}
+      <div ref={track} tabIndex={0} role="region" aria-label="Hot leads, scroll sideways" className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        {data.items.map((row) => {
+          const name = row.company_name ?? row.domain;
+          return (
+            <Card key={row.item.id} className="flex w-72 shrink-0 snap-start flex-col gap-2 p-3">
+              <div className="flex items-center gap-2.5">
+                <LeadIcon domain={row.domain} name={name} />
+                <div className="min-w-0 flex-1">
+                  <Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="block truncate font-semibold text-ink hover:text-primary">
+                    {name}
+                  </Link>
+                  <div className="truncate text-small text-muted">{[row.person, row.title].filter(Boolean).join(" · ") || "Decision-maker"}</div>
+                </div>
+                <FitRing score={row.fit_score} size={36} />
+              </div>
+              {(row.failure_kind === "no_person" || row.failure_kind === "no_email") && row.company_status === "failed" && <Chip className="self-start">No email we could prove</Chip>}
+              <p className="line-clamp-3 text-small text-ink-2">“{row.item.note}”</p>
+              <div className="mt-auto flex items-center gap-2 pt-1">
+                {!readOnly && <CopyNoteButton note={row.item.note} profile={row.profile} />}
+                <Link to="/linkedin" className="text-small font-semibold text-primary hover:underline">
+                  Full message
+                </Link>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </section>
   );
