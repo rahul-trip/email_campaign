@@ -162,3 +162,22 @@ def test_testing_a_model_makes_one_tiny_call_with_its_own_settings(
 def test_platform_staff_without_keys_rights_and_customers_cannot_touch_models(api: Api) -> None:
     assert api.put("/api/admin/models/x", json=DEEPSEEK).status_code == 403
     assert api.put("/api/admin/models/default", json={"default_model": ""}).status_code == 403
+
+
+def test_a_reasoning_model_whose_test_reply_runs_long_still_counts_as_working(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    _, services = app_and_services
+    staff.put("/api/admin/models/deepseek-v3", json={**DEEPSEEK, "max_tokens": 40000})
+    bodies: list[bytes] = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        bodies.append(request.content)
+        reply = {"choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+                 "usage": {"prompt_tokens": 5, "completion_tokens": 40000}}  # fmt: skip
+        return httpx.Response(200, json=reply)
+
+    client = httpx.Client(transport=httpx.MockTransport(answer))
+    result = service(services).test_model("deepseek-v3", by=None, client=client)
+    assert result.ok is True and "token limit" in result.message
+    assert b'"max_tokens":40000' in bodies[0].replace(b" ", b"")  # the model's own limit, not 8
