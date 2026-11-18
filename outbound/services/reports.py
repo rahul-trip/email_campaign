@@ -22,6 +22,7 @@ from outbound.domain.enums import (
     CallOutcome,
     CandidateVerdict,
     CompanyStatus,
+    FailureKind,
     HoldReason,
     MessageState,
 )
@@ -164,12 +165,20 @@ def review_streak(days: list[DayRow]) -> int:
     return streak
 
 
-def outcome(status: CompanyStatus, hold_reason: HoldReason | None, failed_stage: str | None) -> str:
-    """Where a lead is, as one key: ``waiting``, ``failed:<stage>``, ``held:<reason>``, or its
-    status (``disqualified``, ``email_ready``, ``copy_ready``...)."""
+def outcome(
+    status: CompanyStatus,
+    hold_reason: HoldReason | None,
+    failed_stage: str | None,
+    failure_kind: FailureKind | None = None,
+) -> str:
+    """Where a lead is, as one key: ``waiting``, ``failed:<stage>`` (a step broke),
+    ``screened:no_person`` or ``screened:no_email`` (nobody to write to), ``held:<reason>``, or
+    its status (``disqualified``, ``email_ready``, ``copy_ready``...)."""
     if status is CompanyStatus.NEW:
         return "waiting"
     if status is CompanyStatus.FAILED:
+        if failure_kind in (FailureKind.NO_PERSON, FailureKind.NO_EMAIL):
+            return f"screened:{failure_kind.value}"
         return f"failed:{failed_stage or 'unknown'}"
     if status is CompanyStatus.HELD:
         return f"held:{hold_reason.value if hold_reason else 'unknown'}"
@@ -207,7 +216,7 @@ class ReportService:
             errors = uow.reports.errors_by_provider(since, utcnow() + timedelta(seconds=1))
         outcomes: dict[str, int] = {}
         for lead in leads:
-            key = outcome(lead.status, lead.hold_reason, lead.failed_stage)
+            key = outcome(lead.status, lead.hold_reason, lead.failed_stage, lead.failure_kind)
             outcomes[key] = outcomes.get(key, 0) + lead.count
         return FunnelReport(
             days=days,

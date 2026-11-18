@@ -166,7 +166,9 @@ export function describeHold(reason: string): HoldInfo {
 /** Where a lead is, from the funnel report's key (``waiting``, ``failed:<stage>``, ``held:<reason>``, a status). */
 export function leadOutcome(key: string): string {
   if (key === "waiting") return "Waiting to start";
-  if (key.startsWith("failed:")) return `Failed at ${humanize(key.slice(7)).toLowerCase()}`;
+  if (key === "screened:no_person") return "Screened out: no decision-maker found";
+  if (key === "screened:no_email") return "Screened out: no email we could prove";
+  if (key.startsWith("failed:")) return `Stopped at ${humanize(key.slice(7)).toLowerCase()}`;
   if (key.startsWith("held:")) return `Held: ${describeHold(key.slice(5)).label.toLowerCase()}`;
   return humanize(key);
 }

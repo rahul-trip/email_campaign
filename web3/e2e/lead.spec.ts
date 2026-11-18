@@ -6,7 +6,7 @@ test("a lead held for consent is released by adding a person who consented", asy
   await addTarget(page, { website: domain, country: "IN" });
   await runEngine(page);
 
-  // Needs attention offers the action that fixes it, not a release the server would refuse.
+  // Needs a decision offers the action that fixes it, not a release the server would refuse.
   await page.goto("/attention");
   const row = page.getByRole("listitem").filter({ hasText: domain });
   await expect(row).toBeVisible();

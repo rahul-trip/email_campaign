@@ -33,7 +33,7 @@ export const SECTIONS: Section[] = [
     place: "/",
     steps: [
       { icon: "👋", title: "Welcome to Outbound", body: "Seven quick stops, about a minute. See how the engine finds, researches and writes for you, and where you stay in charge." },
-      { target: "today-hero", icon: "☀️", title: "Your day starts here", body: "What waits for you, how long it has waited, and one button to start reviewing." },
+      { target: "today-hero", icon: "☀️", title: "Your day starts here", body: "The emails ready to approve come first, with the best three right here and one button to start reviewing. Hot leads to message on LinkedIn follow; what the engine screened out stays quiet below." },
       { target: "search", icon: "⌨️", title: "⌘K finds anything", body: "Press ⌘K (Ctrl+K) anywhere to open a lead or jump to any page." },
     ],
   },

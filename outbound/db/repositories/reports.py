@@ -25,6 +25,7 @@ from outbound.domain.enums import (
     CompanyStatus,
     ContactStatus,
     EntityType,
+    FailureKind,
     HoldReason,
     MessageState,
 )
@@ -58,6 +59,7 @@ class LeadOutcome:
     status: CompanyStatus
     hold_reason: HoldReason | None
     failed_stage: str | None
+    failure_kind: FailureKind | None
     count: int
 
 
@@ -113,13 +115,24 @@ class ReportRepository(ScopedRepository):
         return CandidateCounts(by_verdict, int(judged or 0))
 
     def lead_outcomes(self, since: datetime) -> list[LeadOutcome]:
-        """Where the companies added since a date are now: status, hold reason, failed stage."""
+        """Where the companies added since a date are now: status, hold, failed stage and kind."""
         stmt = (
-            select(CompanyRow.status, CompanyRow.hold_reason, CompanyRow.failed_stage, func.count())
+            select(
+                CompanyRow.status,
+                CompanyRow.hold_reason,
+                CompanyRow.failed_stage,
+                CompanyRow.failure_kind,
+                func.count(),
+            )
             .where(CompanyRow.workspace_id == self._workspace_id, CompanyRow.created_at >= since)
-            .group_by(CompanyRow.status, CompanyRow.hold_reason, CompanyRow.failed_stage)
+            .group_by(
+                CompanyRow.status,
+                CompanyRow.hold_reason,
+                CompanyRow.failed_stage,
+                CompanyRow.failure_kind,
+            )
         )
-        return [LeadOutcome(s, h, f, int(n)) for s, h, f, n in self._session.execute(stmt)]
+        return [LeadOutcome(s, h, f, k, int(n)) for s, h, f, k, n in self._session.execute(stmt)]
 
     def errors_by_provider(self, since: datetime, until: datetime) -> list[ErrorRow]:
         """Calls that reached a vendor (not cache hits) and how many of them failed."""
