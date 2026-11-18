@@ -6,18 +6,53 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, CheckCircle2, Clock, Globe2, RefreshCw, UserPlus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Clock, Flame, Globe2, RefreshCw, UserPlus, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { ago, words } from "../lib/format";
+import { cx } from "../lib/cx";
+import { ago, credits as aiCredits, words } from "../lib/format";
 import { HOLD_REASONS, describeHold } from "../lib/status";
 import { STEP_LABEL, day, useUsage } from "../lib/usage";
-import { Avatar, Button, buttonClass, Card, Chip, Empty, Input, Mono, PageHeader, Problem, Skeleton } from "../ui/core";
+import { Avatar, Button, buttonClass, Card, Chip, Empty, Input, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
+import { FilterChip, SearchBox, SortControl } from "../ui/filters";
+import { FitBreakdown, qualificationOf } from "../ui/lead";
+import { FitRing } from "../ui/viz";
 import { Confirm, Tabs, useToast } from "../ui/overlay";
 import { Section, SectionGroup } from "../ui/sections";
 
-type Company = Schemas["CompanyOut"];
+type Company = Schemas["CompanyRowOut"];
 type Filter = "all" | "held" | "failed" | "confirm" | "credits";
+type SortKey = "fit" | "waiting" | "newest" | "company";
+type Facets = { q: string; hot: boolean; fit: number | null; step: string; source: string; country: string; sort: SortKey; dir: "asc" | "desc" };
+const SORTS = [
+  ["fit", "Best fit"],
+  ["waiting", "Waiting longest"],
+  ["newest", "Newest"],
+  ["company", "Company A to Z"],
+] as const;
+const NATURAL: Record<SortKey, "asc" | "desc"> = { fit: "desc", waiting: "asc", newest: "desc", company: "asc" };
+const NO_FACETS: Facets = { q: "", hot: false, fit: null, step: "", source: "", country: "", sort: "fit", dir: "desc" };
+const SOURCES = [
+  ["discovery", "Found by discovery"],
+  ["manual", "Added by you"],
+  ["import", "Imported"],
+  ["referral", "Referral"],
+] as const;
+
+const matches = (c: Company, f: Facets) =>
+  (!f.q || [c.name, c.domain, c.summary?.contact_name].some((v) => v?.toLowerCase().includes(f.q.toLowerCase()))) &&
+  (!f.hot || c.hot) &&
+  (f.fit === null || (c.fit_score ?? -1) >= f.fit) &&
+  (!f.step || (c.failed_stage ?? "") === f.step) &&
+  (!f.source || c.source === f.source) &&
+  (!f.country || c.country_code?.toUpperCase() === f.country);
+
+const order = (a: Company, b: Company, f: Facets) => {
+  const sign = f.dir === "asc" ? 1 : -1;
+  const key = (c: Company): number | string => (f.sort === "fit" ? (c.fit_score ?? -1) : f.sort === "waiting" ? (c.updated_at ?? "") : f.sort === "newest" ? (c.created_at ?? "") : (c.name ?? c.domain).toLowerCase());
+  const [x, y] = [key(a), key(b)];
+  return x < y ? -sign : x > y ? sign : 0;
+};
 
 const STEP_ORDER = ["research", "gate", "contacts", "email", "copy", "deliver"];
 const STEP_NAMES: Record<string, string> = { research: "research", gate: "qualification", contacts: "people", email: "the email address", copy: "writing the email", deliver: "the mailbox", other: "another step" };
@@ -29,24 +64,29 @@ function useRefresh() {
 
 export function AttentionPage() {
   const [filter, setFilter] = useState<Filter>("all");
+  const [facets, setFacets] = useState<Facets>(NO_FACETS);
   // Only what a person can unblock: holds the engine is not working on, and steps that broke on
   // every try. Leads still being retried, and normal "nobody to write to" outcomes, are not here.
   const lists = useQuery({
     queryKey: ["companies", "attention"],
     queryFn: async () => {
-      const decision = await ok(client.GET("/api/companies", { params: { query: { bucket: "decision", limit: 200 } } }));
+      const decision = await ok(client.GET("/api/companies", { params: { query: { bucket: "decision", include: "summary", limit: 200 } } }));
       return { held: decision.items.filter((c) => c.status === "held"), failed: decision.items.filter((c) => c.status === "failed") };
     },
     refetchInterval: 10000,
   });
   const waiting = useQuery({ queryKey: ["waiting"], queryFn: () => ok(client.GET("/api/targets/waiting")) });
   const usage = useUsage();
-  const credits = useQuery({ queryKey: ["companies", "credits"], queryFn: () => ok(client.GET("/api/companies", { params: { query: { waiting_for_credits: true, limit: 200 } } })), refetchInterval: 10000 });
+  const credits = useQuery({ queryKey: ["companies", "credits"], queryFn: () => ok(client.GET("/api/companies", { params: { query: { waiting_for_credits: true, include: "summary", limit: 200 } } })), refetchInterval: 10000 });
 
-  const held = lists.data?.held ?? [];
-  const failed = lists.data?.failed ?? [];
+  const keep = (list: Company[]) => list.filter((c) => matches(c, facets)).sort((a, b) => order(a, b, facets));
+  const everyone = [...(lists.data?.held ?? []), ...(lists.data?.failed ?? [])];
+  const held = keep(lists.data?.held ?? []);
+  const failed = keep(lists.data?.failed ?? []);
   const confirm = waiting.data ?? [];
-  const parked = credits.data?.items ?? [];
+  const parked = keep(credits.data?.items ?? []);
+  const narrowed = JSON.stringify(facets) !== JSON.stringify(NO_FACETS);
+  const countries = [...new Set(everyone.map((c) => c.country_code?.toUpperCase()).filter((v): v is string => !!v))].sort();
   const rows = usage.data?.waiting_rows ?? 0;
   const total = held.length + failed.length + confirm.length + parked.length + rows;
   const groups = HOLD_REASONS.map((r) => [r, held.filter((c) => c.hold_reason === r)] as const).filter(([, list]) => list.length > 0);
@@ -86,6 +126,64 @@ export function AttentionPage() {
           ]}
         />
       </div>
+
+      {everyone.length > 0 && (
+        <Card className="mb-5 overflow-hidden p-0" data-tour="attention-facets">
+          <div className="flex flex-wrap items-center gap-2 bg-surface-2 p-3">
+            <SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={facets.q} onChange={(q) => setFacets({ ...facets, q })} />
+            <FilterChip active={facets.hot} onClick={() => setFacets({ ...facets, hot: !facets.hot })}>
+              <Flame className="size-3.5" aria-hidden /> Hot only
+            </FilterChip>
+            <Select aria-label="Minimum fit" value={facets.fit ?? ""} onChange={(e) => setFacets({ ...facets, fit: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">Any fit</option>
+              {[40, 60, 70, 80, 90].map((n) => (
+                <option key={n} value={n}>
+                  Fit {n}+
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Step that stopped" value={facets.step} onChange={(e) => setFacets({ ...facets, step: e.target.value })}>
+              <option value="">Any step</option>
+              {STEP_ORDER.map((st) => (
+                <option key={st} value={st}>
+                  Stopped at {STEP_NAMES[st]}
+                </option>
+              ))}
+            </Select>
+            <Select aria-label="Source" value={facets.source} onChange={(e) => setFacets({ ...facets, source: e.target.value })}>
+              <option value="">Any source</option>
+              {SOURCES.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+            {countries.length > 1 && (
+              <Select aria-label="Country" value={facets.country} onChange={(e) => setFacets({ ...facets, country: e.target.value })}>
+                <option value="">Any country</option>
+                {countries.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <SortControl value={facets.sort} options={SORTS} direction={facets.dir} onSort={(sort) => setFacets({ ...facets, sort, dir: NATURAL[sort] })} onDirection={() => setFacets({ ...facets, dir: facets.dir === "asc" ? "desc" : "asc" })} />
+              {narrowed && (
+                <Button variant="ghost" size="sm" onClick={() => setFacets(NO_FACETS)}>
+                  <X className="size-3.5" aria-hidden /> Clear
+                </Button>
+              )}
+            </div>
+          </div>
+          {narrowed && (
+            <p className="px-4 py-2 text-small text-muted">
+              Showing {held.length + failed.length + parked.length} of {everyone.length + (credits.data?.items.length ?? 0)} leads.
+            </p>
+          )}
+        </Card>
+      )}
 
       {loading && <Skeleton rows={6} />}
       <Problem error={lists.error ?? waiting.error} />
@@ -157,22 +255,79 @@ export function AttentionPage() {
 }
 
 function Row({ company, detail, children }: { company: Company; detail: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const fit = useQuery({ queryKey: ["fit"], queryFn: () => ok(client.GET("/api/reports/fit")) });
+  const minFit = fit.data?.min_fit_score ?? 60;
+  const person = company.summary?.contact_name;
+  const qualification = qualificationOf(company);
+  const failed = company.status === "failed";
+  const hint =
+    company.fit_score === null || company.fit_score === undefined
+      ? null
+      : company.fit_score < minFit
+        ? { tone: "stopped" as const, text: `Fit ${company.fit_score} is below your minimum (${minFit}): probably not worth retrying` }
+        : company.hot
+          ? { tone: "attention" as const, text: "Hot lead: worth the retry" }
+          : null;
   return (
-    <li className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar name={company.name ?? company.domain} />
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to="/leads/$companyId" params={{ companyId: company.id }} className="block truncate py-2.5 font-semibold text-ink hover:text-primary sm:py-0">
-              {company.name ?? company.domain}
-            </Link>
-            {company.name && <Mono className="text-muted">{company.domain}</Mono>}
-            {company.country_code && <Chip>{company.country_code}</Chip>}
+    <li className="py-3.5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={company.name ?? company.domain} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link to="/leads/$companyId" params={{ companyId: company.id }} className="block truncate py-2.5 font-semibold text-ink hover:text-primary sm:py-0">
+                {company.name ?? company.domain}
+              </Link>
+              {company.name && <Mono className="text-muted">{company.domain}</Mono>}
+              {company.country_code && <Chip>{company.country_code}</Chip>}
+              {company.hot && (
+                <Chip tone="attention" title="A fit score above 80">
+                  <Flame className="size-3.5" aria-hidden /> Hot
+                </Chip>
+              )}
+            </div>
+            <div className="mt-0.5 text-small text-muted">{detail}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-muted">
+              {person && (
+                <span>
+                  {person}
+                  {company.summary?.contact_title ? `, ${company.summary.contact_title}` : ""}
+                </span>
+              )}
+              {failed && (company.max_tries ?? 0) > 0 && <span>Try {Math.min(company.attempts ?? 0, company.max_tries ?? 0)} of {company.max_tries}</span>}
+              {failed && company.failed_stage && <span>Stopped at {STEP_NAMES[company.failed_stage] ?? words(company.failed_stage)}</span>}
+              <span>{company.source === "discovery" ? "Found by discovery" : company.source === "manual" ? "Added by you" : words(company.source)}</span>
+              {company.summary && <span>{aiCredits(company.summary.credits_milli ?? 0)} used so far</span>}
+            </div>
+            {hint && <div className={cx("mt-1 text-small font-medium", hint.tone === "attention" ? "text-attention" : "text-ink-2")}>{hint.text}</div>}
           </div>
-          <div className="mt-0.5 text-small text-muted">{detail}</div>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <FitRing score={company.fit_score} size={40} />
+          {children}
+          <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+            Details <ChevronDown className={cx("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+          </Button>
         </div>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
+      {open && (
+        <div className="mt-3 space-y-3 rounded-xl border border-line bg-surface-2 p-3 sm:ml-12">
+          {company.fit_reason && (
+            <p className="text-small text-ink-2">
+              <span className="font-semibold">Why it fits: </span>
+              {company.fit_reason}
+            </p>
+          )}
+          {failed && company.last_error && (
+            <p className="text-small text-ink-2">
+              <span className="font-semibold">What went wrong: </span>
+              {company.last_error}
+            </p>
+          )}
+          {qualification ? <FitBreakdown data={qualification} compact /> : !company.fit_reason && <p className="text-small text-muted">No fit details were recorded for this lead.</p>}
+        </div>
+      )}
     </li>
   );
 }
