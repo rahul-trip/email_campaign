@@ -184,8 +184,9 @@ def register(app: typer.Typer) -> None:
             container.platform,
             finder_price_micro_usd=finder_price(container.settings),
         )
+        admin = AdminService(container.platform, container.identity, container.uow)
         notices = NoticeService(
-            AdminService(container.platform, container.identity, container.uow),
+            admin,
             container.identity,
             build_transactional_email(container.settings),
             container.settings.app_base_url,
@@ -201,6 +202,7 @@ def register(app: typer.Typer) -> None:
                 notices.run,
                 directory.run,
                 activity.prune,
+                admin.purge_due,  # customers whose 30 days to be restored are over
             ],
             notifier=activity,
             alerts=StaffAlerts(container.identity),

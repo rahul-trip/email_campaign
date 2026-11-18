@@ -153,6 +153,14 @@ class WorkspaceRepository:
         rows = self._session.scalars(select(WorkspaceRow).order_by(WorkspaceRow.created_at))
         return [snapshot(row, Workspace) for row in rows]
 
+    def deletion_due(self, now: datetime) -> list[str]:
+        """Workspaces waiting to be deleted whose grace period is over."""
+        stmt = select(WorkspaceRow.id).where(
+            WorkspaceRow.status == WorkspaceStatus.PENDING_DELETION,
+            WorkspaceRow.deletion_due_at <= now,
+        )
+        return list(self._session.scalars(stmt))
+
 
 class OwnWorkspaceRepository:
     """The one workspace a tenant unit of work belongs to: its own row, nothing else."""

@@ -272,6 +272,28 @@
         "title": "ApproveIn",
         "type": "object"
       },
+      "ApproveWorkspaceIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "website": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ApproveWorkspaceIn",
+        "type": "object"
+      },
       "AttentionOut": {
         "properties": {
           "detail": {
@@ -282,10 +304,23 @@
             "enum": [
               "credit_request",
               "access_ending",
-              "mailbox"
+              "mailbox",
+              "deletion_due",
+              "workspace_request"
             ],
             "title": "Kind",
             "type": "string"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           },
           "workspace_id": {
             "title": "Workspace Id",
@@ -2184,6 +2219,18 @@
             "title": "Credits Milli",
             "type": "integer"
           },
+          "deletion_due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deletion Due At"
+          },
           "features": {
             "items": {
               "type": "string"
@@ -2451,6 +2498,32 @@
           "password"
         ],
         "title": "DeleteAccountIn",
+        "type": "object"
+      },
+      "DeleteCustomerIn": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm": {
+            "maxLength": 200,
+            "title": "Confirm",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Note",
+            "type": "string"
+          },
+          "now": {
+            "default": false,
+            "title": "Now",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "title": "DeleteCustomerIn",
         "type": "object"
       },
       "DeleteLeadIn": {
@@ -4931,6 +5004,11 @@
       },
       "Me": {
         "properties": {
+          "needs_new_workspace": {
+            "default": false,
+            "title": "Needs New Workspace",
+            "type": "boolean"
+          },
           "user": {
             "$ref": "#/components/schemas/UserOut"
           },
@@ -5200,6 +5278,25 @@
           "role"
         ],
         "title": "MyWorkspace",
+        "type": "object"
+      },
+      "MyWorkspaceRequestOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "created_at"
+        ],
+        "title": "MyWorkspaceRequestOut",
         "type": "object"
       },
       "NotHereIn": {
@@ -9007,6 +9104,73 @@
         "title": "WebhookSecretOut",
         "type": "object"
       },
+      "WorkspaceRequestIn": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 1000,
+            "title": "Note",
+            "type": "string"
+          },
+          "website": {
+            "default": "",
+            "maxLength": 255,
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "WorkspaceRequestIn",
+        "type": "object"
+      },
+      "WorkspaceRequestOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "user_id": {
+            "title": "User Id",
+            "type": "string"
+          },
+          "website": {
+            "title": "Website",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "email",
+          "name",
+          "website",
+          "note",
+          "created_at"
+        ],
+        "title": "WorkspaceRequestOut",
+        "type": "object"
+      },
       "WorkspaceSettingsIn": {
         "additionalProperties": false,
         "description": "Only the settings an operator may change, each with its real type.",
@@ -9655,6 +9819,67 @@
         ]
       }
     },
+    "/api/admin/customers/{workspace_id}/delete": {
+      "post": {
+        "description": "Close a customer and delete it after the grace period, or now. Members keep accounts.",
+        "operationId": "delete_customer_api_admin_customers__workspace_id__delete_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteCustomerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CustomerDetailOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Delete Customer Api Admin Customers  Workspace Id  Delete Post"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Customer",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
     "/api/admin/customers/{workspace_id}/dismiss-request": {
       "post": {
         "operationId": "dismiss_request_api_admin_customers__workspace_id__dismiss_request_post",
@@ -10090,6 +10315,49 @@
           }
         },
         "summary": "Change Plan",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/customers/{workspace_id}/restore": {
+      "post": {
+        "description": "Take back a deletion that is not due yet.",
+        "operationId": "restore_customer_api_admin_customers__workspace_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Customer",
         "tags": [
           "admin"
         ]
@@ -11849,6 +12117,119 @@
           }
         },
         "summary": "Test Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/workspace-requests": {
+      "get": {
+        "operationId": "workspace_requests_api_admin_workspace_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkspaceRequestOut"
+                  },
+                  "title": "Response Workspace Requests Api Admin Workspace Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Workspace Requests",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/workspace-requests/{user_id}/approve": {
+      "post": {
+        "description": "Give the person a new workspace, with them as its admin.",
+        "operationId": "approve_workspace_request_api_admin_workspace_requests__user_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveWorkspaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Workspace Request",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/workspace-requests/{user_id}/dismiss": {
+      "post": {
+        "operationId": "dismiss_workspace_request_api_admin_workspace_requests__user_id__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Workspace Request",
         "tags": [
           "admin"
         ]
@@ -15114,6 +15495,76 @@
           }
         },
         "summary": "Mark Read",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/api/me/workspace-request": {
+      "get": {
+        "description": "The open request for a new workspace, if this person made one.",
+        "operationId": "my_workspace_request_api_me_workspace_request_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/MyWorkspaceRequestOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response My Workspace Request Api Me Workspace Request Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "My Workspace Request",
+        "tags": [
+          "me"
+        ]
+      },
+      "post": {
+        "description": "Ask the platform staff for a new workspace, after one was deleted.",
+        "operationId": "request_workspace_api_me_workspace_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WorkspaceRequestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyWorkspaceRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request Workspace",
         "tags": [
           "me"
         ]

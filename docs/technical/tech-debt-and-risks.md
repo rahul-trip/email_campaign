@@ -276,6 +276,11 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-51 · P2 · Every action answered with "204 No Content" showed an error in web3, though it had worked — closed 2026-11-18
+
+- **What:** `web3/src/api/client.ts::ok` treated a reply with no data as a failure, and openapi-fetch gives no data for a 204. Deleting a user or your own account (and every other 204 route) said "Request failed (204)" while the change had been made. Deleting an account also raised 502 if the goodbye email failed after the delete was committed.
+- **Fix:** `ok` checks `response.ok`; `IdentityService::delete_account` logs `account_deleted_email_failed` instead of failing.
+
 ### R-50 · P2 · AI credits: what a customer is charged depends on settings staff must keep up
 
 - **What:** one AI-credit balance per workspace, stamped per call ([ADR 0034](adr/0034-one-ai-credit-balance-metered-per-call.md), migration 0029). Three gaps follow from the design:

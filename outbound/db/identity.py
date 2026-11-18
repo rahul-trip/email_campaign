@@ -641,6 +641,18 @@ class IdentityUnitOfWork:
     def commit(self) -> None:
         self.session.commit()
 
+    def forget_workspace(self, workspace_id: str) -> None:
+        """A deleted customer's open invitations, join requests and notifications. Memberships
+        stay: they are how a former member is known to need a new workspace from the staff."""
+        bind_workspace(self.session, workspace_id)
+        for model in (AuthTokenRow, JoinRequestRow, NotificationRow):
+            self.session.execute(
+                delete(model)
+                .where(model.workspace_id == workspace_id)
+                .execution_options(synchronize_session=False)
+            )
+        self.session.flush()
+
     def workspace_status(self, workspace_id: str) -> WorkspaceStatus | None:
         """The status of one workspace, or None if there is none, read in this transaction.
 

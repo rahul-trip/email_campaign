@@ -22,6 +22,7 @@ from outbound.api.schemas import (
     AdminMailboxOut,
     AdminRoleIn,
     AdminUserOut,
+    ApproveWorkspaceIn,
     AttentionOut,
     AuditOut,
     ChooseModelsIn,
@@ -31,6 +32,7 @@ from outbound.api.schemas import (
     CustomerOut,
     CustomerRowOut,
     DefaultPlanIn,
+    DeleteCustomerIn,
     DirectoryCompaniesOut,
     DirectoryCompanyIn,
     DirectoryCompanyOut,
@@ -73,6 +75,7 @@ from outbound.api.schemas import (
     VendorOut,
     VendorPauseIn,
     VendorsOut,
+    WorkspaceRequestOut,
 )
 from outbound.db.errors import NotFound
 from outbound.domain.entitlements import Grant, Plan
@@ -130,6 +133,7 @@ def _row(row: CustomerRow) -> CustomerRowOut:
         name=row.workspace.name,
         slug=row.workspace.slug,
         status=row.workspace.status.value,
+        deletion_due_at=row.workspace.deletion_due_at,
         plan_code=row.plan.code,
         plan_name=row.plan.name,
         access=quota.access.value,
@@ -267,6 +271,7 @@ def overview(_: Reader, service: Admin) -> OverviewOut:
                 workspace_id=a.workspace_id,
                 workspace_name=a.workspace_name,
                 detail=a.detail,
+                user_id=a.user_id,
             )
             for a in found.attention
         ],
@@ -335,6 +340,64 @@ def change_status(
 ) -> CustomerDetailOut:
     service.set_status(workspace_id, WorkspaceStatus(body.status), by=staff.user.id, note=body.note)
     return _detail(service.customer(workspace_id))
+
+
+@router.post("/customers/{workspace_id}/delete", response_model=CustomerDetailOut | None)
+def delete_customer(
+    workspace_id: str, body: DeleteCustomerIn, staff: Writer, service: Admin
+) -> CustomerDetailOut | None:
+    """Close a customer and delete it after the grace period, or now. Members keep accounts."""
+    found = service.customer(workspace_id)
+    if body.confirm.strip() != found.row.workspace.name.strip():
+        raise ApiError(422, "confirm_mismatch", "Type the customer's name exactly to confirm.")
+    service.schedule_deletion(workspace_id, by=staff.user.id, note=body.note, now_=body.now)
+    return _detail(service.customer(workspace_id))
+
+
+@router.post("/customers/{workspace_id}/restore", response_model=CustomerDetailOut)
+def restore_customer(workspace_id: str, staff: Writer, service: Admin) -> CustomerDetailOut:
+    """Take back a deletion that is not due yet."""
+    service.restore(workspace_id, by=staff.user.id)
+    return _detail(service.customer(workspace_id))
+
+
+@router.get("/workspace-requests", response_model=list[WorkspaceRequestOut])
+def workspace_requests(_: Reader, service: Admin) -> list[WorkspaceRequestOut]:
+    return [
+        WorkspaceRequestOut(
+            user_id=r.user_id,
+            email=r.email,
+            name=r.name,
+            website=r.website,
+            note=r.note,
+            created_at=r.at,
+        )
+        for r in service.workspace_requests()
+    ]
+
+
+@router.post("/workspace-requests/{user_id}/approve", response_model=CustomerOut, status_code=201)
+def approve_workspace_request(
+    user_id: str,
+    body: ApproveWorkspaceIn,
+    staff: Writer,
+    ids: Annotated[IdentityService, Depends(identity)],
+) -> CustomerOut:
+    """Give the person a new workspace, with them as its admin."""
+    try:
+        made = ids.approve_workspace_request(
+            user_id, body.name, by=staff.user.id, website=body.website
+        )
+    except NotFound:
+        raise ApiError(404, "not_found", "No such user.") from None
+    except IdentityError as error:
+        raise ApiError(error.status, error.code, error.detail) from None
+    return CustomerOut(workspace_id=made.id, slug=made.slug, invited="")
+
+
+@router.post("/workspace-requests/{user_id}/dismiss", status_code=204)
+def dismiss_workspace_request(user_id: str, staff: Writer, service: Admin) -> None:
+    service.dismiss_workspace_request(user_id, by=staff.user.id)
 
 
 @router.put("/customers/{workspace_id}/overrides", response_model=CustomerDetailOut)

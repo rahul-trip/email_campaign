@@ -43,6 +43,7 @@ OPEN = {
     # one, read their notifications. Each call acts only on the caller.
     "/api/me/workspaces",
     "/api/me/join-requests",
+    "/api/me/workspace-request",  # after a deletion, ask the staff for a new workspace
     "/api/me/notifications",
     "/api/me/notifications/read",
     # The provider's return page knows no workspace: the route finds it in the session's pending

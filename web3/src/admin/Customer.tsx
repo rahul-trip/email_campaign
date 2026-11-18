@@ -57,7 +57,7 @@ export function CustomerPage() {
 
 // ------------------------------------------------------------------ header and actions
 
-type Action = "grant" | "extend" | "plan" | "status" | null;
+type Action = "grant" | "extend" | "plan" | "status" | "delete" | null;
 
 function Header({ d, onChange }: { d: Detail; onChange: () => void }) {
   const me = useMe();
@@ -109,18 +109,87 @@ function Header({ d, onChange }: { d: Detail; onChange: () => void }) {
                       { label: "Pause the engine", onSelect: () => { setStatus("paused"); setAction("status"); } },
                       { label: "Suspend the customer", tone: "danger" as const, onSelect: () => { setStatus("suspended"); setAction("status"); } },
                     ]
-                  : [{ label: "Make it active again", onSelect: () => { setStatus("active"); setAction("status"); } }]),
+                  : row.status === "paused" || row.status === "suspended"
+                    ? [{ label: "Make it active again", onSelect: () => { setStatus("active"); setAction("status"); } }]
+                    : []),
+                ...(row.status === "pending_deletion" || row.status === "deleted"
+                  ? []
+                  : [{ label: "Delete the customer", tone: "danger" as const, onSelect: () => setAction("delete") }]),
               ]}
             />
           </div>
         }
       />
+      {row.status === "pending_deletion" && <DeletionBanner d={d} onChange={onChange} />}
+      {row.status === "deleted" && (
+        <Callout tone="error" title="Deleted" className="mb-4">
+          Its leads, mailboxes and settings are gone. Its plan, credits, costs and history are kept for the books. Former members keep their accounts and can ask for a new workspace.
+        </Callout>
+      )}
       {d.requests.length > 0 && row.open_request && <RequestBanner d={d} onChange={onChange} />}
       {action === "grant" && <GrantDialog d={d} onClose={close} onDone={done} />}
       {action === "extend" && <ExtendDialog d={d} onClose={close} onDone={done} />}
       {action === "plan" && <PlanDialog d={d} onClose={close} onDone={done} />}
       {action === "status" && <StatusDialog d={d} to={status} onClose={close} onDone={done} />}
+      {action === "delete" && <DeleteDialog d={d} onClose={close} onDone={done} />}
     </>
+  );
+}
+
+function DeletionBanner({ d, onChange }: { d: Detail; onChange: () => void }) {
+  const restore = useMutation({
+    mutationFn: () => ok(client.POST("/api/admin/customers/{workspace_id}/restore", { params: { path: { workspace_id: d.row.id } } })),
+    onSuccess: onChange,
+  });
+  const due = d.row.deletion_due_at ? new Date(d.row.deletion_due_at).toLocaleDateString() : "the due date";
+  return (
+    <Callout tone="error" title="Waiting to be deleted" className="mb-4">
+      <span>Closed to its members. Everything is deleted on {due}; until then you can restore it.</span>
+      <div className="mt-2">
+        <Button size="sm" variant="secondary" busy={restore.isPending} onClick={() => restore.mutate()}>
+          Restore the customer
+        </Button>
+      </div>
+      <Problem error={restore.error} className="mt-2" />
+    </Callout>
+  );
+}
+
+function DeleteDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; onDone: () => void }) {
+  const [confirm, setConfirm] = useState("");
+  const [now, setNow] = useState(false);
+  const [note, setNote] = useState("");
+  const remove = useMutation({
+    mutationFn: () => ok(client.POST("/api/admin/customers/{workspace_id}/delete", { params: { path: { workspace_id: d.row.id } }, body: { confirm, now, note } })),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog
+      title={`Delete · ${d.row.name}`}
+      tone="danger"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" busy={remove.isPending} disabled={confirm.trim() !== d.row.name.trim()} onClick={() => remove.mutate()}>
+            {now ? "Delete now" : "Delete in 30 days"}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-body">
+        The workspace closes now and everyone in it is signed out. After 30 days its leads, emails, mailboxes and settings are deleted for good; until then you can restore it. Members keep their
+        accounts and can ask you for a new workspace.
+      </p>
+      <Field label={`Type “${d.row.name}” to confirm`}>
+        <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} className="w-full" />
+      </Field>
+      <Checkbox checked={now} onChange={setNow} label="Delete everything now, without the 30 days to restore it" />
+      <Note value={note} onChange={setNote} />
+      <Problem error={remove.error} />
+    </Dialog>
   );
 }
 

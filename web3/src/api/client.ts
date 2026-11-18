@@ -66,7 +66,8 @@ type Answer<T> = { data?: T; error?: unknown; response: Response };
 /** Unwrap a client answer: return the data, or throw an ApiProblem. */
 export async function ok<T>(request: Promise<Answer<T>>): Promise<T> {
   const answer = await request;
-  if (answer.error !== undefined || answer.data === undefined) {
+  // A 204 has no body, so openapi-fetch gives no data: that is success, not a failure.
+  if (answer.error !== undefined || !answer.response.ok) {
     const body = (answer.error ?? {}) as {
       code?: string;
       detail?: string;
@@ -79,7 +80,7 @@ export async function ok<T>(request: Promise<Answer<T>>): Promise<T> {
       body.errors ?? [],
     );
   }
-  return answer.data;
+  return answer.data as T;
 }
 
 export const isConflict = (error: unknown): boolean =>

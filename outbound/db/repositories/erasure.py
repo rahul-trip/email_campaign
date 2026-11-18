@@ -13,17 +13,25 @@ from sqlalchemy import CursorResult, String, delete, func, select, update
 from sqlalchemy import cast as sql_cast
 
 from outbound.db.models import (
+    CampaignRow,
     CompanyRow,
     ConsentRow,
     ContactEmailRow,
     ContactRow,
+    CountryPolicyRow,
+    CredentialRow,
+    DiscoveryCandidateRow,
     EventRow,
+    ImportBatchRow,
     ImportRowRow,
     InboundMessageRow,
     LinkedInMessageRow,
+    MailboxRow,
     MessageRow,
     NoteRow,
     ProviderCallRow,
+    RunRow,
+    SuppressionRow,
 )
 from outbound.db.repositories.base import ScopedRepository
 from outbound.domain.enums import EntityType
@@ -61,7 +69,40 @@ def redact(value: Any, needles: list[str]) -> Any:
     return value
 
 
+# A deleted customer's own data, children before parents. What is not here is kept on purpose:
+# the cost ledger (provider_calls, scrubbed below), usage, plan, grants and the audit log.
+_PURGED = (
+    InboundMessageRow, LinkedInMessageRow, MessageRow, ConsentRow, ContactEmailRow, NoteRow,
+    ImportRowRow, ImportBatchRow, ContactRow, DiscoveryCandidateRow, CompanyRow, RunRow, EventRow,
+    CampaignRow, CredentialRow, MailboxRow, SuppressionRow, CountryPolicyRow,
+)  # fmt: skip
+
+
 class ErasureRepository(ScopedRepository):
+    def purge_workspace(self) -> dict[str, int]:
+        """Delete everything this workspace holds about its leads, mailboxes and settings.
+
+        Vendor calls stay, for the platform's books, but lose their answers and every link to a
+        lead, a person or a run. Returns how many rows went from each table.
+        """
+        ws = self._workspace_id
+        self._session.execute(
+            update(ProviderCallRow)
+            .where(ProviderCallRow.workspace_id == ws)
+            .values(run_id=None, company_id=None, contact_id=None, response=None, detail=None)
+            .execution_options(synchronize_session=False)
+        )
+        counts: dict[str, int] = {}
+        for model in _PURGED:
+            result = self._session.execute(
+                delete(model)
+                .where(model.workspace_id == ws)
+                .execution_options(synchronize_session=False)
+            )
+            counts[model.__tablename__] = int(cast(CursorResult[Any], result).rowcount or 0)
+        self._session.flush()
+        return counts
+
     def scrub_contact(self, contact_id: str, address: str | None) -> None:
         """Remove the personal data of one contact and, if known, their email address."""
         ws = self._workspace_id

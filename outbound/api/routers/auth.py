@@ -54,6 +54,7 @@ def _me(ids: IdentityService, user: CurrentUser) -> Me:
             )
             for w, role in ids.workspaces_of(user)
         ],
+        needs_new_workspace=ids.lost_a_workspace(user),
     )
 
 

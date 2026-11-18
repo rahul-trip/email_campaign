@@ -14,6 +14,7 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import timedelta
+from typing import Any
 
 from outbound.db.errors import NotFound
 from outbound.db.identity import IdentityUnitOfWork, IdentityUnitOfWorkFactory, normalise_email
@@ -599,7 +600,10 @@ class IdentityService:
             )  # fmt: skip
             ids.commit()
         log.info("account_deleted", user_id=user_id, by=by, mailboxes=len(owned))
-        self._send(user.email, "Your Outbound account was deleted", _DELETED)
+        try:  # the account is already gone; a failed goodbye email must not report a failure
+            self._send(user.email, "Your Outbound account was deleted", _DELETED)
+        except IdentityError:
+            log.warning("account_deleted_email_failed", user_id=user_id)
         return DeletedAccount(len(owned), suspended)
 
     def _check_can_leave(self, ids: IdentityUnitOfWork, user: User) -> list[str]:
@@ -693,17 +697,89 @@ class IdentityService:
     def create_my_workspace(
         self, current: CurrentUser, name: str, *, website: str = ""
     ) -> Workspace:
-        """Someone with an account makes a workspace and becomes its admin."""
+        """Someone with an account makes a workspace and becomes its admin. Someone whose
+        workspace was deleted asks the staff instead (``request_workspace``)."""
         if not name.strip():
             raise IdentityError(422, "name_required", "Give the company's name.")
+        if self.lost_a_workspace(current):
+            raise IdentityError(
+                403, "ask_platform",
+                "Your workspace was deleted. Ask the platform team for a new one.",
+            )  # fmt: skip
+        return self._start_workspace(current.user.id, name, website=website, by=current.user.id)
+
+    def _start_workspace(self, user_id: str, name: str, *, website: str, by: str) -> Workspace:
         created = create_workspace(self._uow, self._platform, name, website=website)
         with self._identity() as ids:
-            ids.memberships.add(created.id, current.user.id, MembershipRole.ADMIN)
+            ids.memberships.add(created.id, user_id, MembershipRole.ADMIN)
             ids.audit.record(
-                "workspace_created", actor_user_id=current.user.id, workspace_id=created.id,
+                "workspace_created", actor_user_id=by, workspace_id=created.id,
                 target_type="workspace", target_id=created.id, data={"name": name},
             )  # fmt: skip
             ids.commit()
+        return created
+
+    def lost_a_workspace(self, current: CurrentUser) -> bool:
+        """Whether a workspace of theirs was deleted (or is about to be) and they have no other
+        left. Such a person asks the staff for a new workspace instead of making one."""
+        gone = (WorkspaceStatus.PENDING_DELETION, WorkspaceStatus.DELETED)
+        with self._platform() as directory:
+            found = [directory.workspaces.get(m.workspace_id) for m in current.memberships]
+        statuses = [w.status for w in found if w is not None]
+        return any(s in gone for s in statuses) and all(s in gone for s in statuses)
+
+    def request_workspace(
+        self, current: CurrentUser, name: str, *, website: str = "", note: str = ""
+    ) -> None:
+        """Ask the platform staff for a new workspace (after one was deleted)."""
+        if not name.strip():
+            raise IdentityError(422, "name_required", "Give the company's name.")
+        if self.my_workspace_request(current) is not None:
+            raise IdentityError(
+                409, "already_asked", "You have already asked. The team will reply."
+            )
+        with self._identity() as ids:
+            ids.audit.record(
+                "workspace_requested", actor_user_id=current.user.id, target_type="user",
+                target_id=current.user.id, note=note.strip() or None,
+                data={"name": name.strip(), "website": website.strip()},
+            )  # fmt: skip
+            ids.commit()
+        log.info("workspace_requested", user_id=current.user.id)
+
+    def my_workspace_request(self, current: CurrentUser) -> dict[str, Any] | None:
+        """This person's open request for a new workspace, if any."""
+        answered = ("workspace_request_approved", "workspace_request_dismissed")
+        with self._identity() as ids:
+            entries = ids.audit.recent(limit=1000)
+        for entry in entries:  # newest first
+            if entry.get("target_id") != current.user.id:
+                continue
+            if entry["action"] in answered:
+                return None
+            if entry["action"] == "workspace_requested":
+                return entry
+        return None
+
+    def approve_workspace_request(
+        self, user_id: str, name: str, *, by: str, website: str = ""
+    ) -> Workspace:
+        """A platform admin gives the person a new workspace, with them as its admin."""
+        if not name.strip():
+            raise IdentityError(422, "name_required", "Give the company's name.")
+        with self._identity() as ids:
+            user = ids.users.get(user_id)
+        created = self._start_workspace(user_id, name, website=website, by=by)
+        with self._identity() as ids:
+            ids.audit.record(
+                "workspace_request_approved", actor_user_id=by, workspace_id=created.id,
+                target_type="user", target_id=user_id,
+            )  # fmt: skip
+            ids.commit()
+        try:
+            self._send(user.email, "Your new Outbound workspace is ready", _WORKSPACE_READY)
+        except IdentityError:
+            log.warning("workspace_ready_email_failed", user_id=user_id)
         return created
 
     def request_to_join(self, current: CurrentUser, code: str) -> MyJoinRequest:
@@ -830,7 +906,8 @@ class IdentityService:
                 found = directory.workspaces.all()
             else:
                 found = [w for w in (directory.workspaces.get(i) for i in roles) if w]
-        return [(w, roles.get(w.id)) for w in found]
+        gone = (WorkspaceStatus.PENDING_DELETION, WorkspaceStatus.DELETED)
+        return [(w, roles.get(w.id)) for w in found if w.status not in gone]
 
     def _workspace(self, workspace_id: str) -> Workspace:
         with self._platform() as directory:
@@ -909,3 +986,6 @@ signed out. If this was not you, reset your password now from the sign-in page."
 
 _DELETED = """Your Outbound account was deleted, and its mailboxes were disconnected. If this was
 not you, contact support."""
+
+_WORKSPACE_READY = """The platform team has made you a new Outbound workspace, and you are its
+admin. Sign in to set it up."""

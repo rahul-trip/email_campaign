@@ -183,6 +183,8 @@ Every lifecycle, copied from the code with a diagram, is in [technical/hld/state
 
 **Workspace status** (Phase 6a; `outbound/domain/enums.py::WorkspaceStatus`): `active` → `paused` (a platform admin stopped its engine; people can still sign in and read) or `suspended` (nobody can use it) → `pending_deletion` (restorable until due) → `deleted` (a tombstone; cost history keeps its key). A workspace past its plan's access date is `active` but read-only (a quota check, not a status).
 
+**Deleting a customer** (2026-11-18): a platform admin types the customer's name to delete it. It moves to `pending_deletion` at once (closed to its members, everyone signed out, the engine stopped) and can be restored for **30 days**, or deleted at once with *now*. When due, the worker purges its leads, people, emails, runs, events, campaigns, mailboxes and their secrets, suppressions, country rules, open invitations, join requests and notifications; the workspace row stays as a `deleted` tombstone with its plan, grants, usage, vendor-call costs (answers and links blanked) and audit log. **Members keep their accounts.** A person whose only workspaces are deleted cannot start one themselves: they ask the platform staff (*Ask for a new workspace*), and staff approve it (a new, empty workspace with them as its admin) or dismiss it, from the console's Overview.
+
 **Company status** (the runner routes on this alone)
 
 | Status | Meaning | Moves to |
