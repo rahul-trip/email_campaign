@@ -244,7 +244,7 @@ For each confirmed decision-maker who has a LinkedIn profile, the engine writes 
 
 **Nothing is ever sent from this application**: you copy the text into LinkedIn yourself.
 
-- The **LinkedIn** page lists every message, newest first, in three tabs: *To send*, *Sent* and *Skipped*. For each: **Open their LinkedIn**, **Copy** the note, **Copy** the message, then **Mark sent on LinkedIn**. The lead's name links to the lead page.
+- The **LinkedIn** page lists every message, newest first, in three tabs: *To send*, *Sent* and *Skipped*. For each, **Copy & open LinkedIn** beside the note copies it and opens the person's profile in a new tab, ready to paste; the same button beside the message does the same once they accept. Then **Mark sent on LinkedIn**. Without a profile link the buttons only **Copy**; **Open their LinkedIn** still opens the profile on its own. The lead's name links to the lead page.
 - The lead page has the same messages in its **LinkedIn** card, under *People and addresses*.
 - **Edit** changes the words; what you save is yours and the checks no longer apply. **Rewrite** writes a fresh pair. **Skip** sets one aside (**Use it again** undoes it).
 - A message the checks still object to (too long, a link, a leftover placeholder, wording that reads like a template) shows what is wrong in a yellow note, so you edit it before you use it.
