@@ -99,7 +99,7 @@ class SchedulerQueries:
 
 
 def _spend() -> ColumnElement[int]:
-    return func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)
+    return func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)
 
 
 class AdminQueries:
@@ -110,7 +110,20 @@ class AdminQueries:
         self._session = session
 
     def spend(self, start: datetime, end: datetime) -> dict[str, int]:
-        """Vendor spend per workspace in ``[start, end)``, in micro-USD."""
+        """AI credits used per workspace in ``[start, end)``, in thousandths."""
+        stmt = (
+            select(
+                ProviderCallRow.workspace_id,
+                func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
+            )
+            .where(ProviderCallRow.created_at >= start, ProviderCallRow.created_at < end)
+            .group_by(ProviderCallRow.workspace_id)
+        )
+        return {ws: int(total) for ws, total in self._session.execute(stmt)}
+
+    def cost(self, start: datetime, end: datetime) -> dict[str, int]:
+        """What each workspace's calls cost the platform in ``[start, end)``, in micro-USD: for
+        staff only, never shown to a customer."""
         stmt = (
             select(
                 ProviderCallRow.workspace_id,
@@ -121,10 +134,22 @@ class AdminQueries:
         )
         return {ws: int(total) for ws, total in self._session.execute(stmt)}
 
-    def spend_by_provider(self, start: datetime, end: datetime) -> dict[str, int]:
+    def cost_by_provider(self, start: datetime, end: datetime) -> dict[str, int]:
+        """What each vendor's calls (all workspaces) cost the platform, in micro-USD."""
         stmt = (
             select(
                 ProviderCallRow.provider, func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)
+            )
+            .where(ProviderCallRow.created_at >= start, ProviderCallRow.created_at < end)
+            .group_by(ProviderCallRow.provider)
+        )
+        return {name: int(total) for name, total in self._session.execute(stmt)}
+
+    def spend_by_provider(self, start: datetime, end: datetime) -> dict[str, int]:
+        """AI credits used per vendor (all workspaces) in ``[start, end)``, in thousandths."""
+        stmt = (
+            select(
+                ProviderCallRow.provider, func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)
             )
             .where(ProviderCallRow.created_at >= start, ProviderCallRow.created_at < end)
             .group_by(ProviderCallRow.provider)

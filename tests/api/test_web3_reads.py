@@ -87,7 +87,8 @@ def test_a_leads_page_can_carry_each_leads_person_address_status_and_cost(
         for cost in (12_000, 19_000):
             uow.calls.record(
                 provider="hunter", operation="find", request_hash=f"h{cost}",
-                outcome=CallOutcome.HIT, cost_micro_usd=cost, company_id=company_id,
+                outcome=CallOutcome.HIT, cost_micro_usd=cost, credits_milli=cost // 10,
+                company_id=company_id,
             )  # fmt: skip
         uow.commit()
 
@@ -99,10 +100,10 @@ def test_a_leads_page_can_carry_each_leads_person_address_status_and_cost(
         "contact_name": "Sara Okafor",
         "contact_title": "Head of Finance",
         "email_status": "valid",
-        "cost_micro_usd": 31_000,
+        "credits_milli": 3_100,
     }
     assert items[bare]["summary"] == {
-        "contact_name": None, "contact_title": None, "email_status": None, "cost_micro_usd": 0,
+        "contact_name": None, "contact_title": None, "email_status": None, "credits_milli": 0,
     }  # fmt: skip
 
 
@@ -122,7 +123,7 @@ def test_daily_counts_leads_approvals_reviews_and_spend_and_the_review_streak(
         )  # fmt: skip
         uow.calls.record(
             provider="exa", operation="find", request_hash="x", outcome=CallOutcome.MISS,
-            cost_micro_usd=5_000,
+            cost_micro_usd=5_000, credits_milli=500,
         )  # fmt: skip
         uow.commit()
 
@@ -132,7 +133,7 @@ def test_daily_counts_leads_approvals_reviews_and_spend_and_the_review_streak(
     assert today["leads"] == 1
     assert today["approved"] == 2  # by a person and automatically
     assert today["reviewed"] == 2  # a person approved one and rejected one; AUTO is not a review
-    assert today["spend_micro_usd"] == 5_000
+    assert today["credits_milli"] == 500
     assert body["review_streak"] == 1
     assert api.get("/api/reports/daily?days=0").status_code == 422
 

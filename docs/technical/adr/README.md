@@ -50,9 +50,11 @@ An ADR records one architecturally significant decision: the context, what was d
 | [0024](0024-row-level-security-and-least-privilege-roles.md) | Row-level security and three least-privilege Postgres roles | Accepted | 2026-10-23 |
 | [0025](0025-tenant-bound-foreign-keys-and-multi-workspace-worker.md) | Composite tenant-bound foreign keys, and one worker scheduling every workspace | Accepted | 2026-10-23 |
 | [0026](0026-revocable-sessions-and-fixed-permission-model.md) | Revocable, hashed sessions replace signed stateless sessions; permissions, not roles, gate every route | Accepted | 2026-10-23 |
-| [0027](0027-credits-charged-once-per-lead-per-step.md) | A plan's credit for a step is charged once per lead, except rewrites, which charge every time | Accepted | 2026-10-24 |
+| [0027](0027-credits-charged-once-per-lead-per-step.md) | A plan's credit for a step is charged once per lead, except rewrites, which charge every time | Superseded by 0034 | 2026-10-24 |
 | [0028](0028-encrypted-credentials-and-oauth-for-customer-mailboxes.md) | Encrypted-at-rest credentials, OAuth for Microsoft/Google, and an SSRF guard for customer-supplied IMAP hosts | Accepted | 2026-10-23 |
 | [0029](0029-shared-lead-directory-with-no-contributor-attribution.md) | A cross-workspace verified lead directory, with attribution structurally absent rather than filtered out | Accepted | 2026-10-26 |
 | [0030](0030-rules-based-inbox-classification-no-model.md) | Reply classification is rules-only until a later phase, and only two categories act automatically | Accepted | 2026-10-26 |
 | [0031](0031-multi-source-discovery-screened-before-intake.md) | Discovery looks in several sources, and screens every company against the brief before it becomes a lead | Accepted | 2026-11-06 |
 | [0032](0032-discovery-roles-and-website-picks-by-closed-choice.md) | Discovery decides what a company is, and which site is its own, by closed choice | Accepted | 2026-11-14 |
+| [0033](0033-cold-drafts-may-be-approved-without-a-person.md) | Cold drafts may be approved without a person, when a workspace switches it on | Accepted | 2026-11-16 |
+| [0034](0034-one-ai-credit-balance-metered-per-call.md) | One balance of AI credits per workspace, used by every vendor and model call | Accepted | 2026-11-18 |

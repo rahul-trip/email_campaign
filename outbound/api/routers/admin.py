@@ -1,6 +1,7 @@
 """The platform's own console (Phase 6d): customers, plans, credits, people, settings, audit.
 
-Platform admins and the alpha's superadmin only. Reads need ``admin.read``, changes ``admin.write``.
+Platform admins and the alpha's superadmin only. Reads need ``admin.read``, changes ``admin.write``;
+defining plans and the value of an AI credit needs ``admin.plans`` (superadmins).
 Everything here is counts, plans and settings: an admin sees how a customer uses the service,
 never the content of its leads.
 """
@@ -16,12 +17,13 @@ from fastapi.responses import Response
 from outbound.api.deps import identity, require_platform
 from outbound.api.errors import ApiError
 from outbound.api.schemas import (
+    AdminCreditsOut,
     AdminMailboxOut,
     AdminRoleIn,
-    AdminStepOut,
     AdminUserOut,
     AttentionOut,
     AuditOut,
+    CreditValueIn,
     CustomerDetailOut,
     CustomerIn,
     CustomerOut,
@@ -44,6 +46,7 @@ from outbound.api.schemas import (
     GrantIn,
     GrantOut,
     KeyCheckOut,
+    LlmChargeOut,
     LlmSettingsIn,
     MemberOut,
     OverrideIn,
@@ -67,14 +70,14 @@ from outbound.api.schemas import (
     VendorsOut,
 )
 from outbound.db.errors import NotFound
-from outbound.domain.entitlements import Plan
+from outbound.domain.entitlements import Grant, Plan
 from outbound.domain.enums import (
     MembershipRole,
     PlatformRole,
-    UsageStep,
     UserStatus,
     WorkspaceStatus,
 )
+from outbound.domain.permissions import PLATFORM_PERMISSIONS
 from outbound.domain.permissions import Permission as P
 from outbound.domain.platform_settings import PlatformSettings
 from outbound.domain.vendors import MAX_KEYS
@@ -92,6 +95,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 Reader = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_READ))]
 Writer = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_WRITE))]
 KeyHolder = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_KEYS))]
+PlanMaker = Annotated[CurrentUser, Depends(require_platform(P.ADMIN_PLANS))]
 
 
 def admin(request: Request) -> AdminService:
@@ -126,18 +130,16 @@ def _row(row: CustomerRow) -> CustomerRowOut:
         access_until=quota.access_until,
         period_start=quota.period_start,
         period_end=quota.period_end,
-        steps=[
-            AdminStepOut(
-                step=s.step.value,
-                plan_limit=row.plan.limits.get(s.step),
-                limit=s.limit,
-                granted=s.granted,
-                used=s.used,
-                remaining=s.remaining,
-            )
-            for s in quota.steps.values()
-        ],
-        spend_micro_usd=row.spend_micro_usd,
+        credits=AdminCreditsOut(
+            plan_monthly=row.plan.monthly_credits,
+            monthly=quota.credits.monthly,
+            granted=quota.credits.granted,
+            allowance=quota.credits.allowance,
+            used_milli=quota.credits.used_milli,
+            remaining_milli=quota.credits.remaining_milli,
+        ),
+        credits_milli=row.credits_milli,
+        cost_micro_usd=row.cost_micro_usd,
         leads=row.leads,
         members=row.members,
         mailboxes=row.mailboxes,
@@ -151,7 +153,7 @@ def _row(row: CustomerRow) -> CustomerRowOut:
         mailbox_limit=quota.entitlements.mailboxes,
         active_campaigns=quota.entitlements.active_campaigns,
         max_leads_per_run=quota.entitlements.max_leads_per_run,
-        max_prospect_budget_micro_usd=quota.entitlements.max_prospect_budget_micro_usd,
+        max_prospect_budget_credits=quota.entitlements.max_prospect_budget_credits,
     )
 
 
@@ -180,13 +182,7 @@ def _detail(found: CustomerDetail) -> CustomerDetailOut:
             )
             for o in found.overrides
         ],
-        grants=[
-            GrantOut(
-                id=g.id, step=g.step.value, amount=g.amount, created_at=g.created_at,
-                expires_at=g.expires_at, revoked_at=g.revoked_at, note=g.note,
-            )
-            for g in found.grants
-        ],
+        grants=[_grant(g) for g in found.grants],
         members=[
             MemberOut(
                 user_id=u.id, email=u.email, name=u.name, role=m.role.value,
@@ -209,16 +205,23 @@ def _detail(found: CustomerDetail) -> CustomerDetailOut:
     )  # fmt: skip
 
 
+def _grant(g: Grant) -> GrantOut:
+    return GrantOut(
+        id=g.id, step=g.step.value if g.step else None, amount=g.amount,
+        created_at=g.created_at, expires_at=g.expires_at, revoked_at=g.revoked_at, note=g.note,
+    )  # fmt: skip
+
+
 def _plan(plan: Plan, customers: int) -> PlanDefinition:
     return PlanDefinition(
         code=plan.code,
         name=plan.name,
-        limits={s.value: plan.limits.get(s) for s in UsageStep},
+        monthly_credits=plan.monthly_credits,
         seats=plan.seats,
         mailboxes=plan.mailboxes,
         active_campaigns=plan.active_campaigns,
         max_leads_per_run=plan.max_leads_per_run,
-        max_prospect_budget_micro_usd=plan.max_prospect_budget_micro_usd,
+        max_prospect_budget_credits=plan.max_prospect_budget_credits,
         features=sorted(plan.features),
         access_days=plan.access_days,
         customers=customers,
@@ -246,8 +249,10 @@ def overview(_: Reader, service: Admin) -> OverviewOut:
         expiring=found.expiring,
         leads_added=found.leads_added,
         drafts_made=found.drafts_made,
-        spend_micro_usd=found.spend_micro_usd,
-        spend_by_provider=found.spend_by_provider,
+        credits_milli=found.credits_milli,
+        credits_by_provider=found.credits_by_provider,
+        cost_micro_usd=found.cost_micro_usd,
+        cost_by_provider=found.cost_by_provider,
         waiting=found.waiting,
         waiting_customers=found.waiting_customers,
         attention=[
@@ -350,14 +355,11 @@ def revoke_override(
 @router.post("/customers/{workspace_id}/grants", response_model=GrantedOut, status_code=201)
 def grant_credits(workspace_id: str, body: GrantIn, staff: Writer, service: Admin) -> GrantedOut:
     made, released = service.grant(
-        workspace_id, UsageStep(body.step), body.amount, by=staff.user.id,
+        workspace_id, body.amount, by=staff.user.id,
         expires_at=body.expires_at, note=body.note, resume_now=body.resume_now,
     )  # fmt: skip
     return GrantedOut(
-        grant=GrantOut(
-            id=made.id, step=made.step.value, amount=made.amount, created_at=made.created_at,
-            expires_at=made.expires_at, revoked_at=made.revoked_at, note=made.note,
-        ),
+        grant=_grant(made),
         resumed_leads=released.leads,
         resumed_rows=released.rows,
     )  # fmt: skip
@@ -450,33 +452,43 @@ def set_platform_role(user_id: str, body: PlatformRoleIn, staff: Writer, service
 
 
 @router.get("/plans", response_model=PlansOut)
-def plans(_: Reader, service: Admin) -> PlansOut:
+def plans(staff: Reader, service: Admin) -> PlansOut:
     settings, version = service.settings()
     counts = service.plan_customers()
+    role = staff.user.platform_role
     return PlansOut(
         plans=[_plan(p, counts.get(p.code, 0)) for p in settings.plans.values()],
         default_plan=settings.default_plan,
+        credit_value_micro_usd=settings.credit_value_micro_usd,
+        can_edit=role is not None and P.ADMIN_PLANS in PLATFORM_PERMISSIONS[role],
         version=version,
     )
 
 
 @router.put("/plans/default", response_model=PlansOut)
-def default_plan(body: DefaultPlanIn, staff: Writer, service: Admin) -> PlansOut:
+def default_plan(body: DefaultPlanIn, staff: PlanMaker, service: Admin) -> PlansOut:
     service.set_default_plan(body.plan, by=staff.user.id, version=body.version)
     return plans(staff, service)
 
 
+@router.put("/plans/credit-value", response_model=PlansOut)
+def credit_value(body: CreditValueIn, staff: PlanMaker, service: Admin) -> PlansOut:
+    """How much vendor and model cost one AI credit stands for, from the next call on."""
+    service.set_credit_value(body.credit_value_micro_usd, by=staff.user.id, version=body.version)
+    return plans(staff, service)
+
+
 @router.put("/plans/{code}", response_model=PlansOut)
-def save_plan(code: str, body: PlanSaveIn, staff: Writer, service: Admin) -> PlansOut:
+def save_plan(code: str, body: PlanSaveIn, staff: PlanMaker, service: Admin) -> PlansOut:
     plan = Plan(
         code=code,
         name=body.name.strip(),
-        limits={UsageStep(step): value for step, value in body.limits.items()},
+        monthly_credits=body.monthly_credits,
         seats=body.seats,
         mailboxes=body.mailboxes,
         active_campaigns=body.active_campaigns,
         max_leads_per_run=body.max_leads_per_run,
-        max_prospect_budget_micro_usd=body.max_prospect_budget_micro_usd,
+        max_prospect_budget_credits=body.max_prospect_budget_credits,
         features=frozenset(body.features),
         access_days=body.access_days,
     )
@@ -545,6 +557,10 @@ def _vendors(service: VendorService) -> VendorsOut:
     return VendorsOut(
         vendors=[VendorOut.model_validate(v) for v in service.statuses()],
         llm=service.llm_settings(),
+        llm_charges=[
+            LlmChargeOut(model=model, per_million_input=rate[0], per_million_output=rate[1])
+            for model, rate in sorted(service.llm_charges().items())
+        ],
     )
 
 
@@ -596,7 +612,14 @@ def pause_vendor(
 
 @router.patch("/vendors/llm", response_model=VendorsOut)
 def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
-    service.update_llm(body.model_dump(exclude_none=True), by=staff.user.id)
+    changes = body.model_dump(exclude_none=True, exclude={"charges"})
+    if changes:
+        service.update_llm(changes, by=staff.user.id)
+    if body.charges is not None:
+        service.set_llm_charges(
+            {c.model: (c.per_million_input, c.per_million_output) for c in body.charges},
+            by=staff.user.id,
+        )
     return _vendors(service)
 
 
@@ -604,7 +627,7 @@ def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> Vendo
 def set_vendor_cap(
     vendor: str, body: VendorCapIn, staff: KeyHolder, service: Vendors
 ) -> VendorsOut:
-    service.set_cap(vendor, body.cap_micro_usd, by=staff.user.id)
+    service.set_cap(vendor, body.cap_credits, by=staff.user.id)
     return _vendors(service)
 
 

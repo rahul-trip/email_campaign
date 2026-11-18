@@ -11,10 +11,10 @@ test("a platform admin opens the console, finds a customer and grants credits", 
   await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();
   await page.getByRole("link", { name: /default/i }).first().click();
 
-  await page.getByRole("button", { name: "Grant credits" }).click();
+  await page.getByRole("button", { name: "Grant AI credits" }).click();
   await page.getByLabel("Note").fill("e2e pilot extension");
   await page.getByRole("button", { name: /^Grant \d+/ }).click();
-  await expect(page.getByText(/Granted 10 credits/)).toBeVisible();
+  await expect(page.getByText(/Granted 500 credits/)).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
 
   await page.getByRole("link", { name: "Audit log" }).click();

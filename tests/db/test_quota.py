@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entitlements import AccessLevel
-from outbound.domain.enums import CompanySource, UsageStep, WorkspaceStatus
+from outbound.domain.enums import CallOutcome, WorkspaceStatus
 from outbound.domain.platform_settings import PlatformSettings
 from outbound.services.quota import QuotaService
 from outbound.services.workspaces import create_workspace
@@ -20,12 +20,22 @@ def at(factory: UnitOfWorkFactory, ws: str, when: datetime = NOW) -> QuotaServic
     return QuotaService(factory, ws, now=lambda: when)
 
 
+def use(factory: UnitOfWorkFactory, ws: str, credits: int) -> None:
+    """Calls that used ``credits`` AI credits, now."""
+    with factory(ws) as uow:
+        uow.calls.record(
+            provider="tavily", operation="search", request_hash="h", outcome=CallOutcome.HIT,
+            cost_micro_usd=credits * 10_000, credits_milli=credits * 1000,
+        )  # fmt: skip
+        uow.commit()
+
+
 def test_a_workspace_with_no_plan_row_is_unlimited_and_never_expires(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
     quota = at(factory, ws).quota()
     assert quota.plan.code == "unlimited" and quota.access is AccessLevel.FULL and quota.engine
-    assert all(quota.remaining(step) is None for step in UsageStep)
+    assert quota.credits.remaining_milli is None and quota.has_credits()
     assert quota.entitlements.seats is None and quota.access_until is None
 
 
@@ -35,8 +45,7 @@ def test_a_new_workspace_gets_the_default_plan_for_thirty_days(
     created = create_workspace(factory, platform, "Globex Ltd")
     quota = QuotaService(factory, created.id).quota()
     assert quota.plan.code == "free"
-    assert (quota.remaining(UsageStep.DISCOVERY), quota.remaining(UsageStep.MANUAL)) == (5, 5)
-    assert quota.remaining(UsageStep.RESEARCH) is None
+    assert quota.credits.allowance == 100 and quota.credits.remaining_milli == 100_000
     assert quota.access_until is not None
     assert timedelta(days=29) < quota.access_until - datetime.now(UTC) <= timedelta(days=30)
 
@@ -46,33 +55,27 @@ def test_a_grant_an_override_and_use_change_what_is_left_at_once(
 ) -> None:
     ws = create_workspace(factory, platform, "Globex Ltd").id
     service = QuotaService(factory, ws)
-    with factory(ws) as uow:
-        for n in range(5):
-            company = uow.companies.create(domain=f"a{n}.com", source=CompanySource.MANUAL)
-            uow.usage.charge(UsageStep.MANUAL, company.id)
-        uow.commit()
-    assert service.quota().remaining(UsageStep.MANUAL) == 0
-    assert not service.quota().has_credit(UsageStep.MANUAL)
+    use(factory, ws, 100)
+    assert service.quota().credits.remaining_milli == 0
+    assert not service.quota().has_credits()
     with platform() as p:
-        p.plans.add_grant(ws, UsageStep.MANUAL, 10)
+        p.plans.add_grant(ws, 500)
         p.commit()
-    assert service.quota().remaining(UsageStep.MANUAL) == 10  # no restart, no cache
+    assert service.quota().credits.remaining_milli == 500_000  # no restart, no cache
     with platform() as p:
-        p.plans.add_override(ws, "limit.manual", 7)
+        p.plans.add_override(ws, "monthly_credits", 2000)
         p.commit()
-    assert service.quota().remaining(UsageStep.MANUAL) == 12  # 7 + 10 - 5
+    assert service.quota().credits.remaining_milli == 2_400_000  # 2000 + 500 - 100
 
 
 def test_use_in_the_last_period_does_not_count_in_this_one(
     factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
     ws = create_workspace(factory, platform, "Globex Ltd").id
-    with factory(ws) as uow:
-        company = uow.companies.create(domain="a.com", source=CompanySource.MANUAL)
-        uow.usage.charge(UsageStep.MANUAL, company.id)
-        uow.commit()
+    use(factory, ws, 60)
+    assert QuotaService(factory, ws).quota().credits.remaining_milli == 40_000
     next_month = datetime.now(UTC) + timedelta(days=33)
-    assert at(factory, ws, next_month).quota().remaining(UsageStep.MANUAL) == 5  # a fresh period
+    assert at(factory, ws, next_month).quota().credits.remaining_milli == 100_000  # fresh period
 
 
 def test_access_ends_at_the_date_and_extending_it_reopens_the_workspace(

@@ -300,6 +300,7 @@ def test_a_run_totals_the_cost_of_its_calls(factory: UnitOfWorkFactory, ws: str)
             request_hash="a",
             outcome=CallOutcome.HIT,
             cost_micro_usd=24_500,
+            credits_milli=2_450,
             run_id=run,
         )
         uow.calls.record(
@@ -308,6 +309,7 @@ def test_a_run_totals_the_cost_of_its_calls(factory: UnitOfWorkFactory, ws: str)
             request_hash="b",
             outcome=CallOutcome.HIT,
             cost_micro_usd=12_250,
+            credits_milli=1_225,
             run_id=run,
         )
         uow.calls.record(
@@ -319,7 +321,8 @@ def test_a_run_totals_the_cost_of_its_calls(factory: UnitOfWorkFactory, ws: str)
         )
         uow.runs.finish(run, RunStatus.SUCCEEDED, {"companies": 3})
         uow.commit()
-        assert uow.runs.cost_of(run) == 36_750
+        assert uow.runs.credits_of(run) == 3_675
+        assert uow.runs.get(run).credits_milli == 3_675
         assert uow.runs.status(run) is RunStatus.SUCCEEDED
 
 
@@ -370,11 +373,11 @@ def test_spend_is_totalled_by_provider_and_by_company(factory: UnitOfWorkFactory
         for provider_name, cost in (("hunter", 100), ("hunter", 50), ("tavily", 7)):
             uow.calls.record(
                 provider=provider_name, operation="x", request_hash="r", outcome=CallOutcome.HIT,
-                cost_micro_usd=cost, company_id=company.id,
+                cost_micro_usd=cost, credits_milli=cost * 10, company_id=company.id,
             )  # fmt: skip
         uow.commit()
         since = now - timedelta(hours=1)
         assert uow.calls.spend_since("hunter", since) == 150
         assert uow.calls.spend_since("tavily", since) == 7
-        assert uow.calls.spend_on_company(company.id) == 157
+        assert uow.calls.credits_on_company(company.id) == 1570
         assert uow.calls.spend_since("hunter", now + timedelta(hours=1)) == 0

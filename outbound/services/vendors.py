@@ -19,6 +19,7 @@ from pydantic import SecretStr
 from outbound.config import Settings
 from outbound.db.platform import PlatformUnitOfWork, PlatformUnitOfWorkFactory
 from outbound.db.types import utcnow
+from outbound.domain.credits import as_credits, milli
 from outbound.domain.errors import InvalidInput
 from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
 from outbound.logging import get_logger
@@ -53,8 +54,9 @@ class VendorStatus:
     set_by: str | None
     paused: bool
     can_roll_back: bool
-    spend_micro_usd: int  # this calendar month
-    cap_micro_usd: int | None
+    credits_milli: int  # AI credits used this calendar month, in thousandths
+    cost_micro_usd: int  # what those calls cost the platform this month
+    cap_credits: int | None  # AI credits a month
     key_refusals: int  # calls the vendor refused our key for in the last day
     can_test: bool
     keys: list[KeyView]  # every live key in the database, in slot order
@@ -106,6 +108,7 @@ class VendorService:
             settings, _ = p.settings.get()
             stored = p.vendor_keys.summaries()
             spent = self._spend(p)
+            cost = self._spend(p, dollars=True)
             refused = self._refusals(p)
         out: list[VendorStatus] = []
         for vendor in VENDORS:
@@ -124,7 +127,8 @@ class VendorService:
                     found.set_at if found else None, found.set_by if found else None,
                     vendor.code in settings.paused_vendors,
                     any(k.can_roll_back for k in live),
-                    spent.get(vendor.code, 0), settings.vendor_caps.get(vendor.code),
+                    spent.get(vendor.code, 0), cost.get(vendor.code, 0),
+                    settings.vendor_caps.get(vendor.code),
                     refused.get(vendor.code, 0), can_test(vendor.code),
                     [
                         KeyView(k.slot, mask(k.last4), k.version, k.set_at, k.set_by,
@@ -135,26 +139,27 @@ class VendorService:
             )  # fmt: skip
         return out
 
-    def set_cap(self, vendor: str, cap_micro_usd: int | None, *, by: str | None) -> None:
-        """A monthly spend cap for a vendor; ``None`` removes it. See ``enforce_caps``."""
+    def set_cap(self, vendor: str, cap_credits: int | None, *, by: str | None) -> None:
+        """A monthly cap for a vendor in AI credits; ``None`` removes it. See ``enforce_caps``."""
         _known(vendor)
-        if cap_micro_usd is not None and cap_micro_usd < 0:
+        if cap_credits is not None and cap_credits < 0:
             raise InvalidInput("a cap cannot be negative")
         with self._platform() as p:
             current, version = p.settings.get()
             caps = {k: v for k, v in current.vendor_caps.items() if k != vendor}
-            if cap_micro_usd is not None:
-                caps[vendor] = cap_micro_usd
+            if cap_credits is not None:
+                caps[vendor] = cap_credits
             p.settings.save(replace(current, vendor_caps=caps), expected_version=version)
             p.audit.record(
                 "vendor_cap_set", actor_user_id=by, target_type="vendor", target_id=vendor,
-                data={"cap_micro_usd": cap_micro_usd},
+                data={"cap_credits": cap_credits},
             )  # fmt: skip
             p.commit()
 
     def enforce_caps(self) -> list[str]:
-        """Pause every vendor that has spent its monthly cap. Returns the ones paused now; a
-        person resumes them (after raising the cap, or next month). Run from the worker."""
+        """Pause every vendor whose calls used its monthly cap of AI credits. Returns the ones
+        paused now; a person resumes them (after raising the cap, or next month). Run from the
+        worker."""
         paused: list[str] = []
         with self._platform() as p:
             current, version = p.settings.get()
@@ -162,7 +167,7 @@ class VendorService:
             over = [
                 code
                 for code, cap in current.vendor_caps.items()
-                if spent.get(code, 0) >= cap and code not in current.paused_vendors
+                if spent.get(code, 0) >= milli(cap) and code not in current.paused_vendors
             ]
             if not over:
                 return []
@@ -173,7 +178,7 @@ class VendorService:
             for code in over:
                 p.audit.record(
                     "vendor_paused_by_cap", actor_user_id=None, target_type="vendor",
-                    target_id=code, data={"spend_micro_usd": spent.get(code, 0)},
+                    target_id=code, data={"credits": as_credits(spent.get(code, 0))},
                 )  # fmt: skip
                 paused.append(code)
             p.commit()
@@ -223,12 +228,14 @@ class VendorService:
             p.commit()
         return result
 
-    def _spend(self, p: PlatformUnitOfWork) -> dict[str, int]:
-        """This month's cost per vendor. The language model's ledger name is its provider
-        preset, so it is whatever no other vendor claims."""
+    def _spend(self, p: PlatformUnitOfWork, *, dollars: bool = False) -> dict[str, int]:
+        """This month's AI credits (thousandths) per vendor, or with ``dollars`` what the calls
+        cost the platform (micro-USD). The language model's ledger name is its provider preset,
+        so it is whatever no other vendor claims."""
         now = self._now()
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        ledger = p.figures.spend_by_provider(start, start + timedelta(days=32))
+        sums = p.figures.cost_by_provider if dollars else p.figures.spend_by_provider
+        ledger = sums(start, start + timedelta(days=32))
         spent = {code: total for code, total in ledger.items() if code in BY_CODE}
         spent["llm"] = sum(
             t for name, t in ledger.items() if name not in BY_CODE and name != "directory"
@@ -324,6 +331,32 @@ class VendorService:
             p.audit.record(
                 "llm_settings_changed", actor_user_id=by, target_type="vendor", target_id="llm",
                 data=changes,
+            )  # fmt: skip
+            p.commit()
+
+    def llm_charges(self) -> dict[str, tuple[float, float]]:
+        """What each model's calls use, in AI credits per million input and output tokens."""
+        with self._platform() as p:
+            current, _ = p.settings.get()
+        return dict(current.llm_charges)
+
+    def set_llm_charges(self, charges: dict[str, tuple[float, float]], *, by: str | None) -> None:
+        """Replace the charges for model calls. A model with no charge uses its dollar price
+        (``LLM_PRICES``), and none is configured by default, so its calls would use no credits."""
+        clean: dict[str, tuple[float, float]] = {}
+        for model, (per_in, per_out) in charges.items():
+            name = model.strip()
+            if not name:
+                raise InvalidInput("each charge needs a model name")
+            if per_in < 0 or per_out < 0:
+                raise InvalidInput("a charge cannot be negative")
+            clean[name] = (float(per_in), float(per_out))
+        with self._platform() as p:
+            current, version = p.settings.get()
+            p.settings.save(replace(current, llm_charges=clean), expected_version=version)
+            p.audit.record(
+                "llm_charges_changed", actor_user_id=by, target_type="vendor", target_id="llm",
+                data={model: list(rate) for model, rate in clean.items()},
             )  # fmt: skip
             p.commit()
 

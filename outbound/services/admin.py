@@ -24,6 +24,7 @@ from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entities import Membership, User, Workspace
 from outbound.domain.entitlements import (
+    OVERRIDE_KEYS,
     UNLIMITED,
     AccessLevel,
     Grant,
@@ -31,11 +32,10 @@ from outbound.domain.entitlements import (
     Plan,
     PlanAssignment,
     Quota,
-    StepQuota,
     compute_quota,
     period_bounds,
 )
-from outbound.domain.enums import PlatformRole, UsageStep, UserStatus, WorkspaceStatus
+from outbound.domain.enums import PlatformRole, UserStatus, WorkspaceStatus
 from outbound.domain.errors import InvalidInput
 from outbound.domain.platform_settings import PlatformSettings
 from outbound.logging import get_logger
@@ -44,9 +44,6 @@ from outbound.services.resume import Released, ResumeService
 
 log = get_logger(__name__)
 
-OVERRIDE_KEYS = frozenset(
-    {"seats", "mailboxes", "active_campaigns", "max_leads_per_run", "max_prospect_budget"}
-)
 SOON = timedelta(days=7)
 SUPER = PlatformRole.SUPERADMIN
 ANSWERED = ("credits_granted", "credits_dismissed")
@@ -57,7 +54,8 @@ class CustomerRow:
     workspace: Workspace
     plan: Plan
     quota: Quota
-    spend_micro_usd: int  # this calendar month
+    credits_milli: int  # AI credits used this calendar month, in thousandths
+    cost_micro_usd: int  # what those calls cost the platform; staff only
     leads: int
     members: int
     mailboxes: int
@@ -68,9 +66,7 @@ class CustomerRow:
 
     @property
     def near_limit(self) -> bool:
-        return any(
-            s.limit and (s.used / s.limit >= 0.8) for s in self.quota.steps.values() if s.limit
-        )
+        return self.quota.near_limit
 
 
 @dataclass(frozen=True)
@@ -105,8 +101,10 @@ class Overview:
     expiring: int
     leads_added: int
     drafts_made: int
-    spend_micro_usd: int
-    spend_by_provider: dict[str, int]
+    credits_milli: int  # AI credits used this calendar month, all customers
+    credits_by_provider: dict[str, int]
+    cost_micro_usd: int  # what those calls cost the platform
+    cost_by_provider: dict[str, int]
     waiting: int
     waiting_customers: int
     attention: list[Attention]
@@ -145,6 +143,7 @@ class AdminService:
             start, end = month, month + timedelta(days=32)
             end = end.replace(day=1)
             by_provider = figures.spend_by_provider(start, end)
+            cost_by_provider = figures.cost_by_provider(start, end)
             leads, drafts = figures.leads_added(start, end), figures.drafts_made(start, end)
             activity = p.audit.recent(limit=12)
         names = {r.workspace.id: r.workspace.name for r in rows}
@@ -174,8 +173,10 @@ class AdminService:
             ),
             leads_added=leads,
             drafts_made=drafts,
-            spend_micro_usd=sum(by_provider.values()),
-            spend_by_provider=by_provider,
+            credits_milli=sum(by_provider.values()),
+            credits_by_provider=by_provider,
+            cost_micro_usd=sum(cost_by_provider.values()),
+            cost_by_provider=cost_by_provider,
             waiting=sum(r.waiting for r in rows),
             waiting_customers=sum(1 for r in rows if r.waiting),
             attention=attention,
@@ -324,9 +325,8 @@ class AdminService:
         note: str = "",
     ) -> Override:
         kind, _, name = key.partition(".")
-        known_step = kind == "limit" and name in {s.value for s in UsageStep}
         known_feature = kind == "feature" and bool(name)
-        if not (known_step or known_feature or key in OVERRIDE_KEYS):
+        if not (known_feature or key in OVERRIDE_KEYS):
             raise InvalidInput(f"{key!r} is not something that can be overridden")
         if isinstance(value, int) and not isinstance(value, bool) and value < 0:
             raise InvalidInput("a limit cannot be negative")
@@ -355,7 +355,6 @@ class AdminService:
     def grant(
         self,
         workspace_id: str,
-        step: UsageStep,
         amount: int,
         *,
         by: str,
@@ -363,10 +362,10 @@ class AdminService:
         note: str = "",
         resume_now: bool = True,
     ) -> tuple[Grant, Released]:
-        """Give extra credits for a step. With ``resume_now`` whatever waited for them goes on
-        straight away, oldest first, as far as the credits reach."""
+        """Give extra AI credits, added to each period's allowance while the grant lasts. With
+        ``resume_now`` whatever waited for credits goes on straight away, oldest first."""
         if amount < 1:
-            raise InvalidInput("give at least one credit")
+            raise InvalidInput("give at least one AI credit")
         now = self._now()
         if expires_at is not None and expires_at <= now:
             raise InvalidInput("the credits would already have expired")
@@ -374,12 +373,12 @@ class AdminService:
             if p.workspaces.get(workspace_id) is None:
                 raise NotFound(f"workspace {workspace_id}")
             made = p.plans.add_grant(
-                workspace_id, step, amount, expires_at=expires_at, note=note, granted_by=by
+                workspace_id, amount, expires_at=expires_at, note=note, granted_by=by
             )
             p.audit.record(
                 "credits_granted", actor_user_id=by, workspace_id=workspace_id,
                 target_type="grant", target_id=made.id, note=note or None,
-                data={"step": step.value, "amount": amount,
+                data={"amount": amount,
                       "expires_at": expires_at.isoformat() if expires_at else None},
             )  # fmt: skip
             p.commit()
@@ -392,7 +391,7 @@ class AdminService:
             p.audit.record(
                 "grant_revoked", actor_user_id=by, workspace_id=workspace_id,
                 target_type="grant", target_id=grant_id,
-                data={"step": revoked.step.value, "amount": revoked.amount},
+                data={"amount": revoked.amount},
             )  # fmt: skip
             p.commit()
 
@@ -504,7 +503,24 @@ class AdminService:
             saved = p.settings.save(replace(current, plans=plans), expected_version=version)
             p.audit.record(
                 "plan_saved", actor_user_id=by, target_type="plan", target_id=plan.code,
-                data={"limits": {s.value: v for s, v in plan.limits.items()}},
+                data={"monthly_credits": plan.monthly_credits},
+            )  # fmt: skip
+            p.commit()
+        return saved
+
+    def set_credit_value(self, micro_usd: int, *, by: str, version: int) -> int:
+        """How much vendor and model cost one AI credit stands for. Applies to calls made from
+        now on; what was used before keeps the credits it was stamped with."""
+        if micro_usd < 1:
+            raise InvalidInput("one AI credit must stand for at least one micro-dollar")
+        with self._platform() as p:
+            current, _ = p.settings.get()
+            saved = p.settings.save(
+                replace(current, credit_value_micro_usd=micro_usd), expected_version=version
+            )
+            p.audit.record(
+                "credit_value_set", actor_user_id=by, target_type="platform",
+                data={"from": current.credit_value_micro_usd, "to": micro_usd},
             )  # fmt: skip
             p.commit()
         return saved
@@ -619,6 +635,7 @@ class AdminService:
         month_end = (month + timedelta(days=32)).replace(day=1)
         figures = p.figures
         spend, waiting = figures.spend(month, month_end), figures.waiting_leads()
+        cost = figures.cost(month, month_end)
         mailboxes, active = figures.mailboxes(), figures.last_activity()
         leads = figures.lead_counts()
         with self._identity() as ids:
@@ -633,7 +650,7 @@ class AdminService:
             start, end = period_bounds(assignment.started_at, now)
             quota = compute_quota(
                 assignment, plan, p.plans.overrides(workspace.id), p.plans.grants(workspace.id),
-                p.plans.used(workspace.id, start, end), workspace.status, now,
+                p.plans.credits_used(workspace.id, start, end), workspace.status, now,
             )  # fmt: skip
             total, bad = mailboxes.get(workspace.id, (0, 0))
             rows.append(
@@ -642,6 +659,7 @@ class AdminService:
                     plan,
                     quota,
                     spend.get(workspace.id, 0),
+                    cost.get(workspace.id, 0),
                     leads.get(workspace.id, 0),
                     members.get(workspace.id, 0),
                     total,
@@ -675,4 +693,4 @@ def _csv_safe(text: str) -> str:
     return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
-__all__ = ["AccessLevel", "AdminError", "AdminService", "StepQuota"]
+__all__ = ["AccessLevel", "AdminError", "AdminService"]

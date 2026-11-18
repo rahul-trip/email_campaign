@@ -88,7 +88,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 
 Overview; Customers (plan, access, status, overrides, grants, resume, dismiss request, members,
 mailbox reconnect); Users (disable/enable, sign out, delete, platform role); Plans (default,
-edit); Settings; Vendors & keys (up to three keys, test, reveal, rollback, pause, spend cap, LLM
-settings); Lead directory (flags, history, entries, companies); Audit log + CSV; Invitations.
+edit, credit rate; superadmins only); Settings; Vendors & keys (up to three keys, test, reveal,
+rollback, pause, cap in AI credits, LLM settings and model charges in AI credits); Lead directory (flags, history, entries, companies); Audit log + CSV; Invitations.
 web3 keeps the same eight pages under `/admin`, in the same visual system, with a distinct
 header colour so staff always know they are in the console.

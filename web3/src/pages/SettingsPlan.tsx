@@ -1,11 +1,12 @@
-/** Settings → Plan & usage: what the plan allows, what is used, and asking for more. */
+/** Settings → Plan & usage: the plan's AI credits, what is used, and asking for more. */
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
-import { Button, Callout, Card, Dialog, Field, Problem, QueryState, SaveNote, Select, Table, Td, Textarea, Th } from "../ui/compat";
+import { Button, Callout, Card, Dialog, Field, Input, Problem, QueryState, SaveNote, Table, Td, Textarea, Th } from "../ui/compat";
 import { cx } from "../lib/cx";
-import { STEP_LABEL, day, shown, useUsage, waitingTotal, type Usage } from "../lib/usage";
+import { credits, wholeCredits } from "../lib/format";
+import { STEP_LABEL, creditState, day, useUsage, waitingTotal, type Usage } from "../lib/usage";
 
 export function PlanAndUsage() {
   const usage = useUsage();
@@ -27,40 +28,27 @@ function Plan({ usage }: { usage: Usage }) {
       <Card
         tour="plan-meters"
         title={`${usage.plan_name} plan`}
-        subtitle={`Allowances renew on ${day(usage.period_end)}.${usage.access_until ? ` Access until ${day(usage.access_until)}.` : ""}`}
+        subtitle={`AI credits renew on ${day(usage.period_end)}.${usage.access_until ? ` Access until ${day(usage.access_until)}.` : ""}`}
         actions={
           !isViewing(workspace) && (
             <Button variant="secondary" size="sm" onClick={() => setAsking(true)}>
-              Ask for more credits
+              Ask for more AI credits
             </Button>
           )
         }
       >
-        <Table>
-          <thead>
-            <tr>
-              <Th>What</Th>
-              <Th>Used</Th>
-              <Th>Allowance</Th>
-              <Th>Extra credits</Th>
-              <Th>Left</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown(usage).map((s) => (
-              <tr key={s.step}>
-                <Td className="font-medium">{STEP_LABEL[s.step] ?? s.step}</Td>
-                <Td>{s.used}</Td>
-                <Td>{s.limit ?? "No limit"}</Td>
-                <Td>{s.granted ? `+${s.granted}` : "—"}</Td>
-                <Td>
-                  <Meter used={s.used} total={s.limit === null ? null : s.limit + s.granted} />
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-        <p className="mt-3 text-small text-muted">Each step is counted once per lead: researching a lead again, retrying or rerunning costs nothing more.</p>
+        <dl className="grid gap-3 sm:grid-cols-4">
+          <Figure label="Each month" value={wholeCredits(usage.credits.monthly)} />
+          <Figure label="Extra given" value={usage.credits.granted ? `+${wholeCredits(usage.credits.granted)}` : "—"} />
+          <Figure label="Used" value={credits(usage.credits.used_milli)} />
+          <Figure label="Left" value={usage.credits.remaining_milli == null ? "No limit" : credits(usage.credits.remaining_milli)} />
+        </dl>
+        <div className="mt-3">
+          <Meter usage={usage} />
+        </div>
+        <p className="mt-3 text-small text-muted">
+          Every search, email lookup, verification and AI model call uses AI credits; answers reused from earlier cost nothing. A step that has started finishes even if it takes you a little past your allowance.
+        </p>
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -79,8 +67,7 @@ function Plan({ usage }: { usage: Usage }) {
           <Table>
             <thead>
               <tr>
-                <Th>Step</Th>
-                <Th>Credits</Th>
+                <Th>AI credits</Th>
                 <Th>Given</Th>
                 <Th>Until</Th>
                 <Th>Note</Th>
@@ -89,8 +76,7 @@ function Plan({ usage }: { usage: Usage }) {
             <tbody>
               {usage.grants.map((g) => (
                 <tr key={g.id} className={cx(g.revoked_at && "text-muted line-through")}>
-                  <Td>{STEP_LABEL[g.step] ?? g.step}</Td>
-                  <Td>+{g.amount}</Td>
+                  <Td>+{wholeCredits(g.amount)}</Td>
                   <Td>{day(g.created_at)}</Td>
                   <Td>{g.expires_at ? day(g.expires_at) : "No end"}</Td>
                   <Td className="text-muted">{g.note}</Td>
@@ -100,7 +86,7 @@ function Plan({ usage }: { usage: Usage }) {
           </Table>
         </Card>
       )}
-      {asking && <AskDialog usage={usage} onClose={() => setAsking(false)} />}
+      {asking && <AskDialog onClose={() => setAsking(false)} />}
     </div>
   );
 }
@@ -112,16 +98,30 @@ const Line = ({ label, value }: { label: string; value: number | null }) => (
   </div>
 );
 
-function Meter({ used, total }: { used: number; total: number | null }) {
-  if (total === null) return <span className="text-muted">No limit</span>;
-  const left = Math.max(0, total - used);
-  const share = total === 0 ? 1 : Math.min(1, used / total);
+const Figure = ({ label, value }: { label: string; value: string }) => (
+  <div>
+    <dt className="text-small text-muted">{label}</dt>
+    <dd className="tnum text-title font-semibold">{value}</dd>
+  </div>
+);
+
+function Meter({ usage }: { usage: Usage }) {
+  const state = creditState(usage);
+  if (state === null) return <span className="text-small text-muted">No limit on AI credits</span>;
+  const share = Math.min(1, state.share);
   return (
-    <div className="flex items-center gap-2" role="meter" aria-valuemin={0} aria-valuemax={total} aria-valuenow={Math.min(used, total)} aria-label={`${left} left`}>
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-3">
+    <div
+      className="flex items-center gap-3"
+      role="meter"
+      aria-valuemin={0}
+      aria-valuemax={state.allowance}
+      aria-valuenow={Math.min(state.used, state.allowance)}
+      aria-label={`${Math.round(share * 100)}% of AI credits used`}
+    >
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
         <div className={cx("h-full rounded-full", share >= 1 ? "bg-error" : share >= 0.8 ? "bg-attention" : "bg-primary")} style={{ width: `${share * 100}%` }} />
       </div>
-      <span className={cx("font-mono text-small", left === 0 && "font-semibold text-error")}>{left}</span>
+      <span className={cx("tnum text-small", state.out && "font-semibold text-error")}>{Math.round(share * 100)}% used</span>
     </div>
   );
 }
@@ -129,7 +129,7 @@ function Meter({ used, total }: { used: number; total: number | null }) {
 function Waiting({ usage }: { usage: Usage }) {
   const total = waitingTotal(usage);
   return (
-    <Card title="Waiting for credits" subtitle={total ? "These continue by themselves as soon as credits exist." : undefined}>
+    <Card title="Waiting for AI credits" subtitle={total ? "These continue by themselves as soon as AI credits are back." : undefined}>
       {total === 0 ? (
         <p className="text-body text-muted">Nothing is waiting.</p>
       ) : (
@@ -150,15 +150,16 @@ function Waiting({ usage }: { usage: Usage }) {
   );
 }
 
-function AskDialog({ usage, onClose }: { usage: Usage; onClose: () => void }) {
-  const [step, setStep] = useState("");
+function AskDialog({ onClose }: { onClose: () => void }) {
+  const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const wanted = amount.trim() === "" ? null : Math.max(1, Math.round(Number(amount)));
   const ask = useMutation({
-    mutationFn: () => ok(client.POST("/api/usage/request-credits", { body: { step: (step || null) as "manual" | null, note } })),
+    mutationFn: () => ok(client.POST("/api/usage/request-credits", { body: { amount: wanted, note } })),
   });
   return (
     <Dialog
-      title="Ask for more credits"
+      title="Ask for more AI credits"
       onClose={onClose}
       footer={
         <>
@@ -166,7 +167,7 @@ function AskDialog({ usage, onClose }: { usage: Usage; onClose: () => void }) {
             {ask.isSuccess ? "Close" : "Cancel"}
           </Button>
           {!ask.isSuccess && (
-            <Button busy={ask.isPending} disabled={!step && !note.trim()} onClick={() => ask.mutate()}>
+            <Button busy={ask.isPending} disabled={!wanted && !note.trim()} onClick={() => ask.mutate()}>
               Send request
             </Button>
           )}
@@ -174,17 +175,10 @@ function AskDialog({ usage, onClose }: { usage: Usage; onClose: () => void }) {
       }
     >
       <p className="text-small text-muted">The team who runs this service sees your request and can add credits or extend your access.</p>
-      <Field label="What do you need more of?">
-        <Select value={step} onChange={(e) => setStep(e.target.value)}>
-          <option value="">Not sure</option>
-          {usage.steps.map((s) => (
-            <option key={s.step} value={s.step}>
-              {STEP_LABEL[s.step] ?? s.step}
-            </option>
-          ))}
-        </Select>
+      <Field label="How many AI credits do you need?" hint="Leave it blank if you are not sure.">
+        <Input type="number" min={1} step="100" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-40" />
       </Field>
-      <Field label="Anything we should know?" hint="For example how many more you need, or why.">
+      <Field label="Anything we should know?" hint="For example what you plan to run, or by when.">
         <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} className="w-full" />
       </Field>
       <Problem error={ask.error} />

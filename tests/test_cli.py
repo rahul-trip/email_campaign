@@ -192,7 +192,7 @@ def test_the_quality_report_says_nothing_has_been_sent_yet(isolated: str) -> Non
 
 def test_the_cost_report_works_with_no_spend(isolated: str) -> None:
     code, out = run("report", "cost", "--days", "7", url=isolated)
-    assert code == 0 and "total $0.0000 over 7 day(s)" in out and "calls: none" in out
+    assert code == 0 and "total 0.0 AI credits over 7 day(s)" in out and "calls: none" in out
 
 
 def test_the_sender_profile_must_be_confirmed_and_can_be(isolated: str) -> None:

@@ -1,8 +1,9 @@
 """Plans, overrides, credit grants and usage (Phase 6d).
 
 Two views of the same tables. ``UsageRepository`` is the workspace's own (tenant unit of work):
-it reads the plan, overrides and grants, counts this period's use, and writes one thing, a
-charge. ``PlanAdminRepository`` is the platform's (platform unit of work): it changes the plan,
+it reads the plan, overrides and grants, adds up the AI credits this period's calls used
+(``provider_calls.credits_milli``), and writes one thing, an activity count (``usage_events``).
+``PlanAdminRepository`` is the platform's (platform unit of work): it changes the plan,
 overrides, grants and access date of any workspace. The database enforces the split: the app
 role may only read the first three tables.
 """
@@ -20,6 +21,7 @@ from outbound.db.models import (
     CreditGrantRow,
     EntitlementOverrideRow,
     PlatformSettingsRow,
+    ProviderCallRow,
     UsageEventRow,
     WorkspacePlanRow,
 )
@@ -94,7 +96,7 @@ class PlatformSettingsRepository:
 
 
 class UsageRepository(ScopedRepository):
-    """A workspace's plan, overrides, grants and use. Writes only charges."""
+    """A workspace's plan, overrides, grants and use. Writes only activity counts."""
 
     def assignment(self) -> PlanAssignment | None:
         stmt = select(WorkspacePlanRow).where(WorkspacePlanRow.workspace_id == self._workspace_id)
@@ -117,18 +119,14 @@ class UsageRepository(ScopedRepository):
         )
         return [_grant(r) for r in self._session.scalars(stmt)]
 
-    def used(self, start: datetime, end: datetime) -> dict[UsageStep, int]:
-        """Charges made in ``[start, end)``, per step."""
-        stmt = (
-            select(UsageEventRow.step, func.count())
-            .where(
-                UsageEventRow.workspace_id == self._workspace_id,
-                UsageEventRow.created_at >= start,
-                UsageEventRow.created_at < end,
-            )
-            .group_by(UsageEventRow.step)
+    def credits_used(self, start: datetime, end: datetime) -> int:
+        """AI credits (thousandths) this workspace's calls used in ``[start, end)``."""
+        stmt = select(func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)).where(
+            ProviderCallRow.workspace_id == self._workspace_id,
+            ProviderCallRow.created_at >= start,
+            ProviderCallRow.created_at < end,
         )
-        return {step: int(count) for step, count in self._session.execute(stmt)}
+        return int(self._session.scalar(stmt) or 0)
 
     def charged(self, step: UsageStep, company_id: str) -> bool:
         stmt = select(func.count()).where(
@@ -139,8 +137,9 @@ class UsageRepository(ScopedRepository):
         return bool(self._session.scalar(stmt))
 
     def charge(self, step: UsageStep, company_id: str) -> bool:
-        """Charge ``step`` on a lead. False if it was charged already (not an error: a retry, a
-        rerun or "research again" must not cost twice). ``rewrite`` is charged every time."""
+        """Count ``step`` done on a lead, for reports. False if it was counted already (a retry,
+        a rerun or "research again"). ``rewrite`` is counted every time. Credits are not
+        charged here: every call charges its own (``Meter.record``)."""
         try:
             with self._session.begin_nested():
                 self._session.add(
@@ -178,17 +177,14 @@ class PlanAdminRepository:
         )
         return [_grant(r) for r in self._session.scalars(stmt)]
 
-    def used(self, workspace_id: str, start: datetime, end: datetime) -> dict[UsageStep, int]:
-        stmt = (
-            select(UsageEventRow.step, func.count())
-            .where(
-                UsageEventRow.workspace_id == workspace_id,
-                UsageEventRow.created_at >= start,
-                UsageEventRow.created_at < end,
-            )
-            .group_by(UsageEventRow.step)
+    def credits_used(self, workspace_id: str, start: datetime, end: datetime) -> int:
+        """AI credits (thousandths) a workspace's calls used in ``[start, end)``."""
+        stmt = select(func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)).where(
+            ProviderCallRow.workspace_id == workspace_id,
+            ProviderCallRow.created_at >= start,
+            ProviderCallRow.created_at < end,
         )
-        return {step: int(count) for step, count in self._session.execute(stmt)}
+        return int(self._session.scalar(stmt) or 0)
 
     # writes
     def set_plan(
@@ -260,7 +256,6 @@ class PlanAdminRepository:
     def add_grant(
         self,
         workspace_id: str,
-        step: UsageStep,
         amount: int,
         *,
         expires_at: datetime | None = None,
@@ -268,7 +263,7 @@ class PlanAdminRepository:
         granted_by: str | None = None,
     ) -> Grant:
         row = CreditGrantRow(
-            workspace_id=workspace_id, step=step, amount=amount,
+            workspace_id=workspace_id, step=None, amount=amount,
             expires_at=expires_at, note=note, granted_by=granted_by,
         )  # fmt: skip
         self._session.add(row)

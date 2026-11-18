@@ -47,4 +47,3 @@ export function UseBar({ used, total, label }: { used: number; total: number | n
 
 export const stepName = (step: string) => STEP_LABEL[step] ?? step;
 
-export const StepOf = (row: Row, step: string) => row.steps.find((s) => s.step === step);

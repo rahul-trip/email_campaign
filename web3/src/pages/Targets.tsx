@@ -60,7 +60,7 @@ export function TargetsPage() {
               <strong className="text-ink">One piece is enough:</strong> a website, a company name, a work email, a person and company, or a LinkedIn profile URL.
             </li>
             <li>
-              <strong className="text-ink">A name only</strong> costs one web search to find the website; if it is not sure, it asks you.
+              <strong className="text-ink">A name only</strong> uses one web search (a few AI credits) to find the website; if it is not sure, it asks you.
             </li>
             <li>
               <strong className="text-ink">The same website</strong> is never added twice: your notes are added to the existing lead.
@@ -278,7 +278,7 @@ function UploadFile({ campaigns }: { campaigns: Schemas["CampaignOut"][] }) {
 
 
 /** Companies you added that are good leads but over this month's allowance. They are kept, and
- * become leads as soon as credits exist. */
+ * become leads as soon as AI credits are back. */
 function WaitingRows() {
   const queryClient = useQueryClient();
   const usage = useUsage();
@@ -289,13 +289,13 @@ function WaitingRows() {
   const waiting = usage.data?.waiting_rows ?? 0;
   if (waiting === 0) return null;
   return (
-    <Callout tone="attention" title={`${waiting} compan${waiting === 1 ? "y is" : "ies are"} waiting for credits`} className="mb-5">
-      Your allowance for added leads is used up this month. They are saved and become leads when credits exist, by themselves or when you press Resume.
+    <Callout tone="attention" title={`${waiting} compan${waiting === 1 ? "y is" : "ies are"} waiting for AI credits`} className="mb-5">
+      Your AI credits are used up this month. They are saved and become leads when credits are back, by themselves or when you press Resume.
       <div className="mt-2 flex items-center gap-3">
         <Button size="sm" busy={resume.isPending} onClick={() => resume.mutate()}>
           Resume
         </Button>
-        {resume.isSuccess && <span role="status">{resume.data.rows ? `${resume.data.rows} added.` : "No credits yet."}</span>}
+        {resume.isSuccess && <span role="status">{resume.data.rows ? `${resume.data.rows} added.` : "No AI credits yet."}</span>}
       </div>
     </Callout>
   );

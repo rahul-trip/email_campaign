@@ -127,6 +127,12 @@ Done: the contacts step writes a connection note and a follow-up for each confir
 
 Done: LinkedIn profile lookups in research ask for five people per search (a lead with ten people: 2 searches, was 10); **Check who works here** reads profile headlines five people per search (was one each); LinkedIn drafts for a lead's people are one model call (was one per person, up to three), with one more call only for the drafts the checks reject. Related questions now share one model call with one output schema: the site call also returns the people on the team pages (given in their own block with their own length cap, so nothing is cut short or sent twice), and the news call also answers the campaign's questions and the hiring and tech signals. Research makes 3 model calls instead of 5 for a typical lead.
 
+## AI credits (2026-11-18, branch `phase-6/ai-credits`, migration 0029, ADR 0034, R-50)
+
+Done: one balance of AI credits per workspace replaces per-step limits. Plans Free (100), Starter (2,000) and Pro (10,000); superadmins edit them, the default and the credit rate (`admin.plans`); platform admins grant AI credits and set model charges. Every metered call stamps `provider_calls.credits_milli` (model calls at the admin's charge per million tokens, others at cost ÷ rate); past calls are not converted. Paying stages wait in place without credits; rewrites and discovery are refused. Customers see AI credits everywhere (web3, API, CLI, notices); the console shows staff the dollar cost beside them. Budget per lead and console vendor caps are in credits. Verified: 2,286 tests on SQLite, ruff, mypy, import contracts, web3 typecheck/build/parity.
+
+Gates still open: set the live model's charge after deploying 0029; the migration on a copy of production data (Postgres); the browser suite (`npx playwright test`) for the changed credit, admin and auth specs.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

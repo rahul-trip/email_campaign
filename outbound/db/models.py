@@ -642,7 +642,9 @@ class RunRow(Mutable, Base):
     params: Mapped[dict[str, Any] | None] = mapped_column(Json)
     status: Mapped[RunStatus] = mapped_column(enum_type(RunStatus, "run_status"))
     counts: Mapped[dict[str, Any] | None] = mapped_column(Json)
-    cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
+    cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)  # the platform's own books
+    # AI credits used, in thousandths (migration 0029)
+    credits_milli: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     heartbeat_at: Mapped[datetime | None] = mapped_column(UtcDateTime)  # touched between leads
@@ -675,7 +677,9 @@ class ProviderCallRow(AppendOnly, Base):
     request_hash: Mapped[str] = mapped_column(String(64))
     outcome: Mapped[CallOutcome] = mapped_column(enum_type(CallOutcome, "call_outcome"))
     response: Mapped[dict[str, Any] | None] = mapped_column(Json)
-    cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)
+    cost_micro_usd: Mapped[int] = mapped_column(BigInteger, default=0)  # the platform's own books
+    # AI credits the call used, in thousandths, at the rate in force when it was made (0029).
+    credits_milli: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     detail: Mapped[dict[str, Any] | None] = mapped_column(Json)  # {"asked": ..., "got": ...}
 
@@ -853,12 +857,13 @@ class EntitlementOverrideRow(AppendOnly, Base):
 
 
 class CreditGrantRow(AppendOnly, Base):
-    """Extra credits for a step, given by a platform admin."""
+    """Extra AI credits, given by a platform admin. ``step`` is set only on grants made before
+    credits were one pool (migration 0029)."""
 
     __tablename__ = "credit_grants"
     __table_args__ = (CheckConstraint("amount > 0", name="amount_positive"),)
 
-    step: Mapped[UsageStep] = mapped_column(enum_type(UsageStep, "usage_step"))
+    step: Mapped[UsageStep | None] = mapped_column(enum_type(UsageStep, "usage_step"))
     amount: Mapped[int] = mapped_column(Integer)
     expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
     revoked_at: Mapped[datetime | None] = mapped_column(UtcDateTime)
@@ -922,7 +927,8 @@ class LinkedInMessageRow(Mutable, Base):
 
 
 class UsageEventRow(AppendOnly, Base):
-    """One charge: a step used on a lead. Append-only, and the lead is not a foreign key, so
+    """One step done on a lead, counted for reports (AI credits, not these, limit a workspace;
+    see ``provider_calls.credits_milli``). Append-only, and the lead is not a foreign key, so
     deleting a lead does not give its credits back. A step is charged once per lead, except
     ``rewrite``, which is charged every time."""
 

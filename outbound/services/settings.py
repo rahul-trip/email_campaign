@@ -59,7 +59,7 @@ def profile_template(current: Mapping[str, Any] | None = None) -> dict[str, Any]
 SETTING_FIELDS = frozenset(
     {
         "safe_to_send_only",
-        "budget_per_prospect_micro_usd",
+        "budget_per_prospect_credits",
         "few_shot_examples",
         "timezone",
         "country_policy_enabled",  # off: no country rule is applied anywhere (suppression is)

@@ -48,7 +48,9 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
   - `migrate` treats "database ahead of code" as success and logs it.
 - **Links:** [release-and-rollback.md](operations/release-and-rollback.md), [migrations.md](data/migrations.md), ADR [0018](adr/0018-additive-only-migrations.md).
 
-### R-03 · P1 · Cost: model calls are recorded at $0 (B5)
+### R-03 · P1 · Cost: model calls are recorded at $0 (B5) — AI credits fixed 2026-11-18; dollars still open
+
+- **2026-11-18:** what a model call uses in **AI credits** no longer depends on this: staff set each model's charge in the console (`platform_settings.llm_charges`) and `Meter.record` stamps `provider_calls.credits_milli` from the tokens ([ADR 0034](adr/0034-one-ai-credit-balance-metered-per-call.md)). A model with no charge still uses no credits (R-50). The dollar figure (`cost_micro_usd`, seen by staff only) still needs `LLM_PRICES`.
 
 - **What:** `outbound/providers/pricing.py::DEFAULT_LLM_PRICES` is empty, so unless `LLM_PRICES` is set, every LLM call writes a `provider_calls` row with `cost_micro_usd = 0`.
 - **Effect:**
@@ -273,6 +275,17 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Links:** [capacity and limits](operations/capacity-and-limits.md), [runbook: db max clients](operations/runbooks/db-max-clients.md).
 
 ## Closed entries
+
+### R-50 · P2 · AI credits: what a customer is charged depends on settings staff must keep up
+
+- **What:** one AI-credit balance per workspace, stamped per call ([ADR 0034](adr/0034-one-ai-credit-balance-metered-per-call.md), migration 0029). Three gaps follow from the design:
+  - a model with no charge in Vendors → Language model uses **no credits**, so a new or renamed model is free until staff set its charge (the card warns);
+  - calls made before migration 0029 keep `credits_milli = 0` (not converted, at the operator's request), so the first period after deploying under-counts;
+  - a stage that started with credits left finishes, so a workspace can go past its allowance by one stage's calls per lead in flight.
+- **Also:** grants made per step before 0029 were multiplied by 20 into AI credits; `Plan.max_prospect_budget_credits` is shown but not enforced when a customer saves their budget per lead.
+- **Read:** `outbound/metering/metered.py::Meter.record`, `outbound/runner/guards.py::Guards.check`, `outbound/db/migrations/versions/0029_ai_credits.py`.
+- **Evidence:** `tests/db/test_credits.py`, `tests/db/test_metered.py`, `tests/domain/test_entitlements.py`.
+- **Next:** set the live model's charge right after deploying 0029; consider a default charge for unknown models.
 
 ### R-49 · P1 · The web server used the environment's vendor keys, and nobody was told when a key or a vendor's credit failed — closed 2026-11-18
 

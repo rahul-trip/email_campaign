@@ -2,7 +2,7 @@ import { emailedToken, expect, test, signIn, addTarget, unique, STAFF } from "./
 
 const WRITE = { "X-Requested-With": "outbound" };
 
-test("a customer over its allowance waits, the admin grants credits in the console, and the lead is added", async ({ browser }) => {
+test("a customer out of AI credits waits, the admin grants credits in the console, and the lead is added", async ({ browser }) => {
   const staff = await (await browser.newContext()).newPage();
   const customer = await (await browser.newContext()).newPage();
   await staff.addInitScript(() => localStorage.setItem("outbound.tour", "done"));
@@ -19,27 +19,25 @@ test("a customer over its allowance waits, the admin grants credits in the conso
   };
   try {
     await clear(); // earlier tests may have granted credits to this shared customer
-    // Put the customer on the Free plan with nothing left to add this month.
+    // Put the customer on the Free plan with no AI credits left this month.
     await staff.request.patch(`${base}/plan`, { data: { plan: "free" }, headers: WRITE });
-    const used = (await (await staff.request.get(base)).json()).row.steps.find((s: { step: string }) => s.step === "manual").used;
-    await staff.request.put(`${base}/overrides`, { data: { key: "limit.manual", value: used }, headers: WRITE });
+    await staff.request.put(`${base}/overrides`, { data: { key: "monthly_credits", value: 0 }, headers: WRITE });
 
     await signIn(customer);
     await addTarget(customer, { website: unique("waits"), country: "UK" });
     await customer.goto("/");
     await customer.getByRole("link", { name: "Add leads" }).first().click();
-    await expect(customer.getByText(/waiting for credits/).first()).toBeVisible();
+    await expect(customer.getByText(/waiting for AI credits/).first()).toBeVisible();
 
-    // The admin grants one credit from the console, setting waiting work going.
+    // The admin grants AI credits from the console, setting waiting work going.
     await staff.goto(`/admin/customers/${row.id}`);
-    await staff.getByRole("button", { name: "Grant credits" }).click();
-    await staff.getByLabel("Step").selectOption("manual");
-    await staff.getByRole("dialog").getByRole("spinbutton", { name: "Credits" }).fill("1");
-    await staff.getByRole("button", { name: /^Grant 1 credit/ }).click();
+    await staff.getByRole("button", { name: "Grant AI credits" }).click();
+    await staff.getByRole("dialog").getByRole("spinbutton", { name: "AI credits" }).fill("100");
+    await staff.getByRole("button", { name: /^Grant 100 credits/ }).click();
     await expect(staff.getByText(/1 waiting added as leads/)).toBeVisible();
 
     await customer.reload();
-    await expect(customer.getByText(/waiting for credits/)).toHaveCount(0);
+    await expect(customer.getByText(/waiting for AI credits/)).toHaveCount(0);
   } finally {
     // Leave the shared customer as it was: unlimited, with no override or grant left behind.
     await clear();

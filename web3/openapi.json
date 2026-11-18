@@ -31,6 +31,72 @@
         "title": "AcceptIn",
         "type": "object"
       },
+      "AdminCreditsOut": {
+        "properties": {
+          "allowance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowance"
+          },
+          "granted": {
+            "title": "Granted",
+            "type": "integer"
+          },
+          "monthly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly"
+          },
+          "plan_monthly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Monthly"
+          },
+          "remaining_milli": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Milli"
+          },
+          "used_milli": {
+            "title": "Used Milli",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "plan_monthly",
+          "monthly",
+          "granted",
+          "allowance",
+          "used_milli",
+          "remaining_milli"
+        ],
+        "title": "AdminCreditsOut",
+        "type": "object"
+      },
       "AdminMailboxOut": {
         "properties": {
           "address": {
@@ -100,65 +166,6 @@
           "role"
         ],
         "title": "AdminRoleIn",
-        "type": "object"
-      },
-      "AdminStepOut": {
-        "properties": {
-          "granted": {
-            "title": "Granted",
-            "type": "integer"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit"
-          },
-          "plan_limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Plan Limit"
-          },
-          "remaining": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remaining"
-          },
-          "step": {
-            "title": "Step",
-            "type": "string"
-          },
-          "used": {
-            "title": "Used",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "step",
-          "plan_limit",
-          "limit",
-          "granted",
-          "used",
-          "remaining"
-        ],
-        "title": "AdminStepOut",
         "type": "object"
       },
       "AdminUserOut": {
@@ -510,8 +517,8 @@
             "title": "At",
             "type": "string"
           },
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
+          "credits_milli": {
+            "title": "Credits Milli",
             "type": "integer"
           },
           "got": {
@@ -537,7 +544,7 @@
           "provider",
           "operation",
           "outcome",
-          "cost_micro_usd"
+          "credits_milli"
         ],
         "title": "CallOut",
         "type": "object"
@@ -1827,6 +1834,7 @@
         "type": "object"
       },
       "CostOut": {
+        "description": "AI credits used, in thousandths.",
         "properties": {
           "by_provider": {
             "additionalProperties": {
@@ -1905,6 +1913,82 @@
           "name"
         ],
         "title": "CreateWorkspaceIn",
+        "type": "object"
+      },
+      "CreditValueIn": {
+        "additionalProperties": false,
+        "properties": {
+          "credit_value_micro_usd": {
+            "maximum": 100000000.0,
+            "minimum": 1.0,
+            "title": "Credit Value Micro Usd",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "credit_value_micro_usd",
+          "version"
+        ],
+        "title": "CreditValueIn",
+        "type": "object"
+      },
+      "CreditsOut": {
+        "description": "A workspace's AI credits this period. Whole credits, except the ``_milli`` counts.",
+        "properties": {
+          "allowance": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowance"
+          },
+          "granted": {
+            "title": "Granted",
+            "type": "integer"
+          },
+          "monthly": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly"
+          },
+          "remaining_milli": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Milli"
+          },
+          "used_milli": {
+            "title": "Used Milli",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "monthly",
+          "granted",
+          "allowance",
+          "used_milli",
+          "remaining_milli"
+        ],
+        "title": "CreditsOut",
         "type": "object"
       },
       "CustomerDetailOut": {
@@ -2070,6 +2154,17 @@
             ],
             "title": "Active Campaigns"
           },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "credits": {
+            "$ref": "#/components/schemas/AdminCreditsOut"
+          },
+          "credits_milli": {
+            "title": "Credits Milli",
+            "type": "integer"
+          },
           "features": {
             "items": {
               "type": "string"
@@ -2127,7 +2222,7 @@
             ],
             "title": "Max Leads Per Run"
           },
-          "max_prospect_budget_micro_usd": {
+          "max_prospect_budget_credits": {
             "anyOf": [
               {
                 "type": "integer"
@@ -2136,7 +2231,7 @@
                 "type": "null"
               }
             ],
-            "title": "Max Prospect Budget Micro Usd"
+            "title": "Max Prospect Budget Credits"
           },
           "members": {
             "title": "Members",
@@ -2187,20 +2282,9 @@
             "title": "Slug",
             "type": "string"
           },
-          "spend_micro_usd": {
-            "title": "Spend Micro Usd",
-            "type": "integer"
-          },
           "status": {
             "title": "Status",
             "type": "string"
-          },
-          "steps": {
-            "items": {
-              "$ref": "#/components/schemas/AdminStepOut"
-            },
-            "title": "Steps",
-            "type": "array"
           },
           "waiting": {
             "title": "Waiting",
@@ -2218,8 +2302,9 @@
           "access_until",
           "period_start",
           "period_end",
-          "steps",
-          "spend_micro_usd",
+          "credits",
+          "credits_milli",
+          "cost_micro_usd",
           "leads",
           "members",
           "mailboxes",
@@ -2233,7 +2318,7 @@
           "mailbox_limit",
           "active_campaigns",
           "max_leads_per_run",
-          "max_prospect_budget_micro_usd"
+          "max_prospect_budget_credits"
         ],
         "title": "CustomerRowOut",
         "type": "object"
@@ -2265,6 +2350,10 @@
             "title": "Approved",
             "type": "integer"
           },
+          "credits_milli": {
+            "title": "Credits Milli",
+            "type": "integer"
+          },
           "day": {
             "format": "date",
             "title": "Day",
@@ -2281,10 +2370,6 @@
           "sent": {
             "title": "Sent",
             "type": "integer"
-          },
-          "spend_micro_usd": {
-            "title": "Spend Micro Usd",
-            "type": "integer"
           }
         },
         "required": [
@@ -2293,7 +2378,7 @@
           "approved",
           "reviewed",
           "sent",
-          "spend_micro_usd"
+          "credits_milli"
         ],
         "title": "DayOut",
         "type": "object"
@@ -2870,8 +2955,8 @@
             "title": "People",
             "type": "integer"
           },
-          "saved_micro_usd": {
-            "title": "Saved Micro Usd",
+          "saved_credits_milli": {
+            "title": "Saved Credits Milli",
             "type": "integer"
           },
           "unfolded": {
@@ -2887,7 +2972,7 @@
           "unfolded",
           "lookups",
           "hits",
-          "saved_micro_usd"
+          "saved_credits_milli"
         ],
         "title": "DirectoryFiguresOut",
         "type": "object"
@@ -3481,7 +3566,7 @@
         "additionalProperties": false,
         "properties": {
           "amount": {
-            "maximum": 1000000.0,
+            "maximum": 10000000.0,
             "minimum": 1.0,
             "title": "Amount",
             "type": "integer"
@@ -3508,23 +3593,9 @@
             "default": true,
             "title": "Resume Now",
             "type": "boolean"
-          },
-          "step": {
-            "enum": [
-              "discovery",
-              "manual",
-              "research",
-              "email",
-              "copy",
-              "deliver",
-              "rewrite"
-            ],
-            "title": "Step",
-            "type": "string"
           }
         },
         "required": [
-          "step",
           "amount"
         ],
         "title": "GrantIn",
@@ -3574,8 +3645,15 @@
             "title": "Revoked At"
           },
           "step": {
-            "title": "Step",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
           }
         },
         "required": [
@@ -3955,8 +4033,8 @@
             "title": "Stages",
             "type": "array"
           },
-          "total_cost_micro_usd": {
-            "title": "Total Cost Micro Usd",
+          "total_credits_milli": {
+            "title": "Total Credits Milli",
             "type": "integer"
           }
         },
@@ -3966,7 +4044,7 @@
           "next_step",
           "origin",
           "stages",
-          "total_cost_micro_usd"
+          "total_credits_milli"
         ],
         "title": "JourneyOut",
         "type": "object"
@@ -4067,8 +4145,8 @@
             ],
             "title": "Contact Title"
           },
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
+          "credits_milli": {
+            "title": "Credits Milli",
             "type": "integer"
           },
           "email_status": {
@@ -4087,7 +4165,7 @@
           "contact_name",
           "contact_title",
           "email_status",
-          "cost_micro_usd"
+          "credits_milli"
         ],
         "title": "LeadSummaryOut",
         "type": "object"
@@ -4321,9 +4399,76 @@
         "title": "LinkedInState",
         "type": "string"
       },
+      "LlmChargeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Model",
+            "type": "string"
+          },
+          "per_million_input": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Per Million Input",
+            "type": "number"
+          },
+          "per_million_output": {
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Per Million Output",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "per_million_input",
+          "per_million_output"
+        ],
+        "title": "LlmChargeIn",
+        "type": "object"
+      },
+      "LlmChargeOut": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "per_million_input": {
+            "title": "Per Million Input",
+            "type": "number"
+          },
+          "per_million_output": {
+            "title": "Per Million Output",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "per_million_input",
+          "per_million_output"
+        ],
+        "title": "LlmChargeOut",
+        "type": "object"
+      },
       "LlmSettingsIn": {
         "additionalProperties": false,
         "properties": {
+          "charges": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LlmChargeIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Charges"
+          },
           "llm_base_url": {
             "anyOf": [
               {
@@ -5257,6 +5402,28 @@
             "title": "Attention",
             "type": "array"
           },
+          "cost_by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Cost By Provider",
+            "type": "object"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "credits_by_provider": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Credits By Provider",
+            "type": "object"
+          },
+          "credits_milli": {
+            "title": "Credits Milli",
+            "type": "integer"
+          },
           "customers": {
             "title": "Customers",
             "type": "integer"
@@ -5273,17 +5440,6 @@
             "title": "Leads Added",
             "type": "integer"
           },
-          "spend_by_provider": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Spend By Provider",
-            "type": "object"
-          },
-          "spend_micro_usd": {
-            "title": "Spend Micro Usd",
-            "type": "integer"
-          },
           "waiting": {
             "title": "Waiting",
             "type": "integer"
@@ -5298,8 +5454,10 @@
           "expiring",
           "leads_added",
           "drafts_made",
-          "spend_micro_usd",
-          "spend_by_provider",
+          "credits_milli",
+          "credits_by_provider",
+          "cost_micro_usd",
+          "cost_by_provider",
           "waiting",
           "waiting_customers",
           "attention",
@@ -5534,20 +5692,6 @@
             "title": "Features",
             "type": "array"
           },
-          "limits": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "title": "Limits",
-            "type": "object"
-          },
           "mailboxes": {
             "anyOf": [
               {
@@ -5570,7 +5714,7 @@
             ],
             "title": "Max Leads Per Run"
           },
-          "max_prospect_budget_micro_usd": {
+          "max_prospect_budget_credits": {
             "anyOf": [
               {
                 "type": "integer"
@@ -5579,7 +5723,18 @@
                 "type": "null"
               }
             ],
-            "title": "Max Prospect Budget Micro Usd"
+            "title": "Max Prospect Budget Credits"
+          },
+          "monthly_credits": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Credits"
           },
           "name": {
             "title": "Name",
@@ -5600,12 +5755,12 @@
         "required": [
           "code",
           "name",
-          "limits",
+          "monthly_credits",
           "seats",
           "mailboxes",
           "active_campaigns",
           "max_leads_per_run",
-          "max_prospect_budget_micro_usd",
+          "max_prospect_budget_credits",
           "features",
           "access_days",
           "customers"
@@ -5650,31 +5805,6 @@
             "title": "Features",
             "type": "array"
           },
-          "limits": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "propertyNames": {
-              "enum": [
-                "discovery",
-                "manual",
-                "research",
-                "email",
-                "copy",
-                "deliver",
-                "rewrite"
-              ]
-            },
-            "title": "Limits",
-            "type": "object"
-          },
           "mailboxes": {
             "anyOf": [
               {
@@ -5700,7 +5830,7 @@
             ],
             "title": "Max Leads Per Run"
           },
-          "max_prospect_budget_micro_usd": {
+          "max_prospect_budget_credits": {
             "anyOf": [
               {
                 "minimum": 0.0,
@@ -5710,8 +5840,22 @@
                 "type": "null"
               }
             ],
-            "default": 500000,
-            "title": "Max Prospect Budget Micro Usd"
+            "default": 50,
+            "title": "Max Prospect Budget Credits"
+          },
+          "monthly_credits": {
+            "anyOf": [
+              {
+                "maximum": 100000000.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 100,
+            "title": "Monthly Credits"
           },
           "name": {
             "maxLength": 100,
@@ -5817,6 +5961,14 @@
       },
       "PlansOut": {
         "properties": {
+          "can_edit": {
+            "title": "Can Edit",
+            "type": "boolean"
+          },
+          "credit_value_micro_usd": {
+            "title": "Credit Value Micro Usd",
+            "type": "integer"
+          },
           "default_plan": {
             "title": "Default Plan",
             "type": "string"
@@ -5836,6 +5988,8 @@
         "required": [
           "plans",
           "default_plan",
+          "credit_value_micro_usd",
+          "can_edit",
           "version"
         ],
         "title": "PlansOut",
@@ -6458,31 +6612,24 @@
       "RequestCreditsIn": {
         "additionalProperties": false,
         "properties": {
-          "note": {
-            "default": "",
-            "maxLength": 500,
-            "title": "Note",
-            "type": "string"
-          },
-          "step": {
+          "amount": {
             "anyOf": [
               {
-                "enum": [
-                  "discovery",
-                  "manual",
-                  "research",
-                  "email",
-                  "copy",
-                  "deliver",
-                  "rewrite"
-                ],
-                "type": "string"
+                "maximum": 10000000.0,
+                "minimum": 1.0,
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Step"
+            "title": "Amount"
+          },
+          "note": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Note",
+            "type": "string"
           }
         },
         "title": "RequestCreditsIn",
@@ -6811,8 +6958,8 @@
             "title": "Calls",
             "type": "integer"
           },
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
+          "credits_milli": {
+            "title": "Credits Milli",
             "type": "integer"
           },
           "errors": {
@@ -6849,7 +6996,7 @@
           "reused",
           "errors",
           "blocked",
-          "cost_micro_usd",
+          "credits_milli",
           "avg_latency_ms"
         ],
         "title": "RunCallOut",
@@ -6958,10 +7105,6 @@
       },
       "RunOut": {
         "properties": {
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
-            "type": "integer"
-          },
           "counts": {
             "anyOf": [
               {
@@ -6978,6 +7121,10 @@
             "format": "date-time",
             "title": "Created At",
             "type": "string"
+          },
+          "credits_milli": {
+            "title": "Credits Milli",
+            "type": "integer"
           },
           "finished_at": {
             "anyOf": [
@@ -7034,7 +7181,7 @@
           "status",
           "params",
           "counts",
-          "cost_micro_usd",
+          "credits_milli",
           "started_at",
           "finished_at",
           "created_at"
@@ -7559,8 +7706,8 @@
             "title": "Calls",
             "type": "array"
           },
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
+          "credits_milli": {
+            "title": "Credits Milli",
             "type": "integer"
           },
           "facts": {
@@ -7614,7 +7761,7 @@
           "facts",
           "incidents",
           "calls",
-          "cost_micro_usd"
+          "credits_milli"
         ],
         "title": "StageOut",
         "type": "object"
@@ -7684,53 +7831,6 @@
           "waiting_for_review"
         ],
         "title": "StatusOut",
-        "type": "object"
-      },
-      "StepUsageOut": {
-        "properties": {
-          "granted": {
-            "title": "Granted",
-            "type": "integer"
-          },
-          "limit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Limit"
-          },
-          "remaining": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Remaining"
-          },
-          "step": {
-            "title": "Step",
-            "type": "string"
-          },
-          "used": {
-            "title": "Used",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "step",
-          "limit",
-          "granted",
-          "used",
-          "remaining"
-        ],
-        "title": "StepUsageOut",
         "type": "object"
       },
       "SuppressionIn": {
@@ -8057,6 +8157,9 @@
             "title": "Announcement",
             "type": "string"
           },
+          "credits": {
+            "$ref": "#/components/schemas/CreditsOut"
+          },
           "engine": {
             "title": "Engine",
             "type": "boolean"
@@ -8115,13 +8218,6 @@
             ],
             "title": "Seats"
           },
-          "steps": {
-            "items": {
-              "$ref": "#/components/schemas/StepUsageOut"
-            },
-            "title": "Steps",
-            "type": "array"
-          },
           "waiting_leads": {
             "additionalProperties": {
               "type": "integer"
@@ -8142,7 +8238,7 @@
           "access",
           "access_until",
           "engine",
-          "steps",
+          "credits",
           "grants",
           "waiting_leads",
           "waiting_rows",
@@ -8236,21 +8332,19 @@
       "VendorCapIn": {
         "additionalProperties": false,
         "properties": {
-          "cap_micro_usd": {
+          "cap_credits": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Cap Micro Usd"
+            "title": "Cap Credits"
           }
         },
-        "required": [
-          "cap_micro_usd"
-        ],
         "title": "VendorCapIn",
         "type": "object"
       },
@@ -8353,7 +8447,7 @@
             "title": "Can Test",
             "type": "boolean"
           },
-          "cap_micro_usd": {
+          "cap_credits": {
             "anyOf": [
               {
                 "type": "integer"
@@ -8362,11 +8456,19 @@
                 "type": "null"
               }
             ],
-            "title": "Cap Micro Usd"
+            "title": "Cap Credits"
           },
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "cost_micro_usd": {
+            "title": "Cost Micro Usd",
+            "type": "integer"
+          },
+          "credits_milli": {
+            "title": "Credits Milli",
+            "type": "integer"
           },
           "key": {
             "title": "Key",
@@ -8422,10 +8524,6 @@
             "title": "Source",
             "type": "string"
           },
-          "spend_micro_usd": {
-            "title": "Spend Micro Usd",
-            "type": "integer"
-          },
           "version": {
             "title": "Version",
             "type": "integer"
@@ -8442,8 +8540,9 @@
           "set_by",
           "paused",
           "can_roll_back",
-          "spend_micro_usd",
-          "cap_micro_usd",
+          "credits_milli",
+          "cost_micro_usd",
+          "cap_credits",
           "key_refusals",
           "can_test",
           "keys"
@@ -8484,6 +8583,13 @@
             "title": "Llm",
             "type": "object"
           },
+          "llm_charges": {
+            "items": {
+              "$ref": "#/components/schemas/LlmChargeOut"
+            },
+            "title": "Llm Charges",
+            "type": "array"
+          },
           "vendors": {
             "items": {
               "$ref": "#/components/schemas/VendorOut"
@@ -8494,7 +8600,8 @@
         },
         "required": [
           "vendors",
-          "llm"
+          "llm",
+          "llm_charges"
         ],
         "title": "VendorsOut",
         "type": "object"
@@ -8589,8 +8696,8 @@
             ],
             "title": "Contact Id"
           },
-          "cost_micro_usd": {
-            "title": "Cost Micro Usd",
+          "credits_milli": {
+            "title": "Credits Milli",
             "type": "integer"
           },
           "got": {
@@ -8627,7 +8734,7 @@
           "provider",
           "operation",
           "outcome",
-          "cost_micro_usd",
+          "credits_milli",
           "latency_ms",
           "contact_id"
         ],
@@ -8722,10 +8829,10 @@
             ],
             "title": "Auto Discovery Review Limit"
           },
-          "budget_per_prospect_micro_usd": {
+          "budget_per_prospect_credits": {
             "anyOf": [
               {
-                "maximum": 100000000.0,
+                "maximum": 1000000.0,
                 "minimum": 0.0,
                 "type": "integer"
               },
@@ -8733,7 +8840,7 @@
                 "type": "null"
               }
             ],
-            "title": "Budget Per Prospect Micro Usd"
+            "title": "Budget Per Prospect Credits"
           },
           "country_policy_enabled": {
             "anyOf": [
@@ -10450,6 +10557,48 @@
           }
         },
         "summary": "Plans",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/plans/credit-value": {
+      "put": {
+        "description": "How much vendor and model cost one AI credit stands for, from the next call on.",
+        "operationId": "credit_value_api_admin_plans_credit_value_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreditValueIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlansOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Credit Value",
         "tags": [
           "admin"
         ]

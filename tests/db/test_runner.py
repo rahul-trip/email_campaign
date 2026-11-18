@@ -546,11 +546,12 @@ def test_a_free_stage_still_runs_for_a_lead_that_has_used_its_budget(
             request_hash="h",
             outcome=CallOutcome.HIT,
             cost_micro_usd=500_000,
+            credits_milli=50_000,
             company_id=cid,
         )
         uow.commit()
     free = FakeStage("research", C.NEW, C.RESEARCHED, spends=False)
-    make_runner(factory, ws, [free], budget=BudgetPolicy(per_prospect=500_000)).run_pipeline()
+    make_runner(factory, ws, [free], budget=BudgetPolicy(per_prospect=50)).run_pipeline()
     assert status_of(factory, ws, cid) is C.RESEARCHED
 
 
@@ -651,11 +652,12 @@ def test_a_lead_over_its_budget_gets_no_more_paid_work(factory: UnitOfWorkFactor
             request_hash="h",
             outcome=CallOutcome.HIT,
             cost_micro_usd=500_000,
+            credits_milli=50_000,
             company_id=cid,
         )
         uow.commit()
     stage = FakeStage("research", C.NEW, C.RESEARCHED)
-    make_runner(factory, ws, [stage], budget=BudgetPolicy(per_prospect=500_000)).run_pipeline()
+    make_runner(factory, ws, [stage], budget=BudgetPolicy(per_prospect=50)).run_pipeline()
     failed = company(factory, ws, cid)
     assert stage.seen == []
     assert (failed.status, failed.failed_stage) == (C.FAILED, "research")
@@ -680,7 +682,7 @@ def test_a_budget_error_raised_inside_a_stage_fails_the_lead_with_its_message(
     ).run_pipeline()
     failed = company(factory, ws, cid)
     assert failed.status is C.FAILED
-    assert "monthly cap" in (failed.last_error or "")
+    assert "monthly limit" in (failed.last_error or "")
 
 
 # ------------------------------------------------------------------ cost and runs
@@ -700,15 +702,16 @@ def test_paid_calls_inside_a_stage_are_attributed_to_the_run_and_the_company(
         factory, ws, [FakeStage("research", C.NEW, C.RESEARCHED, action=action)]
     ).run_pipeline()
     with factory(ws) as uow:
-        assert uow.calls.spend_on_company(cid) == 250
+        assert uow.calls.credits_on_company(cid) == 25  # 250 micro-USD: 0.025 credits
         run = uow.session.get(RunRow, report.run_id)
         assert run is not None
-        assert (run.status, run.cost_micro_usd, run.counts) == (
+        assert (run.status, run.cost_micro_usd, run.credits_milli, run.counts) == (
             RunStatus.SUCCEEDED,
             250,
+            25,
             {"research": {"advanced": 1}},
         )
-    assert report.cost_micro_usd == 250
+    assert report.credits_milli == 25
 
 
 def test_killed_after_the_third_lead_the_rerun_finishes_without_repeating_a_paid_call(

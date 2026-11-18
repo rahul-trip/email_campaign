@@ -1,12 +1,15 @@
 ---
 type: reference
-status: accepted
+status: superseded
+superseded_by: 0034
 date: 2026-10-24
 deciders: "@rahul-trip"
 introduced_in: cca1800, 67236fd
 ---
 
 # 0027. A plan's credit for a step is charged once per lead, except rewrites, which charge every time
+
+> **Superseded by [ADR 0034](0034-one-ai-credit-balance-metered-per-call.md)** (2026-11-18): one balance of AI credits, used by every vendor and model call.
 
 ## Context
 

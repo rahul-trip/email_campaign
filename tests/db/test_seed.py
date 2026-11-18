@@ -67,7 +67,7 @@ def test_the_default_workspace_keeps_automatic_sending_off(
     assert workspace is not None
     assert workspace.settings["send_enabled"] is False
     assert workspace.settings["safe_to_send_only"] is True
-    assert workspace.settings["budget_per_prospect_micro_usd"] == 500_000
+    assert workspace.settings["budget_per_prospect_credits"] == 50
     # The footers need these, and they are blank until the operator fills them in.
     assert workspace.sender_profile["postal_address"] == ""
     assert workspace.sender_profile["narrative"] == ""  # nothing is pre-written for the writer

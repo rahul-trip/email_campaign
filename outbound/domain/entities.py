@@ -266,14 +266,14 @@ class ProviderCall:
     provider: str
     operation: str
     outcome: CallOutcome
-    cost_micro_usd: int
+    cost_micro_usd: int  # the platform's own books; never shown to a customer
     latency_ms: int | None
     run_id: str | None
     company_id: str | None
     contact_id: str | None
     created_at: datetime
     detail: dict[str, Any] | None = None  # what it asked and got, in words
-    # (the response itself is not exposed)
+    credits_milli: int = 0  # AI credits it used, in thousandths
 
 
 @dataclass(frozen=True)

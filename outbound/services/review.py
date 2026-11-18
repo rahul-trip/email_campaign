@@ -239,10 +239,10 @@ class ReviewService:
             workspace = uow.workspace()
             sender = dict(workspace.sender_profile) if workspace else {}
             settings = dict(workspace.settings) if workspace else {}
-            left, renews = credit_left(uow, UsageStep.REWRITE, utcnow())
+            left, renews = credit_left(uow, utcnow())
         if not left:  # checked before the model is asked, so nothing is spent on a refusal
             raise ReviewError(
-                f"no rewrite credits are left; they renew on {renews:%d %b}. "
+                f"no AI credits are left; they renew on {renews:%d %b}. "
                 "Ask your admin for more in Settings → Plan and usage."
             )
         low = int(settings.get("email_min_words") or 120)

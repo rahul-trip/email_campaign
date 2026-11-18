@@ -105,8 +105,8 @@ There is no single operator mailbox any more — each workspace connects its own
 | Variable | Type | Default | Where | Purpose |
 |---|---|---|---|---|
 | `PROVIDER_PRICES` | JSON object, `"vendor:operation"` → micro-USD | `{}` | D | Overrides the built-in prices ([integrations](../integrations/README.md#prices)) |
-| `LLM_PRICES` | JSON object, model → `[input, output]` micro-USD per million tokens | `{}` | **D (set it)** | Without it, every model call is recorded at $0 ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5)) |
-| `MONTHLY_CAPS_MICRO_USD` | JSON object, provider → micro-USD | `{}` | D | Monthly cap per provider |
+| `LLM_PRICES` | JSON object, model → `[input, output]` micro-USD per million tokens | `{}` | D | The platform's own dollar cost of model calls, for its books. What a model call uses in **AI credits** is set in the console (Vendors → Language model, `platform_settings.llm_charges`); a model with neither a charge nor a price uses no credits |
+| `MONTHLY_CAPS_MICRO_USD` | JSON object, provider → micro-USD | `{}` | D | The platform's dollar safety cap per provider and workspace. The console's caps are in AI credits across every customer (`platform_settings.vendor_caps_credits`) |
 
 Example: `LLM_PRICES={"claude-sonnet-5-5": [3000000, 15000000]}` records $3 per million input tokens and $15 per million output tokens. Use your provider's current prices.
 
@@ -146,7 +146,7 @@ These are stored in `workspaces.settings` and edited in the app (Settings, and P
 | Key | Default | Editable | Purpose |
 |---|---|---|---|
 | `safe_to_send_only` | true | yes | Refuse unverifiable catch-all addresses |
-| `budget_per_prospect_micro_usd` | 500,000 ($0.50) | yes (`null` means no ceiling; `0` means no paid calls) | Per-lead spend ceiling |
+| `budget_per_prospect_credits` | 50 | yes (`null` means no ceiling; `0` means no paid calls) | The AI credits one lead may use (migration 0029 converted the old `budget_per_prospect_micro_usd`) |
 | `few_shot_examples` | 5 | yes (0–20) | Operator edits shown to the writer |
 | `timezone` | `UTC` | yes | For the Phase 5 send window |
 | `country_policy_enabled` | true | yes | Off skips every country rule (red banner); suppression still applies |

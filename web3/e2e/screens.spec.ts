@@ -52,14 +52,14 @@ test("settings: a blank budget means no limit; the profile is confirmed", async 
   await page.goto("/settings");
   await expect(page.getByText("Setup check").first()).toBeVisible();
   await page.getByRole("tab", { name: "Limits and budget" }).click();
-  const budget = page.getByLabel(/Budget per prospect/);
+  const budget = page.getByLabel(/Budget per lead/);
   await budget.fill("");
   await page.getByRole("button", { name: "Save limits" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
   await page.reload();
   await page.getByRole("tab", { name: "Limits and budget" }).click();
   await expect(budget).toHaveValue("");
-  await budget.fill("0.50");
+  await budget.fill("50");
   await page.getByRole("button", { name: "Save limits" }).click();
   await expect(page.getByText("Saved.")).toBeVisible();
 

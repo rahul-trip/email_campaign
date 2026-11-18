@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, QueryState, Table, Td, Th } from "../ui/compat";
+import { credits, usd, wholeCredits } from "../lib/format";
 import { Pill, When } from "./bits";
 
 type Vendor = Schemas["VendorOut"];
@@ -65,7 +66,7 @@ export function VendorsPage() {
                     <Th>Vendor</Th>
                     <Th>Does</Th>
                     <Th>Keys</Th>
-                    <Th>Spend this month</Th>
+                    <Th>AI credits this month</Th>
                     <Th>Status</Th>
                     <Th />
                   </tr>
@@ -81,7 +82,7 @@ export function VendorsPage() {
                             <span className="font-mono">{v.key}</span>
                             {v.source === "environment" && <span className="ml-2 text-label text-muted">from the environment</span>}
                             {v.source === "environment" && v.can_test && (
-                              <Button size="sm" variant="ghost" className="ml-1" busy={busy(test, v, 1)} onClick={() => test.mutate({ vendor: v, slot: 1 })} title="Makes one small real call (a fraction of a cent) to check the key works">
+                              <Button size="sm" variant="ghost" className="ml-1" busy={busy(test, v, 1)} onClick={() => test.mutate({ vendor: v, slot: 1 })} title="Makes one small real call to check the key works">
                                 Test
                               </Button>
                             )}
@@ -100,7 +101,7 @@ export function VendorsPage() {
                                     Replace
                                   </Button>
                                   {v.can_test && (
-                                    <Button size="sm" variant="ghost" busy={busy(test, v, k.slot)} onClick={() => test.mutate({ vendor: v, slot: k.slot })} title="Makes one small real call (a fraction of a cent) to check the key works">
+                                    <Button size="sm" variant="ghost" busy={busy(test, v, k.slot)} onClick={() => test.mutate({ vendor: v, slot: k.slot })} title="Makes one small real call to check the key works">
                                       Test
                                     </Button>
                                   )}
@@ -123,10 +124,11 @@ export function VendorsPage() {
                         )}
                       </Td>
                       <Td className="whitespace-nowrap text-small">
-                        ${(v.spend_micro_usd / 1e6).toFixed(2)}
-                        {v.cap_micro_usd != null ? ` of $${(v.cap_micro_usd / 1e6).toFixed(0)}` : ""}
+                        {credits(v.credits_milli)}
+                        {v.cap_credits != null ? ` of ${wholeCredits(v.cap_credits)}` : ""}
+                        <span className="block text-label text-muted">{usd(v.cost_micro_usd)} billed</span>
                         <button type="button" className="ml-2 text-primary hover:underline" onClick={() => setCapping(v)}>
-                          {v.cap_micro_usd != null ? "Change cap" : "Set cap"}
+                          {v.cap_credits != null ? "Change cap" : "Set cap"}
                         </button>
                       </Td>
                       <Td>
@@ -150,7 +152,7 @@ export function VendorsPage() {
                 </tbody>
               </Table>
             </div>
-            <LlmCard llm={data.llm} onSaved={refresh} />
+            <LlmCard llm={data.llm} charges={data.llm_charges} onSaved={refresh} />
           </div>
         )}
       </QueryState>
@@ -206,8 +208,25 @@ const LLM_LABELS: [string, string][] = [
   ["llm_max_tokens", "Max tokens"],
 ];
 
-function LlmCard({ llm, onSaved }: { llm: Record<string, string | number>; onSaved: (data: unknown) => void }) {
+type Charge = Schemas["LlmChargeOut"];
+type ChargeRow = { model: string; input: string; output: string };
+
+/** The models in use, each with its charge (or a blank row to fill in), then any others set. */
+function chargeRows(llm: Record<string, string | number>, charges: Charge[]): ChargeRow[] {
+  const inUse = [String(llm.llm_model ?? ""), String(llm.llm_copy_model ?? "")].filter(Boolean);
+  const models = [...new Set([...inUse, ...charges.map((c) => c.model)])];
+  return models.map((model) => {
+    const found = charges.find((c) => c.model === model);
+    return { model, input: found ? String(found.per_million_input) : "", output: found ? String(found.per_million_output) : "" };
+  });
+}
+
+function LlmCard({ llm, charges, onSaved }: { llm: Record<string, string | number>; charges: Charge[]; onSaved: (data: unknown) => void }) {
   const [form, setForm] = useState<Record<string, string>>(Object.fromEntries(Object.entries(llm).map(([k, v]) => [k, String(v)])));
+  const [rows, setRows] = useState<ChargeRow[]>(() => chargeRows(llm, charges));
+  const priced = rows.filter((r) => r.model.trim() && r.input.trim() !== "" && r.output.trim() !== "");
+  const unpriced = [form.llm_model, form.llm_copy_model].filter((m) => m && m.trim() && !priced.some((r) => r.model.trim() === m.trim()));
+  const setRow = (i: number, change: Partial<ChargeRow>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
   const save = useMutation({
     mutationFn: () =>
       ok(
@@ -219,6 +238,7 @@ function LlmCard({ llm, onSaved }: { llm: Record<string, string | number>; onSav
             llm_copy_model: form.llm_copy_model,
             llm_temperature: Number(form.llm_temperature),
             llm_max_tokens: Number(form.llm_max_tokens),
+            charges: priced.map((r) => ({ model: r.model.trim(), per_million_input: Number(r.input), per_million_output: Number(r.output) })),
           },
         }),
       ),
@@ -233,7 +253,45 @@ function LlmCard({ llm, onSaved }: { llm: Record<string, string | number>; onSav
           </Field>
         ))}
       </div>
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-5 space-y-2">
+        <h3 className="text-small font-semibold text-ink">What each model's calls use, in AI credits</h3>
+        <p className="text-small text-muted">Per million tokens sent to the model (input) and written by it (output). A model call uses exactly this, from the next call on; calls made before keep what they used.</p>
+        {unpriced.length > 0 && <Callout tone="attention">No charge is set for {unpriced.join(" and ")}, so its calls use no AI credits.</Callout>}
+        <Table>
+          <thead>
+            <tr>
+              <Th>Model</Th>
+              <Th>Input, per million tokens</Th>
+              <Th>Output, per million tokens</Th>
+              <Th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <Td>
+                  <Input aria-label="Model" value={r.model} onChange={(e) => setRow(i, { model: e.target.value })} className="w-full font-mono" />
+                </Td>
+                <Td>
+                  <Input aria-label="Input credits per million tokens" type="number" min={0} step="1" value={r.input} onChange={(e) => setRow(i, { input: e.target.value })} className="w-32" />
+                </Td>
+                <Td>
+                  <Input aria-label="Output credits per million tokens" type="number" min={0} step="1" value={r.output} onChange={(e) => setRow(i, { output: e.target.value })} className="w-32" />
+                </Td>
+                <Td className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => setRows(rows.filter((_, j) => j !== i))}>
+                    Remove
+                  </Button>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+        <Button size="sm" variant="secondary" onClick={() => setRows([...rows, { model: "", input: "", output: "" }])}>
+          Add a model
+        </Button>
+      </div>
+      <div className="mt-4 flex items-center gap-3">
         <Button busy={save.isPending} onClick={() => save.mutate()}>
           Save
         </Button>
@@ -245,9 +303,9 @@ function LlmCard({ llm, onSaved }: { llm: Record<string, string | number>; onSav
 }
 
 function CapDialog({ vendor, onClose, onDone }: { vendor: Vendor; onClose: () => void; onDone: (data: unknown) => void }) {
-  const [dollars, setDollars] = useState(vendor.cap_micro_usd == null ? "" : String(vendor.cap_micro_usd / 1e6));
+  const [cap, setCap] = useState(vendor.cap_credits == null ? "" : String(vendor.cap_credits));
   const save = useMutation({
-    mutationFn: () => ok(client.PUT("/api/admin/vendors/{vendor}/cap", { ...path(vendor.code), body: { cap_micro_usd: dollars.trim() === "" ? null : Math.round(Number(dollars) * 1e6) } })),
+    mutationFn: () => ok(client.PUT("/api/admin/vendors/{vendor}/cap", { ...path(vendor.code), body: { cap_credits: cap.trim() === "" ? null : Math.max(0, Math.round(Number(cap))) } })),
     onSuccess: onDone,
   });
   return (
@@ -265,8 +323,8 @@ function CapDialog({ vendor, onClose, onDone }: { vendor: Vendor; onClose: () =>
         </>
       }
     >
-      <Field label="Cap in US dollars" hint="When this month's spend reaches it, the vendor is paused and staff are emailed. Empty: no cap.">
-        <Input type="number" min={0} step="1" value={dollars} onChange={(e) => setDollars(e.target.value)} className="w-40" />
+      <Field label="Cap in AI credits" hint="When this month's calls to it reach it, across every customer, the vendor is paused and staff are emailed. Empty: no cap.">
+        <Input type="number" min={0} step="100" value={cap} onChange={(e) => setCap(e.target.value)} className="w-40" />
       </Field>
       <Problem error={save.error} />
     </Dialog>

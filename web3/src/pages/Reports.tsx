@@ -3,7 +3,7 @@ import { useState } from "react";
 import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Card, Label, PageHeader, Problem, Sections, Segmented, Skeleton, Stat, Table, Td, Th } from "../ui/compat";
-import { percent, usd } from "../lib/format";
+import { percent, credits } from "../lib/format";
 import { callOutcome, candidateVerdict, describe, describeHold, discoverySource, leadOutcome } from "../lib/status";
 import { BudgetMeter, ProviderBars } from "../components/Charts";
 
@@ -14,7 +14,9 @@ export function ReportsPage() {
   const funnel = useQuery({ queryKey: ["funnel", days], queryFn: () => ok(client.GET("/api/reports/funnel", { params: { query: { days } } })) });
   const sources = useQuery({ queryKey: ["report-sources"], queryFn: () => ok(client.GET("/api/reports/sources")) });
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
-  const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
+  // The budget per lead is whole AI credits; the figures it is set against are thousandths.
+  const budget = settings.data?.budget_per_prospect_credits as number | null | undefined;
+  const ceiling = budget == null ? budget : budget * 1000;
   const c = cost.data;
   const q = quality.data;
   const outcomes = c?.outcomes ?? {};
@@ -26,10 +28,10 @@ export function ReportsPage() {
     <Sections>
         <PageHeader
           title="Reports"
-          subtitle="Are the emails good enough to send unedited, and does each prospect stay under budget?"
+          subtitle="Are the emails good enough to send unedited, and does each prospect stay within its AI-credit budget?"
           actions={
             <Segmented
-              label="Period for spend"
+              label="Period for AI credits"
               value={days}
               onChange={setDays}
               options={[
@@ -52,17 +54,17 @@ export function ReportsPage() {
         </div>
 
         <div className="mb-6 flex items-center justify-between">
-          <Label>Spend, last {days === 365 ? "year" : `${days} days`}</Label>
+          <Label>AI credits, last {days === 365 ? "year" : `${days} days`}</Label>
         </div>
         <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Stat label="Total" value={usd(c?.total, 2)} hint={c ? `${c.paid_calls} paid calls` : undefined} />
-          <Stat label="Per prospect" value={c?.per_prospect != null ? usd(c.per_prospect) : "–"} hint={ceiling == null ? "No ceiling set" : `Ceiling ${usd(ceiling, 2)}`} tone="primary" />
-          <Stat label="Prospects" value={c?.prospects ?? "–"} hint="Companies with any spend" />
-          <Stat label="Answered from cache" value={calls ? percent((outcomes.cache_hit ?? 0) / calls) : "–"} hint={`${outcomes.cache_hit ?? 0} calls reused at no cost`} tone={outcomes.cache_hit ? "good" : undefined} />
+          <Stat label="Total" value={credits(c?.total)} hint={c ? `${c.paid_calls} paid calls` : undefined} />
+          <Stat label="Per prospect" value={c?.per_prospect != null ? credits(c.per_prospect) : "–"} hint={ceiling == null ? "No budget set" : `Budget ${credits(ceiling)}`} tone="primary" />
+          <Stat label="Prospects" value={c?.prospects ?? "–"} hint="Companies that used any AI credits" />
+          <Stat label="Answered from cache" value={calls ? percent((outcomes.cache_hit ?? 0) / calls) : "–"} hint={`${outcomes.cache_hit ?? 0} calls reused, using no credits`} tone={outcomes.cache_hit ? "good" : undefined} />
         </div>
 
         <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
-          <Card title="Spend by vendor">
+          <Card title="AI credits by vendor">
             {cost.isPending ? (
               <Skeleton />
             ) : (
@@ -99,7 +101,7 @@ export function ReportsPage() {
             )}
           </Card>
 
-          <Card collapsible defaultOpen title="Cost per vendor" subtitle="The number the vendor bake-off decides on: what each vendor costs per call, and the outcome of every call." className="lg:col-span-2 p-0">
+          <Card collapsible defaultOpen title="AI credits per vendor" subtitle="What each vendor's calls use per call, and the outcome of every call." className="lg:col-span-2 p-0">
             {cost.isPending ? (
               <div className="p-4">
                 <Skeleton />
@@ -110,9 +112,9 @@ export function ReportsPage() {
                   <tr>
                     <Th>Vendor</Th>
                     <Th className="text-right">Calls</Th>
-                    <Th className="text-right">Spend</Th>
+                    <Th className="text-right">AI credits</Th>
                     <Th className="text-right">Average per call</Th>
-                    <Th className="text-right">Share of spend</Th>
+                    <Th className="text-right">Share</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,8 +126,8 @@ export function ReportsPage() {
                         <tr key={vendor}>
                           <Td className="font-medium">{vendor}</Td>
                           <Td className="tnum text-right text-small">{n}</Td>
-                          <Td className="tnum text-right text-small">{usd(spent)}</Td>
-                          <Td className="tnum text-right text-small">{n ? usd(spent / n) : "–"}</Td>
+                          <Td className="tnum text-right text-small">{credits(spent)}</Td>
+                          <Td className="tnum text-right text-small">{n ? credits(spent / n) : "–"}</Td>
                           <Td className="tnum text-right text-small">{c?.total ? percent(spent / c.total) : "–"}</Td>
                         </tr>
                       );

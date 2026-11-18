@@ -1,10 +1,11 @@
-"""Letting work that waits for credits continue (Phase 6d).
+"""Letting work that waits for AI credits continue (Phase 6d).
 
-Work waits in two places: a lead parked mid-pipeline (``companies.credit_wait_step``) and a
-manual row that was a good lead but over the limit (a pending import row). Both wait in place,
-nothing is lost, and both are released when a credit exists: by the tick as soon as credits
-appear (a new period, a grant, a raised limit, extended access), or by a person pressing Resume.
-Release is oldest first and never more than the credits available.
+Work waits in two places: a lead parked mid-pipeline (``companies.credit_wait_step``, the step it
+waits at) and a manual row that came in while no credits were left (a pending import row). Both
+wait in place, nothing is lost, and both are released once AI credits exist again: by the tick
+(a new period, a grant, a larger plan, extended access), or by a person pressing Resume. Release
+is oldest first; a lead released when credits are short simply waits again before its next paid
+stage.
 """
 
 from __future__ import annotations
@@ -101,13 +102,13 @@ class ResumeService:
             and (waiting or self._intake.waiting_for_credits())
         ):
             step = waiting[0].credit_wait_step if waiting else UsageStep.MANUAL
-            raise NoCredits(step, quota.period_end, f"no {step.value if step else ''} credit yet")
+            raise NoCredits(step, quota.period_end, "no AI credits left yet")
         if leads or rows:
             log.info("credits_resumed", leads=leads, rows=rows)
         return Released(leads, rows)
 
     def resume_lead(self, company_id: str, *, actor: str) -> UsageStep:
-        """Resume one waiting lead if its step now has a credit; otherwise say when it renews."""
+        """Resume one waiting lead if AI credits are left; otherwise say when they renew."""
         now = self._now()
         with self._uow(self._workspace_id) as uow:
             quota, _ = quota_in(uow, now)
@@ -117,8 +118,8 @@ class ResumeService:
                 raise NoCredits(None, quota.period_end, "this lead is not waiting for credits")
             if not quota.engine:
                 raise NoCredits(step, quota.period_end, _why_stopped(quota))
-            if not (quota.has_credit(step) or uow.usage.charged(step, company_id)):
-                raise NoCredits(step, quota.period_end, f"no {step.value} credit left")
+            if not quota.has_credits():
+                raise NoCredits(step, quota.period_end, "no AI credits left")
             uow.companies.release_credit_wait(company_id, actor)
             uow.commit()
         return step
@@ -130,19 +131,12 @@ class ResumeService:
         waiting: list[Company],
         actor: str,
     ) -> int:
-        left: dict[UsageStep, int | None] = {s: quota.remaining(s) for s in UsageStep}
+        if not quota.has_credits():
+            return 0
         released = 0
         for company in waiting:  # oldest first
-            step = company.credit_wait_step
-            if step is None:
+            if company.credit_wait_step is None:
                 continue
-            paid = uow.usage.charged(step, company.id)
-            if not paid:
-                remaining = left[step]
-                if remaining is not None and remaining <= 0:
-                    continue  # no credit for this one; another step's lead may still go
-                if remaining is not None:
-                    left[step] = remaining - 1
             uow.companies.release_credit_wait(company.id, actor)
             released += 1
         return released

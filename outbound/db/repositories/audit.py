@@ -28,7 +28,7 @@ class RunView:
     status: RunStatus
     params: dict[str, Any] | None
     counts: dict[str, Any] | None
-    cost_micro_usd: int
+    credits_milli: int  # AI credits the run used, in thousandths
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
@@ -159,7 +159,7 @@ class RunRepository(ScopedRepository):
             row.status,
             row.params,
             row.counts,
-            row.cost_micro_usd,
+            row.credits_milli,
             row.started_at,
             row.finished_at,
             row.created_at,
@@ -188,17 +188,26 @@ class RunRepository(ScopedRepository):
             row.status = status
         row.counts = counts
         row.finished_at = utcnow()
-        row.cost_micro_usd = self.cost_of(run_id)
+        row.cost_micro_usd, row.credits_milli = self._totals(run_id)
         self._session.flush()
 
     def status(self, run_id: str) -> RunStatus:
         return self._row(RunRow, run_id).status
 
-    def cost_of(self, run_id: str) -> int:
-        stmt = select(func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)).where(
+    def credits_of(self, run_id: str) -> int:
+        """The AI credits (thousandths) the run's calls used so far."""
+        return self._totals(run_id)[1]
+
+    def _totals(self, run_id: str) -> tuple[int, int]:
+        """What the run's calls cost the platform (micro-USD) and used (milli-credits)."""
+        stmt = select(
+            func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+            func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
+        ).where(
             ProviderCallRow.workspace_id == self._workspace_id, ProviderCallRow.run_id == run_id
         )
-        return int(self._session.scalar(stmt) or 0)
+        cost, credits = self._session.execute(stmt).one()
+        return int(cost or 0), int(credits or 0)
 
 
 @dataclass(frozen=True)
@@ -213,7 +222,7 @@ class RunCallSummary:
     reused: int  # answered from the cache, at no cost
     errors: int
     blocked: int  # refused by a spending limit
-    cost_micro_usd: int
+    credits_milli: int
     avg_latency_ms: int | None
 
 
@@ -226,6 +235,7 @@ class ProviderCallRepository(ScopedRepository):
         request_hash: str,
         outcome: CallOutcome,
         cost_micro_usd: int = 0,
+        credits_milli: int = 0,
         response: dict[str, Any] | None = None,
         latency_ms: int | None = None,
         run_id: str | None = None,
@@ -240,6 +250,7 @@ class ProviderCallRepository(ScopedRepository):
             request_hash=request_hash,
             outcome=outcome,
             cost_micro_usd=cost_micro_usd,
+            credits_milli=credits_milli,
             response=response,
             latency_ms=latency_ms,
             run_id=run_id,
@@ -259,7 +270,7 @@ class ProviderCallRepository(ScopedRepository):
                 ProviderCallRow.operation,
                 ProviderCallRow.outcome,
                 func.count(),
-                func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
                 func.avg(ProviderCallRow.latency_ms),
             )
             .where(
@@ -295,7 +306,7 @@ class ProviderCallRepository(ScopedRepository):
             )
             for (provider, operation), r in merged.items()
         ]  # fmt: skip
-        return sorted(out, key=lambda c: (-c.cost_micro_usd, c.provider, c.operation))
+        return sorted(out, key=lambda c: (-c.credits_milli, c.provider, c.operation))
 
     def cached_response(
         self, provider: str, operation: str, request_hash: str, since: datetime
@@ -333,6 +344,8 @@ class ProviderCallRepository(ScopedRepository):
         return [snapshot(row, ProviderCall) for row in self._session.scalars(stmt)]
 
     def spend_since(self, provider: str, since: datetime) -> int:
+        """What this workspace's calls to ``provider`` cost the platform since then (micro-USD):
+        the environment's monthly safety caps, which are the platform's, not the customer's."""
         stmt = select(func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)).where(
             ProviderCallRow.workspace_id == self._workspace_id,
             ProviderCallRow.provider == provider,
@@ -340,9 +353,19 @@ class ProviderCallRepository(ScopedRepository):
         )
         return int(self._session.scalar(stmt) or 0)
 
-    def spend_on_company(self, company_id: str) -> int:
-        stmt = select(func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0)).where(
+    def credits_on_company(self, company_id: str) -> int:
+        """The AI credits (thousandths) spent on one lead, for its budget per prospect."""
+        stmt = select(func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)).where(
             ProviderCallRow.workspace_id == self._workspace_id,
             ProviderCallRow.company_id == company_id,
+        )
+        return int(self._session.scalar(stmt) or 0)
+
+    def credits_between(self, start: datetime, end: datetime) -> int:
+        """The AI credits (thousandths) this workspace's calls used in ``[start, end)``."""
+        stmt = select(func.coalesce(func.sum(ProviderCallRow.credits_milli), 0)).where(
+            ProviderCallRow.workspace_id == self._workspace_id,
+            ProviderCallRow.created_at >= start,
+            ProviderCallRow.created_at < end,
         )
         return int(self._session.scalar(stmt) or 0)

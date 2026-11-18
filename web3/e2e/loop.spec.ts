@@ -39,7 +39,7 @@ test("targets to review to draft, and an unapproved email is never drafted", asy
 
   // 5. The drafted lead's page shows its emails, vendor calls and timeline.
   await page.goto(`/leads/${await leadId(page, approved)}`);
-  await expect(page.getByRole("heading", { name: "Vendor calls" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Vendor and model calls" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
   await openCard(page, "Activity");
   await expect(page.getByText("Draft saved to the mailbox").first()).toBeVisible();

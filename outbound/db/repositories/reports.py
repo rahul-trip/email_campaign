@@ -41,7 +41,7 @@ class TouchOneStats:
 @dataclass(frozen=True)
 class SpendRow:
     key: str
-    cost_micro_usd: int
+    credits_milli: int  # AI credits, in thousandths
     calls: int
 
 
@@ -77,7 +77,7 @@ class DayRow:
     approved: int = 0  # emails approved, by a person or automatically
     reviewed: int = 0  # emails a person approved or rejected
     sent: int = 0  # emails seen in a Sent folder
-    spend_micro_usd: int = 0
+    credits_milli: int = 0  # AI credits used, in thousandths
 
 
 @dataclass(frozen=True)
@@ -88,7 +88,7 @@ class LeadSummary:
     contact_name: str | None
     contact_title: str | None
     email_status: str | None
-    cost_micro_usd: int
+    credits_milli: int
 
 
 # People the engine works on; the others (unconfirmed, not here, gone) are not "the contact".
@@ -190,7 +190,7 @@ class ReportRepository(ScopedRepository):
         stmt = (
             select(
                 ProviderCallRow.provider,
-                func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
                 func.count(),
             )
             .where(*self._window(since, until))
@@ -203,7 +203,7 @@ class ReportRepository(ScopedRepository):
         stmt = (
             select(
                 ProviderCallRow.company_id,
-                func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
                 func.count(),
             )
             .where(*self._window(since, until), ProviderCallRow.company_id.is_not(None))
@@ -273,11 +273,11 @@ class ReportRepository(ScopedRepository):
         ):
             bump(sent_at, "sent")
         for created, cost in self._session.execute(
-            select(ProviderCallRow.created_at, ProviderCallRow.cost_micro_usd).where(
-                *self._window(since, until), ProviderCallRow.cost_micro_usd > 0
+            select(ProviderCallRow.created_at, ProviderCallRow.credits_milli).where(
+                *self._window(since, until), ProviderCallRow.credits_milli > 0
             )
         ):
-            bump(created, "spend_micro_usd", int(cost))
+            bump(created, "credits_milli", int(cost))
         return list(days.values())
 
     def fit_scores(self, campaign_id: str | None) -> tuple[dict[int, int], int]:
@@ -332,7 +332,7 @@ class ReportRepository(ScopedRepository):
             for company_id, cost in self._session.execute(
                 select(
                     ProviderCallRow.company_id,
-                    func.coalesce(func.sum(ProviderCallRow.cost_micro_usd), 0),
+                    func.coalesce(func.sum(ProviderCallRow.credits_milli), 0),
                 )
                 .where(
                     ProviderCallRow.workspace_id == self._workspace_id,

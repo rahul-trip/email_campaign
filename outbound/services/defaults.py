@@ -47,7 +47,7 @@ def default_workspace_settings() -> dict[str, Any]:
     return {
         "send_enabled": False,  # automatic sending stays off until Phase 5's gate passes
         "safe_to_send_only": True,
-        "budget_per_prospect_micro_usd": 500_000,  # the $0.50 ceiling
+        "budget_per_prospect_credits": 50,  # AI credits a lead may use at most
         "breaker": {"hard_per_100": 3, "hard_per_24h": 2},
         "catch_all_resolver": "scrubby",
         "reply_webhook_url": None,

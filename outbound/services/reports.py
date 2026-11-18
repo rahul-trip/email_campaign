@@ -60,7 +60,7 @@ class QualityReport:
 class CostReport:
     since: datetime
     until: datetime
-    by_provider: dict[str, int] = field(default_factory=dict)
+    by_provider: dict[str, int] = field(default_factory=dict)  # AI credits, in thousandths
     calls_by_provider: dict[str, int] = field(default_factory=dict)
     prospects: int = 0
     outcomes: dict[CallOutcome, int] = field(default_factory=dict)
@@ -228,13 +228,13 @@ class ReportService:
         with self._uow(self._workspace_id) as uow:
             providers = uow.reports.spend_by_provider(since, until)
             prospects = [
-                row for row in uow.reports.spend_by_company(since, until) if row.cost_micro_usd
+                row for row in uow.reports.spend_by_company(since, until) if row.credits_milli
             ]
             outcomes = uow.reports.call_outcomes(since, until)
         return CostReport(
             since,
             until,
-            {row.key: row.cost_micro_usd for row in providers},
+            {row.key: row.credits_milli for row in providers},
             {row.key: row.calls for row in providers},
             len(prospects),
             outcomes,

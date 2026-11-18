@@ -2,7 +2,7 @@
  * Leads: saved views, filter pills, a clickable stage ribbon and a readable table. Every filter
  * lives in the URL so a view can be bookmarked or shared. Uses the list's server-side filters
  * (status, hold, search, fit, hot, source, country, sort) and the per-row summary (contact,
- * email status, spend).
+ * email status, AI credits used).
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
 import { cx } from "../lib/cx";
-import { ago, usd, when } from "../lib/format";
+import { ago, credits, when } from "../lib/format";
 import { HOLD_REASONS, LEAD_STATUSES, STAGES, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
 import { Avatar, Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
 import { FitRing } from "../ui/viz";
@@ -237,7 +237,7 @@ export function LeadsPage() {
                   <th className="px-3 py-3 text-center">Fit</th>
                   <th className="hidden px-3 py-3 md:table-cell">Contact</th>
                   <th className="hidden px-3 py-3 xl:table-cell">Email</th>
-                  <th className="hidden px-3 py-3 text-right xl:table-cell">Spend</th>
+                  <th className="hidden px-3 py-3 text-right xl:table-cell">AI credits</th>
                   <th className="hidden px-3 py-3 xl:table-cell">Changed</th>
                   <th className="px-4 py-3">
                     <span className="sr-only">Links</span>
@@ -298,7 +298,7 @@ export function LeadsPage() {
                         )}
                       </td>
                       <td className="hidden px-3 py-3.5 xl:table-cell">{s?.email_status ? <Chip tone={describe(emailStatus, s.email_status).family}>{describe(emailStatus, s.email_status).label}</Chip> : <span className="text-small text-faint">—</span>}</td>
-                      <td className="tnum hidden px-3 py-3.5 text-right text-small text-ink-2 xl:table-cell">{s ? usd(s.cost_micro_usd) : "—"}</td>
+                      <td className="tnum hidden px-3 py-3.5 text-right text-small text-ink-2 xl:table-cell">{s ? credits(s.credits_milli) : "—"}</td>
                       <td className="hidden px-3 py-3.5 text-small whitespace-nowrap text-muted xl:table-cell">
                         <span title={`Added ${when(company.created_at)}`}>{ago(company.updated_at ?? company.created_at)}</span>
                       </td>

@@ -157,7 +157,7 @@ class WaterfallStep:
     provider: str
     operation: str
     outcome: str
-    cost_micro_usd: int
+    credits_milli: int  # AI credits, in thousandths
     latency_ms: int | None
     contact_id: str | None
     asked: str = ""  # what the call asked, in words ("" for calls made before this was kept)
@@ -850,10 +850,10 @@ class LeadService:
                 if m.state in (MessageState.GENERATED, MessageState.APPROVED)
             ]
             if open_emails:  # throwing an email away to have it written again costs a rewrite
-                left, renews = credit_left(uow, UsageStep.REWRITE, utcnow())
+                left, renews = credit_left(uow, utcnow())
                 if not left:
                     raise LeadError(
-                        f"no rewrite credits are left; they renew on {renews:%d %b}. "
+                        f"no AI credits are left; they renew on {renews:%d %b}. "
                         "Ask your admin for more in Settings → Plan and usage."
                     )
                 uow.usage.charge(UsageStep.REWRITE, company_id)
@@ -1176,7 +1176,7 @@ def _step(row: ProviderCall) -> WaterfallStep:
         row.provider,
         row.operation,
         row.outcome.value,
-        row.cost_micro_usd,
+        row.credits_milli,
         row.latency_ms,
         row.contact_id,
         (row.detail or {}).get("asked", ""),

@@ -3,8 +3,8 @@ import { Plus } from "lucide-react";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { Button, Checkbox, Dialog, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../ui/compat";
-import { ago, usd } from "../lib/format";
-import { AccessPill, Pill, StepOf, UseBar, type Row } from "./bits";
+import { ago, credits, usd } from "../lib/format";
+import { AccessPill, Pill, UseBar, type Row } from "./bits";
 import { A } from "./nav";
 
 export function CustomersPage() {
@@ -68,8 +68,8 @@ export function CustomersPage() {
                     <Th>Customer</Th>
                     <Th>Plan</Th>
                     <Th>Access</Th>
-                    <Th>Leads this period</Th>
-                    <Th>Spend (month)</Th>
+                    <Th>AI credits this period</Th>
+                    <Th>Used this month</Th>
                     <Th>Mailboxes</Th>
                     <Th>Skips directory</Th>
                     <Th>Active</Th>
@@ -91,8 +91,6 @@ export function CustomersPage() {
 }
 
 function CustomerLine({ row }: { row: Row }) {
-  const found = StepOf(row, "discovery");
-  const added = StepOf(row, "manual");
   return (
     <tr className="hover:bg-surface-2">
       <Td>
@@ -106,17 +104,15 @@ function CustomerLine({ row }: { row: Row }) {
         <AccessPill row={row} />
       </Td>
       <Td>
-        <div className="space-y-0.5">
-          {found && <UseBar label="Disc" used={found.used} total={found.limit === null ? null : found.limit + found.granted} />}
-          {added && (
-            <div className="flex items-center gap-1.5">
-              <UseBar label="Man" used={added.used} total={added.limit === null ? null : added.limit + added.granted} />
-              {row.waiting > 0 && <Pill tone="attention">{row.waiting} waiting</Pill>}
-            </div>
-          )}
+        <div className="flex items-center gap-1.5">
+          <UseBar used={Math.round(row.credits.used_milli / 1000)} total={row.credits.allowance} />
+          {row.waiting > 0 && <Pill tone="attention">{row.waiting} waiting</Pill>}
         </div>
       </Td>
-      <Td className="font-mono">{usd(row.spend_micro_usd)}</Td>
+      <Td className="font-mono">
+        {credits(row.credits_milli)}
+        <span className="block text-label text-muted">{usd(row.cost_micro_usd)} cost</span>
+      </Td>
       <Td>{row.mailboxes === 0 ? <span className="text-muted">none</span> : row.mailbox_problems ? <Pill tone="error">{row.mailbox_problems} need care</Pill> : <Pill tone="good">{row.mailboxes} ok</Pill>}</Td>
       <Td>{row.features.includes("directory_bypass") ? "allowed" : "off"}</Td>
       <Td className="text-muted">{row.last_active ? ago(row.last_active) : "never"}</Td>

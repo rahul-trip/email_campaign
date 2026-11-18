@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2 } from "lucide-react";
 import { client, ok } from "../api/client";
 import { Card, Empty, PageHeader, QueryState, Stat } from "../ui/compat";
-import { usd } from "../lib/format";
+import { credits, usd } from "../lib/format";
 import { A } from "./nav";
 import { When } from "./bits";
 
@@ -16,7 +16,7 @@ export function OverviewPage() {
       <PageHeader title="Overview" subtitle="What needs a decision today. Counts and sums only: you never see a customer's leads here." />
       <QueryState query={overview} rows={6}>
         {(o) => {
-          const providers = Object.entries(o.spend_by_provider).sort((a, b) => b[1] - a[1]);
+          const providers = Object.entries(o.credits_by_provider).sort((a, b) => b[1] - a[1]);
           const top = Math.max(1, ...providers.map(([, v]) => v));
           return (
             <div className="space-y-5">
@@ -24,7 +24,8 @@ export function OverviewPage() {
                 <Stat label="Active customers" value={o.customers} hint={o.expiring ? `${o.expiring} end within 7 days` : undefined} tone={o.expiring ? "attention" : undefined} />
                 <Stat label="Leads added" value={o.leads_added} hint="this month" />
                 <Stat label="Drafts made" value={o.drafts_made} hint="this month" />
-                <Stat label="Vendor spend" value={usd(o.spend_micro_usd)} hint="this month, all customers" />
+                <Stat label="AI credits used" value={credits(o.credits_milli)} hint="this month, all customers" />
+                <Stat label="Platform cost" value={usd(o.cost_micro_usd)} hint="what vendors and the model billed, this month" />
                 <Stat label="Waiting for credits" value={o.waiting} hint={o.waiting_customers ? `${o.waiting_customers} customer${o.waiting_customers === 1 ? "" : "s"}` : undefined} tone={o.waiting ? "attention" : undefined} />
               </div>
               <div className="grid gap-5 lg:grid-cols-2">
@@ -51,7 +52,7 @@ export function OverviewPage() {
                     </ul>
                   )}
                 </Card>
-                <Card title="Spend by vendor" subtitle="This month, all customers.">
+                <Card title="AI credits by vendor" subtitle="This month, all customers, with what each vendor billed the platform.">
                   {providers.length === 0 ? (
                     <p className="text-body text-muted">No vendor calls yet this month.</p>
                   ) : (
@@ -60,7 +61,9 @@ export function OverviewPage() {
                         <li key={name}>
                           <div className="flex justify-between">
                             <span>{name}</span>
-                            <span className="font-mono">{usd(micro)}</span>
+                            <span className="font-mono">
+                              {credits(micro)} · {usd(o.cost_by_provider[name])}
+                            </span>
                           </div>
                           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
                             <div className="h-full rounded-full bg-primary" style={{ width: `${(micro / top) * 100}%` }} />

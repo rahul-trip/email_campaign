@@ -18,7 +18,6 @@ from outbound.domain.entities import Workspace
 from outbound.domain.enums import (
     CampaignStatus,
     CompanyStatus,
-    UsageStep,
 )
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
@@ -353,11 +352,8 @@ def discover_companies(
         quota, _ = quota_in(uow, utcnow())
     if not quota.engine:
         return Discovery()
-    left = quota.remaining(UsageStep.DISCOVERY)
-    if left is not None:
-        count = min(count, left)  # never search for companies there is no credit to add
-    if count <= 0:
-        log.info("discovery_skipped", reason="no discovery credit left")
+    if count <= 0 or not quota.has_credits():  # searching and screening use AI credits
+        log.info("discovery_skipped", reason="no AI credits left")
         return Discovery()
     return Discoverer(
         uow=container.uow,

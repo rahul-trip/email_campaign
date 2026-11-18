@@ -335,24 +335,18 @@ WAITING_FOR_CREDITS = "waiting for credits"  # the reason a pending row carries 
 
 
 class _Credits:
-    """The credits left for the two intake steps, read once per call and counted down as rows
-    are accepted, so a large file does not re-read the plan for every row."""
+    """Whether AI credits are left, read once per call so a large file does not re-read the
+    plan for every row. Adding a lead uses no credits itself; a person's rows wait while none are
+    left, so they are not added only to stop at the first paid step."""
 
     def __init__(self, uow: UnitOfWork) -> None:
         quota, _ = quota_in(uow, utcnow())
-        self._left: dict[UsageStep, int | None] = {
-            step: quota.remaining(step) for step in (UsageStep.DISCOVERY, UsageStep.MANUAL)
-        }
+        self._any = quota.has_credits()
 
     def take(self, step: UsageStep) -> bool:
-        """Use one credit if there is one (or the step is unlimited)."""
-        left = self._left[step]
-        if left is None:
-            return True
-        if left <= 0:
-            return False
-        self._left[step] = left - 1
-        return True
+        """Whether a lead for ``step`` may be added now. A company discovery found and screened
+        is always added (its credits are spent already); it waits before research if need be."""
+        return step is UsageStep.DISCOVERY or self._any
 
 
 class IntakeService:
@@ -435,14 +429,14 @@ class IntakeService:
             return uow.imports.rows_with_status(ImportRowStatus.NEEDS_CONFIRMATION)
 
     def waiting_for_credits(self) -> list[ImportRowView]:
-        """Manual rows that are good leads but wait for a credit, oldest first."""
+        """Manual rows that are good leads but wait for AI credits, oldest first."""
         with self._uow(self._workspace_id) as uow:
             pending = uow.imports.rows_with_status(ImportRowStatus.PENDING, 1000)
         return [r for r in pending if r.reason == WAITING_FOR_CREDITS]
 
     def release_waiting(self, *, actor: str | None = None, limit: int | None = None) -> int:
-        """Add the waiting rows as leads, oldest first, as many as the credits allow. Returns
-        how many were added; stops at the first one that still has no credit."""
+        """Add the waiting rows as leads, oldest first, once AI credits are left. Returns how
+        many were added."""
         actor = actor or self._actor
         added = 0
         with self._uow(self._workspace_id) as uow:
@@ -465,7 +459,7 @@ class IntakeService:
                     credits=credits,
                 )
                 if decision.status is ImportRowStatus.PENDING:
-                    break  # still no credit: the rest wait too
+                    break  # still no credits: the rest wait too
                 uow.imports.settle_row(
                     row.id,
                     decision.status,
@@ -604,12 +598,6 @@ class IntakeService:
             UsageStep.DISCOVERY if company_source is CompanySource.DISCOVERY else UsageStep.MANUAL
         )
         if not credits.take(step):
-            if (
-                step is UsageStep.DISCOVERY
-            ):  # discovery is capped before it searches; a race ends here
-                return _Decision(
-                    ImportRowStatus.REJECTED, domain, reason="no discovery credit left"
-                )
             # A person added it and it is a good lead: it waits, and is added when credits exist.
             return _Decision(ImportRowStatus.PENDING, domain, confidence, WAITING_FOR_CREDITS)
         company_id, note = self._create(

@@ -1,4 +1,4 @@
-"""The entitlement rules (Phase 6d): overrides, grants, the monthly period and access."""
+"""The entitlement rules (Phase 6d): AI credits, overrides, grants, the period and access."""
 
 from __future__ import annotations
 
@@ -6,20 +6,27 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from outbound.domain.credits import credits_for, llm_credits, milli
 from outbound.domain.entitlements import (
+    DEFAULT_PLANS,
     FREE,
+    PRO,
+    STARTER,
+    UNLIMITED,
     AccessLevel,
     Grant,
     Override,
     Plan,
+    PlanAssignment,
     access_level,
     add_months,
     available,
+    compute_quota,
     effective_entitlements,
     engine_may_run,
     period_bounds,
 )
-from outbound.domain.enums import UsageStep, WorkspaceStatus
+from outbound.domain.enums import WorkspaceStatus
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
 EARLIER = NOW - timedelta(days=5)
@@ -29,33 +36,35 @@ def override(key: str, value: int | bool | None, **kw: object) -> Override:
     return Override(key, value, created_at=kw.pop("created_at", EARLIER), **kw)  # type: ignore[arg-type]
 
 
-def grant(step: UsageStep, amount: int, **kw: object) -> Grant:
-    return Grant(step, amount, created_at=kw.pop("created_at", EARLIER), **kw)  # type: ignore[arg-type]
+def grant(amount: int, **kw: object) -> Grant:
+    return Grant(amount, created_at=kw.pop("created_at", EARLIER), **kw)  # type: ignore[arg-type]
 
 
-# ------------------------------------------------------------------ the plan and its overrides
+# ------------------------------------------------------------------ the plans
 
 
-def test_the_free_plan_limits_only_discovery_and_manual_leads() -> None:
+def test_there_are_three_plans_free_starter_and_pro_each_with_more_ai_credits() -> None:
+    assert [p.code for p in DEFAULT_PLANS] == ["free", "starter", "pro"]
+    assert FREE.monthly_credits < STARTER.monthly_credits < PRO.monthly_credits  # type: ignore[operator]
+    assert FREE.access_days == 30 and STARTER.access_days is None and PRO.access_days is None
+    assert UNLIMITED.monthly_credits is None
+
+
+def test_the_free_plan_gives_ai_credits_seats_mailboxes_and_discovery() -> None:
     ent = effective_entitlements(FREE, [], NOW)
-    assert (ent.limit(UsageStep.DISCOVERY), ent.limit(UsageStep.MANUAL)) == (5, 5)
-    for step in (
-        UsageStep.RESEARCH,
-        UsageStep.EMAIL,
-        UsageStep.COPY,
-        UsageStep.DELIVER,
-        UsageStep.REWRITE,
-    ):
-        assert ent.limit(step) is None
-    assert (ent.seats, ent.mailboxes, ent.active_campaigns) == (3, 1, 2)
+    assert ent.monthly_credits == 100
+    assert (ent.seats, ent.mailboxes, ent.active_campaigns) == (1, 1, 1)
     assert ent.has("discovery") and not ent.has("directory_bypass")
 
 
-def test_an_override_replaces_a_limit_and_none_means_unlimited() -> None:
-    ent = effective_entitlements(
-        FREE, [override("limit.manual", 20), override("limit.discovery", None)], NOW
+def test_an_override_replaces_the_monthly_credits_and_none_means_unlimited() -> None:
+    assert (
+        effective_entitlements(FREE, [override("monthly_credits", 500)], NOW).monthly_credits == 500
     )
-    assert ent.limit(UsageStep.MANUAL) == 20 and ent.limit(UsageStep.DISCOVERY) is None
+    assert (
+        effective_entitlements(FREE, [override("monthly_credits", None)], NOW).monthly_credits
+        is None
+    )
 
 
 def test_the_latest_override_of_a_key_wins() -> None:
@@ -65,11 +74,11 @@ def test_the_latest_override_of_a_key_wins() -> None:
 
 
 def test_an_expired_or_revoked_override_no_longer_applies() -> None:
-    expired = override("limit.manual", 50, expires_at=NOW - timedelta(seconds=1))
-    revoked = override("limit.discovery", 50, revoked_at=NOW - timedelta(days=1))
+    expired = override("monthly_credits", 50, expires_at=NOW - timedelta(seconds=1))
+    revoked = override("seats", 50, revoked_at=NOW - timedelta(days=1))
     live = override("mailboxes", 4, expires_at=NOW + timedelta(days=1))
     ent = effective_entitlements(FREE, [expired, revoked, live], NOW)
-    assert (ent.limit(UsageStep.MANUAL), ent.limit(UsageStep.DISCOVERY), ent.mailboxes) == (5, 5, 4)
+    assert (ent.monthly_credits, ent.seats, ent.mailboxes) == (100, 1, 4)
 
 
 def test_features_are_switched_on_and_off_per_customer() -> None:
@@ -81,39 +90,73 @@ def test_features_are_switched_on_and_off_per_customer() -> None:
     assert ent.has("directory_bypass") and not ent.has("discovery")
 
 
-def test_unknown_override_keys_are_ignored_not_trusted() -> None:
-    ent = effective_entitlements(
-        FREE, [override("limit.nonsense", 1), override("whatever", 7)], NOW
-    )
+def test_unknown_and_old_per_step_override_keys_are_ignored_not_trusted() -> None:
+    ent = effective_entitlements(FREE, [override("limit.manual", 1), override("whatever", 7)], NOW)
     assert ent == effective_entitlements(FREE, [], NOW)
 
 
-# ------------------------------------------------------------------ what is left on a step
+# ------------------------------------------------------------------ AI credits left
 
 
-def test_credits_left_are_the_limit_plus_active_grants_minus_use() -> None:
+def test_credits_left_are_the_monthly_credits_plus_active_grants_minus_use() -> None:
     ent = effective_entitlements(FREE, [], NOW)
-    assert available(UsageStep.MANUAL, ent, [], 3, NOW) == 2
-    assert available(UsageStep.MANUAL, ent, [], 5, NOW) == 0
-    assert available(UsageStep.MANUAL, ent, [], 9, NOW) == 0  # never negative
-    assert available(UsageStep.MANUAL, ent, [grant(UsageStep.MANUAL, 10)], 5, NOW) == 10
+    assert available(ent, [], milli(30), NOW) == milli(70)
+    assert available(ent, [], milli(100), NOW) == 0
+    assert available(ent, [], milli(130), NOW) == 0  # a finished step may overdraw; never negative
+    assert available(ent, [grant(500)], milli(100), NOW) == milli(500)
 
 
-def test_a_grant_counts_only_while_active_and_only_for_its_step() -> None:
+def test_a_grant_counts_only_while_active() -> None:
     ent = effective_entitlements(FREE, [], NOW)
     grants = [
-        grant(UsageStep.MANUAL, 10, expires_at=NOW + timedelta(days=1)),  # to a date
-        grant(UsageStep.MANUAL, 100, expires_at=NOW - timedelta(minutes=1)),  # ran out
-        grant(UsageStep.MANUAL, 100, revoked_at=NOW - timedelta(days=1)),  # taken back
-        grant(UsageStep.DISCOVERY, 100),  # another step
-        grant(UsageStep.MANUAL, 1),  # never expires
+        grant(10, expires_at=NOW + timedelta(days=1)),  # to a date
+        grant(100, expires_at=NOW - timedelta(minutes=1)),  # ran out
+        grant(100, revoked_at=NOW - timedelta(days=1)),  # taken back
+        grant(1),  # never expires
     ]
-    assert available(UsageStep.MANUAL, ent, grants, 0, NOW) == 5 + 10 + 1
+    assert available(ent, grants, 0, NOW) == milli(100 + 10 + 1)
 
 
-def test_an_unlimited_step_has_no_number() -> None:
-    ent = effective_entitlements(FREE, [], NOW)
-    assert available(UsageStep.RESEARCH, ent, [], 10_000, NOW) is None
+def test_an_unlimited_plan_has_no_number() -> None:
+    ent = effective_entitlements(UNLIMITED, [], NOW)
+    assert available(ent, [], milli(1_000_000), NOW) is None
+
+
+def test_the_quota_says_whether_credits_are_left_and_when_it_is_near_the_end() -> None:
+    assignment = PlanAssignment("free", EARLIER)
+    fresh = compute_quota(assignment, FREE, [], [], 0, WorkspaceStatus.ACTIVE, NOW)
+    assert fresh.has_credits() and not fresh.near_limit
+    assert fresh.credits.allowance == 100 and fresh.credits.remaining_milli == milli(100)
+    near = compute_quota(assignment, FREE, [], [], milli(85), WorkspaceStatus.ACTIVE, NOW)
+    assert near.has_credits() and near.near_limit
+    spent = compute_quota(
+        assignment, FREE, [], [grant(20)], milli(120), WorkspaceStatus.ACTIVE, NOW
+    )
+    assert not spent.has_credits() and spent.credits.allowance == 120
+    endless = compute_quota(
+        assignment, UNLIMITED, [], [], milli(10**6), WorkspaceStatus.ACTIVE, NOW
+    )
+    assert endless.has_credits() and not endless.near_limit
+
+
+# ------------------------------------------------------------------ converting cost to AI credits
+
+
+def test_a_calls_cost_becomes_ai_credits_at_the_platforms_rate_rounded_up() -> None:
+    cent = 10_000  # micro-USD: the default value of one AI credit
+    assert credits_for(0, cent) == 0  # a free call, a cache hit, an error
+    assert credits_for(cent, cent) == 1000  # one credit, in thousandths
+    assert credits_for(24_500, cent) == 2450  # a Hunter find: 2.45 credits
+    assert credits_for(1, cent) == 1  # a paid call never costs nothing
+    assert credits_for(24_500, 2 * cent) == 1225  # a credit worth more: fewer credits
+
+
+def test_a_model_call_uses_the_charge_per_million_tokens_rounded_up() -> None:
+    assert llm_credits(1_000_000, 0, 30, 100) == milli(30)
+    assert llm_credits(0, 1_000_000, 30, 100) == milli(100)
+    assert llm_credits(2_000, 500, 30, 100) == 110  # 0.06 + 0.05 credits
+    assert llm_credits(1, 0, 30, 100) == 1  # never rounded down to nothing
+    assert llm_credits(5_000, 5_000, 0, 0) == 0  # a free model
 
 
 # ------------------------------------------------------------------ the monthly period
@@ -175,6 +218,6 @@ def test_access_for_every_combination(
 
 
 def test_a_custom_plan_can_have_no_limits_and_no_end() -> None:
-    plan = Plan("gold", "Gold", seats=None, mailboxes=None, access_days=None)
+    plan = Plan("gold", "Gold", monthly_credits=None, seats=None, mailboxes=None, access_days=None)
     ent = effective_entitlements(plan, [], NOW)
-    assert ent.seats is None and all(ent.limit(s) is None for s in UsageStep)
+    assert ent.seats is None and ent.monthly_credits is None

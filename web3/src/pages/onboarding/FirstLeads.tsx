@@ -27,8 +27,8 @@ export function FirstLeads({ onNext }: { onNext: () => void }) {
       for (const key of ["runs", "setup", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
     },
   });
-  const step = usage.data?.steps.find((s) => s.step === "discovery");
-  const noCredit = (step && step.limit !== null && (step.remaining ?? 1) <= 0) || usage.data?.engine === false;
+  const left = usage.data?.credits.remaining_milli;
+  const noCredit = (left !== undefined && left !== null && left <= 0) || usage.data?.engine === false;
   const totals = run ? totalsOf(run.counts) : null;
   const line = totals ? discoveryLine(totals) : null;
   const finished = run && run.status !== "queued" && run.status !== "running";
@@ -41,7 +41,7 @@ export function FirstLeads({ onNext }: { onNext: () => void }) {
           <Button busy={start.isPending} disabled={Boolean(noCredit) || Boolean(working)} onClick={() => start.mutate()}>
             <Search className="size-4" aria-hidden /> Find 10 companies now
           </Button>
-          {noCredit && <p className="mt-2 text-small text-muted">Your plan has no search credit left. Bring your own list instead.</p>}
+          {noCredit && <p className="mt-2 text-small text-muted">Your plan has no AI credits left this month. Bring your own list instead.</p>}
           {working && !startedId && <p className="mt-2 text-small text-muted">A run is already working. Watch it below.</p>}
           <Problem error={start.error} className="mt-2" />
         </Card>

@@ -1,4 +1,4 @@
-"""Plan, use and credits (Phase 6d), and letting waiting work continue."""
+"""Plan, use and AI credits (Phase 6d), and letting waiting work continue."""
 
 from __future__ import annotations
 
@@ -8,13 +8,12 @@ from fastapi import APIRouter, Depends
 
 from outbound.api.deps import Services, Tenant, require, services
 from outbound.api.schemas import (
+    CreditsOut,
     GrantOut,
     RequestCreditsIn,
     ResumedOut,
-    StepUsageOut,
     UsageOut,
 )
-from outbound.domain.enums import UsageStep
 from outbound.domain.permissions import Permission as P
 
 router = APIRouter(prefix="/api", tags=["usage"])
@@ -34,19 +33,17 @@ def usage(svc: Svc) -> UsageOut:
         access=quota.access.value,
         access_until=quota.access_until,
         engine=quota.engine,
-        steps=[
-            StepUsageOut(
-                step=s.step.value,
-                limit=s.limit,
-                granted=s.granted,
-                used=s.used,
-                remaining=s.remaining,
-            )
-            for s in quota.steps.values()
-        ],
+        credits=CreditsOut(
+            monthly=quota.credits.monthly,
+            granted=quota.credits.granted,
+            allowance=quota.credits.allowance,
+            used_milli=quota.credits.used_milli,
+            remaining_milli=quota.credits.remaining_milli,
+        ),
         grants=[
             GrantOut(
-                id=g.id, step=g.step.value, amount=g.amount, created_at=g.created_at,
+                id=g.id, step=g.step.value if g.step else None, amount=g.amount,
+                created_at=g.created_at,
                 expires_at=g.expires_at, revoked_at=g.revoked_at, note=g.note,
             )
             for g in report.grants
@@ -68,8 +65,7 @@ def request_credits(
     ctx: Annotated[Tenant, Depends(require(P.LEADS_READ))],
     svc: Svc,
 ) -> dict[str, str]:
-    step = UsageStep(body.step) if body.step else None
-    svc.usage.request_credits(ctx.user.user.id, step, body.note)
+    svc.usage.request_credits(ctx.user.user.id, body.amount, body.note)
     return {"detail": "Your request was sent to the team."}
 
 

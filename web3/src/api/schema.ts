@@ -455,6 +455,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/plans/credit-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Credit Value
+         * @description How much vendor and model cost one AI credit stands for, from the next call on.
+         */
+        put: operations["credit_value_api_admin_plans_credit_value_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/plans/default": {
         parameters: {
             query?: never;
@@ -3029,6 +3049,21 @@ export interface components {
             /** Password */
             password?: string | null;
         };
+        /** AdminCreditsOut */
+        AdminCreditsOut: {
+            /** Allowance */
+            allowance: number | null;
+            /** Granted */
+            granted: number;
+            /** Monthly */
+            monthly: number | null;
+            /** Plan Monthly */
+            plan_monthly: number | null;
+            /** Remaining Milli */
+            remaining_milli: number | null;
+            /** Used Milli */
+            used_milli: number;
+        };
         /** AdminMailboxOut */
         AdminMailboxOut: {
             /** Address */
@@ -3051,21 +3086,6 @@ export interface components {
              * @enum {string}
              */
             role: "admin" | "member";
-        };
-        /** AdminStepOut */
-        AdminStepOut: {
-            /** Granted */
-            granted: number;
-            /** Limit */
-            limit: number | null;
-            /** Plan Limit */
-            plan_limit: number | null;
-            /** Remaining */
-            remaining: number | null;
-            /** Step */
-            step: string;
-            /** Used */
-            used: number;
         };
         /** AdminUserOut */
         AdminUserOut: {
@@ -3182,8 +3202,8 @@ export interface components {
              * Format: date-time
              */
             at: string;
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /**
              * Got
              * @default
@@ -3529,7 +3549,10 @@ export interface components {
             /** Title */
             title: string | null;
         };
-        /** CostOut */
+        /**
+         * CostOut
+         * @description AI credits used, in thousandths.
+         */
         CostOut: {
             /** By Provider */
             by_provider: {
@@ -3561,6 +3584,29 @@ export interface components {
              * @default
              */
             website?: string;
+        };
+        /** CreditValueIn */
+        CreditValueIn: {
+            /** Credit Value Micro Usd */
+            credit_value_micro_usd: number;
+            /** Version */
+            version: number;
+        };
+        /**
+         * CreditsOut
+         * @description A workspace's AI credits this period. Whole credits, except the ``_milli`` counts.
+         */
+        CreditsOut: {
+            /** Allowance */
+            allowance: number | null;
+            /** Granted */
+            granted: number;
+            /** Monthly */
+            monthly: number | null;
+            /** Remaining Milli */
+            remaining_milli: number | null;
+            /** Used Milli */
+            used_milli: number;
         };
         /** CustomerDetailOut */
         CustomerDetailOut: {
@@ -3614,6 +3660,11 @@ export interface components {
             access_until: string | null;
             /** Active Campaigns */
             active_campaigns: number | null;
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            credits: components["schemas"]["AdminCreditsOut"];
+            /** Credits Milli */
+            credits_milli: number;
             /** Features */
             features: string[];
             /** Id */
@@ -3630,8 +3681,8 @@ export interface components {
             mailboxes: number;
             /** Max Leads Per Run */
             max_leads_per_run: number | null;
-            /** Max Prospect Budget Micro Usd */
-            max_prospect_budget_micro_usd: number | null;
+            /** Max Prospect Budget Credits */
+            max_prospect_budget_credits: number | null;
             /** Members */
             members: number;
             /** Name */
@@ -3658,12 +3709,8 @@ export interface components {
             seats: number | null;
             /** Slug */
             slug: string;
-            /** Spend Micro Usd */
-            spend_micro_usd: number;
             /** Status */
             status: string;
-            /** Steps */
-            steps: components["schemas"]["AdminStepOut"][];
             /** Waiting */
             waiting: number;
         };
@@ -3678,6 +3725,8 @@ export interface components {
         DayOut: {
             /** Approved */
             approved: number;
+            /** Credits Milli */
+            credits_milli: number;
             /**
              * Day
              * Format: date
@@ -3689,8 +3738,6 @@ export interface components {
             reviewed: number;
             /** Sent */
             sent: number;
-            /** Spend Micro Usd */
-            spend_micro_usd: number;
         };
         /** DecideJoinIn */
         DecideJoinIn: {
@@ -3869,8 +3916,8 @@ export interface components {
             open_reports: number;
             /** People */
             people: number;
-            /** Saved Micro Usd */
-            saved_micro_usd: number;
+            /** Saved Credits Milli */
+            saved_credits_milli: number;
             /** Unfolded */
             unfolded: number;
         };
@@ -4088,11 +4135,6 @@ export interface components {
              * @default true
              */
             resume_now?: boolean;
-            /**
-             * Step
-             * @enum {string}
-             */
-            step: "discovery" | "manual" | "research" | "email" | "copy" | "deliver" | "rewrite";
         };
         /** GrantOut */
         GrantOut: {
@@ -4112,7 +4154,7 @@ export interface components {
             /** Revoked At */
             revoked_at: string | null;
             /** Step */
-            step: string;
+            step: string | null;
         };
         /** GrantedOut */
         GrantedOut: {
@@ -4245,8 +4287,8 @@ export interface components {
             origin: components["schemas"]["OriginOut"];
             /** Stages */
             stages: components["schemas"]["StageOut"][];
-            /** Total Cost Micro Usd */
-            total_cost_micro_usd: number;
+            /** Total Credits Milli */
+            total_credits_milli: number;
         };
         /** KeyCheckOut */
         KeyCheckOut: {
@@ -4273,8 +4315,8 @@ export interface components {
             contact_name: string | null;
             /** Contact Title */
             contact_title: string | null;
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /** Email Status */
             email_status: string | null;
         };
@@ -4348,8 +4390,28 @@ export interface components {
          * @enum {string}
          */
         LinkedInState: "drafted" | "sent" | "skipped";
+        /** LlmChargeIn */
+        LlmChargeIn: {
+            /** Model */
+            model: string;
+            /** Per Million Input */
+            per_million_input: number;
+            /** Per Million Output */
+            per_million_output: number;
+        };
+        /** LlmChargeOut */
+        LlmChargeOut: {
+            /** Model */
+            model: string;
+            /** Per Million Input */
+            per_million_input: number;
+            /** Per Million Output */
+            per_million_output: number;
+        };
         /** LlmSettingsIn */
         LlmSettingsIn: {
+            /** Charges */
+            charges?: components["schemas"]["LlmChargeIn"][] | null;
             /** Llm Base Url */
             llm_base_url?: string | null;
             /** Llm Copy Model */
@@ -4643,6 +4705,18 @@ export interface components {
             activity: components["schemas"]["AuditOut"][];
             /** Attention */
             attention: components["schemas"]["AttentionOut"][];
+            /** Cost By Provider */
+            cost_by_provider: {
+                [key: string]: number;
+            };
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Credits By Provider */
+            credits_by_provider: {
+                [key: string]: number;
+            };
+            /** Credits Milli */
+            credits_milli: number;
             /** Customers */
             customers: number;
             /** Drafts Made */
@@ -4651,12 +4725,6 @@ export interface components {
             expiring: number;
             /** Leads Added */
             leads_added: number;
-            /** Spend By Provider */
-            spend_by_provider: {
-                [key: string]: number;
-            };
-            /** Spend Micro Usd */
-            spend_micro_usd: number;
             /** Waiting */
             waiting: number;
             /** Waiting Customers */
@@ -4733,16 +4801,14 @@ export interface components {
             customers: number;
             /** Features */
             features: string[];
-            /** Limits */
-            limits: {
-                [key: string]: number | null;
-            };
             /** Mailboxes */
             mailboxes: number | null;
             /** Max Leads Per Run */
             max_leads_per_run: number | null;
-            /** Max Prospect Budget Micro Usd */
-            max_prospect_budget_micro_usd: number | null;
+            /** Max Prospect Budget Credits */
+            max_prospect_budget_credits: number | null;
+            /** Monthly Credits */
+            monthly_credits: number | null;
             /** Name */
             name: string;
             /** Seats */
@@ -4762,10 +4828,6 @@ export interface components {
             active_campaigns?: number | null;
             /** Features */
             features?: string[];
-            /** Limits */
-            limits?: {
-                [key: string]: number | null;
-            };
             /**
              * Mailboxes
              * @default 1
@@ -4774,10 +4836,15 @@ export interface components {
             /** Max Leads Per Run */
             max_leads_per_run?: number | null;
             /**
-             * Max Prospect Budget Micro Usd
-             * @default 500000
+             * Max Prospect Budget Credits
+             * @default 50
              */
-            max_prospect_budget_micro_usd?: number | null;
+            max_prospect_budget_credits?: number | null;
+            /**
+             * Monthly Credits
+             * @default 100
+             */
+            monthly_credits?: number | null;
             /** Name */
             name: string;
             /**
@@ -4807,6 +4874,10 @@ export interface components {
         };
         /** PlansOut */
         PlansOut: {
+            /** Can Edit */
+            can_edit: boolean;
+            /** Credit Value Micro Usd */
+            credit_value_micro_usd: number;
             /** Default Plan */
             default_plan: string;
             /** Plans */
@@ -5010,13 +5081,13 @@ export interface components {
         };
         /** RequestCreditsIn */
         RequestCreditsIn: {
+            /** Amount */
+            amount?: number | null;
             /**
              * Note
              * @default
              */
             note?: string;
-            /** Step */
-            step?: ("discovery" | "manual" | "research" | "email" | "copy" | "deliver" | "rewrite") | null;
         };
         /** ResetIn */
         ResetIn: {
@@ -5125,8 +5196,8 @@ export interface components {
             blocked: number;
             /** Calls */
             calls: number;
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /** Errors */
             errors: number;
             /** Found */
@@ -5189,8 +5260,6 @@ export interface components {
         RunMode: "manual" | "discovery" | "mixed";
         /** RunOut */
         RunOut: {
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
             /** Counts */
             counts: {
                 [key: string]: unknown;
@@ -5200,6 +5269,8 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Credits Milli */
+            credits_milli: number;
             /** Finished At */
             finished_at: string | null;
             /** Id */
@@ -5353,8 +5424,8 @@ export interface components {
         StageOut: {
             /** Calls */
             calls: components["schemas"]["CallOut"][];
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /** Facts */
             facts: components["schemas"]["FactOut"][];
             /** Incidents */
@@ -5399,19 +5470,6 @@ export interface components {
             };
             /** Waiting For Review */
             waiting_for_review: number;
-        };
-        /** StepUsageOut */
-        StepUsageOut: {
-            /** Granted */
-            granted: number;
-            /** Limit */
-            limit: number | null;
-            /** Remaining */
-            remaining: number | null;
-            /** Step */
-            step: string;
-            /** Used */
-            used: number;
         };
         /** SuppressionIn */
         SuppressionIn: {
@@ -5515,6 +5573,7 @@ export interface components {
             active_campaigns: number | null;
             /** Announcement */
             announcement: string;
+            credits: components["schemas"]["CreditsOut"];
             /** Engine */
             engine: boolean;
             /** Features */
@@ -5539,8 +5598,6 @@ export interface components {
             plan_name: string;
             /** Seats */
             seats: number | null;
-            /** Steps */
-            steps: components["schemas"]["StepUsageOut"][];
             /** Waiting Leads */
             waiting_leads: {
                 [key: string]: number;
@@ -5574,8 +5631,8 @@ export interface components {
         };
         /** VendorCapIn */
         VendorCapIn: {
-            /** Cap Micro Usd */
-            cap_micro_usd: number | null;
+            /** Cap Credits */
+            cap_credits?: number | null;
         };
         /** VendorErrorsOut */
         VendorErrorsOut: {
@@ -5617,10 +5674,14 @@ export interface components {
             can_roll_back: boolean;
             /** Can Test */
             can_test: boolean;
-            /** Cap Micro Usd */
-            cap_micro_usd: number | null;
+            /** Cap Credits */
+            cap_credits: number | null;
             /** Code */
             code: string;
+            /** Cost Micro Usd */
+            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /** Key */
             key: string;
             /** Key Refusals */
@@ -5639,8 +5700,6 @@ export interface components {
             set_by: string | null;
             /** Source */
             source: string;
-            /** Spend Micro Usd */
-            spend_micro_usd: number;
             /** Version */
             version: number;
         };
@@ -5655,6 +5714,8 @@ export interface components {
             llm: {
                 [key: string]: string | number;
             };
+            /** Llm Charges */
+            llm_charges: components["schemas"]["LlmChargeOut"][];
             /** Vendors */
             vendors: components["schemas"]["VendorOut"][];
         };
@@ -5689,8 +5750,8 @@ export interface components {
             at: string;
             /** Contact Id */
             contact_id: string | null;
-            /** Cost Micro Usd */
-            cost_micro_usd: number;
+            /** Credits Milli */
+            credits_milli: number;
             /**
              * Got
              * @default
@@ -5732,8 +5793,8 @@ export interface components {
             auto_discovery_per_day?: number | null;
             /** Auto Discovery Review Limit */
             auto_discovery_review_limit?: number | null;
-            /** Budget Per Prospect Micro Usd */
-            budget_per_prospect_micro_usd?: number | null;
+            /** Budget Per Prospect Credits */
+            budget_per_prospect_credits?: number | null;
             /** Country Policy Enabled */
             country_policy_enabled?: boolean | null;
             /** Email Max Words */
@@ -6757,6 +6818,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlansOut"];
+                };
+            };
+        };
+    };
+    credit_value_api_admin_plans_credit_value_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreditValueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlansOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

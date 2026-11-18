@@ -1,13 +1,13 @@
-/** Spend and run charts shared by Reports and Runs (from web2's dashboard). */
+/** AI-credit and run charts shared by Reports and Runs (from web2's dashboard). */
 import { cx } from "../lib/cx";
-import { usd } from "../lib/format";
+import { credits } from "../lib/format";
 
 export function BudgetMeter({ spent, ceiling }: { spent: number; ceiling: number }) {
   const used = Math.min(100, Math.round((spent / ceiling) * 100));
   return (
     <div className="col-span-2">
       <div className="mb-1 flex justify-between tnum text-label text-muted">
-        <span>Average spend against the ceiling</span>
+        <span>Average per lead against the budget</span>
         <span className={cx("font-semibold", used > 90 ? "text-error" : used > 70 ? "text-attention" : "text-good")}>{used}% used</span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-surface-3" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={used} aria-label="Budget used">
@@ -30,7 +30,7 @@ export function ProviderBars({ byProvider, calls, total }: { byProvider: Record<
             <div className="flex items-center justify-between gap-2 tnum text-small">
               <span className="font-medium">{vendor}</span>
               <span className="text-muted">
-                {calls[vendor] ?? 0} calls · {usd(micro)} {total > 0 && `(${share}%)`}
+                {calls[vendor] ?? 0} calls · {credits(micro)} {total > 0 && `(${share}%)`}
               </span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">

@@ -95,7 +95,7 @@ def test_a_targets_list_becomes_drafts_and_a_rerun_costs_nothing(
     run = pipeline.runner.run_pipeline()
     assert statuses(factory, ws) == {"acme.co.uk": C.COPY_READY, "beta.com": C.COPY_READY}
     assert run.count("copy", Outcome.ADVANCED) == 2
-    assert run.cost_micro_usd >= 0
+    assert run.credits_milli >= 0
     assert world.mailbox.appends == 0  # nothing reaches the mailbox without approval
 
     # 3. the operator reviews: approves one with an edit, the other as written

@@ -124,12 +124,16 @@ test("a new customer's admin is taken to the guided setup, which starts empty", 
   await expect(boss.getByText(/Finish setting up/)).toBeVisible();
 });
 
-test("a free customer reaches its limit, sees it everywhere, and what waits is kept", async ({ page, browser }) => {
+test("a free customer runs out of AI credits, sees it everywhere, and what waits is kept", async ({ page, browser }) => {
   await signIn(page, STAFF, false);
   await expect(page.getByRole("heading", { name: "Choose a workspace" })).toBeVisible();
   const email = `owner-${Date.now().toString(36)}@limits.example`;
   const made = await page.request.post("/api/admin/customers", { data: { name: "Limits Ltd", admin_email: email }, headers: WRITE });
   expect(made.status()).toBe(201);
+  // Its month's AI credits are all used: the staff set them to none.
+  const { workspace_id } = await made.json();
+  const none = await page.request.put(`/api/admin/customers/${workspace_id}/overrides`, { data: { key: "monthly_credits", value: 0 }, headers: WRITE });
+  expect(none.ok()).toBeTruthy();
   const token = await emailedToken(page, "invite", email);
 
   const owner = await (await browser.newContext()).newPage();
@@ -145,28 +149,26 @@ test("a free customer reaches its limit, sees it everywhere, and what waits is k
   const filled = await owner.request.patch(`/api/settings/campaigns/${first.id}`, { data: { target_titles: ["COO"], icp_description: "Energy traders." }, headers: WRITE });
   expect(filled.ok()).toBeTruthy();
 
-  for (let n = 0; n < 6; n++) {
+  for (let n = 0; n < 1; n++) {
     const added = await owner.request.post("/api/targets", { data: { website: `limit${n}-${Date.now().toString(36)}.com`, country: "UK" }, headers: WRITE });
     expect(added.ok()).toBeTruthy();
   }
   await owner.goto("/w/limits-ltd/settings?tab=plan");
   await expect(owner.getByRole("heading", { name: "Free plan" })).toBeVisible();
-  const manual = owner.getByRole("row", { name: /Leads you add/ });
-  await expect(manual).toContainText("5");
-  await expect(manual.getByRole("meter")).toHaveAttribute("aria-label", "0 left");
-  await expect(owner.getByText("No credits left for leads you add")).toBeVisible(); // the banner, everywhere
+  await expect(owner.getByRole("meter")).toHaveAttribute("aria-label", "100% of AI credits used");
+  await expect(owner.getByText(/No AI credits left, so paid work waits/)).toBeVisible(); // the banner, everywhere
   await expect(owner.getByText("1 you added is waiting to become leads")).toBeVisible();
 
   await owner.goto("/w/limits-ltd/attention");
-  await expect(owner.getByRole("heading", { name: /Waiting for credits/ })).toBeVisible();
+  await expect(owner.getByRole("heading", { name: /Waiting for AI credits/ })).toBeVisible();
   await owner.goto("/w/limits-ltd/targets");
-  await expect(owner.getByText("1 company is waiting for credits")).toBeVisible();
+  await expect(owner.getByText("1 company is waiting for AI credits")).toBeVisible();
   await owner.getByRole("button", { name: "Resume", exact: true }).click();
-  await expect(owner.getByText("No credits yet.")).toBeVisible(); // refused without a credit, kept
+  await expect(owner.getByText("No AI credits yet.")).toBeVisible(); // refused without credits, kept
 
   await owner.goto("/w/limits-ltd/settings?tab=plan");
-  await owner.getByRole("button", { name: "Ask for more credits" }).click();
-  await owner.getByLabel("What do you need more of?").selectOption("manual");
+  await owner.getByRole("button", { name: "Ask for more AI credits" }).click();
+  await owner.getByLabel("How many AI credits do you need?").fill("500");
   await owner.getByRole("button", { name: "Send request" }).click();
   await expect(owner.getByText("Sent. The team will get back to you.")).toBeVisible();
 });

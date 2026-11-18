@@ -2,7 +2,7 @@
  * Needs attention: everything waiting on a person except email review. Tabs with counts; each
  * group is a folding section (the first open) with its plain cause, its fix and a bulk action.
  * Same actions as web2: retry one, by step or all; release; find email again (one or all);
- * use the suggested country and release; resume after a credit wait; confirm websites.
+ * use the suggested country and release; resume after waiting for AI credits; confirm websites.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -61,7 +61,7 @@ export function AttentionPage() {
     <>
       <PageHeader
         title="Needs attention"
-        subtitle={total ? `${total} item${total === 1 ? "" : "s"} wait on you. Most take one click.` : "Holds, failures, websites to confirm and credit waits land here."}
+        subtitle={total ? `${total} item${total === 1 ? "" : "s"} wait on you. Most take one click.` : "Holds, failures, websites to confirm and leads waiting for AI credits land here."}
         actions={
           filter !== "credits" &&
           failed.length > 1 &&
@@ -83,7 +83,7 @@ export function AttentionPage() {
             { key: "failed", label: "Failed", count: failed.length },
             { key: "held", label: "On hold", count: held.length },
             { key: "confirm", label: "Websites to confirm", count: confirm.length },
-            { key: "credits", label: "Waiting for credits", count: parked.length + rows },
+            { key: "credits", label: "Waiting for AI credits", count: parked.length + rows },
           ]}
         />
       </div>
@@ -256,7 +256,7 @@ function CreditWait({ leads, rows, renews }: { leads: Company[]; rows: number; r
     <Section
       id="credits"
       tour="credit-wait"
-      title="Waiting for credits"
+      title="Waiting for AI credits"
       summary={`${leads.length + rows} paused where they are, losing nothing${renews ? ` · allowance renews ${renews}` : ""}`}
       chip={<Chip tone="attention">{leads.length + rows}</Chip>}
       actions={
@@ -265,7 +265,7 @@ function CreditWait({ leads, rows, renews }: { leads: Company[]; rows: number; r
         </Button>
       }
     >
-      <p className="mb-3 text-small text-muted">Your plan's allowance for a step ran out. They continue by themselves when credits exist; Resume tries now.</p>
+      <p className="mb-3 text-small text-muted">Your plan's AI credits for this month ran out. They continue by themselves when credits are back; Resume tries now.</p>
       <Problem error={all.error ?? one.error} className="mb-3" />
       {rows > 0 && (
         <p className="mb-2 text-body text-ink-2">
@@ -278,7 +278,7 @@ function CreditWait({ leads, rows, renews }: { leads: Company[]; rows: number; r
       )}
       <ul className="divide-y divide-line">
         {leads.map((c) => (
-          <Row key={c.id} company={c} detail={`Waiting for a credit: ${(STEP_LABEL[c.credit_wait_step ?? ""] ?? c.credit_wait_step ?? "").toLowerCase()}`}>
+          <Row key={c.id} company={c} detail={`Waiting for AI credits before: ${(STEP_LABEL[c.credit_wait_step ?? ""] ?? c.credit_wait_step ?? "").toLowerCase()}`}>
             <Button size="sm" variant="secondary" busy={one.isPending && one.variables === c.id} onClick={() => one.mutate(c.id)}>
               Resume
             </Button>
@@ -314,7 +314,7 @@ function BulkAction({ ids, kind, label }: { ids: string[]; kind: "retry" | "rele
         <Confirm title={kind === "retry" ? `Retry ${n} lead${n === 1 ? "" : "s"}?` : `Release ${n} lead${n === 1 ? "" : "s"}?`} confirm={kind === "retry" ? "Retry" : "Release"} busy={run.isPending} onClose={() => setConfirming(false)} onConfirm={() => run.mutate()}>
           <p>
             {kind === "retry"
-              ? "Each lead goes back to the step that failed and runs again now, in one run. A step that pays vendors (research, the email address, writing) costs again for every lead; anything already found is reused."
+              ? "Each lead goes back to the step that failed and runs again now, in one run. A step that calls vendors or the AI model (research, the email address, writing) uses AI credits again for every lead; anything already found is reused."
               : "Each lead goes back to looking for its email and writing it, in one run started now; the email will say you already wrote on LinkedIn."}
           </p>
           <Problem error={run.error} className="mt-3" />
@@ -341,7 +341,7 @@ function FindAgainAll({ ids }: { ids: string[] }) {
       </Button>
       {confirming && (
         <Confirm title={`Look for ${ids.length} email${ids.length === 1 ? "" : "s"} again?`} confirm="Find again" busy={run.isPending} onClose={() => setConfirming(false)} onConfirm={() => run.mutate()}>
-          <p>Each lead is checked once more with fresh answers from the vendors. This costs vendor credits for every lead. They run in one run, started now.</p>
+          <p>Each lead is checked once more with fresh answers from the vendors. This uses AI credits for every lead. They run in one run, started now.</p>
           <Problem error={run.error} className="mt-3" />
         </Confirm>
       )}

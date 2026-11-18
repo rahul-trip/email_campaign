@@ -19,6 +19,7 @@ from outbound.db.repositories.directory import CompanyView, DirectoryFigures, En
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.actors import OPERATOR
+from outbound.domain.credits import credits_for
 from outbound.domain.enums import DirectoryTarget, EmailStatus
 from outbound.domain.errors import InvalidInput
 from outbound.domain.state_machines import EMAIL
@@ -153,7 +154,11 @@ class DirectoryService:
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         with self._platform() as p:
             return DirectoryOverview(
-                p.directory.figures(start, start + timedelta(days=32), self._finder_price),
+                p.directory.figures(
+                    start,
+                    start + timedelta(days=32),
+                    credits_for(self._finder_price, p.settings.get()[0].credit_value_micro_usd),
+                ),
                 p.directory.open_flags(),
             )
 

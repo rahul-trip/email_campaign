@@ -21,7 +21,6 @@ from outbound.domain.enums import (
     MessageState,
     RunKind,
     RunStatus,
-    UsageStep,
 )
 from outbound.logging import get_logger
 from outbound.metering.quota import quota_in
@@ -122,7 +121,7 @@ class AutoDiscovery:
                 reason = OFF
             elif campaign is None:
                 reason = NO_CAMPAIGN
-            elif not quota.engine or not quota.has_credit(UsageStep.DISCOVERY):
+            elif not quota.engine or not quota.has_credits():
                 reason = NO_CREDITS  # nothing could be added, so do not search
             elif busy:
                 reason = RUN_IN_PROGRESS

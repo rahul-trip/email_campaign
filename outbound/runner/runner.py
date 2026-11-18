@@ -58,7 +58,7 @@ class RunReport:
     run_id: str
     status: RunStatus = RunStatus.RUNNING
     counts: dict[str, Counter[str]] = field(default_factory=dict)
-    cost_micro_usd: int = 0
+    credits_milli: int = 0  # AI credits the run used, in thousandths
 
     def count(self, stage: str, outcome: Outcome) -> int:
         return self.counts.get(stage, Counter())[outcome.value]
@@ -152,7 +152,7 @@ class Runner:
     def _summary(report: RunReport, started: float) -> dict[str, Any]:
         return {
             "duration_ms": int((time.monotonic() - started) * 1000),
-            "cost_micro_usd": report.cost_micro_usd,
+            "credits_milli": report.credits_milli,
             "outcomes": report.to_json(),
         }
 
@@ -169,7 +169,7 @@ class Runner:
     def _finish(self, run_id: str, status: RunStatus, report: RunReport) -> None:
         with self._uow(self._workspace_id) as uow:
             uow.runs.finish(run_id, status, report.to_json())
-            report.cost_micro_usd = uow.runs.cost_of(run_id)
+            report.credits_milli = uow.runs.credits_of(run_id)
             uow.commit()
 
     def _cancelled(self, run_id: str) -> bool:
@@ -263,8 +263,8 @@ class Runner:
                 next_action_at=result.next_action_at,
                 run_id=self._run_id,
             )
-            # The step succeeded, so it is charged, in the same transaction as its result. A
-            # lead already charged for it (research again, a rerun) is not charged twice.
+            # The step succeeded, so it is counted for reports, in the same transaction as its
+            # result, once per lead. (Its calls already used their AI credits.)
             charge = STAGE_CHARGES.get(stage.name)
             if charge is not None and result.to_status is charge[1]:
                 uow.usage.charge(charge[0], company.id)

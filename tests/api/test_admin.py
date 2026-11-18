@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 
 from outbound.api.deps import Services
-from outbound.domain.enums import MembershipRole, PlatformRole
+from outbound.domain.enums import CallOutcome, MembershipRole, PlatformRole
 from tests.api.conftest import ADMIN, Api, add_user, sign_in
 
 STAFF = "ops@platform.example"
@@ -42,6 +42,23 @@ def free(app_and_services: tuple[FastAPI, Services]) -> Services:
         )  # fmt: skip
         p.commit()
     return services
+
+
+def use(services: Services, credits: int) -> None:
+    """Calls in the test workspace that used ``credits`` AI credits."""
+    with services.container.uow(services.workspace_id) as uow:
+        uow.calls.record(
+            provider="hunter", operation="find", request_hash="h", outcome=CallOutcome.HIT,
+            cost_micro_usd=credits * 10_000, credits_milli=credits * 1000,
+        )  # fmt: skip
+        uow.commit()
+
+
+def no_credits(staff: Api, services: Services) -> None:
+    staff.put(
+        f"/api/admin/customers/{services.workspace_id}/overrides",
+        json={"key": "monthly_credits", "value": 0},
+    )
 
 
 def audited(services: Services, action: str, workspace_id: str | None = None) -> list[dict]:  # type: ignore[type-arg]
@@ -85,15 +102,19 @@ def test_the_overview_and_customer_list_show_use_without_any_lead_content(
 ) -> None:
     for n in range(7):
         api.post("/api/targets", json={"website": f"lead{n}.com", "country": "UK"})
+    use(free, 90)
     overview = staff.get("/api/admin/overview").json()
-    assert overview["customers"] >= 1 and overview["leads_added"] == 5 and overview["waiting"] == 0
+    assert overview["customers"] >= 1 and overview["leads_added"] == 7 and overview["waiting"] == 0
+    assert overview["credits_milli"] >= 90_000 and overview["credits_by_provider"]["hunter"]
+    assert overview["cost_micro_usd"] >= 900_000  # staff also see what the calls cost in dollars
     [row] = [c for c in staff.get("/api/admin/customers").json() if c["id"] == free.workspace_id]
-    steps = {s["step"]: s for s in row["steps"]}
-    assert (
-        steps["manual"]["plan_limit"],
-        steps["manual"]["used"],
-        steps["manual"]["remaining"],
-    ) == (5, 5, 0)
+    credits = row["credits"]
+    assert (credits["plan_monthly"], credits["used_milli"], credits["remaining_milli"]) == (
+        100,
+        90_000,
+        10_000,
+    )
+    assert row["cost_micro_usd"] == 900_000
     assert row["plan_code"] == "free" and row["access"] == "full" and row["near_limit"] is True
     text = str(staff.get(f"/api/admin/customers/{free.workspace_id}").json())
     assert "lead0.com" not in text  # counts and settings, never the leads themselves
@@ -113,21 +134,21 @@ def test_customers_can_be_searched_and_filtered(staff: Api, free: Services) -> N
 # ------------------------------------------------------------------ the gate: limit, grant, resume
 
 
-def test_the_sixth_lead_waits_and_a_grant_with_resume_now_adds_it(
+def test_a_lead_added_with_no_credits_waits_and_a_grant_with_resume_now_adds_it(
     api: Api, staff: Api, free: Services
 ) -> None:
-    for n in range(5):
-        api.post("/api/targets", json={"website": f"lead{n}.com", "country": "UK"})
+    no_credits(staff, free)
     api.post("/api/targets", json={"website": "sixth.com", "country": "UK"})
     assert api.get("/api/usage").json()["waiting_rows"] == 1
 
     granted = staff.post(
         f"/api/admin/customers/{free.workspace_id}/grants",
-        json={"step": "manual", "amount": 3, "note": "pilot week"},
+        json={"amount": 3, "note": "pilot week"},
     )
     assert granted.status_code == 201
     body = granted.json()
-    assert (body["grant"]["amount"], body["resumed_rows"], body["resumed_leads"]) == (3, 1, 0)
+    assert (body["grant"]["amount"], body["grant"]["step"]) == (3, None)
+    assert (body["resumed_rows"], body["resumed_leads"]) == (1, 0)
     assert api.get("/api/usage").json()["waiting_rows"] == 0
     assert api.get("/api/companies?q=sixth.com").json()["total"] == 1
     [entry] = audited(free, "credits_granted", free.workspace_id)
@@ -137,11 +158,11 @@ def test_the_sixth_lead_waits_and_a_grant_with_resume_now_adds_it(
 def test_a_grant_without_resume_now_leaves_waiting_work_for_the_tick(
     api: Api, staff: Api, free: Services
 ) -> None:
-    for n in range(6):
-        api.post("/api/targets", json={"website": f"lead{n}.com", "country": "UK"})
+    no_credits(staff, free)
+    api.post("/api/targets", json={"website": "lead0.com", "country": "UK"})
     made = staff.post(
         f"/api/admin/customers/{free.workspace_id}/grants",
-        json={"step": "manual", "amount": 1, "resume_now": False},
+        json={"amount": 1, "resume_now": False},
     ).json()
     assert made["resumed_rows"] == 0 and api.get("/api/usage").json()["waiting_rows"] == 1
     assert staff.post(f"/api/admin/customers/{free.workspace_id}/resume").status_code == 200
@@ -150,43 +171,34 @@ def test_a_grant_without_resume_now_leaves_waiting_work_for_the_tick(
 
 def test_a_grant_is_validated_and_can_be_withdrawn(api: Api, staff: Api, free: Services) -> None:
     base = f"/api/admin/customers/{free.workspace_id}"
-    assert staff.post(f"{base}/grants", json={"step": "manual", "amount": 0}).status_code == 422
+    assert staff.post(f"{base}/grants", json={"amount": 0}).status_code == 422
+    assert staff.post(f"{base}/grants", json={"step": "manual", "amount": 2}).status_code == 422
     past = (datetime.now(UTC) - timedelta(days=1)).isoformat()
-    expired = staff.post(f"{base}/grants", json={"step": "manual", "amount": 2, "expires_at": past})
+    expired = staff.post(f"{base}/grants", json={"amount": 2, "expires_at": past})
     assert expired.status_code == 422
-    made = staff.post(f"{base}/grants", json={"step": "manual", "amount": 4}).json()["grant"]
-    assert api.get("/api/usage").json()["steps"][1]["granted"] == 4
+    made = staff.post(f"{base}/grants", json={"amount": 400}).json()["grant"]
+    assert api.get("/api/usage").json()["credits"]["granted"] == 400
     detail = staff.delete(f"{base}/grants/{made['id']}").json()
     assert detail["grants"][0]["revoked_at"] is not None
-    assert [
-        s["granted"] for s in api.get("/api/usage").json()["steps"] if s["step"] == "manual"
-    ] == [0]
+    assert api.get("/api/usage").json()["credits"]["granted"] == 0
     assert staff.delete(f"{base}/grants/not-a-grant").status_code == 404
     assert len(audited(free, "grant_revoked", free.workspace_id)) == 1
 
 
-def test_overrides_change_a_limit_at_once_and_unlimited_is_a_value(
+def test_overrides_change_the_monthly_credits_at_once_and_unlimited_is_a_value(
     api: Api, staff: Api, free: Services
 ) -> None:
     base = f"/api/admin/customers/{free.workspace_id}"
-    staff.put(f"{base}/overrides", json={"key": "limit.manual", "value": 20, "note": "agreed"})
-    manual = next(s for s in api.get("/api/usage").json()["steps"] if s["step"] == "manual")
-    assert (manual["limit"], manual["remaining"]) == (20, 20)
-    detail = staff.put(f"{base}/overrides", json={"key": "limit.discovery", "value": None}).json()
-    assert (
-        next(s for s in api.get("/api/usage").json()["steps"] if s["step"] == "discovery")["limit"]
-        is None
-    )
+    staff.put(f"{base}/overrides", json={"key": "monthly_credits", "value": 2000, "note": "agreed"})
+    credits = api.get("/api/usage").json()["credits"]
+    assert (credits["monthly"], credits["remaining_milli"]) == (2000, 2_000_000)
+    detail = staff.put(f"{base}/overrides", json={"key": "seats", "value": None}).json()
+    assert api.get("/api/usage").json()["seats"] is None
     ids = {o["key"]: o["id"] for o in detail["overrides"]}
-    staff.delete(f"{base}/overrides/{ids['limit.manual']}")
-    assert (
-        next(s for s in api.get("/api/usage").json()["steps"] if s["step"] == "manual")["limit"]
-        == 5
-    )
-    assert (
-        staff.put(f"{base}/overrides", json={"key": "limit.nonsense", "value": 1}).status_code
-        == 422
-    )
+    staff.delete(f"{base}/overrides/{ids['monthly_credits']}")
+    assert api.get("/api/usage").json()["credits"]["monthly"] == 100
+    for old in ("limit.manual", "limit.nonsense"):  # per-step limits are gone
+        assert staff.put(f"{base}/overrides", json={"key": old, "value": 1}).status_code == 422
     assert staff.put(f"{base}/overrides", json={"key": "seats", "value": -1}).status_code == 422
     assert len(audited(free, "override_set", free.workspace_id)) == 2
 
@@ -308,7 +320,7 @@ def test_a_paused_engine_is_shown_to_the_customer_and_stops_runs(
 def test_a_request_for_credits_is_open_until_a_grant_or_a_dismissal(
     api: Api, staff: Api, free: Services
 ) -> None:
-    api.post("/api/usage/request-credits", json={"step": "manual", "note": "need more"})
+    api.post("/api/usage/request-credits", json={"amount": 500, "note": "need more"})
     overview = staff.get("/api/admin/overview").json()
     assert [(a["kind"], a["workspace_id"]) for a in overview["attention"]] == [
         ("credit_request", free.workspace_id)
@@ -317,9 +329,7 @@ def test_a_request_for_credits_is_open_until_a_grant_or_a_dismissal(
         staff.get(f"/api/admin/customers/{free.workspace_id}").json()["requests"][0]["note"]
         == "need more"
     )
-    staff.post(
-        f"/api/admin/customers/{free.workspace_id}/grants", json={"step": "manual", "amount": 5}
-    )
+    staff.post(f"/api/admin/customers/{free.workspace_id}/grants", json={"amount": 500})
     assert staff.get("/api/admin/overview").json()["attention"] == []  # answered by the grant
     api.post("/api/usage/request-credits", json={"note": "again"})
     assert len(staff.get("/api/admin/overview").json()["attention"]) == 1
@@ -409,35 +419,39 @@ def test_only_a_superadmin_deletes_an_account_and_never_their_own_or_the_last_on
 # ------------------------------------------------------------------ plans and settings
 
 
-def test_plans_are_edited_with_a_version_check_and_the_default_is_chosen(
-    staff: Api, free: Services
+def test_superadmins_edit_plans_with_a_version_check_and_choose_the_default(
+    staff: Api, superadmin: Api, free: Services
 ) -> None:
-    catalog = staff.get("/api/admin/plans").json()
-    assert [p["code"] for p in catalog["plans"]] == ["free"] and catalog["default_plan"] == "free"
+    catalog = superadmin.get("/api/admin/plans").json()
+    assert [p["code"] for p in catalog["plans"]] == ["free", "starter", "pro"]
+    assert catalog["default_plan"] == "free" and catalog["can_edit"] is True
     free_plan = catalog["plans"][0]
-    assert free_plan["limits"]["manual"] == 5 and free_plan["customers"] == 1
-    body = {"name": "Pro", "limits": {"manual": 100, "discovery": 50}, "seats": 10, "mailboxes": 5,
+    assert free_plan["monthly_credits"] == 100 and free_plan["customers"] == 1
+    body = {"name": "Pro", "monthly_credits": 25_000, "seats": 10, "mailboxes": 5,
             "active_campaigns": None, "features": ["discovery", "directory_bypass"],
-            "access_days": None, "version": catalog["version"]}  # fmt: skip
-    saved = staff.put("/api/admin/plans/pro", json=body)
-    assert saved.status_code == 200 and {p["code"] for p in saved.json()["plans"]} == {
-        "free",
-        "pro",
-    }
-    stale = staff.put("/api/admin/plans/pro", json=body)  # the version moved on
+            "max_prospect_budget_credits": 100, "access_days": None,
+            "version": catalog["version"]}  # fmt: skip
+    # Platform admins see the plans but may not change them.
+    assert staff.get("/api/admin/plans").json()["can_edit"] is False
+    assert staff.put("/api/admin/plans/pro", json=body).status_code == 403
+    saved = superadmin.put("/api/admin/plans/pro", json=body)
+    assert saved.status_code == 200
+    pro = next(p for p in saved.json()["plans"] if p["code"] == "pro")
+    assert (pro["monthly_credits"], pro["max_prospect_budget_credits"]) == (25_000, 100)
+    stale = superadmin.put("/api/admin/plans/pro", json=body)  # the version moved on
     assert stale.status_code == 409 and stale.json()["code"] == "version_conflict"
     assert (
-        staff.put(
+        superadmin.put(
             "/api/admin/plans/unlimited", json={**body, "version": saved.json()["version"]}
         ).status_code
         == 422
     )
-    set_default = staff.put(
+    set_default = superadmin.put(
         "/api/admin/plans/default", json={"plan": "pro", "version": saved.json()["version"]}
     )
     assert set_default.json()["default_plan"] == "pro"
     assert (
-        staff.put(
+        superadmin.put(
             "/api/admin/plans/default",
             json={"plan": "ghost", "version": set_default.json()["version"]},
         ).status_code
@@ -446,16 +460,48 @@ def test_plans_are_edited_with_a_version_check_and_the_default_is_chosen(
     assert len(audited(free, "plan_saved")) == 1
 
 
-def test_a_customer_made_now_starts_on_the_default_plan(staff: Api, free: Services) -> None:
-    catalog = staff.get("/api/admin/plans").json()
+def test_a_superadmin_sets_what_an_ai_credit_stands_for(
+    staff: Api, superadmin: Api, free: Services
+) -> None:
+    catalog = superadmin.get("/api/admin/plans").json()
+    assert catalog["credit_value_micro_usd"] == 10_000
+    body = {"credit_value_micro_usd": 5_000, "version": catalog["version"]}
+    assert staff.put("/api/admin/plans/credit-value", json=body).status_code == 403
+    changed = superadmin.put("/api/admin/plans/credit-value", json=body)
+    assert changed.status_code == 200 and changed.json()["credit_value_micro_usd"] == 5_000
+    assert superadmin.put("/api/admin/plans/credit-value", json=body).status_code == 409  # stale
+    [entry] = audited(free, "credit_value_set")
+    assert entry["data"] == {"from": 10_000, "to": 5_000}
+
+
+def test_platform_admins_set_what_each_model_call_uses(staff: Api, free: Services) -> None:
+    body = {
+        "charges": [{"model": "deepseek-v3", "per_million_input": 30, "per_million_output": 110}]
+    }
+    saved = staff.patch("/api/admin/vendors/llm", json=body)
+    assert saved.status_code == 200
+    assert saved.json()["llm_charges"] == [
+        {"model": "deepseek-v3", "per_million_input": 30.0, "per_million_output": 110.0}
+    ]
+    negative = {"charges": [{"model": "x", "per_million_input": -1, "per_million_output": 1}]}
+    assert staff.patch("/api/admin/vendors/llm", json=negative).status_code == 422
+    cleared = staff.patch("/api/admin/vendors/llm", json={"charges": []}).json()
+    assert cleared["llm_charges"] == []
+    assert len(audited(free, "llm_charges_changed")) == 2
+
+
+def test_a_customer_made_now_starts_on_the_default_plan(
+    staff: Api, superadmin: Api, free: Services
+) -> None:
+    catalog = superadmin.get("/api/admin/plans").json()
     body = {
         "name": "Pro",
-        "limits": {"manual": 100},
+        "monthly_credits": 10_000,
         "access_days": 60,
         "version": catalog["version"],
     }
-    saved = staff.put("/api/admin/plans/pro", json=body).json()
-    staff.put("/api/admin/plans/default", json={"plan": "pro", "version": saved["version"]})
+    saved = superadmin.put("/api/admin/plans/pro", json=body).json()
+    superadmin.put("/api/admin/plans/default", json={"plan": "pro", "version": saved["version"]})
     made = staff.post(
         "/api/admin/customers", json={"name": "Initech", "admin_email": "boss@initech.example"}
     )
@@ -507,9 +553,7 @@ def test_the_audit_log_filters_and_exports_without_formula_injection(
     api: Api, staff: Api, free: Services
 ) -> None:
     base = f"/api/admin/customers/{free.workspace_id}"
-    staff.post(
-        f"{base}/grants", json={"step": "manual", "amount": 2, "note": '=HYPERLINK("http://evil")'}
-    )
+    staff.post(f"{base}/grants", json={"amount": 2, "note": '=HYPERLINK("http://evil")'})
     staff.patch(f"{base}/plan", json={"plan": "unlimited"})
     everything = staff.get("/api/admin/audit").json()
     assert {"credits_granted", "plan_changed"} <= {e["action"] for e in everything}

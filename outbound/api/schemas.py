@@ -257,7 +257,7 @@ class LeadSummaryOut(Out):
     contact_name: str | None
     contact_title: str | None
     email_status: str | None
-    cost_micro_usd: int
+    credits_milli: int  # AI credits used on the lead, in thousandths
 
 
 class CompanyRowOut(CompanyOut):
@@ -343,7 +343,7 @@ class WaterfallOut(Out):
     provider: str
     operation: str
     outcome: str
-    cost_micro_usd: int
+    credits_milli: int
     latency_ms: int | None
     contact_id: str | None
     asked: str = ""
@@ -360,7 +360,7 @@ class CallOut(Out):
     provider: str
     operation: str
     outcome: str
-    cost_micro_usd: int
+    credits_milli: int
     asked: str = ""
     got: str = ""
 
@@ -379,7 +379,7 @@ class StageOut(Out):
     facts: list[FactOut]
     incidents: list[IncidentOut]
     calls: list[CallOut]
-    cost_micro_usd: int
+    credits_milli: int
 
 
 class OriginOut(Out):
@@ -395,7 +395,7 @@ class JourneyOut(Out):
     next_step: str
     origin: OriginOut
     stages: list[StageOut]
-    total_cost_micro_usd: int
+    total_credits_milli: int
 
 
 class CompanyPatch(In):
@@ -547,8 +547,9 @@ class WorkspaceSettingsIn(In):
     """Only the settings an operator may change, each with its real type."""
 
     safe_to_send_only: bool | None = None
-    # null means "no ceiling"; 0 means "no paid calls at all". The screen sends null when blank.
-    budget_per_prospect_micro_usd: int | None = Field(default=None, ge=0, le=100_000_000)
+    # AI credits a lead may use. null means "no ceiling"; 0 means "no paid calls at all". The
+    # screen sends null when blank.
+    budget_per_prospect_credits: int | None = Field(default=None, ge=0, le=1_000_000)
     few_shot_examples: int | None = Field(default=None, ge=0, le=20)
     timezone: str | None = Field(default=None, max_length=64)
     country_policy_enabled: bool | None = None
@@ -633,7 +634,7 @@ class RunOut(Out):
     status: str
     params: dict[str, Any] | None
     counts: dict[str, Any] | None
-    cost_micro_usd: int
+    credits_milli: int  # AI credits the run used, in thousandths
     started_at: datetime | None
     finished_at: datetime | None
     created_at: datetime
@@ -716,7 +717,7 @@ class RunCallOut(Out):
     reused: int
     errors: int
     blocked: int
-    cost_micro_usd: int
+    credits_milli: int
     avg_latency_ms: int | None
 
 
@@ -767,6 +768,8 @@ class FunnelOut(Out):
 
 
 class CostOut(Out):
+    """AI credits used, in thousandths."""
+
     total: int
     per_prospect: int | None
     prospects: int
@@ -952,18 +955,20 @@ class CampaignDraftOut(Out):
     research_questions: list[str]
 
 
-class StepUsageOut(Out):
-    step: str
-    limit: int | None  # None: unlimited
-    granted: int
-    used: int
-    remaining: int | None  # None: unlimited
+class CreditsOut(Out):
+    """A workspace's AI credits this period. Whole credits, except the ``_milli`` counts."""
+
+    monthly: int | None  # from the plan (and any override); None: unlimited
+    granted: int  # from active grants
+    allowance: int | None  # monthly plus granted; None: unlimited
+    used_milli: int  # used this period, in thousandths
+    remaining_milli: int | None  # None: unlimited
 
 
 class GrantOut(Out):
     id: str
-    step: str
-    amount: int
+    step: str | None  # only on grants made before AI credits
+    amount: int  # AI credits
     created_at: datetime
     expires_at: datetime | None
     revoked_at: datetime | None
@@ -978,9 +983,9 @@ class UsageOut(Out):
     access: Literal["full", "read_only", "locked"]
     access_until: datetime | None
     engine: bool  # the worker may work for this workspace
-    steps: list[StepUsageOut]
+    credits: CreditsOut
     grants: list[GrantOut]
-    waiting_leads: dict[str, int]  # leads parked for a credit, per step
+    waiting_leads: dict[str, int]  # leads parked for AI credits, per step they wait at
     waiting_rows: int  # manual rows waiting to become leads
     seats: int | None
     mailboxes: int | None
@@ -990,9 +995,7 @@ class UsageOut(Out):
 
 
 class RequestCreditsIn(In):
-    step: (
-        Literal["discovery", "manual", "research", "email", "copy", "deliver", "rewrite"] | None
-    ) = None
+    amount: int | None = Field(default=None, ge=1, le=10_000_000)  # AI credits wanted
     note: str = Field(default="", max_length=500)
 
 
@@ -1004,13 +1007,13 @@ class ResumedOut(Out):
 # ----------------------------------------------------------------------- admin console (6d)
 
 
-class AdminStepOut(Out):
-    step: str
-    plan_limit: int | None  # the plan's own limit; None: unlimited
-    limit: int | None  # after this customer's overrides
+class AdminCreditsOut(Out):
+    plan_monthly: int | None  # the plan's own AI credits a month; None: unlimited
+    monthly: int | None  # after this customer's overrides
     granted: int
-    used: int
-    remaining: int | None
+    allowance: int | None  # monthly plus granted
+    used_milli: int  # this period, in thousandths
+    remaining_milli: int | None
 
 
 class OverrideOut(Out):
@@ -1034,8 +1037,9 @@ class CustomerRowOut(Out):
     access_until: datetime | None
     period_start: datetime
     period_end: datetime
-    steps: list[AdminStepOut]
-    spend_micro_usd: int  # this calendar month
+    credits: AdminCreditsOut
+    credits_milli: int  # AI credits used this calendar month, in thousandths
+    cost_micro_usd: int  # what those calls cost the platform (staff only)
     leads: int
     members: int
     mailboxes: int
@@ -1049,7 +1053,7 @@ class CustomerRowOut(Out):
     mailbox_limit: int | None
     active_campaigns: int | None
     max_leads_per_run: int | None
-    max_prospect_budget_micro_usd: int | None
+    max_prospect_budget_credits: int | None
 
 
 class AdminMailboxOut(Out):
@@ -1098,8 +1102,10 @@ class OverviewOut(Out):
     expiring: int
     leads_added: int
     drafts_made: int
-    spend_micro_usd: int
-    spend_by_provider: dict[str, int]
+    credits_milli: int  # AI credits used this month, all customers, in thousandths
+    credits_by_provider: dict[str, int]
+    cost_micro_usd: int  # what those calls cost the platform
+    cost_by_provider: dict[str, int]
     waiting: int
     waiting_customers: int
     attention: list[AttentionOut]
@@ -1140,8 +1146,7 @@ class OverrideIn(In):
 
 
 class GrantIn(In):
-    step: StepName
-    amount: int = Field(ge=1, le=1_000_000)
+    amount: int = Field(ge=1, le=10_000_000)  # AI credits
     expires_at: datetime | None = None
     note: str = Field(default="", max_length=500)
     resume_now: bool = True
@@ -1156,12 +1161,12 @@ class GrantedOut(Out):
 class PlanDefinition(Out):
     code: str
     name: str
-    limits: dict[str, int | None]
+    monthly_credits: int | None  # AI credits a month; None: unlimited
     seats: int | None
     mailboxes: int | None
     active_campaigns: int | None
     max_leads_per_run: int | None
-    max_prospect_budget_micro_usd: int | None
+    max_prospect_budget_credits: int | None
     features: list[str]
     access_days: int | None
     customers: int  # how many are on it now
@@ -1170,17 +1175,19 @@ class PlanDefinition(Out):
 class PlansOut(Out):
     plans: list[PlanDefinition]
     default_plan: str
+    credit_value_micro_usd: int  # the vendor and model cost one AI credit stands for
+    can_edit: bool  # superadmins define plans; other staff see them
     version: int
 
 
 class PlanSaveIn(In):
     name: str = Field(min_length=1, max_length=100)
-    limits: dict[StepName, int | None] = Field(default_factory=dict)
+    monthly_credits: int | None = Field(default=100, ge=0, le=100_000_000)
     seats: int | None = Field(default=3, ge=0)
     mailboxes: int | None = Field(default=1, ge=0)
     active_campaigns: int | None = Field(default=2, ge=0)
     max_leads_per_run: int | None = Field(default=None, ge=0)
-    max_prospect_budget_micro_usd: int | None = Field(default=500_000, ge=0)
+    max_prospect_budget_credits: int | None = Field(default=50, ge=0)
     features: list[str] = Field(default_factory=lambda: ["discovery"])
     access_days: int | None = Field(default=30, ge=1)
     version: int
@@ -1188,6 +1195,11 @@ class PlanSaveIn(In):
 
 class DefaultPlanIn(In):
     plan: str
+    version: int
+
+
+class CreditValueIn(In):
+    credit_value_micro_usd: int = Field(ge=1, le=100_000_000)
     version: int
 
 
@@ -1231,16 +1243,24 @@ class VendorOut(Out):
     set_by: str | None
     paused: bool
     can_roll_back: bool
-    spend_micro_usd: int
-    cap_micro_usd: int | None
+    credits_milli: int  # AI credits used this month, in thousandths
+    cost_micro_usd: int  # what those calls cost the platform this month
+    cap_credits: int | None
     key_refusals: int
     can_test: bool
     keys: list[VendorKeyOut]  # every live key in the database; each call uses one at random
 
 
+class LlmChargeOut(Out):
+    model: str
+    per_million_input: float  # AI credits
+    per_million_output: float
+
+
 class VendorsOut(Out):
     vendors: list[VendorOut]
     llm: dict[str, str | int | float]
+    llm_charges: list[LlmChargeOut]  # what each model's calls use, in AI credits
 
 
 class VendorKeyIn(In):
@@ -1251,6 +1271,12 @@ class VendorPauseIn(In):
     paused: bool
 
 
+class LlmChargeIn(In):
+    model: str = Field(min_length=1, max_length=200)
+    per_million_input: float = Field(ge=0, le=1_000_000)  # AI credits per million tokens
+    per_million_output: float = Field(ge=0, le=1_000_000)
+
+
 class LlmSettingsIn(In):
     llm_provider: str | None = None
     llm_model: str | None = None
@@ -1258,6 +1284,8 @@ class LlmSettingsIn(In):
     llm_copy_model: str | None = None
     llm_temperature: float | None = None
     llm_max_tokens: int | None = None
+    # Replaces every model's charge when given; omitted: the charges stay as they are.
+    charges: list[LlmChargeIn] | None = None
 
 
 class RevealedKeyOut(Out):
@@ -1265,7 +1293,7 @@ class RevealedKeyOut(Out):
 
 
 class VendorCapIn(In):
-    cap_micro_usd: int | None
+    cap_credits: int | None = Field(default=None, ge=0)  # AI credits a month; null: no cap
 
 
 class DirectoryBadgeOut(Out):
@@ -1301,7 +1329,7 @@ class DirectoryFiguresOut(Out):
     unfolded: int
     lookups: int
     hits: int
-    saved_micro_usd: int
+    saved_credits_milli: int  # AI credits the hits saved, at a finder call's price
 
 
 class DirectoryOverviewOut(Out):
@@ -1481,7 +1509,7 @@ class DayOut(Out):
     approved: int
     reviewed: int
     sent: int
-    spend_micro_usd: int
+    credits_milli: int  # AI credits used that day, in thousandths
 
 
 class DailyOut(Out):
