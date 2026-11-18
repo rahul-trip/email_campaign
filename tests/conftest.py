@@ -31,6 +31,7 @@ def clean_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in _SETTING_ENV:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SECRETS_KEYS", TEST_SECRETS_KEYS)
+    monkeypatch.setenv("VENDOR_BALANCE_CHECKS", "false")  # no test asks a vendor for a balance
 
 
 @pytest.fixture(autouse=True)

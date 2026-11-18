@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     # client. "*" is right in the container, whose port is published on the VM's loopback only.
     forwarded_allow_ips: str = "127.0.0.1"
 
+    # Ask each vendor with a free balance call what its account has left (the admin console
+    # shows it, and a finder with none is paused). The tests turn it off: no test calls a vendor.
+    vendor_balance_checks: bool = True
+
     # --- email waterfall (provisional until the bake-off) ---
     # Finders are tried in this order. OrbiSearch is verify-only, so it cannot be a finder.
     finder_chain: Annotated[list[str], NoDecode] = ["hunter", "zerobounce"]

@@ -1286,6 +1286,10 @@ class VendorOut(Out):
     key_refusals: int
     can_test: bool
     keys: list[VendorKeyOut]  # every live key in the database; each call uses one at random
+    balance: float | None = None  # what the vendor says the account has left, if it can say
+    balance_unit: str = ""  # "searches" or "credits"
+    balance_note: str = ""  # for example "resets 2026-12-16"
+    paused_for_credit: bool = False  # paused by itself: it ran out, and resumes when it has more
 
 
 class LlmChargeOut(Out):

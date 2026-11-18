@@ -28,7 +28,7 @@ from outbound.domain.policies import PolicyOutcome
 from outbound.domain.ranking import can_be_written_to
 from outbound.metering.metered import call_scope
 from outbound.providers.ports import CatchAllResolver, EmailFinder, EmailVerifier
-from outbound.stages.base import StageContext, StageFailure, StageResult
+from outbound.stages.base import StageContext, StageFailure, StageResult, VendorUnavailable
 from outbound.stages.contacts import operator_chosen
 from outbound.stages.email.patterns import infer_pattern
 from outbound.stages.email.waterfall import Record, Target, Verdict, Waterfall
@@ -105,6 +105,8 @@ class EmailStage:
         chosen: Record | None = None
         chosen_contact: Contact | None = None
         pending = False
+        reached = False
+        finders_answered = checks_answered = checks_failed = 0
         for contact, emails in people:
             # Every paid call is recorded against the person it was for, so erasing the person
             # can find and clear it.
@@ -114,6 +116,10 @@ class EmailStage:
             problems.extend(outcome.problems)
             unverified = unverified or outcome.catch_all_unverified
             resolver_down = resolver_down or outcome.resolver_down
+            reached = reached or outcome.finders_reached
+            finders_answered += outcome.finders_answered
+            checks_answered += outcome.checks_answered
+            checks_failed += outcome.checks_failed
             if outcome.verdict is Verdict.READY:
                 chosen, chosen_contact = outcome.chosen, contact
                 break
@@ -185,6 +191,14 @@ class EmailStage:
                 write=write,
             )
         detail = f" ({'; '.join(problems[:3])})" if problems else ""
+        # Nobody could look (every finder out of credit, down or paused; or the verifier not
+        # answering): that is not "no such address". The lead waits and is tried again by itself.
+        if (reached and finders_answered == 0) or (checks_failed and not checks_answered):
+            what = "email finder" if reached and finders_answered == 0 else "email verifier"
+            raise VendorUnavailable(
+                f"no {what} is answering{detail or ' (none is available)'}: the lead waits and"
+                " is tried again by itself"
+            )
         raise StageFailure(f"no valid email found for {len(people)} contact(s){detail}")
 
 

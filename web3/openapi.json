@@ -8785,6 +8785,27 @@
       },
       "VendorOut": {
         "properties": {
+          "balance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance"
+          },
+          "balance_note": {
+            "default": "",
+            "title": "Balance Note",
+            "type": "string"
+          },
+          "balance_unit": {
+            "default": "",
+            "title": "Balance Unit",
+            "type": "string"
+          },
           "can_roll_back": {
             "title": "Can Roll Back",
             "type": "boolean"
@@ -8837,6 +8858,11 @@
           },
           "paused": {
             "title": "Paused",
+            "type": "boolean"
+          },
+          "paused_for_credit": {
+            "default": false,
+            "title": "Paused For Credit",
             "type": "boolean"
           },
           "role": {

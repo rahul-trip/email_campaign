@@ -23,6 +23,14 @@ class StageFailure(Exception):
     """A lead cannot go on, for a reason the operator should read (shown as its last error)."""
 
 
+class VendorUnavailable(StageFailure):
+    """No vendor could answer (out of credit, paused, down), so the lead is not at fault.
+
+    The runner keeps the lead in Failed with the reason, but does not count an attempt against
+    it and tries it again after a couple of hours, until a vendor answers.
+    """
+
+
 class Reader:
     """Runs a read in its own short transaction, for stages that need more than the snapshot."""
 

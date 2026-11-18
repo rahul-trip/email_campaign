@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder, ZeroBounceVerifier
-from outbound.providers.errors import ProviderError
+from outbound.providers.errors import BudgetExceeded, ProviderAuthError, ProviderError
 from outbound.providers.ports import PersonQuery, VerificationStatus
 from tests.contract._shared import SECRET
 from tests.contract.finder_contract import EmailFinderContract
@@ -44,6 +44,27 @@ class TestZeroBounceFinder(EmailFinderContract):
         with pytest.raises(ProviderError) as info:
             self.build(always(response)).find(PersonQuery(first_name="J", last_name="D"), "")
         assert not info.value.retryable
+
+    def test_an_empty_account_is_out_of_credit_not_a_miss(self) -> None:
+        # Seen on 2026-11-18: HTTP 200 and a "Message" field, read as "nothing found" and cached.
+        message = "Invalid API key or your account ran out of credits"
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/getcredits"):
+                return httpx.Response(200, json={"Credits": "0"})
+            return httpx.Response(200, json={"Message": message})
+
+        with pytest.raises(BudgetExceeded):
+            self.build(handler).find(PersonQuery(first_name="J", last_name="D"), "acme.com")
+
+    def test_the_same_message_with_an_unknown_key_is_an_auth_failure(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/getcredits"):
+                return httpx.Response(200, json={"Credits": "-1"})
+            return httpx.Response(200, json={"Message": "Invalid API key or your account ran out"})
+
+        with pytest.raises(ProviderAuthError):
+            self.build(handler).find(PersonQuery(first_name="J", last_name="D"), "acme.com")
 
 
 class TestZeroBounceVerifier(EmailVerifierContract):

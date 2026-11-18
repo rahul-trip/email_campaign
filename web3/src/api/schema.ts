@@ -6025,6 +6025,18 @@ export interface components {
         };
         /** VendorOut */
         VendorOut: {
+            /** Balance */
+            balance?: number | null;
+            /**
+             * Balance Note
+             * @default
+             */
+            balance_note?: string;
+            /**
+             * Balance Unit
+             * @default
+             */
+            balance_unit?: string;
             /** Can Roll Back */
             can_roll_back: boolean;
             /** Can Test */
@@ -6047,6 +6059,11 @@ export interface components {
             name: string;
             /** Paused */
             paused: boolean;
+            /**
+             * Paused For Credit
+             * @default false
+             */
+            paused_for_credit?: boolean;
             /** Role */
             role: string;
             /** Set At */

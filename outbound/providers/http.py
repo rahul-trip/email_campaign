@@ -22,7 +22,7 @@ from tenacity import (
 from tenacity.wait import wait_base
 
 from outbound.logging import get_logger
-from outbound.providers.errors import ProviderAuthError, ProviderError, RateLimited
+from outbound.providers.errors import BudgetExceeded, ProviderAuthError, ProviderError, RateLimited
 
 log = get_logger(__name__)
 
@@ -53,6 +53,22 @@ def _honouring_retry_after(base: wait_base) -> wait_base:
             return base(retry_state)
 
     return _Wait()
+
+
+# What a vendor says when the account is out of what it paid for, as against a short rate limit:
+# Hunter answers 429 "You've reached the limit for the number of searches per billing period
+# included in your plan". Waiting does not help, so it is not retried and staff are told.
+_OUT_OF_QUOTA = (
+    "billing period", "usage limit", "quota", "out of credit", "insufficient credit",
+    "no credits", "credits left", "plan limit", "pay-as-you-go", "upgrade your plan",
+    "included in your plan",
+)  # fmt: skip
+
+
+def out_of_quota(text: str) -> bool:
+    """Whether a vendor's answer says the account is out of credit or over its plan."""
+    lowered = text.lower()[:2000]
+    return any(phrase in lowered for phrase in _OUT_OF_QUOTA)
 
 
 def _is_retryable(exc: BaseException) -> bool:
@@ -169,6 +185,10 @@ class HttpClient:
     def _interpret(self, method: str, path: str, response: httpx.Response) -> Any:
         status = response.status_code
         where = f"{method} {path}"
+        if status == 402 or (status == 429 and out_of_quota(response.text)):
+            raise BudgetExceeded(
+                self._provider, f"{where}: {status}, the vendor's plan or credit limit is reached"
+            )
         if status == 429:
             retry_after = response.headers.get("retry-after")
             raise RateLimited(

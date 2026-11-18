@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from outbound.db.uow import UnitOfWorkFactory
@@ -16,8 +17,9 @@ from outbound.domain.enums import (
     Provenance,
 )
 from outbound.domain.policy_seeds import DEFAULT_COUNTRY_POLICIES
-from outbound.providers.errors import ProviderError
+from outbound.providers.errors import BudgetExceeded, ProviderError
 from outbound.providers.ports import (
+    EmailFinder,
     FinderResult,
     PersonQuery,
     ResolutionResult,
@@ -135,7 +137,7 @@ def lead(
 def run_stage(
     factory: UnitOfWorkFactory,
     ws: str,
-    finders: list[Finder],
+    finders: Sequence[EmailFinder],
     verifier: Verifier,
     resolver: Resolver | None = None,
 ) -> None:
@@ -235,6 +237,108 @@ def test_when_every_finder_misses_the_lead_fails_with_a_reason(
     after = company(factory, ws, cid)
     assert (after.status, after.failed_stage) == (C.FAILED, "email")
     assert "no valid email found" in (after.last_error or "")
+
+
+class DeadFinder:
+    """A finder that is out of credit: every call raises."""
+
+    def __init__(self, name: str = "hunter") -> None:
+        self.name = name
+        self.calls = 0
+
+    def find(self, person: PersonQuery, domain: str) -> FinderResult:
+        self.calls += 1
+        raise BudgetExceeded(self.name, "the vendor's plan or credit limit is reached")
+
+
+class DeadVerifier:
+    name = "verifier"
+
+    def verify(self, email: str) -> VerificationResult:
+        raise BudgetExceeded(self.name, "out of credit")
+
+
+def test_when_no_finder_can_answer_the_lead_waits_and_no_attempt_is_counted(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    # Seen on 2026-11-18: Hunter out of searches, ZeroBounce out of credits; 49 leads failed.
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    dead = DeadFinder()
+    run_stage(factory, ws, [dead, DeadFinder("zerobounce")], Verifier({}))
+    after = company(factory, ws, cid)
+    assert (after.status, after.failed_stage) == (C.FAILED, "email")
+    assert "no email finder is answering" in (after.last_error or "")
+    assert after.attempts == 0  # not the lead's fault: nothing is used up
+    assert after.next_action_at == NOW + timedelta(hours=2)
+    assert dead.calls == 1
+
+
+def test_a_failure_that_is_a_vendors_forgives_the_attempts_already_used(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    with factory(ws) as uow:
+        for _ in range(3):  # three real failures: the tick would no longer retry it
+            version = uow.companies.get(cid).row_version
+            uow.companies.transition(
+                cid, C.FAILED, expected_version=version, failed_stage="email", last_error="x"
+            )
+            version = uow.companies.get(cid).row_version
+            uow.companies.transition(cid, C.CONTACTS_FOUND, expected_version=version)
+        assert uow.companies.get(cid).attempts == 3
+        version = uow.companies.get(cid).row_version
+        after = uow.companies.transition(
+            cid, C.FAILED, expected_version=version, failed_stage="email", last_error="y",
+            vendor_wait=True,
+        )  # fmt: skip
+        assert after.attempts == 0
+
+
+def test_a_finder_that_answers_nothing_found_is_a_real_miss_even_if_another_is_down(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    run_stage(factory, ws, [DeadFinder(), Finder("zerobounce", {})], Verifier({}))
+    after = company(factory, ws, cid)
+    assert (after.failed_stage, after.attempts) == ("email", 1)
+    assert "no valid email found" in (after.last_error or "")  # someone looked and found nothing
+
+
+def test_no_finder_at_all_waits_too(factory: UnitOfWorkFactory, ws: str) -> None:
+    # Every finder paused (out of credit): the chain is empty, and the lead waits for one.
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    run_stage(factory, ws, [], Verifier({}))
+    after = company(factory, ws, cid)
+    assert (after.failed_stage, after.attempts) == ("email", 0)
+    assert "none is available" in (after.last_error or "")
+
+
+def test_a_verifier_that_cannot_answer_makes_the_lead_wait_not_fail(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    run_stage(
+        factory,
+        ws,
+        [Finder("hunter", {"Doe": "jane.doe@acme.com"})],
+        DeadVerifier(),  # type: ignore[arg-type]
+    )
+    after = company(factory, ws, cid)
+    assert after.attempts == 0 and "no email verifier is answering" in (after.last_error or "")
+
+
+def test_a_waiting_lead_goes_back_in_by_itself_once_the_wait_is_over(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    stage = EmailStage(EmailDeps([DeadFinder()], Verifier({})))
+    clock = {"now": NOW}
+    runner = Runner(factory, ws, [stage], Guards(), now=lambda: clock["now"])
+    runner.run_pipeline()
+    assert runner.retry_failed() == 0  # the wait has not passed
+    clock["now"] = NOW + timedelta(hours=2, minutes=1)
+    assert runner.retry_failed() == 1
+    assert company(factory, ws, cid).status is C.CONTACTS_FOUND
 
 
 def test_at_most_three_contacts_are_tried(factory: UnitOfWorkFactory, ws: str) -> None:

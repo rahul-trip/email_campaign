@@ -62,6 +62,7 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `ORBISEARCH_API_KEY` | str | — | yes | D | `VERIFIER=orbisearch` |
 | `ENRICHLEY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=enrichley` |
 | `SCRUBBY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=scrubby` (default) |
+| `VENDOR_BALANCE_CHECKS` | bool | `true` | no | D | Ask each vendor that has a free balance call what its account has left: the admin console shows it, and a finder with none is paused by the worker (and resumed when it has credit). The tests set it `false` |
 | `VENDOR_KEY_POOLS` | JSON | `{}` | yes | D | Not set by hand: the admin console's extra key slots fill it (`{"tavily": ["key1", "key2"]}`); a vendor with two or more keys uses one at random per call (PLAN decision 37) |
 | `SCRUBBY_BASE_URL` | str | `https://api.scrubby.io` | | D | Optional; Scrubby's documented address |
 | `COMPANIES_HOUSE_API_KEY` | str | — | yes | D | Optional: UK incorporation checks, and UK companies by industry code for discovery |

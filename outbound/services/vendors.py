@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -30,11 +31,13 @@ from outbound.domain.platform_settings import (
 from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
 from outbound.logging import get_logger
 from outbound.providers.adapters.llm import PRESETS
+from outbound.providers.balances import HAS_BALANCE, Balance, balance
 from outbound.providers.keycheck import KeyCheck, can_test, check_key
 
 log = get_logger(__name__)
 
 Stamp = tuple[int, tuple[tuple[str, int], ...]]
+BALANCE_TTL = timedelta(minutes=10)
 
 
 @dataclass(frozen=True)
@@ -67,6 +70,11 @@ class VendorStatus:
     key_refusals: int  # calls the vendor refused our key for in the last day
     can_test: bool
     keys: list[KeyView]  # every live key in the database, in slot order
+    # What the vendor says the account has left (None: no balance call, or it failed).
+    balance: float | None = None
+    balance_unit: str = ""
+    balance_note: str = ""
+    paused_for_credit: bool = False  # paused by itself because the account ran out
 
 
 class VendorService:
@@ -76,7 +84,12 @@ class VendorService:
         base: Settings,
         *,
         now: Callable[[], datetime] = utcnow,
+        balance_of: Callable[[str, str], Balance | None] = balance,
     ) -> None:
+        self._balance_of = balance_of
+        self._balances: dict[str, Balance | None] = {}
+        self._balances_at: datetime | None = None
+        self._balance_lock = threading.Lock()
         self._platform = platform
         self._base = base
         self._now = now
@@ -111,7 +124,80 @@ class VendorService:
 
     # ------------------------------------------------------------------ the console
 
+    def _env_key(self, code: str) -> str:
+        return str(getattr(self._base, BY_CODE[code].setting).get_secret_value())
+
+    def balances(self, *, refresh: bool = False) -> dict[str, Balance | None]:
+        """What each vendor with a balance call says is left. The calls are free; the answer is
+        kept for ten minutes, so opening the console does not ask every time."""
+        with self._balance_lock:
+            if not self._base.vendor_balance_checks:
+                return {}
+            fresh = self._balances_at is not None and self._now() - self._balances_at < BALANCE_TTL
+            if fresh and not refresh:
+                return dict(self._balances)
+            with self._platform() as p:
+                stored = p.vendor_keys.current()
+            # A paused vendor's key is still read: that is how we see it has credit again.
+            keys = {code: (stored.get(code) or [self._env_key(code)])[0] for code in HAS_BALANCE}
+            with ThreadPoolExecutor(max_workers=len(keys)) as pool:
+                answers = pool.map(lambda code: self._balance_of(code, keys[code]), keys)
+                found = dict(zip(keys, answers, strict=True))
+            self._balances, self._balances_at = found, self._now()
+            return dict(found)
+
+    def handle_credit(self) -> tuple[list[str], list[str]]:
+        """Pause finders whose account ran out of credit, and resume the ones that have credit
+        again. Returns (paused, resumed). Run from the worker.
+
+        A finder is paused when its balance is zero, or when the balance cannot be read and the
+        vendor refused a call for lack of credit in the last hour. A finder is resumed when its
+        balance shows credit. Only finders: pausing the verifier would stop every lead. A vendor
+        staff paused by hand is never resumed here.
+        """
+        balances = self.balances(refresh=True)
+        with self._platform() as p:
+            current, _ = p.settings.get()
+            refused = p.figures.key_failures(self._now() - timedelta(hours=1), "BudgetExceeded")
+            stored = p.vendor_keys.current()
+        paused: list[str] = []
+        for vendor in VENDORS:
+            if vendor.role != "finder" or vendor.code in current.paused_vendors:
+                continue
+            seen = balances.get(vendor.code)
+            empty = seen.empty if seen is not None else refused.get(vendor.code, 0) > 0
+            if empty and (stored.get(vendor.code) or self._env_key(vendor.code)):
+                paused.append(vendor.code)
+        resumed = []
+        for code in sorted(current.paused_for_credit):
+            seen = balances.get(code)
+            if seen is not None and not seen.empty:
+                resumed.append(code)
+        if not paused and not resumed:
+            return [], []
+        with self._platform() as p:
+            current, version = p.settings.get()
+            p.settings.save(
+                replace(
+                    current,
+                    paused_vendors=(current.paused_vendors | set(paused)) - set(resumed),
+                    paused_for_credit=(current.paused_for_credit | set(paused)) - set(resumed),
+                ),
+                expected_version=version,
+            )
+            for action, codes in (("paused_for_credit", paused), ("resumed_with_credit", resumed)):
+                for code in codes:
+                    seen = balances.get(code)
+                    p.audit.record(
+                        f"vendor_{action}", actor_user_id=None, target_type="vendor",
+                        target_id=code, data={"balance": seen.label() if seen else None},
+                    )  # fmt: skip
+            p.commit()
+        log.warning("vendors_credit_handled", paused=paused, resumed=resumed)
+        return paused, resumed
+
     def statuses(self) -> list[VendorStatus]:
+        balances = self.balances()
         with self._platform() as p:
             settings, _ = p.settings.get()
             stored = p.vendor_keys.summaries()
@@ -129,6 +215,7 @@ class VendorService:
                 key, source, version = mask(env[-4:]), "environment", 0
             else:
                 key, source, version = mask(""), "none", 0
+            seen = balances.get(vendor.code)
             out.append(
                 VendorStatus(
                     vendor.code, vendor.name, vendor.role, key, source, version,
@@ -143,6 +230,10 @@ class VendorService:
                                 k.can_roll_back)
                         for k in live
                     ],
+                    seen.remaining if seen else None,
+                    seen.unit if seen else "",
+                    seen.note if seen else "",
+                    vendor.code in settings.paused_for_credit,
                 )
             )  # fmt: skip
         return out
@@ -314,8 +405,14 @@ class VendorService:
             current, version = p.settings.get()
             names = set(current.paused_vendors)
             names.add(vendor) if paused else names.discard(vendor)
+            # A person's choice replaces the automatic one either way.
             p.settings.save(
-                replace(current, paused_vendors=frozenset(names)), expected_version=version
+                replace(
+                    current,
+                    paused_vendors=frozenset(names),
+                    paused_for_credit=current.paused_for_credit - {vendor},
+                ),
+                expected_version=version,
             )
             p.audit.record(
                 "vendor_paused" if paused else "vendor_resumed", actor_user_id=by,

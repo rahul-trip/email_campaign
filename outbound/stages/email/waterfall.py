@@ -70,6 +70,13 @@ class Outcome:
     # The resolver did not answer (an outage or a refused key), as distinct from answering
     # "cannot prove it": nothing is recorded, so the lead can be tried again.
     resolver_down: bool = False
+    # Whether any vendor answered. A finder that returned "nothing found" answered; one that
+    # raised (out of credit, down, paused and so absent) did not. The email step uses these to
+    # tell "no such address" from "no one could look".
+    finders_reached: bool = False
+    finders_answered: int = 0
+    checks_answered: int = 0
+    checks_failed: int = 0
 
     @property
     def pending(self) -> bool:
@@ -152,6 +159,7 @@ class Waterfall:
             company_name=target.name,
             linkedin_url=contact.linkedin_url,
         )
+        outcome.finders_reached = True
         for finder in self._finders:
             if finder.name in target.skip_finders:
                 continue
@@ -160,6 +168,7 @@ class Waterfall:
             except ProviderError as error:
                 outcome.problems.append(f"{finder.name}: {error}")
                 continue
+            outcome.finders_answered += 1
             if not found.email:
                 continue
             address = found.email.lower()
@@ -236,7 +245,9 @@ class Waterfall:
             checked = self._verifier.verify(address)
         except ProviderError as error:
             out.problems.append(f"{self._verifier.name}: {error}")
+            out.checks_failed += 1
             return False
+        out.checks_answered += 1
         # The vendor that answered: with backups it may not be the first one.
         verified_by = checked.provider or self._verifier.name
 

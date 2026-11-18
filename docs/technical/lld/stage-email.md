@@ -97,6 +97,8 @@ Each candidate is skipped if already tried or suppressed (so no money is spent o
 | `invalid` | Recorded; try the next finder |
 | Undecided | `catch_all_unverified`; the search for this person ends |
 
+**When no vendor could answer.** `Waterfall` counts the finders that answered (even with "nothing found") and the verifier checks that answered or failed (`Outcome.finders_answered`, `checks_answered`, `checks_failed`). When nothing was chosen and no finder answered (each one out of credit, down, paused, or none left in the chain), or the verifier failed every check, `EmailStage.handle` raises `VendorUnavailable` (`stages/base.py`, a `StageFailure`) instead of "no valid email found". The runner (`Runner._fail`) then keeps the lead in `failed` with that reason, **counts no attempt and forgives the earlier ones** (`CompanyRepository.transition(vendor_wait=True)`), and retries it after two hours (`Runner(vendor_wait=...)`), until a vendor answers. A finder that answered "nothing found" is a real miss and counts as an attempt as before.
+
 A catch-all ends the search for that person, because every other address at the domain would say the same. A `ProviderError` from any finder, verifier or resolver, including `BudgetExceeded` from the meter, is added to `problems`, and the next source is tried. The problems appear in the failure reason (up to three).
 
 ### What the stage writes

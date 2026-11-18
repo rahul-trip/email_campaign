@@ -81,6 +81,8 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | `build_mailbox_if_configured(settings)` | The IMAP mailbox, or `None` without a login | — |
 | `configured_finders`, `configured_verifiers`, `configured_resolvers` | Every adapter whose key is set (used by the bake-off) | Skipped |
 
+`providers/balances.py::balance` asks Hunter, ZeroBounce, MyEmailVerifier or OrbiSearch what the account has left (free calls; `None` = unknown, never zero). `HttpClient` reads a 402, or a 429 whose text says the plan or credit limit is reached (Hunter: "searches per billing period included in your plan"), as `BudgetExceeded`, which is not retried; any other 429 is a `RateLimited` that is. ZeroBounce answers an empty account with HTTP 200 and a `Message` field: the adapter settles key or credit with `/getcredits`.
+
 Registry names: finders `hunter`, `zerobounce`; verifiers `hunter`, `zerobounce`, `orbisearch`, `myemailverifier`; resolvers `scrubby` and `enrichley`.
 
 ### Errors (`outbound/providers/errors.py`)

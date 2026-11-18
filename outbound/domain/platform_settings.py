@@ -51,6 +51,9 @@ class PlatformSettings:
     superadmin_enabled: bool = True  # alpha only
     announcement: str = ""  # shown in every workspace
     paused_vendors: frozenset[str] = frozenset()  # their keys are ignored until resumed
+    # Finders paused because their account ran out of credit (a subset of ``paused_vendors``):
+    # the worker resumes them by itself once the vendor's balance shows credit again.
+    paused_for_credit: frozenset[str] = frozenset()
     llm: dict[str, Any] = field(default_factory=dict)  # overrides of the LLM_* settings
     vendor_caps: dict[str, int] = field(default_factory=dict)  # AI credits a month, per vendor
     # What each model's calls use: model -> (AI credits per million input tokens, per million
@@ -134,6 +137,7 @@ def to_json(settings: PlatformSettings) -> dict[str, Any]:
         "superadmin_enabled": settings.superadmin_enabled,
         "announcement": settings.announcement,
         "paused_vendors": sorted(settings.paused_vendors),
+        "paused_for_credit": sorted(settings.paused_for_credit),
         "llm": settings.llm,
         "vendor_caps_credits": settings.vendor_caps,
         "llm_charges": {model: list(rate) for model, rate in settings.llm_charges.items()},
@@ -160,6 +164,7 @@ def from_json(data: dict[str, Any]) -> PlatformSettings:
         superadmin_enabled=bool(data.get("superadmin_enabled", True)),
         announcement=str(data.get("announcement") or ""),
         paused_vendors=frozenset(str(v) for v in data.get("paused_vendors", [])),
+        paused_for_credit=frozenset(str(v) for v in data.get("paused_for_credit", [])),
         llm={str(k): v for k, v in (data.get("llm") or {}).items() if k in LLM_FIELDS},
         vendor_caps=caps,
         llm_charges={

@@ -134,7 +134,7 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 
 ### Retries
 
-`retry_failed(limit)` moves due `failed` leads with fewer than 3 attempts back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
+`retry_failed(limit)` moves due `failed` leads with fewer than 3 attempts (a lead that failed because no vendor could answer, `VendorUnavailable`, is not counted and waits two hours: see [the email stage](stage-email.md)) back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
 
 ### The tick
 
