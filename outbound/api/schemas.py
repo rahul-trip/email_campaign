@@ -1607,6 +1607,10 @@ class LinkedInDraftRowOut(Out):
     profile: str | None
     fit_score: int | None = None
     company_bucket: Bucket = Bucket.WORKING
+    company_status: CompanyStatus = CompanyStatus.NEW
+    failure_kind: FailureKind | None = None
+    country_code: str | None = None
+    fit_reason: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

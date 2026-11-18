@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 
 from outbound.db.models import CompanyRow, ContactRow, LinkedInMessageRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import LinkedInMessage
-from outbound.domain.enums import EntityType, LinkedInState
+from outbound.domain.enums import CompanyStatus, EntityType, FailureKind, LinkedInState
 from outbound.domain.outcomes import Bucket, bucket_of
 from outbound.domain.qualification import HOT_ABOVE
 from outbound.domain.state_machines import LINKEDIN
@@ -29,6 +29,10 @@ class LinkedInListing:
     profile: str | None
     fit_score: int | None
     company_bucket: Bucket  # where the lead stands: "ready" for a hot lead nobody could email
+    company_status: CompanyStatus
+    failure_kind: FailureKind | None
+    country_code: str | None
+    fit_reason: str | None
 
 
 class LinkedInRepository(ScopedRepository):
@@ -119,10 +123,24 @@ class LinkedInRepository(ScopedRepository):
         return snapshot(row, LinkedInMessage)
 
     def page(
-        self, state: LinkedInState, *, limit: int, offset: int, hot: bool | None = None
+        self,
+        state: LinkedInState,
+        *,
+        limit: int,
+        offset: int,
+        hot: bool | None = None,
+        text: str | None = None,
+        min_fit: int | None = None,
+        no_email: bool | None = None,
+        country: str | None = None,
+        sort: str | None = None,
+        direction: str | None = None,
     ) -> tuple[list[LinkedInListing], int]:
-        """Messages in one state. Waiting messages list the best-fitting leads first (hot ones
-        on top); ``hot`` keeps only leads scoring above 80, or only the rest."""
+        """Messages in one state. ``hot`` keeps only leads scoring above 80, or only the rest;
+        ``text`` matches the company, its domain or the person; ``no_email`` keeps the leads
+        nobody could find a provable address for (or only the others). ``sort`` is ``fit``,
+        ``newest`` or ``company``; by default waiting messages list the best fit first and the
+        rest the newest first. Empty values go last either way."""
         where = [
             LinkedInMessageRow.workspace_id == self._workspace_id,
             LinkedInMessageRow.state == state,
@@ -130,24 +148,48 @@ class LinkedInRepository(ScopedRepository):
         if hot is not None:
             is_hot = CompanyRow.fit_score > HOT_ABOVE
             where.append(is_hot if hot else or_(CompanyRow.fit_score.is_(None), ~is_hot))
+        if min_fit is not None:
+            where.append(CompanyRow.fit_score >= min_fit)
+        if country:
+            where.append(func.upper(CompanyRow.country_code) == country.strip().upper())
+        if no_email is not None:
+            nobody = and_(
+                CompanyRow.status == CompanyStatus.FAILED,
+                CompanyRow.failure_kind.in_((FailureKind.NO_PERSON, FailureKind.NO_EMAIL)),
+            )
+            where.append(nobody if no_email else ~nobody)
+        if text:
+            like = f"%{text.strip().lower()}%"
+            where.append(
+                or_(
+                    func.lower(CompanyRow.domain).like(like),
+                    func.lower(CompanyRow.name).like(like),
+                    func.lower(ContactRow.full_name).like(like),
+                )
+            )
         total = int(
             self._session.scalar(
                 select(func.count())
                 .select_from(LinkedInMessageRow)
                 .join(CompanyRow, CompanyRow.id == LinkedInMessageRow.company_id)
+                .join(ContactRow, ContactRow.id == LinkedInMessageRow.contact_id)
                 .where(*where)
             )
             or 0
         )
-        fit_first = (
-            [CompanyRow.fit_score.desc().nulls_last()] if state is LinkedInState.DRAFTED else []
-        )
+        by = sort or ("fit" if state is LinkedInState.DRAFTED else "newest")
+        column, natural = {
+            "fit": (CompanyRow.fit_score, "desc"),
+            "company": (func.lower(func.coalesce(CompanyRow.name, CompanyRow.domain)), "asc"),
+        }.get(by, (LinkedInMessageRow.created_at, "desc"))
+        key = column.desc() if (direction or natural) == "desc" else column.asc()
+        order = [key.nulls_last(), LinkedInMessageRow.created_at.desc()]
         stmt = (
             select(LinkedInMessageRow, CompanyRow, ContactRow)
             .join(CompanyRow, CompanyRow.id == LinkedInMessageRow.company_id)
             .join(ContactRow, ContactRow.id == LinkedInMessageRow.contact_id)
             .where(*where, CompanyRow.workspace_id == self._workspace_id)
-            .order_by(*fit_first, LinkedInMessageRow.created_at.desc(), LinkedInMessageRow.id)
+            .order_by(*order, LinkedInMessageRow.id)
             .limit(limit)
             .offset(offset)
         )
@@ -168,6 +210,10 @@ class LinkedInRepository(ScopedRepository):
                     fit_score=company.fit_score,
                     waiting_for_credit=company.credit_wait_step is not None,
                 ),
+                company.status,
+                company.failure_kind,
+                company.country_code,
+                company.fit_reason,
             )
             for message, company, contact in self._session.execute(stmt)
         ]
