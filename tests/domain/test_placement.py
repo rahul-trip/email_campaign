@@ -88,3 +88,11 @@ def test_a_snippet_that_names_the_company_keeps_a_namesake_unsure() -> None:
         domain="coval.dev",
     )
     assert placed.placement is Placement.UNSURE
+
+
+def test_one_shared_word_in_the_employer_is_another_company() -> None:
+    placed = place(
+        name="Jithin James", headline="Data Science", employer="Gapblue Software Labs Pvt Ltd",
+        company="Vibrant Labs", domain="vibrantlabs.com",
+    )  # fmt: skip
+    assert placed is Placement.NOT_HERE

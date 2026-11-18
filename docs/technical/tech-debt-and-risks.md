@@ -276,6 +276,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-50 · P1 · LinkedIn: a namesake's profile was attached, and a one-letter spelling difference missed the right one — closed 2026-11-18
+
+- **Was:** `find_linkedin_many` kept a same-name profile unless the rules placed the person at another company. For Vibrant Labs, a search returned eight "Jithin James" profiles, none at Vibrant Labs; the first (a data analyst at "Gapblue Software Labs") was saved on the co-founder, because `placement._overlaps` counted one shared word ("Labs") as the same company, and the seven with no employer were "unsure", which counted as yes. For daxa.ai, the operator typed "Shridhar" and the profile says "Sridhar Ramaswamy – Co-founder & CTO at Daxa AI": `same_name` needs one first name to begin the other, so the right profile was turned down.
+- **Fixed by:** `stages/research/linkedin.py::names_the_company`: a profile is kept only when its employer is the company or its headline or snippet mentions the company's name or website; `similar_name` allows a one-letter difference in the first name (two for long names) with the same surname, only on a profile that names the company; `placement._overlaps` needs all of the company's name words (or its website's name), so "Gapblue Software Labs" is not "Vibrant Labs".
+- **Evidence:** `tests/db/test_person_actions.py` (the Vibrant Labs namesakes are not taken; a snippet that names the company is; Shridhar/Sridhar at Daxa is, at another company is not), `tests/domain/test_placement.py::test_one_shared_word_in_the_employer_is_another_company`.
+- **Still open:** profile links saved before this are kept; the wrong one on the Vibrant Labs co-founder must be removed by hand (or with a one-off update). A real employee whose public profile names no employer anywhere is now left without a link for the operator to add.
+
 ### R-51 · P2 · Every action answered with "204 No Content" showed an error in web3, though it had worked — closed 2026-11-18
 
 - **What:** `web3/src/api/client.ts::ok` treated a reply with no data as a failure, and openapi-fetch gives no data for a 204. Deleting a user or your own account (and every other 204 route) said "Request failed (204)" while the change had been made. Deleting an account also raised 502 if the goodbye email failed after the delete was committed.

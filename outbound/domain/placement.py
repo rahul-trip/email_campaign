@@ -74,11 +74,16 @@ def _segments(headline: str) -> list[str]:
 
 
 def _overlaps(text: str, company: str, domain: str) -> bool:
+    """Whether an employer could be this company: it holds all of the company's name ("Daxa AI"
+    for "Daxa Inc"), or its website's name. One shared word is not enough: "Gapblue Software
+    Labs" is not "Vibrant Labs"."""
     words = set(company_tokens(_PARENTHESES.sub(" ", text)))
     wanted = set(company_tokens(company))
     label = domain_label(domain)
     joined = "".join(company_tokens(text))
-    return bool(words & wanted) or (len(label) >= 3 and (label in words or label in joined))
+    return (bool(wanted) and wanted <= words) or (
+        len(label) >= 3 and (label in words or label in joined)
+    )
 
 
 def place_by_rules(

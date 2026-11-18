@@ -9,14 +9,19 @@ from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CompanySource, CompanyStatus, ContactSource, HoldReason
 from outbound.providers.ports import SearchHit
 from outbound.services.leads import LeadError, LeadService
-from outbound.stages.research.linkedin import find_linkedin, profile_address, same_name
+from outbound.stages.research.linkedin import (
+    find_linkedin,
+    profile_address,
+    same_name,
+    similar_name,
+)
 from tests.stages.fakes import FakeSearch
 
 C = CompanyStatus
 
 
-def hit(url: str, title: str = "") -> SearchHit:
-    return SearchHit(url=url, title=title, snippet="")
+def hit(url: str, title: str = "", snippet: str = "") -> SearchHit:
+    return SearchHit(url=url, title=title, snippet=snippet)
 
 
 def test_only_a_profile_page_counts_and_its_address_is_made_plain() -> None:
@@ -63,6 +68,56 @@ def test_the_search_uses_the_company_name_without_inc_or_ltd() -> None:
     assert '"acme.com"' in only_noise.searches[0]  # nothing left of the name: the website
 
 
+def test_a_namesake_whose_profile_names_another_company_or_none_is_not_taken() -> None:
+    # Seen on Vibrant Labs: eight "Jithin James" profiles, none at Vibrant Labs; the first (a
+    # data analyst at "Gapblue Software Labs") was saved because "Labs" matched.
+    search = FakeSearch(
+        hits=[
+            hit(
+                "https://www.linkedin.com/in/jithin-james-1",
+                "Jithin James - Data Science|| Power BI - Gapblue Software Labs Pvt Ltd | LinkedIn",
+                "Data Analyst with 4+ years in Bengaluru",
+            ),
+            hit("https://www.linkedin.com/in/jithin-james-2", "Jithin James | LinkedIn",
+                "Sales Manager at 42 Estates"),
+        ]
+    )  # fmt: skip
+    assert find_linkedin(search, "Jithin James", "Vibrant Labs", "vibrantlabs.com") is None
+
+
+def test_a_profile_that_mentions_the_company_only_in_its_snippet_is_taken() -> None:
+    search = FakeSearch(
+        hits=[
+            hit("https://www.linkedin.com/in/jithin-james-9", "Jithin James | LinkedIn",
+                "## Experience - Co-founder at Vibrant Labs (2023 to present)"),
+        ]
+    )  # fmt: skip
+    assert find_linkedin(search, "Jithin James", "Vibrant Labs", "vibrantlabs.com") == (
+        "https://www.linkedin.com/in/jithin-james-9"
+    )
+
+
+def test_a_one_letter_spelling_difference_is_taken_only_with_the_company_named() -> None:
+    # Seen on daxa.ai: entered "Shridhar", the profile says "Sridhar".
+    right = FakeSearch(
+        hits=[
+            hit("https://www.linkedin.com/in/sridhar-r", "Sridhar Ramaswamy - Co-founder & CTO at "
+                "Daxa AI - LinkedIn")
+        ]
+    )  # fmt: skip
+    assert find_linkedin(right, "Shridhar ramaswamy", "Daxa inc", "daxa.ai") == (
+        "https://www.linkedin.com/in/sridhar-r"
+    )
+    elsewhere = FakeSearch(
+        hits=[hit("https://www.linkedin.com/in/sridhar-x", "Sridhar Ramaswamy | LinkedIn",
+                  "Engineer at Snowflake")]
+    )  # fmt: skip
+    assert find_linkedin(elsewhere, "Shridhar ramaswamy", "Daxa inc", "daxa.ai") is None
+    assert similar_name("Mohammed Ali", "Mohammad Ali")
+    assert not similar_name("John Doe", "Jane Doe")  # four letters, two apart
+    assert not similar_name("Sridhar Raman", "Shridhar Ramaswamy")  # another surname
+
+
 def lead(
     factory: UnitOfWorkFactory,
     ws: str,
@@ -96,7 +151,9 @@ def lead(
 
 def test_a_found_profile_is_saved_on_the_person(factory: UnitOfWorkFactory, ws: str) -> None:
     person = lead(factory, ws)
-    search = FakeSearch(hits=[hit("https://www.linkedin.com/in/jane-doe", "Jane Doe | LinkedIn")])
+    search = FakeSearch(
+        hits=[hit("https://www.linkedin.com/in/jane-doe", "Jane Doe - CTO at Acme | LinkedIn")]
+    )
     service = LeadService(factory, ws, search=search)
     assert service.find_linkedin(person) == "https://www.linkedin.com/in/jane-doe"
     with factory(ws) as uow:
