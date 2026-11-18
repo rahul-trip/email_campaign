@@ -4,7 +4,7 @@ ones take their defaults) so a newer or older version of the code can share a da
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from outbound.domain.credits import DEFAULT_CREDIT_VALUE_MICRO_USD
@@ -12,6 +12,31 @@ from outbound.domain.entitlements import DEFAULT_PLANS, FREE, UNLIMITED, Plan
 from outbound.domain.vendors import LLM_FIELDS
 
 DEFAULTS_BY_CODE = {p.code: p for p in DEFAULT_PLANS}
+
+# The kinds of model endpoint the engine can call (``providers/adapters/llm.py::PRESETS``).
+LLM_PROVIDERS = ("openai_compatible", "openai", "anthropic", "gemini", "ollama", "github_copilot")
+REASONING_EFFORTS = ("", "low", "medium", "high")
+
+
+@dataclass(frozen=True)
+class LlmModel:
+    """A model staff added in the console: everything needed to call it, and what its calls use
+    in AI credits. Its API key is stored apart, encrypted, as the vendor key ``model:<code>``."""
+
+    code: str  # short and fixed, e.g. "deepseek-v3"
+    label: str
+    provider: str  # one of LLM_PROVIDERS
+    model: str  # the provider's own model name
+    base_url: str = ""  # required for openai_compatible; else the provider's own address
+    temperature: float = 0.7
+    max_tokens: int = 4_000
+    reasoning_effort: str = ""  # one of REASONING_EFFORTS; "" sends none
+    input_credits: float = 0.0  # AI credits per million input tokens
+    output_credits: float = 0.0  # AI credits per million output tokens
+
+    @property
+    def key_name(self) -> str:
+        return f"model:{self.code}"
 
 
 @dataclass(frozen=True)
@@ -31,6 +56,18 @@ class PlatformSettings:
     # What each model's calls use: model -> (AI credits per million input tokens, per million
     # output tokens). Set in the console's Language model card; applies from then on.
     llm_charges: dict[str, tuple[float, float]] = field(default_factory=dict)
+    # Models staff added; the default is used for every model call, the writer (if set) for
+    # writing emails. Empty: the LLM_* settings (and ``llm``) apply, as before.
+    models: dict[str, LlmModel] = field(default_factory=dict)
+    default_model: str = ""
+    writer_model: str = ""
+
+    def charge(self, model_name: str) -> tuple[float, float] | None:
+        """What a call to this provider model name uses: a catalog model's charge first."""
+        for found in self.models.values():
+            if found.model == model_name and (found.input_credits or found.output_credits):
+                return (found.input_credits, found.output_credits)
+        return self.llm_charges.get(model_name)
 
     def plan(self, code: str) -> Plan:
         """The plan with this code; the default plan if it was removed from the catalog."""
@@ -100,6 +137,9 @@ def to_json(settings: PlatformSettings) -> dict[str, Any]:
         "llm": settings.llm,
         "vendor_caps_credits": settings.vendor_caps,
         "llm_charges": {model: list(rate) for model, rate in settings.llm_charges.items()},
+        "models": [asdict(m) for m in settings.models.values()],
+        "default_model": settings.default_model,
+        "writer_model": settings.writer_model,
     }
 
 
@@ -127,4 +167,18 @@ def from_json(data: dict[str, Any]) -> PlatformSettings:
             for model, rate in (data.get("llm_charges") or {}).items()
             if isinstance(rate, list | tuple) and len(rate) == 2
         },
+        models={m.code: m for m in (_model(d) for d in data.get("models") or []) if m},
+        default_model=str(data.get("default_model") or ""),
+        writer_model=str(data.get("writer_model") or ""),
     )
+
+
+def _model(data: Any) -> LlmModel | None:
+    """A saved model, or None if it cannot be read (an older or newer shape)."""
+    if not isinstance(data, dict) or not data.get("code") or not data.get("model"):
+        return None
+    known = set(LlmModel.__dataclass_fields__)
+    try:
+        return LlmModel(**{k: v for k, v in data.items() if k in known})
+    except TypeError:
+        return None

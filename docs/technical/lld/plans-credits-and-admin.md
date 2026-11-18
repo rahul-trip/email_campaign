@@ -26,7 +26,7 @@ Every workspace has one balance of **AI credits** a month. Every third-party ven
 
 | Call | AI credits (thousandths, rounded up) |
 |---|---|
-| A model call whose model has a charge in `PlatformSettings.llm_charges` | `domain/credits.py::llm_credits`: input tokens × charge per million in + output tokens × charge per million out |
+| A model call whose model has a charge (a console model's `input_credits`/`output_credits`, else `PlatformSettings.llm_charges`; `PlatformSettings.charge`) | `domain/credits.py::llm_credits`: input tokens × charge per million in + output tokens × charge per million out |
 | Any other paid call (and a model with no charge but a dollar price in `LLM_PRICES`) | `domain/credits.py::credits_for`: its cost in micro-USD ÷ `PlatformSettings.credit_value_micro_usd` (default 10,000: one credit per US cent) |
 | A cache hit, an error, a call blocked by a cap, a free vendor | 0 |
 
@@ -118,7 +118,7 @@ A grant adds its credits to every period while it is active, so the console defa
 | No AI credits left | A paying stage does not start and the lead waits in place; a rewrite is refused before the model is asked; resuming by hand returns `409 no_credits` with the renewal date |
 | `access_level` is `READ_ONLY` | Writes guarded by workspace permissions return `403`, `access_lapsed`; reads still succeed |
 | `access_level` is `LOCKED` | Every workspace-scoped route (read or write) returns `403`; only a platform admin route can see why |
-| A model with no charge set | Its calls use no AI credits; the console's Language model card warns |
+| A model with no charge set | Its calls use no AI credits; the console's AI models card warns |
 
 ## Transactions and concurrency
 

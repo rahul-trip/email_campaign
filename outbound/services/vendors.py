@@ -21,8 +21,15 @@ from outbound.db.platform import PlatformUnitOfWork, PlatformUnitOfWorkFactory
 from outbound.db.types import utcnow
 from outbound.domain.credits import as_credits, milli
 from outbound.domain.errors import InvalidInput
+from outbound.domain.platform_settings import (
+    LLM_PROVIDERS,
+    REASONING_EFFORTS,
+    LlmModel,
+    PlatformSettings,
+)
 from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
 from outbound.logging import get_logger
+from outbound.providers.adapters.llm import PRESETS
 from outbound.providers.keycheck import KeyCheck, can_test, check_key
 
 log = get_logger(__name__)
@@ -95,6 +102,7 @@ class VendorService:
                 update[vendor.setting] = SecretStr(keys[vendor.code][0])
                 if len(keys[vendor.code]) > 1:
                     pools[vendor.code] = [SecretStr(k) for k in keys[vendor.code]]
+        update |= _model_update(platform_settings, keys, pools)
         update["vendor_key_pools"] = pools
         update["finder_chain"] = [
             f for f in self._base.finder_chain if f not in platform_settings.paused_vendors
@@ -360,6 +368,120 @@ class VendorService:
             )  # fmt: skip
             p.commit()
 
+    # ------------------------------------------------------------------ models
+
+    def models(self) -> tuple[PlatformSettings, dict[str, str]]:
+        """The settings (catalog, default, writer) and each model's key, masked."""
+        with self._platform() as p:
+            current, _ = p.settings.get()
+            stored = p.vendor_keys.summaries()
+        keys = {
+            code: mask(stored[m.key_name][0].last4) if stored.get(m.key_name) else ""
+            for code, m in current.models.items()
+        }
+        return current, keys
+
+    def save_model(self, model: LlmModel, *, api_key: str | None, by: str | None) -> None:
+        """Add a model or change one. ``api_key`` None keeps the stored key; "" removes it."""
+        _check_model(model)
+        with self._platform() as p:
+            current, version = p.settings.get()
+            has_key = bool(p.vendor_keys.summaries().get(model.key_name))
+            if api_key:  # a model with no key of its own uses the Language model vendor's key
+                if len(api_key.strip()) < 8:
+                    raise InvalidInput("that does not look like an API key")
+                p.vendor_keys.put(model.key_name, api_key.strip(), by=by)
+                has_key = True
+            elif api_key == "" and has_key:
+                p.vendor_keys.remove(model.key_name, 1)
+                has_key = False
+            models = {**current.models, model.code: model}
+            p.settings.save(replace(current, models=models), expected_version=version)
+            p.audit.record(
+                "model_saved", actor_user_id=by, target_type="model", target_id=model.code,
+                data={"provider": model.provider, "model": model.model,
+                      "base_url": model.base_url, "key_changed": api_key is not None},
+            )  # fmt: skip
+            p.commit()
+
+    def remove_model(self, code: str, *, by: str | None) -> None:
+        with self._platform() as p:
+            current, version = p.settings.get()
+            if code not in current.models:
+                raise InvalidInput(f"there is no model {code!r}")
+            if code in (current.default_model, current.writer_model):
+                raise InvalidInput("choose another default (and writer) model before removing it")
+            if p.vendor_keys.summaries().get(f"model:{code}"):
+                p.vendor_keys.remove(f"model:{code}", 1)
+            models = {k: v for k, v in current.models.items() if k != code}
+            p.settings.save(replace(current, models=models), expected_version=version)
+            p.audit.record(
+                "model_removed", actor_user_id=by, target_type="model", target_id=code
+            )  # fmt: skip
+            p.commit()
+
+    def choose_models(self, default: str, writer: str, *, by: str | None) -> None:
+        """The model every call uses, and the one that writes emails ("": the default). An empty
+        default goes back to the LLM_* settings."""
+        with self._platform() as p:
+            current, version = p.settings.get()
+            for code in (default, writer):
+                if code and code not in current.models:
+                    raise InvalidInput(f"there is no model {code!r}")
+            if writer and not default:
+                raise InvalidInput("choose a default model before a writer model")
+            chosen = current.models.get(default)
+            if (
+                chosen is not None
+                and PRESETS[chosen.provider].needs_key
+                and not p.vendor_keys.summaries().get(chosen.key_name)
+                and not self._fallback_key()
+            ):
+                raise InvalidInput(f"{chosen.label} has no API key: add one before choosing it")
+            if writer and default:
+                one, two = current.models[default], current.models[writer]
+                if (one.provider, one.base_url) != (two.provider, two.base_url):
+                    raise InvalidInput(
+                        "the writer model must use the same provider and address as the default"
+                    )
+            p.settings.save(
+                replace(current, default_model=default, writer_model=writer),
+                expected_version=version,
+            )
+            p.audit.record(
+                "models_chosen", actor_user_id=by, target_type="model", target_id=default or None,
+                data={"default": default, "writer": writer},
+            )  # fmt: skip
+            p.commit()
+
+    def test_model(
+        self, code: str, *, by: str | None, client: httpx.Client | None = None
+    ) -> KeyCheck:
+        """One tiny real call to the model, with its own settings and key."""
+        with self._platform() as p:
+            current, _ = p.settings.get()
+            if code not in current.models:
+                raise InvalidInput(f"there is no model {code!r}")
+            keys = p.vendor_keys.current()
+        trial = replace(current, default_model=code, writer_model="")
+        update: dict[str, Any] = {**current.llm, **_model_update(trial, keys, {})}
+        if "llm" in keys and "llm_api_key" not in update:
+            update["llm_api_key"] = SecretStr(keys["llm"][0])
+        result = check_key("llm", self._base.model_copy(update=update), client)
+        with self._platform() as p:
+            p.audit.record(
+                "model_tested", actor_user_id=by, target_type="model", target_id=code,
+                data={"ok": result.ok},
+            )  # fmt: skip
+            p.commit()
+        return result
+
+    def _fallback_key(self) -> bool:
+        """Whether a model without its own key can use the Language model vendor's key."""
+        with self._platform() as p:
+            stored = p.vendor_keys.summaries()
+        return bool(stored.get("llm")) or bool(self._base.llm_api_key.get_secret_value())
+
     def import_env(self, *, by: str | None = None) -> list[str]:
         """Copy the environment's keys into the database, once. A vendor that already has a key
         there is left alone. Returns the vendors copied."""
@@ -403,3 +525,64 @@ class LiveProviders[T]:
 def _known(vendor: str) -> None:
     if vendor not in BY_CODE:
         raise InvalidInput(f"unknown vendor {vendor!r}")
+
+
+# Where each provider's own key lives in the settings (``providers/registry.py::_llm``).
+_PROVIDER_KEY = {
+    "anthropic": "anthropic_api_key",
+    "openai": "openai_api_key",
+    "gemini": "gemini_api_key",
+    "github_copilot": "copilot_api_key",
+}
+
+
+def _model_update(
+    settings: PlatformSettings, keys: dict[str, list[str]], pools: dict[str, list[SecretStr]]
+) -> dict[str, Any]:
+    """The LLM_* settings the chosen default (and writer) model stands for. Empty when no model
+    is chosen. A model with its own key replaces the Language model vendor's key and pool."""
+    chosen = settings.models.get(settings.default_model)
+    if chosen is None:
+        return {}
+    writer = settings.models.get(settings.writer_model)
+    update: dict[str, Any] = {
+        "llm_provider": chosen.provider,
+        "llm_model": chosen.model,
+        "llm_base_url": chosen.base_url,
+        "llm_temperature": chosen.temperature,
+        "llm_max_tokens": chosen.max_tokens,
+        "llm_reasoning_effort": chosen.reasoning_effort,
+        "llm_copy_model": writer.model if writer else "",
+    }
+    own = keys.get(chosen.key_name)
+    if own and "llm" not in settings.paused_vendors:
+        key = SecretStr(own[0])
+        update["llm_api_key"] = key
+        if chosen.provider in _PROVIDER_KEY:
+            update[_PROVIDER_KEY[chosen.provider]] = key
+        pools.pop("llm", None)
+    return update
+
+
+def _check_model(model: LlmModel) -> None:
+    code = model.code.strip()
+    if not code or not code.replace("-", "").replace("_", "").replace(".", "").isalnum():
+        raise InvalidInput("a model code is letters, digits, '.', '-' and '_'")
+    if code == "default":
+        raise InvalidInput("'default' cannot be a model code")
+    if model.provider not in LLM_PROVIDERS:
+        raise InvalidInput(f"the provider must be one of {', '.join(LLM_PROVIDERS)}")
+    if not model.model.strip():
+        raise InvalidInput("say the provider's name for the model")
+    if model.provider == "openai_compatible" and not model.base_url.strip():
+        raise InvalidInput("an OpenAI-compatible model needs its base URL")
+    if model.base_url and not model.base_url.startswith(("https://", "http://")):
+        raise InvalidInput("the base URL must start with https:// (or http:// for a local one)")
+    if model.reasoning_effort not in REASONING_EFFORTS:
+        raise InvalidInput("reasoning effort is low, medium, high or none")
+    if not 0 <= model.temperature <= 2:
+        raise InvalidInput("temperature is between 0 and 2")
+    if not 16 <= model.max_tokens <= 200_000:
+        raise InvalidInput("max tokens is between 16 and 200,000")
+    if model.input_credits < 0 or model.output_credits < 0:
+        raise InvalidInput("a charge cannot be negative")

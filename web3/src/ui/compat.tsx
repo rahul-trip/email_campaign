@@ -513,8 +513,8 @@ export function Dialog({ title, children, onClose, footer, tone }: { title: Reac
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="w-full max-w-md rounded-xl border border-line bg-surface shadow-xl outline-none">
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3.5">
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-xl border border-line bg-surface shadow-xl outline-none">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-5 py-3.5">
           <h2 id={titleId} className={cx("text-base font-semibold", tone === "danger" && "text-error")}>
             {title}
           </h2>
@@ -522,8 +522,8 @@ export function Dialog({ title, children, onClose, footer, tone }: { title: Reac
             <X className="size-4" />
           </button>
         </div>
-        <div className="space-y-3 px-5 py-4 text-body">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-body">{children}</div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

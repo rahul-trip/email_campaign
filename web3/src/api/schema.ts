@@ -421,6 +421,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/models/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose Models
+         * @description The model every call uses, and the one that writes emails.
+         */
+        put: operations["choose_models_api_admin_models_default_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/models/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Model
+         * @description Add a model, or change one; the key is kept unless a new one (or "") is sent.
+         */
+        put: operations["save_model_api_admin_models__code__put"];
+        post?: never;
+        /** Remove Model */
+        delete: operations["remove_model_api_admin_models__code__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/models/{code}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Model
+         * @description One tiny real call to the model, with its own settings and key.
+         */
+        post: operations["test_model_api_admin_models__code__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/overview": {
         parameters: {
             query?: never;
@@ -3344,6 +3405,19 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** ChooseModelsIn */
+        ChooseModelsIn: {
+            /**
+             * Default Model
+             * @default
+             */
+            default_model?: string;
+            /**
+             * Writer Model
+             * @default
+             */
+            writer_model?: string;
+        };
         /** CompanyOut */
         CompanyOut: {
             /** Campaign Id */
@@ -4407,6 +4481,90 @@ export interface components {
             per_million_input: number;
             /** Per Million Output */
             per_million_output: number;
+        };
+        /** LlmModelIn */
+        LlmModelIn: {
+            /** Api Key */
+            api_key?: string | null;
+            /**
+             * Base Url
+             * @default
+             */
+            base_url?: string;
+            /**
+             * Input Credits
+             * @default 0
+             */
+            input_credits?: number;
+            /** Label */
+            label: string;
+            /**
+             * Max Tokens
+             * @default 4000
+             */
+            max_tokens?: number;
+            /** Model */
+            model: string;
+            /**
+             * Output Credits
+             * @default 0
+             */
+            output_credits?: number;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "openai_compatible" | "openai" | "anthropic" | "gemini" | "ollama" | "github_copilot";
+            /**
+             * Reasoning Effort
+             * @default
+             * @enum {string}
+             */
+            reasoning_effort?: "" | "low" | "medium" | "high";
+            /**
+             * Temperature
+             * @default 0.7
+             */
+            temperature?: number;
+        };
+        /** LlmModelOut */
+        LlmModelOut: {
+            /** Base Url */
+            base_url: string;
+            /** Code */
+            code: string;
+            /** Input Credits */
+            input_credits: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Max Tokens */
+            max_tokens: number;
+            /** Model */
+            model: string;
+            /** Output Credits */
+            output_credits: number;
+            /** Provider */
+            provider: string;
+            /** Reasoning Effort */
+            reasoning_effort: string;
+            /** Temperature */
+            temperature: number;
+        };
+        /**
+         * LlmProviderOut
+         * @description A kind of model endpoint the engine can call, for the Add a model form.
+         */
+        LlmProviderOut: {
+            /** Code */
+            code: string;
+            /** Default Base Url */
+            default_base_url: string;
+            /** Needs Base Url */
+            needs_base_url: boolean;
+            /** Needs Key */
+            needs_key: boolean;
         };
         /** LlmSettingsIn */
         LlmSettingsIn: {
@@ -5710,14 +5868,22 @@ export interface components {
         };
         /** VendorsOut */
         VendorsOut: {
+            /** Default Model */
+            default_model: string;
             /** Llm */
             llm: {
                 [key: string]: string | number;
             };
             /** Llm Charges */
             llm_charges: components["schemas"]["LlmChargeOut"][];
+            /** Models */
+            models: components["schemas"]["LlmModelOut"][];
+            /** Providers */
+            providers: components["schemas"]["LlmProviderOut"][];
             /** Vendors */
             vendors: components["schemas"]["VendorOut"][];
+            /** Writer Model */
+            writer_model: string;
         };
         /** WaitingRowOut */
         WaitingRowOut: {
@@ -6769,6 +6935,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformInvitationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    choose_models_api_admin_models_default_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChooseModelsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_model_api_admin_models__code__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LlmModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_model_api_admin_models__code__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_model_api_admin_models__code__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyCheckOut"];
                 };
             };
             /** @description Validation Error */

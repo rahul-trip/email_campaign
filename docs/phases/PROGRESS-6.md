@@ -133,6 +133,10 @@ Done: one balance of AI credits per workspace replaces per-step limits. Plans Fr
 
 Gates still open: set the live model's charge after deploying 0029; the migration on a copy of production data (Postgres); the browser suite (`npx playwright test`) for the changed credit, admin and auth specs.
 
+## AI models in the console (2026-11-18, branch `phase-6/ai-models`, decision 39)
+
+Done: Vendors → AI models adds a model with provider type, model name, base URL, its own encrypted key, temperature, max tokens, reasoning effort and AI-credit charges; staff choose the default and writer models, live from the next call (`VendorService.effective_settings` via `_model_update`); each model can be tested. No default chosen: the LLM_* settings apply as before. Dialogs now scroll on short screens. Gate: choose the production default model and set its charge after deploying.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.
