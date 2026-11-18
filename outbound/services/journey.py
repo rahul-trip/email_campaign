@@ -77,7 +77,7 @@ class CallView:
     provider: str
     operation: str
     outcome: str
-    cost_micro_usd: int
+    credits_milli: int
     asked: str = ""
     got: str = ""
 
@@ -98,7 +98,7 @@ class StageView:
     facts: list[Fact] = field(default_factory=list)
     incidents: list[Incident] = field(default_factory=list)
     calls: list[CallView] = field(default_factory=list)
-    cost_micro_usd: int = 0
+    credits_milli: int = 0
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,7 @@ class Journey:
     next_step: str
     origin: Origin
     stages: list[StageView]
-    total_cost_micro_usd: int
+    total_credits_milli: int
 
 
 @dataclass(frozen=True)
@@ -157,21 +157,21 @@ def build_journey(data: JourneyData) -> Journey:
                 reached_at=reached if state is StageState.DONE else None,
                 summary="",
                 calls=calls,
-                cost_micro_usd=sum(c.cost_micro_usd for c in calls),
+                credits_milli=sum(c.credits_milli for c in calls),
             )
         )
         if reached is not None and state is StageState.DONE:
             window_start = reached
 
     stages = [_describe(stage, data, window_start_of(stages, i)) for i, stage in enumerate(stages)]
-    total = sum(c.cost_micro_usd for c in data.calls)
+    total = sum(c.credits_milli for c in data.calls)
     return Journey(
         company_id=company.id,
         headline=_headline(company),
         next_step=_next_step(company),
         origin=_origin(data),
         stages=stages,
-        total_cost_micro_usd=total,
+        total_credits_milli=total,
     )
 
 
@@ -254,7 +254,7 @@ def _calls_between(
             c.provider,
             c.operation,
             c.outcome.value,
-            c.cost_micro_usd,
+            c.credits_milli,
             (c.detail or {}).get("asked", ""),
             (c.detail or {}).get("got", ""),
         )
@@ -367,7 +367,7 @@ def _describe(stage: StageView, data: JourneyData, since: datetime | None) -> St
         facts=facts,
         incidents=_incidents(data, since, stage.reached_at, stage.state),
         calls=stage.calls,
-        cost_micro_usd=stage.cost_micro_usd,
+        credits_milli=stage.credits_milli,
     )
 
 

@@ -9,7 +9,7 @@ import { Chip, Segmented, Toggle } from "../ui/core";
 import { Drawer, useToast } from "../ui/overlay";
 import { cx } from "../lib/cx";
 import { percent } from "../lib/format";
-import { ago, duration, usd, when } from "../lib/format";
+import { ago, duration, credits, when } from "../lib/format";
 import { describe, runStatus } from "../lib/status";
 import { useUsage } from "../lib/usage";
 import { STAGES, STAGE_LABEL, countsOf, discoveryLine, stagesDone, totalsOf } from "../lib/runs";
@@ -33,12 +33,14 @@ export function RunsPage() {
   const runs = useQuery({
     queryKey: ["runs"],
     queryFn: () => ok(client.GET("/api/runs")),
-    // Poll quickly while anything is queued or running, so progress and spend update live.
+    // Poll quickly while anything is queued or running, so progress and credits update live.
     refetchInterval: (query) => (query.state.data?.some((r) => r.status === "queued" || r.status === "running") ? 2000 : 10000),
   });
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const campaigns = useQuery({ queryKey: ["campaigns"], queryFn: () => ok(client.GET("/api/settings/campaigns")) });
-  const ceiling = settings.data?.budget_per_prospect_micro_usd as number | null | undefined;
+  // The budget per lead is whole AI credits; the figures it is set against are thousandths.
+  const budget = settings.data?.budget_per_prospect_credits as number | null | undefined;
+  const ceiling = budget == null ? budget : budget * 1000;
 
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ["runs"] });
   const cancel = useMutation({ mutationFn: (id: string) => ok(client.POST("/api/runs/{run_id}/cancel", { params: { path: { run_id: id } } })), onSuccess: refresh });
@@ -96,7 +98,7 @@ export function RunsPage() {
                     <Th>State</Th>
                     <Th>What it did</Th>
                     <Th className="hidden md:table-cell">Took</Th>
-                    <Th className="text-right">Spend</Th>
+                    <Th className="text-right">AI credits</Th>
                     <Th>
                       <span className="sr-only">Actions</span>
                     </Th>
@@ -124,7 +126,7 @@ export function RunsPage() {
                           <RunSummary run={run} />
                         </Td>
                         <Td className="hidden whitespace-nowrap text-small text-muted md:table-cell">{run.started_at ? duration(run.started_at, run.finished_at) : "not started"}</Td>
-                        <Td className="tnum text-right text-small">{usd(run.cost_micro_usd)}</Td>
+                        <Td className="tnum text-right text-small">{credits(run.credits_milli)}</Td>
                         <Td className="whitespace-nowrap text-right">
                           {live && (
                             <Button variant="danger-ghost" size="sm" busy={cancel.isPending && cancel.variables === run.id} onClick={() => cancel.mutate(run.id)}>
@@ -159,7 +161,7 @@ function RunStats({ runs }: { runs: Run[] }) {
   const sum = (pick: (t: ReturnType<typeof totalsOf>) => number) => totals.reduce((n, t) => n + pick(t), 0);
   const moved = sum((t) => t.moved);
   const attention = sum((t) => t.held + t.failed);
-  const spend = week.reduce((n, r) => n + r.cost_micro_usd, 0);
+  const spend = week.reduce((n, r) => n + r.credits_milli, 0);
   const failedRuns = week.filter((r) => r.status === "failed").length;
   return (
     <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5" data-tour="run-stats">
@@ -167,7 +169,7 @@ function RunStats({ runs }: { runs: Run[] }) {
       <Stat label="Steps completed" value={moved} hint="leads moved on, step by step" tone="good" />
       <Stat label="New leads found" value={sum((t) => t.newLeads)} hint={`${sum((t) => t.alreadyLeads)} were already yours`} />
       <Stat label="Held or failed" value={attention} hint={attention ? "see Needs attention" : "nothing stuck"} tone={attention ? "attention" : undefined} />
-      <Stat label="Spend this week" value={usd(spend)} hint={moved ? `${usd(spend / moved)} per step completed` : "no paid calls"} />
+      <Stat label="AI credits this week" value={credits(spend)} hint={moved ? `${credits(spend / moved)} per step completed` : "no paid calls"} />
     </div>
   );
 }
@@ -341,10 +343,10 @@ function StartRunDrawer({ canSkip, campaign, ceiling, busy, onClose, onStarted }
           </>
         )}
         {canSkip && (
-          <Toggle label="Find emails with the vendors, not the shared directory" hint="For the leads this run works on. Costs vendor credits; what they find still updates the directory." checked={skipDirectory} onChange={setSkipDirectory} />
+          <Toggle label="Find emails with the vendors, not the shared directory" hint="For the leads this run works on. Uses AI credits; what they find still updates the directory." checked={skipDirectory} onChange={setSkipDirectory} />
         )}
         <p className="text-small text-muted">
-          A run works on up to 50 leads at each step. Budget per lead: {ceiling == null ? "no limit" : usd(ceiling, 2)}; a lead that reaches it makes no more paid calls.
+          A run works on up to 50 leads at each step. Budget per lead: {ceiling == null ? "no limit" : credits(ceiling)}; a lead that reaches it uses no more AI credits.
         </p>
       </div>
     </Drawer>

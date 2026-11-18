@@ -22,7 +22,7 @@ from outbound.pipeline import Pipeline, discover_companies
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import CompanyMention, PageLink, PageText, SearchHit, SourceQuery
 from outbound.services.discovery import PER_SOURCE
-from tests.db.test_credits import started, used
+from tests.db.test_credits import counted, started
 from tests.stages.fakes import screen_all
 from tests.stages.world import World
 
@@ -64,7 +64,7 @@ def test_companies_from_every_source_are_merged_screened_and_only_fits_become_le
     ws, pipeline, _, container = setup(engine, factory, platform)
     found = run(pipeline, container, ws, 5, "run-1")
     assert found.added == 2
-    assert used(factory, ws)["discovery"] == 2  # credits only for leads
+    assert counted(factory, ws)["discovery"] == 2  # counted only for leads
     with factory(ws) as uow:
         candidates = {c.name: c for c in uow.candidates.for_run("run-1")}
         leads = {c.domain: c for c in uow.companies.due(CompanyStatus.NEW, 50)}

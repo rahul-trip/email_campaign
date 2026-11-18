@@ -109,6 +109,7 @@ def populate(uow: UnitOfWork, ws: str) -> dict[str, str]:
         contact_id=jane.id,
         company_id=company.id,
         cost_micro_usd=24_500,
+        credits_milli=2_450,
     )
     batch = uow.imports.create_batch(ImportSource.CSV, "operator", filename="expo.csv")
     uow.imports.add_row(
@@ -268,7 +269,7 @@ def test_rows_and_costs_are_kept_so_the_books_still_add_up(
         forget_email(uow, PERSON)
         uow.commit()
     with factory(ws) as uow:
-        assert uow.calls.spend_on_company(ids["company"]) == 24_500
+        assert uow.calls.credits_on_company(ids["company"]) == 2_450
 
 
 def test_a_colleague_and_the_company_are_left_untouched(

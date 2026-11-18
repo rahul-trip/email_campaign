@@ -144,13 +144,14 @@ def test_the_waterfall_lists_every_provider_call_for_the_lead(
                 request_hash="h",
                 outcome=outcome,
                 cost_micro_usd=cost,
+                credits_milli=cost // 10,
                 company_id=company.id,
             )
         uow.commit()
     steps = leads(factory, ws).waterfall(company.id)
-    assert [(s.provider, s.outcome, s.cost_micro_usd) for s in steps] == [
+    assert [(s.provider, s.outcome, s.credits_milli) for s in steps] == [
         ("hunter", "miss", 0),
-        ("zerobounce", "hit", 160_000),
+        ("zerobounce", "hit", 16_000),
     ]
 
 

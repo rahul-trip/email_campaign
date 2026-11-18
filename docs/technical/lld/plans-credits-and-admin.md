@@ -2,74 +2,89 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-27 (5f6dee4)
+last_verified: 2026-11-18 (phase-6/ai-credits)
 applies_to: Phase 6d
 ---
 
 # Plans, credits and admin
 
-**Code:** `outbound/domain/entitlements.py`, `outbound/db/models.py` (`PlanRow`/`OverrideRow`/`GrantRow`/`UsageEventRow`/`PlatformSettingsRow`), `outbound/db/platform.py`, `outbound/api/routers/admin.py`, `outbound/services/entitlements.py` (guard call sites in `runner/`) · **Layer:** domain → db → services → api · **Tests:** `tests/domain/test_entitlements.py`, `tests/services/test_entitlements.py`
+**Code:** `outbound/domain/credits.py`, `outbound/domain/entitlements.py`, `outbound/domain/platform_settings.py`, `outbound/metering/metered.py::Meter.record`, `outbound/metering/quota.py`, `outbound/db/repositories/plans.py`, `outbound/services/admin.py`, `outbound/api/routers/admin.py` (guard call sites in `outbound/runner/guards.py`) · **Layer:** domain → db → metering → runner → services → api · **Tests:** `tests/domain/test_entitlements.py`, `tests/db/test_plans.py`, `tests/db/test_quota.py`, `tests/db/test_credits.py`, `tests/db/test_resume.py`, `tests/db/test_metered.py`, `tests/api/test_admin.py`, `tests/api/test_usage.py`
 
 ## Purpose
 
-With more than one paying customer, the platform needs to meter and cap usage per workspace, let a platform admin adjust an individual customer's limits without shipping code, and give a customer a read-only grace period rather than an abrupt cutoff when access lapses. All of it is pure, testable arithmetic in `outbound/domain/entitlements.py` — no I/O — composed from a plan, that customer's overrides and grants, and what has already been used this period.
+Every workspace has one balance of **AI credits** a month. Every third-party vendor call and every model call uses AI credits; customers see AI credits only, never dollars and never per-step counts. A superadmin defines the plans (Free, Starter, Pro by default) and what an AI credit stands for; a platform admin can grant extra credits, override a customer's settings and extend access ([ADR 0034](../adr/0034-one-ai-credit-balance-metered-per-call.md), which supersedes [ADR 0027](../adr/0027-credits-charged-once-per-lead-per-step.md)).
 
 ## Responsibilities
 
-- Define a `Plan`'s limits (per `UsageStep`, plus seats/mailboxes/campaigns/budget-per-prospect/features) and compute the `Entitlements` actually in force once a workspace's active `Override`s are layered on.
-- Track usage with one `usage_events` row per charge, enforce "once per lead per step, except `rewrite`" at the database level, and compute what remains in the current monthly period.
-- Decide `AccessLevel` (full / read-only / locked) from `WorkspaceStatus` and an `access_until` date, and whether the worker may run for a workspace at all (`engine_may_run`).
-- Give the platform admin console the reads and writes it needs (plan catalog, per-customer overrides and grants, vendor keys) without ever touching tenant data through anything but `PlatformUnitOfWork` ([tenancy and isolation](tenancy-and-isolation.md)).
+- Turn every metered call into AI credits when it is made and stamp them on its ledger row (`provider_calls.credits_milli`), so a later change of rate never rewrites history.
+- Define a `Plan` (monthly AI credits, seats, mailboxes, campaigns, the most a customer may set as budget per lead, features, access days) and compute the `Entitlements` in force once a workspace's active `Override`s are applied.
+- Compute what is left this period: monthly credits plus active grants minus the credits the period's calls used.
+- Decide `AccessLevel` and whether the worker may run for a workspace (`engine_may_run`), unchanged from before.
+- Give the console the reads and writes it needs, with plan definition and the credit rate reserved to superadmins (`Permission.ADMIN_PLANS`).
 
-**Not its job:** what a step costs in actual vendor/LLM spend — that is `outbound/metering/` ([metering](metering.md)); entitlements cap *count* ("5 discoveries this month"), metering caps *money* ("$20 of ZeroBounce this month"). The two guards run independently and either can block a step.
+## How a call becomes AI credits
+
+| Call | AI credits (thousandths, rounded up) |
+|---|---|
+| A model call whose model has a charge in `PlatformSettings.llm_charges` | `domain/credits.py::llm_credits`: input tokens × charge per million in + output tokens × charge per million out |
+| Any other paid call (and a model with no charge but a dollar price in `LLM_PRICES`) | `domain/credits.py::credits_for`: its cost in micro-USD ÷ `PlatformSettings.credit_value_micro_usd` (default 10,000: one credit per US cent) |
+| A cache hit, an error, a call blocked by a cap, a free vendor | 0 |
+
+`Meter.record` reads the platform settings in the same short transaction that writes the row. The dollar cost stays on the row (`cost_micro_usd`) for the platform's own books and the admin console; nothing a customer sees reads it. Calls made before migration 0029 keep `credits_milli = 0`: they are not converted.
+
+A model with no charge set uses no credits; the Language model card in the console says so.
 
 ## Public interface
 
 | Symbol | Kind | What it does |
 |---|---|---|
-| `entitlements.py::Plan` | dataclass | `limits: Mapping[UsageStep, int\|None]` (missing = unlimited), `seats`, `mailboxes`, `active_campaigns`, `max_leads_per_run`, `max_prospect_budget_micro_usd`, `features`, `access_days` |
-| `entitlements.py::FREE`, `UNLIMITED` | `Plan` constants | `FREE`: 5 discovery + 5 manual leads, no other features. `UNLIMITED`: every limit `None`; used for workspaces predating plans and for the platform's own test/demo use |
-| `entitlements.py::Override` | dataclass | One customer-specific change: `key` (`limit.<step>`, `seats`, `mailboxes`, `active_campaigns`, `max_leads_per_run`, `max_prospect_budget`, `feature.<name>`), `value`, optional `expires_at`/`revoked_at` |
-| `entitlements.py::Grant` | dataclass | Extra credits for one `UsageStep`, with its own expiry |
-| `entitlements.py::effective_entitlements(plan, overrides, now)` | function | The plan with active overrides folded in, latest `created_at` wins per key |
-| `entitlements.py::period_bounds(anchor, now)` | function | The current monthly period, counted from the day the plan started (not the calendar month) |
-| `entitlements.py::available(step, entitlements, grants, used, now)` | function | `limit + active grants - used`, floored at 0, or `None` if unlimited |
-| `entitlements.py::compute_quota(...)` → `Quota` | function | Everything one screen or one guard needs about a workspace at one moment: entitlements, a `StepQuota` per step, the period, access level, whether the engine may run |
-| `entitlements.py::access_level(status, access_until, now)`, `engine_may_run(status, level)` | functions | `AccessLevel.FULL`/`READ_ONLY`/`LOCKED`, and whether the worker should pick up this workspace's runs |
-| `outbound/db/platform.py::PlatformUnitOfWork` | class | Reads/writes `PlanRow`, `OverrideRow`, `GrantRow`, cross-workspace `UsageEventRow` aggregates, `PlatformSettingsRow` (vendor keys) |
+| `credits.py::credits_for(cost_micro_usd, credit_value_micro_usd)` | function | A call's dollar cost as milli-credits, rounded up; 0 for a free call |
+| `credits.py::llm_credits(input_tokens, output_tokens, per_million_in, per_million_out)` | function | A model call's milli-credits at its charge, rounded up |
+| `entitlements.py::Plan` | dataclass | `monthly_credits` (None: unlimited), `seats`, `mailboxes`, `active_campaigns`, `max_leads_per_run`, `max_prospect_budget_credits`, `features`, `access_days` |
+| `entitlements.py::FREE`, `STARTER`, `PRO`, `DEFAULT_PLANS` | `Plan` constants | 100, 2,000 and 10,000 AI credits a month; the catalog a fresh install starts with |
+| `entitlements.py::UNLIMITED` | `Plan` constant | No limits; for workspaces with no plan row and the platform's own use |
+| `entitlements.py::Override` | dataclass | One customer-specific change: `monthly_credits`, `seats`, `mailboxes`, `active_campaigns`, `max_leads_per_run`, `max_prospect_budget`, `feature.<name>` |
+| `entitlements.py::Grant` | dataclass | Extra AI credits, added to each period's allowance while active; `step` is set only on grants made before migration 0029 |
+| `entitlements.py::compute_quota(assignment, plan, overrides, grants, used_milli, status, now)` → `Quota` | function | `Quota.credits` (`CreditQuota`: monthly, granted, allowance, used and remaining milli-credits), the period, access, engine; `has_credits()`, `near_limit` |
+| `platform_settings.py::PlatformSettings` | dataclass | Adds `credit_value_micro_usd`, `vendor_caps` (AI credits a month per vendor) and `llm_charges` (model → credits per million tokens in and out) |
+| `metering/quota.py::quota_in`, `credit_left`, `WAIT_STEP` | functions, map | The workspace's quota now; whether any credits are left; where a lead waits before each paying stage |
+| `repositories/plans.py::UsageRepository.credits_used(start, end)` | method | The period's used milli-credits, from `provider_calls` |
 
 ## How it works
 
-### A plan plus overrides plus grants equals a quota
+### Monthly credits plus grants minus use
 
 ```mermaid
 flowchart LR
-    Plan["Plan (catalog)"] --> EE["effective_entitlements()"]
-    Override["active Overrides<br/>(this customer)"] --> EE
+    Plan["Plan: monthly AI credits"] --> EE["effective_entitlements()"]
+    Override["active Overrides"] --> EE
     EE --> Q["compute_quota()"]
-    Grant["active Grants<br/>(extra credits)"] --> Q
-    Used["usage_events<br/>this period"] --> Q
+    Grant["active Grants (AI credits)"] --> Q
+    Used["provider_calls.credits_milli<br/>this period"] --> Q
     Status["WorkspaceStatus +<br/>access_until"] --> Q
-    Q --> Quota["Quota: per-step remaining,<br/>AccessLevel, engine: bool"]
+    Q --> Quota["Quota: credits left,<br/>AccessLevel, engine"]
 ```
 
-`effective_entitlements` applies overrides in `created_at` order so the latest setting of a given key wins — an override is never deleted to undo it, it is revoked (`revoked_at` set) or left to expire, keeping the full history. A `limit.<step>` override whose `value` is `None` means "make this step unlimited for this customer," distinct from simply absent (which means "use the plan's own limit").
+A grant adds its credits to every period while it is active, so the console defaults a grant's expiry to the end of the current period ("this month only").
 
-### Counting usage: once per lead, except rewrites
+### Where credits are checked
 
-`usage_events` has no foreign key to `companies` — deleting a lead must not refund its credit, which a cascading delete or an `ON DELETE SET NULL` could accidentally do. Instead, a partial unique index enforces the business rule directly in the schema:
+| Where | Check |
+|---|---|
+| `runner/guards.py::Guards.check` | A stage that makes paid calls (`Stage.spends`) starts only while credits are left; otherwise the lead waits in place at `WAIT_STEP[stage]` (`companies.credit_wait_step`). A stage that has started finishes, so the balance may go a little below nothing |
+| `services/intake.py::_Credits` | Adding a lead uses no credits, but a person's rows wait while none are left. A company discovery screened is always added |
+| `pipeline.py::discover_companies`, `services/autodiscovery.py` | No search without credits |
+| `services/review.py::revise`, `services/leads.py` (write it again) | Refused before the model is asked when none are left |
+| `metering/budget.py::check_budget` | The workspace's budget per lead (`budget_per_prospect_credits`) in AI credits; the environment's monthly safety caps per vendor stay in dollars and are the platform's |
+| `services/vendors.py::enforce_caps` | Pauses a vendor whose month's calls, across every customer, reached its cap in AI credits |
 
-```sql
-CREATE UNIQUE INDEX ux_usage_events_once_per_lead
-    ON usage_events (workspace_id, step, company_id)
-    WHERE step <> 'rewrite';
-```
+### Resuming
 
-Every step except `REWRITE` ([`UsageStep`](#the-seven-steps)) may be charged at most once per `(workspace_id, company_id)` — a lead that is researched twice (say, after being reset) is charged once, because the service inserts the row with `INSERT ... ON CONFLICT DO NOTHING`-equivalent handling and checks `available()` before doing the paid work at all, not after. `REWRITE` has no such ceiling in the index: every "write it again" is its own row, because it is the one step a customer can legitimately trigger many times on the same lead.
+`services/resume.py::ResumeService` releases every waiting lead and row, oldest first, once credits exist (a grant, a larger plan or override, a new period, extended access). A lead released while credits are short simply waits again before its next paying stage.
 
-### The seven steps
+### Activity counts are not credits
 
-`DISCOVERY`, `MANUAL` (a company a person added, once accepted as a lead), `RESEARCH`, `EMAIL`, `COPY`, `DELIVER`, `REWRITE`. The first six map one-to-one onto a status transition a lead makes exactly once (`ONCE_PER_LEAD = frozenset(UsageStep) - {REWRITE}`); `REWRITE` maps onto a copy-stage action a person can repeat.
+`usage_events` still records each step once per lead (and every rewrite) for reports and the console's "leads added" and "drafts made". Nothing limits on it.
 
 ### Periods anchored to plan start, not the calendar
 
@@ -87,35 +102,35 @@ Every step except `REWRITE` ([`UsageStep`](#the-seven-steps)) may be charged at 
 
 ### Platform admin console
 
-`outbound/api/routers/admin.py` (behind `require_platform(Permission.ADMIN_READ/ADMIN_WRITE/ADMIN_KEYS)`) exposes: the plan catalog (read-only list of `Plan`s, which are code constants plus any catalog rows — the editable part is overrides and grants, not the plans themselves, keeping the plan list auditable in code review); per-workspace `Quota` (what the Plan & Usage screen shows); creating/revoking an `Override` or `Grant`; setting `access_until`/`WorkspaceStatus`; and platform vendor keys (`PlatformSettingsRow`, AES-256-GCM-encrypted through the same `Keyring` as mailbox credentials — see [tenancy and isolation](tenancy-and-isolation.md#responsibilities)). Every admin write goes through `PlatformUnitOfWork` and writes an `audit_log` row ([identity and access](identity-and-access.md#audit-log)).
+`outbound/api/routers/admin.py` behind `require_platform(...)`: platform admins (`ADMIN_READ`, `ADMIN_WRITE`) see every plan and customer, grant and withdraw AI credits, override settings, set access and status, set vendor caps in AI credits and model charges (`ADMIN_KEYS`). Superadmins also hold `ADMIN_PLANS`: they edit the plan catalog, choose the default plan and set what an AI credit stands for (`PUT /api/admin/plans/credit-value`). The console shows customers' use in AI credits and, for staff only, what those calls cost the platform in dollars. Every write goes through `PlatformUnitOfWork` with its `audit_log` row.
 
 ## Invariants
 
-- `available()` never returns a negative number; a step either has credit or it does not.
-- A step in `ONCE_PER_LEAD` can be charged for the same `(workspace_id, company_id)` at most once, enforced by the database, not just application logic.
-- `engine_may_run` is false for any status other than `ACTIVE`, regardless of overrides or grants — no override can make a `SUSPENDED` workspace run.
-- An `Override`/`Grant`'s `active(now)` is `revoked_at is None and (expires_at is None or expires_at > now)`; nothing elsewhere re-derives activeness differently.
+- What is left is never shown below zero, though use may pass the allowance by what one started stage cost.
+- A call's AI credits are fixed when it is made: changing the rate or a model's charge never changes a past row.
+- `engine_may_run` is false for any status other than `ACTIVE`, whatever the credits.
+- An `Override`/`Grant`'s `active(now)` is `revoked_at is None and (expires_at is None or expires_at > now)`.
 
 ## Errors and failure behaviour
 
 | Situation | Behaviour |
 |---|---|
-| A step has no credit remaining | The service call site raises a typed error before doing the paid work (never after); the API returns `402`-shaped problem detail, `credit_exhausted` |
+| No AI credits left | A paying stage does not start and the lead waits in place; a rewrite is refused before the model is asked; resuming by hand returns `409 no_credits` with the renewal date |
 | `access_level` is `READ_ONLY` | Writes guarded by workspace permissions return `403`, `access_lapsed`; reads still succeed |
 | `access_level` is `LOCKED` | Every workspace-scoped route (read or write) returns `403`; only a platform admin route can see why |
-| A duplicate once-per-lead usage event is attempted | The unique index refuses the insert; the service treats this as "already charged," not an error surfaced to the user |
+| A model with no charge set | Its calls use no AI credits; the console's Language model card warns |
 
 ## Transactions and concurrency
 
-Charging a step and doing the paid work are not one atomic unit — the service checks `available()`, performs the step, and only then inserts the `usage_events` row, inside the same short transaction pattern as everything else (no network call inside an open transaction: the check and the charge are separate from the stage's own work). Two concurrent attempts to charge the same once-per-lead step race on the unique index; the loser's insert fails and is treated as "already charged," not retried as new work.
+The credits are written with the call's ledger row, in the meter's own short transaction. The guard reads the balance before a stage starts; two stages that start at once may both finish past the allowance, which is accepted.
 
 ## Configuration
 
-Plans are code constants (`FREE`, `UNLIMITED`, and any others added to the catalog) — not environment-configured. `outbound/db/platform.py` connection settings are covered in [tenancy and isolation](tenancy-and-isolation.md#three-connections).
+The plan catalog, the credit rate and model charges live in `platform_settings` (JSON, `outbound/domain/platform_settings.py`) and are edited in the console. A fresh install starts with Free, Starter and Pro.
 
 ## Observability
 
-`usage_events` **is** the usage ledger — the Plan & Usage screen and any billing reconciliation read it directly rather than a derived counter. Admin writes (override/grant created or revoked, plan/status/access_until changed) are in `audit_log`.
+`provider_calls.credits_milli` **is** the AI-credit ledger; `runs.credits_milli` totals a run. Admin writes (`plan_saved`, `credit_value_set`, `credits_granted`, `llm_charges_changed`, `vendor_cap_set`, …) are in `audit_log`.
 
 ## Security and privacy
 
@@ -125,23 +140,25 @@ Platform vendor keys and workspace entitlements are platform data with `ADMIN_KE
 
 | File | Proves |
 |---|---|
-| `tests/domain/test_entitlements.py` | `effective_entitlements` override ordering and key parsing; `period_bounds` month-anchoring and short-month clamping; `available` floors at zero; `access_level`/`engine_may_run` truth table |
-| `tests/services/test_entitlements.py` | Once-per-lead charging is idempotent under the unique index; `REWRITE` charges every call; admin override/grant create-revoke round trip with audit rows |
+| `tests/domain/test_entitlements.py` | The three plans; overrides; credits left; cost and token charges into AI credits; periods; access |
+| `tests/db/test_metered.py` | Each call stamped at the rate in force; model charges; budget per lead in credits |
+| `tests/db/test_credits.py`, `tests/db/test_resume.py` | Waiting in place without credits, resuming after a grant, discovery and rewrites refused, finished stages may overdraw |
+| `tests/api/test_admin.py` | Superadmin-only plans and credit rate; grants in AI credits; model charges; staff see dollar cost |
 
 ## Known limitations
 
-- The plan catalog itself (not a customer's overrides) is a code change, by design — there is no admin UI to invent a new plan shape, only to assign and adjust one for a customer. Adding a genuinely new plan still means a PR.
-- `max_leads_per_run` and `max_prospect_budget_micro_usd` are entitlement ceilings read by the runner and the research/email stages respectively, but are not yet surfaced on the Plan & Usage screen as "how close are you" — only as a hard stop.
+- Calls made before migration 0029 have no AI credits; a period that spans the migration counts only later calls.
+- A model with no charge set is free to customers until a charge is entered.
+- `max_prospect_budget_credits` is shown but not yet enforced when a customer saves their budget per lead.
 
 ## Planned
 
-Usage-based billing integration (Stripe metered billing reading `usage_events`) is out of scope for Phase 6; the register notes it as the natural next consumer of this ledger.
+Billing (6e) charges for plans and AI-credit top-ups, reading `provider_calls.credits_milli`.
 
 ## How to refresh this page
 
 ```bash
-sed -n '1,271p' outbound/domain/entitlements.py
-sed -n '805,835p' outbound/db/models.py
-grep -n "UsageStep" outbound/domain/enums.py
-uv run pytest tests/domain/test_entitlements.py tests/services/test_entitlements.py -q
+cat outbound/domain/credits.py outbound/domain/entitlements.py outbound/domain/platform_settings.py
+grep -n "credits" outbound/metering/metered.py outbound/runner/guards.py
+uv run pytest tests/domain/test_entitlements.py tests/db/test_credits.py tests/api/test_admin.py -q
 ```

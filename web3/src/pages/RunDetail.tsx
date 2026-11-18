@@ -6,7 +6,7 @@ import { client, ok, type Schemas } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
 import { Button, buttonClass, Callout, Card, Empty, Input, PageHeader, Problem, QueryState, Sections, Skeleton, Stat, Table, Td, Th } from "../ui/compat";
 import { cx } from "../lib/cx";
-import { ago, duration, usd, when, words } from "../lib/format";
+import { ago, duration, credits, when, words } from "../lib/format";
 import { OUTCOME_LABEL, STAGES, STAGE_LABEL, countsOf, discoveryLine, totalsOf } from "../lib/runs";
 import { candidateVerdict, describe, discoverySource, leadStatus, runStatus } from "../lib/status";
 
@@ -82,7 +82,7 @@ export function RunDetailPage() {
               <StatusBadge status={describe(runStatus, data.status)} />
               <span>Started {when(data.started_at) || "not yet"}</span>
               {data.finished_at && <span>Finished {when(data.finished_at)}</span>}
-              <span>Spend {usd(data.cost_micro_usd)}</span>
+              <span>Used {credits(data.credits_milli)}</span>
               <span className="font-mono text-muted">{data.id}</span>
             </span>
           }
@@ -93,7 +93,7 @@ export function RunDetailPage() {
           <Stat label="Steps completed" value={totals.moved} hint={`${totals.newLeads} new lead${totals.newLeads === 1 ? "" : "s"} found`} tone="good" />
           <Stat label="Held" value={totals.held} hint={totals.held ? "waiting on you or a rule" : "none"} tone={totals.held ? "attention" : undefined} />
           <Stat label="Failed" value={totals.failed} hint={totals.failed ? "see the list below" : "none"} tone={totals.failed ? "error" : undefined} />
-          <Stat label="Spend" value={usd(data.cost_micro_usd)} hint={totals.moved ? `${usd(data.cost_micro_usd / totals.moved)} per step completed` : "no paid calls"} />
+          <Stat label="AI credits" value={credits(data.credits_milli)} hint={totals.moved ? `${credits(data.credits_milli / totals.moved)} per step completed` : "no paid calls"} />
         </div>
 
         {(totals.failed > 0 || data.status === "failed") && (
@@ -192,7 +192,7 @@ export function RunDetailPage() {
           </Card>
         )}
 
-        <Card collapsible tour="run-calls" title="What it spent, by vendor" subtitle="Every vendor call this run made. Reused answers cost nothing." className="mb-5">
+        <Card collapsible tour="run-calls" title="AI credits it used, by vendor" subtitle="Every vendor and model call this run made. Reused answers use no credits." className="mb-5">
           <QueryState query={calls} shape="table">
             {(rows) =>
               rows.length === 0 ? (
@@ -209,7 +209,7 @@ export function RunDetailPage() {
                       <Th className="text-right">Reused</Th>
                       <Th className="text-right">Errors</Th>
                       <Th className="text-right">Avg time</Th>
-                      <Th className="text-right">Cost</Th>
+                      <Th className="text-right">AI credits</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -223,7 +223,7 @@ export function RunDetailPage() {
                         <Td className="tnum text-right text-small">{c.reused}</Td>
                         <Td className={cx("tnum text-right text-small", c.errors > 0 && "font-semibold text-error")}>{c.errors}{c.blocked ? ` (+${c.blocked} blocked)` : ""}</Td>
                         <Td className="tnum text-right text-small text-muted">{c.avg_latency_ms == null ? "–" : `${c.avg_latency_ms} ms`}</Td>
-                        <Td className="tnum text-right text-small">{usd(c.cost_micro_usd)}</Td>
+                        <Td className="tnum text-right text-small">{credits(c.credits_milli)}</Td>
                       </tr>
                     ))}
                     <tr className="border-t border-line font-semibold">
@@ -231,7 +231,7 @@ export function RunDetailPage() {
                       <Td />
                       <Td className="tnum text-right text-small">{rows.reduce((n, c) => n + c.calls, 0)}</Td>
                       <Td colSpan={5} />
-                      <Td className="tnum text-right text-small">{usd(rows.reduce((n, c) => n + c.cost_micro_usd, 0))}</Td>
+                      <Td className="tnum text-right text-small">{credits(rows.reduce((n, c) => n + c.credits_milli, 0))}</Td>
                     </tr>
                   </tbody>
                 </Table>

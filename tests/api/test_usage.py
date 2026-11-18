@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 
 from outbound.api.deps import Services
-from outbound.domain.enums import MembershipRole, UsageStep
+from outbound.domain.enums import CallOutcome, MembershipRole, UsageStep
 from tests.api.conftest import ADMIN, Api, add_user, sign_in
 
 
@@ -25,9 +25,16 @@ def free(app_and_services: tuple[FastAPI, Services]) -> Services:
     return services
 
 
-def grant(services: Services, step: UsageStep, amount: int) -> None:
+def grant(services: Services, amount: int) -> None:
     with services.container.platform() as p:
-        p.plans.add_grant(services.workspace_id, step, amount)
+        p.plans.add_grant(services.workspace_id, amount)
+        p.commit()
+
+
+def no_credits(services: Services) -> None:
+    """The month's AI credits are all used."""
+    with services.container.platform() as p:
+        p.plans.add_override(services.workspace_id, "monthly_credits", 0)
         p.commit()
 
 
@@ -39,55 +46,58 @@ def add_leads(api: Api, count: int, start: int = 0) -> None:
         )
 
 
-def test_usage_shows_the_plan_the_meters_and_when_they_renew(api: Api, free: Services) -> None:
-    add_leads(api, 3)
+def test_usage_shows_the_plan_its_ai_credits_and_when_they_renew(api: Api, free: Services) -> None:
+    with free.container.uow(free.workspace_id) as uow:
+        uow.calls.record(
+            provider="hunter", operation="find", request_hash="h", outcome=CallOutcome.HIT,
+            cost_micro_usd=245_000, credits_milli=24_500,
+        )  # fmt: skip
+        uow.commit()
+    grant(free, 50)
     body = api.get("/api/usage").json()
     assert (body["plan_code"], body["access"], body["engine"]) == ("free", "full", True)
-    steps = {s["step"]: s for s in body["steps"]}
-    assert steps["manual"] == {
-        "step": "manual",
-        "limit": 5,
-        "granted": 0,
-        "used": 3,
-        "remaining": 2,
+    assert body["credits"] == {
+        "monthly": 100,
+        "granted": 50,
+        "allowance": 150,
+        "used_milli": 24_500,
+        "remaining_milli": 125_500,
     }
-    assert steps["research"]["limit"] is None and steps["research"]["remaining"] is None
+    assert [(g["amount"], g["step"]) for g in body["grants"]] == [(50, None)]
     assert body["period_end"] > body["period_start"] and body["access_until"]
-    assert (body["seats"], body["mailboxes"], body["active_campaigns"]) == (3, 1, 2)
+    assert (body["seats"], body["mailboxes"], body["active_campaigns"]) == (1, 1, 1)
     assert body["waiting_leads"] == {} and body["waiting_rows"] == 0
 
 
-def test_the_sixth_manual_lead_waits_and_a_grant_resumes_it(api: Api, free: Services) -> None:
-    add_leads(api, 5)
-    sixth = api.post("/api/targets", json={"website": "sixth.com", "country": "UK"}).json()
+def test_a_lead_added_with_no_credits_left_waits_and_a_grant_resumes_it(
+    api: Api, free: Services
+) -> None:
+    add_leads(api, 2)  # adding a lead uses no AI credits
+    no_credits(free)
+    later = api.post("/api/targets", json={"website": "later.com", "country": "UK"}).json()
     assert (
-        sixth["rows"][0]["status"] == "pending"
-        and "waiting for credits" in sixth["rows"][0]["reason"]
+        later["rows"][0]["status"] == "pending"
+        and "waiting for credits" in later["rows"][0]["reason"]
     )
     assert api.get("/api/usage").json()["waiting_rows"] == 1
 
     refused = api.post("/api/targets/resume")
-    assert refused.json() == {"leads": 0, "rows": 0}  # no credit: nothing happens, no error
+    assert refused.json() == {"leads": 0, "rows": 0}  # no credits: nothing happens, no error
     refused_all = api.post("/api/companies/resume")
     assert refused_all.status_code == 409 and refused_all.json()["code"] == "no_credits"
-    assert (
-        refused_all.json()["step"] == "manual"
-        and "Credits renew on" in refused_all.json()["detail"]
-    )
+    assert "Credits renew on" in refused_all.json()["detail"]
 
-    grant(free, UsageStep.MANUAL, 1)
+    grant(free, 100)
     assert api.post("/api/companies/resume").json() == {"leads": 0, "rows": 1}
     assert api.get("/api/usage").json()["waiting_rows"] == 0
-    assert api.get("/api/companies?q=sixth.com").json()["total"] == 1
+    assert api.get("/api/companies?q=later.com").json()["total"] == 1
 
 
 def test_a_lead_parked_mid_pipeline_is_listed_and_can_be_resumed_by_hand(
     api: Api, free: Services
 ) -> None:
     add_leads(api, 1)
-    with free.container.platform() as p:
-        p.plans.add_override(free.workspace_id, "limit.research", 0)
-        p.commit()
+    no_credits(free)
     with free.container.uow(free.workspace_id) as uow:
         company = uow.companies.search()[0][0]
         uow.companies.wait_for_credit(company.id, UsageStep.RESEARCH)
@@ -101,7 +111,8 @@ def test_a_lead_parked_mid_pipeline_is_listed_and_can_be_resumed_by_hand(
 
     refused = api.post(f"/api/companies/{company.id}/resume")
     assert refused.status_code == 409 and refused.json()["code"] == "no_credits"
-    grant(free, UsageStep.RESEARCH, 1)
+    assert refused.json()["step"] == "research"
+    grant(free, 100)
     assert api.post(f"/api/companies/{company.id}/resume").json() == {"leads": 1, "rows": 0}
     assert api.get("/api/companies?waiting_for_credits=true").json()["total"] == 0
 
@@ -113,13 +124,13 @@ def test_a_member_can_see_usage_and_ask_for_more_credits(
     add_user(app, "pat@customer.example", ws, MembershipRole.MEMBER)
     member = sign_in(app, "pat@customer.example")
     assert member.get("/api/usage").status_code == 200
-    asked = member.post("/api/usage/request-credits", json={"step": "manual", "note": "pilot week"})
+    asked = member.post("/api/usage/request-credits", json={"amount": 500, "note": "pilot week"})
     assert asked.status_code == 202
     with free.container.identity() as ids:
         [entry] = [
             e for e in ids.audit.recent(workspace_id=ws) if e["action"] == "credits_requested"
         ]
-    assert entry["data"] == {"step": "manual"} and entry["note"] == "pilot week"
+    assert entry["data"] == {"amount": 500} and entry["note"] == "pilot week"
     empty = member.post("/api/usage/request-credits", json={})
     assert empty.status_code == 422  # say what you need
 
@@ -152,7 +163,7 @@ def test_admin_credentials_are_unaffected_by_an_unrelated_workspaces_limits(
     _, services = app_and_services
     with services.container.platform() as p:
         p.plans.set_plan(other_ws, "free", started_at=datetime.now(UTC) - timedelta(days=1))
-        p.plans.add_override(other_ws, "limit.manual", 0)
+        p.plans.add_override(other_ws, "monthly_credits", 0)
         p.commit()
     add_leads(api, 7)  # this workspace has no plan row: unlimited
     assert ADMIN and api.get("/api/usage").json()["plan_code"] == "unlimited"

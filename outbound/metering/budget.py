@@ -1,9 +1,9 @@
 """Spend caps, checked before a paid call is made.
 
-Two caps exist: a monthly cap per provider (protects against a runaway loop or a plan that
-would be exceeded) and a ceiling per prospect (the plan's $0.50 rule). Both compare what the
-ledger already holds plus the expected price of the call about to be made, so a call that would
-cross the line is refused rather than made and regretted.
+Two caps exist: a monthly cap per provider, the platform's own safety net against a runaway loop,
+in dollars from the environment; and the customer's budget per prospect, in AI credits. Both
+compare what the ledger already holds plus the expected price of the call about to be made, so a
+call that would cross the line is refused rather than made and regretted.
 """
 
 from __future__ import annotations
@@ -13,14 +13,15 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from outbound.db.uow import UnitOfWork
+from outbound.domain.credits import credits_for, milli
 
-SETTING = "budget_per_prospect_micro_usd"
+SETTING = "budget_per_prospect_credits"
 
 
 @dataclass(frozen=True)
 class BudgetPolicy:
     monthly_caps: Mapping[str, int] = field(default_factory=dict)  # provider -> micro-USD
-    per_prospect: int | None = None  # micro-USD; None means no ceiling
+    per_prospect: int | None = None  # AI credits; None means no ceiling
     # Read the per-prospect ceiling from the workspace at every check, so a change made in the
     # app applies to the next paid call without restarting the worker.
     live: bool = False
@@ -66,10 +67,12 @@ def check_budget(
     if cap is not None:
         spent = uow.calls.spend_since(provider, month_start(now))
         if spent + expected_cost > cap:
-            return f"monthly cap for {provider} reached ({spent} of {cap} micro-USD spent)"
+            return f"the platform's monthly limit for {provider} is reached"
     ceiling = policy.ceiling(uow) if company_id is not None else None
     if ceiling is not None and company_id is not None:
-        spent = uow.calls.spend_on_company(company_id)
-        if spent + expected_cost > ceiling:
-            return f"per-prospect budget reached ({spent} of {ceiling} micro-USD spent)"
+        spent = uow.calls.credits_on_company(company_id)
+        rate = uow.platform_settings.get()[0].credit_value_micro_usd
+        if spent + credits_for(expected_cost, rate) > milli(ceiling):
+            used = spent / 1000
+            return f"budget per prospect reached ({used:g} of {ceiling} AI credits used)"
     return None

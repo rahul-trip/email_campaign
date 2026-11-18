@@ -117,7 +117,7 @@ CREATE TABLE workspaces (
                   -- moves only as the WORKSPACE state machine allows
   deletion_due_at TIMESTAMP,                      -- set while pending_deletion
   sender_profile  JSON NOT NULL,  -- legal name, postal address, registration no., narrative, value props, signature
-  settings        JSON NOT NULL,  -- send_enabled (false), safe_to_send_only (true), budget_per_prospect_micro_usd,
+  settings        JSON NOT NULL,  -- send_enabled (false), safe_to_send_only (true), budget_per_prospect_credits,
                                   -- breaker {hard_per_100: 3, hard_per_24h: 2}, catch_all_resolver,
                                   -- reply_webhook_url, few_shot_examples (5), timezone
   created_at      TIMESTAMP NOT NULL,
@@ -480,7 +480,8 @@ CREATE TABLE runs (
   params           JSON,
   status           TEXT NOT NULL CHECK (status IN ('queued','running','succeeded','failed','cancelled')),
   counts           JSON,
-  cost_micro_usd   BIGINT NOT NULL DEFAULT 0,
+  cost_micro_usd   BIGINT NOT NULL DEFAULT 0,  -- what the run's calls cost the platform
+  credits_milli    BIGINT NOT NULL DEFAULT 0,  -- AI credits they used, in thousandths (0029)
   started_at       TIMESTAMP,
   finished_at      TIMESTAMP,
   heartbeat_at     TIMESTAMP       -- touched between leads; a running run without one for 30
@@ -498,7 +499,10 @@ CREATE TABLE provider_calls (     -- append-only
   request_hash    TEXT NOT NULL,   -- sha256 of the normalised request
   outcome         TEXT NOT NULL CHECK (outcome IN ('hit','miss','error','cache_hit','blocked_by_cap')),
   response        JSON,            -- normalised; never secrets
-  cost_micro_usd  BIGINT NOT NULL DEFAULT 0,
+  cost_micro_usd  BIGINT NOT NULL DEFAULT 0,  -- the platform's own books; never shown to a customer
+  credits_milli   BIGINT NOT NULL DEFAULT 0,  -- AI credits the call used, in thousandths, stamped by
+                                              -- the meter at the rate (or model charge) in force (0029);
+                                              -- 0 on rows written before 0029, which are not converted
   latency_ms      INTEGER,
   detail          JSON             -- {"asked": ..., "got": ...} one line each, up to 300 characters (0021); NULL on older rows. May name a person or address: erased with `response`
 );
@@ -529,16 +533,20 @@ CREATE TABLE workspace_plans (
 );
 
 CREATE TABLE entitlement_overrides (      -- append-only; a change is a new row
-  key        TEXT NOT NULL,               -- limit.<step>, seats, mailboxes, active_campaigns,
-                                          -- max_leads_per_run, max_prospect_budget, feature.<name>
+  key        TEXT NOT NULL,               -- monthly_credits, seats, mailboxes, active_campaigns,
+                                          -- max_leads_per_run, max_prospect_budget (AI credits),
+                                          -- feature.<name>. 0029 revoked every limit.<step> row and
+                                          -- turned max_prospect_budget values from micro-USD to credits
   value      JSON NOT NULL,               -- {"value": 20 | null (unlimited) | true}
   expires_at TIMESTAMP, revoked_at TIMESTAMP,
   note       TEXT NOT NULL DEFAULT '', set_by TEXT
 );
 
-CREATE TABLE credit_grants (              -- extra credits for one step
-  step       TEXT NOT NULL CHECK (step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
-  amount     INTEGER NOT NULL CHECK (amount > 0),
+CREATE TABLE credit_grants (              -- extra AI credits, added to each period while active
+  step       TEXT CHECK (step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
+                                           -- NULL since 0029; set only on grants made per step before,
+                                           -- whose amount 0029 multiplied by 20 into AI credits
+  amount     INTEGER NOT NULL CHECK (amount > 0),  -- AI credits
   expires_at TIMESTAMP,                    -- NULL: never
   revoked_at TIMESTAMP, note TEXT NOT NULL DEFAULT '', granted_by TEXT
 );
@@ -567,14 +575,15 @@ CREATE TABLE discovery_candidates (
 );
 CREATE INDEX ix_discovery_candidates_run ON discovery_candidates (workspace_id, run_id);
 
--- One row per charge. outbound_app may SELECT and INSERT only. company_id is deliberately not a
--- foreign key: deleting a lead must not give its credits back.
+-- One row per step done on a lead, counted for reports; AI credits (provider_calls.credits_milli),
+-- not these, limit a workspace (0029). outbound_app may SELECT and INSERT only. company_id is
+-- deliberately not a foreign key: deleting a lead keeps the count.
 CREATE TABLE usage_events (
   step       TEXT NOT NULL CHECK (step IN ('discovery','manual','research','email','copy','deliver','rewrite')),
   company_id TEXT NOT NULL
 );
 CREATE UNIQUE INDEX ux_usage_events_once_per_lead ON usage_events (workspace_id, step, company_id)
-  WHERE step <> 'rewrite';                -- a step is charged once per lead; a rewrite every time
+  WHERE step <> 'rewrite';                -- a step is counted once per lead; a rewrite every time
 CREATE INDEX ix_usage_events_period ON usage_events (workspace_id, step, created_at);
 
 -- A platform table: one row, id 'platform'. Every role reads it; only outbound_platform writes.
@@ -584,7 +593,12 @@ CREATE TABLE platform_settings (
   version INTEGER NOT NULL, -- +1 on every save; a save states the version it read
   updated_at TIMESTAMP NOT NULL
 );
--- `data` also holds `paused_vendors` (keys ignored until resumed) and `llm` (overrides of the LLM_* settings).
+-- `data` also holds `paused_vendors` (keys ignored until resumed), `llm` (overrides of the LLM_* settings),
+-- and since 0029: each plan's `monthly_credits` and `max_prospect_budget_credits` (no per-step `limits`),
+-- `credit_value_micro_usd` (what one AI credit stands for; default 10000), `vendor_caps_credits`
+-- (AI credits a month per vendor; read from the old micro-USD `vendor_caps` if absent) and `llm_charges`
+-- ({model: [credits per million input tokens, per million output tokens]}). 0029 adds Starter and Pro
+-- to a saved catalog that lacks them.
 
 -- A platform table (migration 0013): only outbound_platform holds a grant. Replacing a key adds a
 -- version and retires the old one, which is kept 30 days for a rollback.
@@ -702,4 +716,4 @@ Migrations 0006–0009 (Phase 6a) are described above: the run heartbeat and loc
 | `import_batches.filename` | For webhook batches, `webhook:{event_id}`; a second request with the same event id is answered as a duplicate and creates nothing |
 | `runs.status` | `queued` (made by the API), `running` (claimed by the worker), then `succeeded`, `failed` or `cancelled`. A run cancelled while running stays `cancelled` when it finishes. `runs.counts` is `{stage: {outcome: n}}`, or `{"error": ...}` for a run that failed outright |
 | `mailboxes.dns_check` | `{domain, ok, spf, dkim, dmarc}`, each check `{name, ok, detail, record}` |
-| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_micro_usd`, `few_shot_examples`, `timezone`, `auto_discovery`, `auto_discovery_per_day` (1–6, default 4), `auto_discovery_review_limit` (default 50) and `auto_approve_cold` (default false). `send_enabled` cannot be switched on before Phase 5. The webhook secret is not stored here: it is the environment setting `INTAKE_WEBHOOK_SECRET` |
+| `workspaces.settings` | Editable from the app: `safe_to_send_only`, `budget_per_prospect_credits`, `few_shot_examples`, `timezone`, `auto_discovery`, `auto_discovery_per_day` (1–6, default 4), `auto_discovery_review_limit` (default 50) and `auto_approve_cold` (default false). `send_enabled` cannot be switched on before Phase 5. The webhook secret is not stored here: it is the environment setting `INTAKE_WEBHOOK_SECRET` |

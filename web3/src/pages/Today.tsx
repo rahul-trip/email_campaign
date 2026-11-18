@@ -12,7 +12,7 @@ import { describe as describeNotice } from "../app/Bell";
 import { useCounts } from "../app/Shell";
 import { useCurrent } from "../app/session";
 import { cx } from "../lib/cx";
-import { ago, percent, usd } from "../lib/format";
+import { ago, percent, credits } from "../lib/format";
 import { describeHold, leadStatus } from "../lib/status";
 import { useSetup } from "../lib/setup";
 import { buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
@@ -173,13 +173,13 @@ export function TodayPage() {
           loading={daily.isPending}
         />
         <Kpi
-          label="Vendor spend this week"
-          value={sum(pick("spend_micro_usd")(thisWeek))}
-          before={sum(pick("spend_micro_usd")(lastWeek))}
-          format={(n) => usd(n, 2)}
-          series={pick("spend_micro_usd")(days)}
+          label="AI credits used this week"
+          value={sum(pick("credits_milli")(thisWeek))}
+          before={sum(pick("credits_milli")(lastWeek))}
+          format={(n) => credits(n)}
+          series={pick("credits_milli")(days)}
           invert
-          why="What finders, verifiers, search and the model cost, from the call ledger."
+          why="What finders, verifiers, search and the AI model used, from the call ledger."
           tone="attention"
           loading={daily.isPending}
         />
@@ -206,7 +206,7 @@ function relative(iso: string) {
 const AUTO_REASON: Record<string, string> = {
   off: "Automatic discovery is switched off.",
   no_campaign: "Waiting for an active campaign with an ideal customer.",
-  no_credits: "No discovery credits left this period.",
+  no_credits: "No AI credits left this period.",
   run_in_progress: "A run is in progress.",
   review_full: "Paused: Review holds enough drafts. Work through them and it starts again.",
   backlog: "Paused: plenty of leads still wait for their emails.",

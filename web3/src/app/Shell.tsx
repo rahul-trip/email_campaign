@@ -9,10 +9,10 @@ import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu
 import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { cx } from "../lib/cx";
-import { ago } from "../lib/format";
+import { ago, credits } from "../lib/format";
 import { useNeedsCampaign } from "../lib/setup";
 import { useTheme, type Theme } from "../lib/theme";
-import { day, nearLimit, STEP_LABEL, useUsage, waitingTotal, type Usage } from "../lib/usage";
+import { creditState, day, nearLimit, useUsage, waitingTotal, type Usage } from "../lib/usage";
 import { Avatar, buttonClass, Kbd } from "../ui/core";
 import { Menu } from "../ui/overlay";
 import { Ring } from "../ui/viz";
@@ -196,11 +196,9 @@ function Frame({ children }: { children: ReactNode }) {
 
 function CreditsMeter({ usage }: { usage?: Usage }) {
   const navigate = useNavigate();
-  const limited = usage?.steps.filter((s) => s.limit !== null && s.limit > 0) ?? [];
-  if (!usage || limited.length === 0) return null;
-  // The tightest allowance is what the operator needs to see.
-  const tightest = limited.reduce((a, b) => ((a.remaining ?? 0) / (a.limit ?? 1) <= (b.remaining ?? 0) / (b.limit ?? 1) ? a : b));
-  const left = (tightest.remaining ?? 0) / (tightest.limit ?? 1);
+  const state = usage ? creditState(usage) : null;
+  if (!usage || state === null || state.allowance === 0) return null;
+  const left = Math.max(0, 1 - state.share);
   return (
     <button
       type="button"
@@ -211,10 +209,10 @@ function CreditsMeter({ usage }: { usage?: Usage }) {
       <Ring share={left} size={44} stroke={5} tone={left < 0.2 ? "error" : left < 0.4 ? "attention" : "good"} label={`${Math.round(left * 100)}`} title={`${Math.round(left * 100)}% left`} />
       <span className="min-w-0">
         <span className="block text-small font-semibold text-ink">
-          <span className="tnum">{tightest.remaining}</span> of <span className="tnum">{tightest.limit}</span> left
+          <span className="tnum">{credits(usage.credits.remaining_milli, false)}</span> of <span className="tnum">{state.allowance.toLocaleString()}</span> left
         </span>
         <span className="block truncate text-label text-muted">
-          {STEP_LABEL[tightest.step] ?? tightest.step} · renews {day(usage.period_end)}
+          AI credits · renew {day(usage.period_end)}
         </span>
       </span>
     </button>
@@ -371,12 +369,12 @@ function usageBanners(usage?: Usage): BannerItem[] {
   if (usage.access === "read_only") items.push({ key: "read-only", tone: "error", node: <>Access to this workspace ended on {day(usage.access_until)}, so it is read-only: nothing is lost, but nothing can be added or run. {plan("Ask for an extension")}.</> });
   if (usage.access === "full" && ending !== null && ending > 0 && ending < WEEK_MS) items.push({ key: "ending", tone: "attention", node: <>Your access ends on {day(usage.access_until)}. {plan("Ask for more time")}.</> });
   if (usage.access === "full" && !usage.engine) items.push({ key: "engine", tone: "error", node: "The engine is stopped for this workspace, so nothing runs. You can still read everything. Ask the team who runs the service." });
-  for (const s of nearLimit(usage)) {
-    const what = (STEP_LABEL[s.step] ?? s.step).toLowerCase();
+  const low = nearLimit(usage);
+  if (low) {
     items.push({
-      key: `credit-${s.step}`,
-      tone: s.out ? "error" : "attention",
-      node: <>{s.out ? `No credits left for ${what}` : `${s.remaining} credit${s.remaining === 1 ? "" : "s"} left for ${what}`}; they renew on {day(usage.period_end)}. {plan("See your plan")}.</>,
+      key: "credits",
+      tone: low.out ? "error" : "attention",
+      node: <>{low.out ? "No AI credits left, so paid work waits" : `${credits(usage.credits.remaining_milli)} left`}; they renew on {day(usage.period_end)}. {plan("See your plan")}.</>,
     });
   }
   return items;

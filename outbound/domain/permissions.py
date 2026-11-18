@@ -45,6 +45,7 @@ class Permission(StrEnum):
     ADMIN_READ = "admin.read"
     ADMIN_WRITE = "admin.write"
     ADMIN_KEYS = "admin.keys"
+    ADMIN_PLANS = "admin.plans"  # define plans and the value of an AI credit: superadmins only
 
 
 P = Permission
@@ -57,7 +58,8 @@ WORK: frozenset[Permission] = READ | {
     P.MAILBOXES_OWN, P.DIRECTORY_REPORT, P.DIRECTORY_SKIP,
 }  # fmt: skip
 PLATFORM: frozenset[Permission] = frozenset({P.ADMIN_READ, P.ADMIN_WRITE, P.ADMIN_KEYS})
-WORKSPACE_ALL: frozenset[Permission] = frozenset(set(Permission) - PLATFORM)
+SUPER: frozenset[Permission] = PLATFORM | {P.ADMIN_PLANS}
+WORKSPACE_ALL: frozenset[Permission] = frozenset(set(Permission) - SUPER)
 
 ROLE_PERMISSIONS: dict[MembershipRole, frozenset[Permission]] = {
     MembershipRole.ADMIN: WORKSPACE_ALL,
@@ -65,7 +67,7 @@ ROLE_PERMISSIONS: dict[MembershipRole, frozenset[Permission]] = {
 }
 PLATFORM_PERMISSIONS: dict[PlatformRole, frozenset[Permission]] = {
     PlatformRole.ADMIN: PLATFORM,
-    PlatformRole.SUPERADMIN: PLATFORM,
+    PlatformRole.SUPERADMIN: SUPER,
 }
 
 

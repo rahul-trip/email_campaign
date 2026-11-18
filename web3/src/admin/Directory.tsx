@@ -3,9 +3,9 @@ import { useState } from "react";
 import { client, ok } from "../api/client";
 import { Button, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Table, Td, Th } from "../ui/compat";
 import { DirectoryBrowser } from "./DirectoryBrowser";
+import { credits } from "../lib/format";
 import { When } from "./bits";
 
-const usd = (micro: number) => `$${(micro / 1e6).toFixed(2)}`;
 
 export function DirectoryPage() {
   const queryClient = useQueryClient();
@@ -33,7 +33,7 @@ export function DirectoryPage() {
                 <Tile label="People" value={f.people} />
                 <Tile label="Addresses" value={f.emails} />
                 <Tile label="Hits this month" value={`${f.hits} of ${f.lookups}`} />
-                <Tile label="Saved this month" value={usd(f.saved_micro_usd)} />
+                <Tile label="AI credits saved this month" value={credits(f.saved_credits_milli)} />
               </div>
               <Card title={`Reports to decide (${data.flags.length})`} subtitle="Until you decide, the reported address is not served to anyone.">
                 <Problem error={resolve.error} className="mb-2" />

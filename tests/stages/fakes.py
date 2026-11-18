@@ -42,6 +42,8 @@ class FakeLlm:
 
     name = "fake-llm"
     model = "fake-model"
+    INPUT_TOKENS = 1_000
+    OUTPUT_TOKENS = 200
 
     ROLES: ClassVar[dict[str, str]] = {
         "read a company's own web pages": "site",
@@ -159,7 +161,14 @@ class FakeLlm:
         self.users[role] = user
         reply = self._reply(role, user)
         text = reply if isinstance(reply, str) else json.dumps(reply)
-        return LlmResult(text=text, provider=self.name, model=self.model)
+        # A fixed size, so a model charge gives a known number of AI credits per call.
+        return LlmResult(
+            text=text,
+            provider=self.name,
+            model=self.model,
+            input_tokens=self.INPUT_TOKENS,
+            output_tokens=self.OUTPUT_TOKENS,
+        )
 
     def _one(self, role: str, user: str) -> Any:
         reply = self.replies[role]

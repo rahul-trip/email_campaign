@@ -17,7 +17,6 @@ from outbound.domain.enums import (
     CompanyStatus,
     HoldReason,
 )
-from outbound.domain.money import format_usd
 from outbound.pipeline import NotConfigured, Pipeline, assemble, execute_run, real_providers
 from outbound.runner.runner import RunReport
 from outbound.runner.tick import TickReport
@@ -57,12 +56,16 @@ def _guard[T](action: Callable[[], T]) -> T:
         raise typer.Exit(1) from error
 
 
+def _credits(milli: int) -> str:
+    return f"{milli / 1000:,.1f} AI credits"
+
+
 def _print_run(report: RunReport) -> None:
     for stage, counts in report.counts.items():
         summary = ", ".join(f"{n} {name}" for name, n in sorted(counts.items())) or "nothing due"
         typer.echo(f"{stage:<9} {summary}")
-    cost = format_usd(report.cost_micro_usd)
-    typer.echo(f"run {report.run_id[:8]} {report.status.value}, cost {cost}")
+    used = _credits(report.credits_milli)
+    typer.echo(f"run {report.run_id[:8]} {report.status.value}, used {used}")
 
 
 def _print_tick(report: TickReport) -> None:
@@ -305,7 +308,7 @@ def register(app: typer.Typer) -> None:
         workspace: WorkspaceName = defaults.DEFAULT_WORKSPACE_NAME,
         database_url: DatabaseUrl = None,
     ) -> None:
-        """Spend per provider and per prospect, and how many paid calls were made."""
+        """AI credits used per provider and per prospect, and how many paid calls were made."""
         container = build_container(settings_for(database_url))
         now = utcnow()
         report = ReportService(container.uow, workspace_id_or_exit(container, workspace)).cost(
@@ -313,9 +316,9 @@ def register(app: typer.Typer) -> None:
         )
         for provider, cost in report.by_provider.items():
             calls = report.calls_by_provider[provider]
-            typer.echo(f"{provider:<18}{format_usd(cost):>10}  {calls} call(s)")
-        typer.echo(f"total {format_usd(report.total)} over {days} day(s)")
+            typer.echo(f"{provider:<18}{_credits(cost):>12}  {calls} call(s)")
+        typer.echo(f"total {_credits(report.total)} over {days} day(s)")
         if report.per_prospect is not None:
-            typer.echo(f"per prospect {format_usd(report.per_prospect)} across {report.prospects}")
+            typer.echo(f"per prospect {_credits(report.per_prospect)} across {report.prospects}")
         outcomes = ", ".join(f"{n} {o.value}" for o, n in sorted(report.outcomes.items()))
         typer.echo(f"calls: {outcomes or 'none'}; paid calls {report.paid_calls}")

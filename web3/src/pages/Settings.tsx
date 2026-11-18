@@ -207,7 +207,7 @@ function Limits() {
   const queryClient = useQueryClient();
   const settings = useQuery({ queryKey: ["workspace-settings"], queryFn: () => ok(client.GET("/api/settings/workspace")) });
   const [safe, setSafe] = useState(true);
-  const [budget, setBudget] = useState("0.50");
+  const [budget, setBudget] = useState("50");
   const [examples, setExamples] = useState(5);
   const [footer, setFooter] = useState(true);
   const [autoCold, setAutoCold] = useState(false);
@@ -221,7 +221,7 @@ function Limits() {
     if (!s) return;
     setSafe(Boolean(s.safe_to_send_only));
     // No stored ceiling means "no limit", which is a blank box, not zero.
-    setBudget(s.budget_per_prospect_micro_usd == null ? "" : (Number(s.budget_per_prospect_micro_usd) / 1_000_000).toFixed(2));
+    setBudget(s.budget_per_prospect_credits == null ? "" : String(s.budget_per_prospect_credits));
     setExamples(Number(s.few_shot_examples ?? 5));
     setFooter(s.footer_enabled !== false);
     setAutoCold(s.auto_approve_cold === true);
@@ -237,7 +237,7 @@ function Limits() {
         client.PUT("/api/settings/workspace", {
           body: {
             safe_to_send_only: safe,
-            budget_per_prospect_micro_usd: budget.trim() === "" ? null : Math.round(Number(budget) * 1_000_000),
+            budget_per_prospect_credits: budget.trim() === "" ? null : Math.round(Number(budget)),
             few_shot_examples: examples,
             footer_enabled: footer,
             auto_approve_cold: autoCold,
@@ -259,8 +259,8 @@ function Limits() {
       {() => (
         <Card title="Limits and budget" className="max-w-3xl">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Budget per prospect (USD)" hint="No paid call is made once a lead has spent this. Blank means no limit; 0 means no paid calls at all.">
-              <Input type="number" step="0.01" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="no limit" />
+            <Field label="Budget per lead (AI credits)" hint="A lead that has used this many AI credits gets no more paid calls. Blank means no limit; 0 means no paid calls at all.">
+              <Input type="number" step="1" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="no limit" />
             </Field>
             <Field label="Shortest first email (words)" hint="The writer is asked for this many at least; the check flags anything shorter. 40 to 600.">
               <Input type="number" min={40} max={600} value={minWords} onChange={(e) => setMinWords(Number(e.target.value))} />

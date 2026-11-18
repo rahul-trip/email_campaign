@@ -1,4 +1,4 @@
-"""Emails the platform sends about credits and access (Phase 6d.8).
+"""Emails the platform sends about AI credits and access (Phase 6d.8).
 
 One periodic pass (``run``, from the worker's tick) finds what deserves a notice and sends each
 once. "Once" is the audit log: every notice sent leaves a ``notice_sent`` row whose key names it,
@@ -52,21 +52,21 @@ class NoticeService:
         for row in self._admin.customers():
             ws, quota = row.workspace, row.quota
             period = f"{quota.period_start:%Y-%m}"
-            for step, q in quota.steps.items():
-                if not q.limit:
-                    continue
-                label = step.value.replace("_", " ")
-                level = 100 if q.used >= q.limit else 80 if q.used >= q.limit * WARN_AT else 0
-                if level and self._once(ws.id, f"{step.value}:{level}:{period}"):
+            allowance, used = quota.credits.allowance, quota.credits.used_milli / 1000
+            if allowance:
+                level = 100 if used >= allowance else 80 if used >= allowance * WARN_AT else 0
+                key = f"credits:{level}:{period}"
+                if level and self._once(ws.id, key):
                     text = (
-                        f"You have used all {q.limit} of your {label} credits this month."
+                        f"You have used all {allowance:,} of your AI credits this month."
                         if level == 100
-                        else f"You have used {q.used} of your {q.limit} {label} credits this month."
+                        else f"You have used {used:,.0f} of your {allowance:,} AI credits "
+                        "this month."
                     )
                     sent["workspace"] += self._to_admins(
-                        ws.id, f"{ws.name}: {label} credits at {level}%", self._ask(text)
+                        ws.id, f"{ws.name}: AI credits at {level}%", self._ask(text)
                     )
-                    self._bell(ws.id, ws.slug, ws.name, text, f"{step.value}:{level}:{period}")
+                    self._bell(ws.id, ws.slug, ws.name, text, key)
             if quota.access_until:
                 day = f"{quota.access_until:%Y-%m-%d}"
                 if quota.access_until <= now:
@@ -102,9 +102,9 @@ class NoticeService:
                 data = grant["data"]
                 count += self._to_admins(
                     workspace_id,
-                    f"{name}: {data.get('amount')} {data.get('step')} credits added",
-                    f"{data.get('amount')} extra {str(data.get('step')).replace('_', ' ')} credits "
-                    f"were added to {name}.\n\n{self._open()}",
+                    f"{name}: {data.get('amount')} AI credits added",
+                    f"{data.get('amount')} extra AI credits were added to {name}."
+                    f"\n\n{self._open()}",
                 )
         return count
 

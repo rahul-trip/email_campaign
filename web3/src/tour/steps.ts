@@ -53,7 +53,7 @@ export const SECTIONS: Section[] = [
     id: "leads",
     title: "Leads",
     place: "/leads",
-    steps: [{ target: "leads-list", icon: "🗂️", title: "Every company, your way", body: "Saved views, fit and source filters, and each lead's contact and spend. Open one to see its journey." }],
+    steps: [{ target: "leads-list", icon: "🗂️", title: "Every company, your way", body: "Saved views, fit and source filters, and each lead's contact and the AI credits it used. Open one to see its journey." }],
   },
   {
     id: "runs",

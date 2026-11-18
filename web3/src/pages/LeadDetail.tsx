@@ -36,7 +36,7 @@ import {
   Th,
 } from "../ui/compat";
 import { cx } from "../lib/cx";
-import { ago, usd, when, words } from "../lib/format";
+import { ago, credits, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
 import { isViewing, useCurrent } from "../app/session";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
@@ -119,7 +119,7 @@ export function LeadDetailPage() {
   const recipientName = contacts.find((c) => c.id === liveRecipient)?.full_name;
   const pausedCampaign = (campaigns.data ?? []).find((c) => c.id === company.campaign_id && c.status !== "active");
   const calls = waterfall.data ?? [];
-  const spent = calls.reduce((n, c) => n + c.cost_micro_usd, 0);
+  const spent = calls.reduce((n, c) => n + c.credits_milli, 0);
 
   return (
     <Sections>
@@ -182,7 +182,7 @@ export function LeadDetailPage() {
           >
             <p>The next run, within 15 minutes or when you start one, reads their site and searches the news again (a few cents), then checks the fit, the people, the address and writes the email afresh.</p>
             <p className="mt-2">
-              An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused at no cost.
+              An email waiting for review or approved but not yet in your mailbox is cancelled. What you set yourself is kept: the name, country, people, addresses and consent. Addresses already found are reused without using AI credits.
             </p>
           </Confirm>
         )}
@@ -346,7 +346,7 @@ export function LeadDetailPage() {
 
             <Research company={company} />
 
-            <Card collapsible title="Vendor calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${usd(spent)} in all. Every paid call made for this lead, in order; a cache hit reused a stored answer at no cost.`}>
+            <Card collapsible title="Vendor and model calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${credits(spent)} in all. Every call made for this lead, in order; a cache hit reused a stored answer and used no credits.`}>
               <QueryState query={waterfall}>
                 {(steps) =>
                   steps.length === 0 ? (
@@ -360,7 +360,7 @@ export function LeadDetailPage() {
                           <Th>Call</Th>
                           <Th>What was asked</Th>
                           <Th>Result</Th>
-                          <Th className="text-right">Cost</Th>
+                          <Th className="text-right">AI credits</Th>
                         </tr>
                       </thead>
                       <tbody>
@@ -383,7 +383,7 @@ export function LeadDetailPage() {
                               <StatusBadge status={describe(callOutcome, step.outcome)} />
                               {step.got && <div className="mt-0.5 text-label text-muted">{step.got}</div>}
                             </Td>
-                            <Td className="tnum text-right text-small">{usd(step.cost_micro_usd)}</Td>
+                            <Td className="tnum text-right text-small">{credits(step.credits_milli)}</Td>
                           </tr>
                         ))}
                       </tbody>
@@ -1311,7 +1311,7 @@ function DangerZone({ company }: { company: Company }) {
         </div>
         <div className="border-t border-line pt-4">
           <div className="font-medium">Delete this lead</div>
-          <p className="mt-0.5 text-small text-muted">Removes the company, its people, emails, notes and history, and any draft in your mailbox. Spend stays in the cost totals. A lead that has been emailed cannot be deleted: suppress it instead.</p>
+          <p className="mt-0.5 text-small text-muted">Removes the company, its people, emails, notes and history, and any draft in your mailbox. The AI credits it used stay in your totals. A lead that has been emailed cannot be deleted: suppress it instead.</p>
           <Button variant="danger" size="sm" className="mt-2" onClick={() => setDialog("delete")}>
             <Trash2 className="size-3.5" aria-hidden /> Delete permanently…
           </Button>

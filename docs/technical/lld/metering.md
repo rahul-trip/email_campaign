@@ -12,12 +12,13 @@ applies_to: Phase 3b
 
 ## Purpose
 
-The meter stands between every stage and every paid vendor. Before a call it answers from the cache if it can, then refuses the call if it would break a spend cap. After the call it writes the cost to the ledger, attributed to a run, company and contact. It exists so that the $0.50-per-prospect rule, monthly caps and reruns at no cost are enforced in one place that no stage can bypass ([ADR 0005](../adr/0005-metered-decorator-and-ledger.md), binding rule 3).
+The meter stands between every stage and every paid vendor. Before a call it answers from the cache if it can, then refuses the call if it would break a spend cap. After the call it writes the cost to the ledger, attributed to a run, company and contact, and stamps the **AI credits** the call used (`provider_calls.credits_milli`: a model call at its model's charge, any other paid call at its dollar cost divided by the platform's credit rate; see [plans, credits and admin](plans-credits-and-admin.md#how-a-call-becomes-ai-credits) and [ADR 0034](../adr/0034-one-ai-credit-balance-metered-per-call.md)). It exists so that the budget per lead (in AI credits), monthly caps and reruns at no cost are enforced in one place that no stage can bypass ([ADR 0005](../adr/0005-metered-decorator-and-ledger.md), binding rule 3).
 
 ## Responsibilities
 
 - Cache vendor answers by request, per workspace, with a time-to-live (TTL) for each kind of call.
-- Check the monthly cap per provider and the per-prospect ceiling *before* a call.
+- Check the monthly cap per provider (dollars, the platform's) and the budget per lead (AI credits) *before* a call.
+- Stamp each recorded call with its AI credits at the rate or model charge in force, read from `platform_settings` in the same transaction.
 - Write one `provider_calls` row for every call, cache hit, error and refusal, each committed in its own transaction. Each row also keeps `detail`: one line of what was asked and one of what came back, supplied by the wrapper (`Meter.call(asked=, got=)`): a search's text and result count, the pages read, "Jane Doe at acme.com", an address and its status, a model and the start of its instruction. A cache hit, a refusal by a cap and an error carry it too (an error's second line is the vendor's message, which never holds a key).
 - Attribute every row to the current run, company and contact.
 

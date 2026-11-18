@@ -2,7 +2,9 @@
 
 They are the same for every stage, so no stage can forget them: suppression always wins, the
 country policy is re-read (it may have changed since the gate), and a company that has used up
-its budget gets no more paid work.
+its budget gets no more paid work. A stage that makes paid calls starts only while the
+workspace has AI credits left; once started it finishes, even if that takes the balance a little
+below nothing.
 """
 
 from __future__ import annotations
@@ -14,12 +16,13 @@ from enum import StrEnum
 
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWork
+from outbound.domain.credits import milli
 from outbound.domain.entities import Company
 from outbound.domain.entitlements import AccessLevel, Quota
 from outbound.domain.enums import HoldReason, UsageStep
 from outbound.domain.policies import PolicyOutcome
 from outbound.metering.budget import BudgetPolicy
-from outbound.metering.quota import STAGE_CHARGES, quota_in
+from outbound.metering.quota import WAIT_STEP, quota_in
 from outbound.stages.base import Stage
 from outbound.stages.policy import policy_decision_for
 
@@ -28,7 +31,7 @@ class RefusalKind(StrEnum):
     SUPPRESSED = "suppressed"  # never contact: the domain is on the suppression list
     HOLD = "hold"  # wait for a person
     BUDGET = "budget"
-    CREDITS = "credits"  # the plan has no credit left for this step: wait in place
+    CREDITS = "credits"  # no AI credits left: wait in place
     ACCESS = "access"  # the workspace may not run now (paused, past its access date, stopped)
 
 
@@ -37,7 +40,7 @@ class Refusal:
     kind: RefusalKind
     reason: str
     hold_reason: HoldReason | None = None
-    step: UsageStep | None = None  # for CREDITS: the step that has none left
+    step: UsageStep | None = None  # for CREDITS: the step the lead waits at
 
 
 class Guards:
@@ -54,16 +57,12 @@ class Guards:
         quota, _ = quota_in(uow, self._now())
         if not quota.engine:
             return Refusal(RefusalKind.ACCESS, _why_not_running(quota))
-        charge = STAGE_CHARGES.get(stage.name)
-        if charge is not None:
-            step = charge[0]
-            # A step already charged on this lead (research again, a retry) never needs a credit.
-            if not quota.has_credit(step) and not uow.usage.charged(step, company.id):
-                return Refusal(
-                    RefusalKind.CREDITS,
-                    f"no {step.value} credit left until {quota.period_end:%d %b}",
-                    step=step,
-                )
+        if stage.spends and not quota.has_credits():
+            return Refusal(
+                RefusalKind.CREDITS,
+                f"no AI credits left until {quota.period_end:%d %b}",
+                step=WAIT_STEP.get(stage.name, UsageStep.RESEARCH),
+            )
 
         if stage.guard_policy:
             decision = policy_decision_for(uow, company, stage=stage.name)
@@ -79,11 +78,11 @@ class Guards:
 
         ceiling = self._budget.ceiling(uow)
         if ceiling is not None and stage.spends:
-            spent = uow.calls.spend_on_company(company.id)
-            if spent >= ceiling:
+            spent = uow.calls.credits_on_company(company.id)
+            if spent >= milli(ceiling):
                 return Refusal(
                     RefusalKind.BUDGET,
-                    f"per-prospect budget used up ({spent} of {ceiling} micro-USD)",
+                    f"budget per prospect used up ({spent / 1000:g} of {ceiling} AI credits)",
                 )
         return None
 

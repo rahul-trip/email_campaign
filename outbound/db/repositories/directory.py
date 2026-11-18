@@ -250,7 +250,7 @@ class DirectoryFigures:
     unfolded: int
     lookups: int  # this month
     hits: int
-    saved_micro_usd: int
+    saved_credits_milli: int  # AI credits the hits saved, at a finder call's price
 
 
 @dataclass(frozen=True)
@@ -675,7 +675,7 @@ class DirectoryAdminRepository:
     # ------------------------------------------------------------------ figures
 
     def figures(
-        self, start: datetime, end: datetime, finder_price_micro_usd: int
+        self, start: datetime, end: datetime, finder_credits_milli: int
     ) -> DirectoryFigures:
         def count(table: Any, *where: Any) -> int:
             return int(
@@ -696,7 +696,7 @@ class DirectoryAdminRepository:
             unfolded=count(DirectoryObservationRow, DirectoryObservationRow.folded_at.is_(None)),
             lookups=count(ProviderCallRow, *ledger),
             hits=hits,
-            saved_micro_usd=hits * finder_price_micro_usd,
+            saved_credits_milli=hits * finder_credits_milli,
         )
 
     def history(self, key: str) -> list[dict[str, Any]]:

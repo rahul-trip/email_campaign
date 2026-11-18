@@ -121,14 +121,14 @@ class RunService:
     def get(self, run_id: str) -> RunView:
         with self._uow(self._workspace_id) as uow:
             run = uow.runs.get(run_id)
-            if run.status is RunStatus.RUNNING:  # spend so far, before the run closes
+            if run.status is RunStatus.RUNNING:  # credits so far, before the run closes
                 return RunView(
                     run.id,
                     run.kind,
                     run.status,
                     run.params,
                     run.counts,
-                    uow.runs.cost_of(run_id),
+                    uow.runs.credits_of(run_id),
                     run.started_at,
                     run.finished_at,
                     run.created_at,

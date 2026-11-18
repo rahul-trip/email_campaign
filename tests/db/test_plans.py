@@ -10,7 +10,7 @@ from outbound.db.errors import ConcurrencyConflict, NotFound
 from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.entitlements import FREE, Plan, compute_quota
-from outbound.domain.enums import CompanySource, UsageStep, WorkspaceStatus
+from outbound.domain.enums import CallOutcome, CompanySource, UsageStep, WorkspaceStatus
 from outbound.domain.platform_settings import PlatformSettings
 
 NOW = datetime(2026, 11, 12, 10, 0, tzinfo=UTC)
@@ -30,42 +30,45 @@ def lead(factory: UnitOfWorkFactory, ws: str, domain: str = "acme.com") -> str:
     return company.id
 
 
-# ------------------------------------------------------------------ charging
-
-
-def test_a_step_is_charged_once_per_lead(factory: UnitOfWorkFactory, ws: str) -> None:
-    company = lead(factory, ws)
+def call(
+    factory: UnitOfWorkFactory, ws: str, credits_milli: int, company: str | None = None
+) -> None:
+    """One metered call that used ``credits_milli`` AI credits (thousandths)."""
     with factory(ws) as uow:
-        assert uow.usage.charge(UsageStep.RESEARCH, company) is True
-        assert uow.usage.charge(UsageStep.RESEARCH, company) is False  # a retry costs nothing
-        assert uow.usage.charge(UsageStep.COPY, company) is True  # another step is its own charge
+        uow.calls.record(
+            provider="hunter", operation="find", request_hash="h", outcome=CallOutcome.HIT,
+            cost_micro_usd=credits_milli * 10, credits_milli=credits_milli, company_id=company,
+        )  # fmt: skip
         uow.commit()
+
+
+# ------------------------------------------------------------------ AI credits used
+
+
+def test_every_calls_ai_credits_are_added_up_for_the_period(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    company = lead(factory, ws)
+    call(factory, ws, 2450, company)
+    call(factory, ws, 110)  # a model call, not about a lead
+    call(factory, ws, 0, company)  # a cache hit uses nothing
     with factory(ws) as uow:
-        assert uow.usage.charged(UsageStep.RESEARCH, company)
-        assert uow.usage.used(*around_now()) == {UsageStep.RESEARCH: 1, UsageStep.COPY: 1}
+        assert uow.usage.credits_used(*around_now()) == 2560
+        assert uow.calls.credits_on_company(company) == 2450
 
 
-def test_a_repeated_charge_does_not_undo_the_rest_of_the_transaction(
+def test_activity_is_still_counted_once_per_lead_for_reports(
     factory: UnitOfWorkFactory, ws: str
 ) -> None:
     company = lead(factory, ws)
     with factory(ws) as uow:
-        uow.usage.charge(UsageStep.RESEARCH, company)
-        uow.usage.charge(UsageStep.RESEARCH, company)  # conflicts, inside a savepoint
-        assert uow.usage.charge(UsageStep.COPY, company)  # the transaction is still usable
+        assert uow.usage.charge(UsageStep.RESEARCH, company) is True
+        assert uow.usage.charge(UsageStep.RESEARCH, company) is False  # counted once
+        assert [uow.usage.charge(UsageStep.REWRITE, company) for _ in range(2)] == [True, True]
         uow.commit()
     with factory(ws) as uow:
         assert uow.usage.charged(UsageStep.RESEARCH, company)
-        assert uow.usage.charged(UsageStep.COPY, company)
-
-
-def test_a_rewrite_is_charged_every_time(factory: UnitOfWorkFactory, ws: str) -> None:
-    company = lead(factory, ws)
-    with factory(ws) as uow:
-        assert [uow.usage.charge(UsageStep.REWRITE, company) for _ in range(3)] == [True] * 3
-        uow.commit()
-    with factory(ws) as uow:
-        assert uow.usage.used(*around_now()) == {UsageStep.REWRITE: 3}
+        assert uow.usage.credits_used(*around_now()) == 0  # counts are not credits
 
 
 def test_deleting_a_lead_does_not_give_its_credits_back(
@@ -74,31 +77,21 @@ def test_deleting_a_lead_does_not_give_its_credits_back(
     from outbound.services.privacy import PrivacyService
 
     company = lead(factory, ws)
-    with factory(ws) as uow:
-        uow.usage.charge(UsageStep.MANUAL, company)
-        uow.commit()
+    call(factory, ws, 3000, company)
     PrivacyService(factory, ws).delete_lead(company, confirm_domain="acme.com")
     with factory(ws) as uow:
-        assert uow.usage.charged(UsageStep.MANUAL, company)  # the row survived the lead
-        assert uow.usage.charge(UsageStep.MANUAL, company) is False
+        assert uow.usage.credits_used(*around_now()) == 3000  # the ledger row survived the lead
 
 
 def test_use_is_counted_per_period_and_per_workspace(
     factory: UnitOfWorkFactory, ws: str, other_ws: str
 ) -> None:
-    mine, theirs = lead(factory, ws), lead(factory, other_ws)
-    with factory(ws) as uow:
-        uow.usage.charge(UsageStep.MANUAL, mine)
-        uow.commit()
-    with factory(other_ws) as uow:
-        uow.usage.charge(UsageStep.MANUAL, theirs)
-        uow.commit()
+    call(factory, ws, 1000)
+    call(factory, other_ws, 7000)
     with factory(ws) as uow:
         now = datetime.now(UTC)
-        assert uow.usage.used(now - timedelta(days=1), now + timedelta(days=1)) == {
-            UsageStep.MANUAL: 1
-        }
-        assert uow.usage.used(now + timedelta(days=1), now + timedelta(days=30)) == {}
+        assert uow.usage.credits_used(now - timedelta(days=1), now + timedelta(days=1)) == 1000
+        assert uow.usage.credits_used(now + timedelta(days=1), now + timedelta(days=30)) == 0
 
 
 # ------------------------------------------------------------------ the platform's side
@@ -110,9 +103,9 @@ def test_a_platform_admin_sets_the_plan_overrides_and_grants_and_the_workspace_s
     until = NOW + timedelta(days=30)
     with platform() as p:
         p.plans.set_plan(ws, "free", started_at=START, access_until=until, note="pilot")
-        manual = p.plans.add_override(ws, "limit.manual", 20, note="pilot", set_by="u1")
-        p.plans.add_override(ws, "limit.discovery", None)  # unlimited is a value, not an absence
-        grant = p.plans.add_grant(ws, UsageStep.MANUAL, 10, expires_at=until, granted_by="u1")
+        monthly = p.plans.add_override(ws, "monthly_credits", 200, note="pilot", set_by="u1")
+        p.plans.add_override(ws, "seats", None)  # unlimited is a value, not an absence
+        grant = p.plans.add_grant(ws, 50, expires_at=until, granted_by="u1")
         p.commit()
     with factory(ws) as uow:
         assignment = uow.usage.assignment()
@@ -121,13 +114,12 @@ def test_a_platform_admin_sets_the_plan_overrides_and_grants_and_the_workspace_s
         "free",
         until,
     )
-    assert {o.key: o.value for o in overrides} == {"limit.manual": 20, "limit.discovery": None}
-    assert [(g.step, g.amount, g.id) for g in grants] == [(UsageStep.MANUAL, 10, grant.id)]
-    quota = compute_quota(
-        assignment, FREE, overrides, grants, {UsageStep.MANUAL: 12}, WorkspaceStatus.ACTIVE, NOW
-    )
-    assert quota.steps[UsageStep.MANUAL].remaining == 20 + 10 - 12
-    assert quota.steps[UsageStep.DISCOVERY].remaining is None and manual.id
+    assert {o.key: o.value for o in overrides} == {"monthly_credits": 200, "seats": None}
+    assert [(g.step, g.amount, g.id) for g in grants] == [(None, 50, grant.id)]
+    quota = compute_quota(assignment, FREE, overrides, grants, 12_000, WorkspaceStatus.ACTIVE, NOW)
+    assert quota.credits.allowance == 250
+    assert quota.credits.remaining_milli == (200 + 50 - 12) * 1000
+    assert quota.entitlements.seats is None and monthly.id
 
 
 def test_withdrawing_an_override_or_grant_keeps_the_record(
@@ -136,7 +128,7 @@ def test_withdrawing_an_override_or_grant_keeps_the_record(
     with platform() as p:
         p.plans.set_plan(ws, "free", started_at=START)
         override = p.plans.add_override(ws, "seats", 9)
-        grant = p.plans.add_grant(ws, UsageStep.MANUAL, 5)
+        grant = p.plans.add_grant(ws, 5)
         p.plans.revoke_override(ws, override.id)
         p.plans.revoke_grant(ws, grant.id)
         p.commit()
@@ -149,7 +141,7 @@ def test_one_workspace_cannot_touch_anothers_grant(
     platform: PlatformUnitOfWorkFactory, ws: str, other_ws: str
 ) -> None:
     with platform() as p:
-        grant = p.plans.add_grant(ws, UsageStep.MANUAL, 5)
+        grant = p.plans.add_grant(ws, 5)
         p.commit()
     with platform() as p, pytest.raises(NotFound):
         p.plans.revoke_grant(other_ws, grant.id)
@@ -178,10 +170,11 @@ def test_the_settings_default_to_the_free_plan_and_save_with_a_version_check(
     with platform() as p:
         settings, version = p.settings.get()
         assert version == 0 and settings.plan("anything") == FREE
+        assert sorted(settings.plans) == ["free", "pro", "starter"]
         gold = Plan(
             "gold",
             "Gold",
-            limits={UsageStep.MANUAL: 500},
+            monthly_credits=50_000,
             seats=None,
             features=frozenset({"discovery", "auto_send"}),
         )
@@ -189,13 +182,18 @@ def test_the_settings_default_to_the_free_plan_and_save_with_a_version_check(
             plans={"free": FREE, "gold": gold},
             default_plan="free",
             announcement="Maintenance Sunday",
+            credit_value_micro_usd=20_000,
+            vendor_caps={"hunter": 3000},
+            llm_charges={"deepseek-v3": (30.0, 110.0)},
         )
         assert p.settings.save(fresh, expected_version=0) == 1
         p.commit()
     with factory(ws) as uow:  # a workspace reads the catalog
         read, version = uow.platform_settings.get()
     assert version == 1 and read.announcement == "Maintenance Sunday"
-    assert read.plan("gold").limits[UsageStep.MANUAL] == 500 and read.plan("gold").seats is None
+    assert read.plan("gold").monthly_credits == 50_000 and read.plan("gold").seats is None
+    assert read.credit_value_micro_usd == 20_000 and read.vendor_caps == {"hunter": 3000}
+    assert read.llm_charges == {"deepseek-v3": (30.0, 110.0)}
     assert "auto_send" in read.plan("gold").features
     with platform() as p, pytest.raises(ConcurrencyConflict):
         p.settings.save(read, expected_version=0)  # someone else saved first
@@ -206,3 +204,18 @@ def test_the_settings_default_to_the_free_plan_and_save_with_a_version_check(
 def test_a_removed_plan_falls_back_to_the_default() -> None:
     settings = PlatformSettings()
     assert settings.plan("gone") == FREE
+
+
+def test_settings_saved_before_ai_credits_are_read_in_credits() -> None:
+    from outbound.domain.platform_settings import from_json
+
+    old = from_json(
+        {
+            "plans": [{"code": "free", "name": "Free", "limits": {"manual": 5},
+                       "max_prospect_budget_micro_usd": 500_000}],
+            "vendor_caps": {"hunter": 20_000_000},
+        }
+    )  # fmt: skip
+    assert old.plan("free").monthly_credits == 100  # the default for the plan
+    assert old.plan("free").max_prospect_budget_credits == 50  # $0.50 at a cent a credit
+    assert old.vendor_caps == {"hunter": 2000}  # $20 at a cent a credit

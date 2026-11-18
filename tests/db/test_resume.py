@@ -1,5 +1,5 @@
-"""Work that waits for credits continues when credits exist (Phase 6d): by the tick, by a
-person, oldest first and never beyond what the credits allow."""
+"""Work that waits for AI credits continues when credits are back (Phase 6d): by the tick, by a
+person, oldest first."""
 
 from __future__ import annotations
 
@@ -16,17 +16,11 @@ from outbound.domain.enums import CompanyStatus, UsageStep
 from outbound.pipeline import Pipeline
 from outbound.services.resume import NoCredits, ResumeService
 from outbound.worker import Worker
-from tests.db.test_credits import add, limit, started, status_of, used
+from tests.db.test_credits import add, grant, monthly, started, status_of
 
 
 def resume(factory: UnitOfWorkFactory, ws: str, pipeline: Pipeline) -> ResumeService:
     return ResumeService(factory, ws, pipeline.intake)
-
-
-def grant(platform: PlatformUnitOfWorkFactory, ws: str, step: UsageStep, amount: int) -> None:
-    with platform() as p:
-        p.plans.add_grant(ws, step, amount)
-        p.commit()
 
 
 def waiting_domains(factory: UnitOfWorkFactory, ws: str) -> list[str]:
@@ -34,103 +28,95 @@ def waiting_domains(factory: UnitOfWorkFactory, ws: str) -> list[str]:
         return [c.domain for c in uow.companies.waiting_for_credits()]
 
 
-def test_the_tick_releases_waiting_leads_oldest_first_and_never_beyond_the_credits(
+def parked(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory, *domains: str
+) -> tuple[str, Pipeline]:
+    """A workspace whose leads were added and then waited, oldest first, for AI credits."""
+    ws, pipeline, _ = started(engine, factory, platform)
+    add(pipeline, *domains)
+    monthly(platform, ws, 0)
+    pipeline.runner.run_pipeline()
+    return ws, pipeline
+
+
+def test_the_tick_releases_waiting_leads_once_credits_are_back(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
-    ws, pipeline, _ = started(engine, factory, platform)
-    limit(platform, ws, "research", 0)
-    for domain in ("first.co.uk", "second.co.uk", "third.co.uk"):
-        add(pipeline, domain)
-        pipeline.runner.run_pipeline()  # each waits, in this order
-    assert sorted(waiting_domains(factory, ws)) == ["first.co.uk", "second.co.uk", "third.co.uk"]
-    assert resume(factory, ws, pipeline).run() == {"leads": 0, "rows": 0}  # no credit yet
+    ws, pipeline = parked(engine, factory, platform, "first.co.uk", "second.co.uk")
+    assert sorted(waiting_domains(factory, ws)) == ["first.co.uk", "second.co.uk"]
+    assert resume(factory, ws, pipeline).run() == {"leads": 0, "rows": 0}  # no credits yet
 
-    grant(platform, ws, UsageStep.RESEARCH, 2)
+    grant(platform, ws, 1000)
     assert resume(factory, ws, pipeline).run() == {"leads": 2, "rows": 0}
-    assert waiting_domains(factory, ws) == ["third.co.uk"]  # the newest still waits
+    assert waiting_domains(factory, ws) == []
     pipeline.runner.run_pipeline()
     assert status_of(factory, ws, "first.co.uk") == (CompanyStatus.COPY_READY, None)
     assert status_of(factory, ws, "second.co.uk") == (CompanyStatus.COPY_READY, None)
-    assert status_of(factory, ws, "third.co.uk") == (CompanyStatus.NEW, UsageStep.RESEARCH)
-    assert used(factory, ws)["research"] == 2
+
+
+def test_a_lead_released_when_credits_are_short_waits_again_before_its_next_paid_stage(
+    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
+) -> None:
+    ws, pipeline = parked(engine, factory, platform, "acme.co.uk")
+    grant(platform, ws, 1)  # one credit: enough to start, not to finish
+    resume(factory, ws, pipeline).run()
+    pipeline.runner.run_pipeline()
+    status, waiting_at = status_of(factory, ws, "acme.co.uk")
+    assert status is not CompanyStatus.NEW and waiting_at is not None
 
 
 def test_a_tick_after_a_grant_resumes_and_runs_the_lead_in_the_same_pass(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
-    ws, pipeline, _ = started(engine, factory, platform)
-    limit(platform, ws, "research", 0)
-    add(pipeline, "acme.co.uk")
-    pipeline.runner.run_pipeline()
+    ws, pipeline = parked(engine, factory, platform, "acme.co.uk")
     assert status_of(factory, ws, "acme.co.uk") == (CompanyStatus.NEW, UsageStep.RESEARCH)
-    grant(platform, ws, UsageStep.RESEARCH, 1)
+    grant(platform, ws, 1000)
     report = pipeline.tick.run()
     assert report.jobs["credit_resume"] == {"leads": 1, "rows": 0}
     assert status_of(factory, ws, "acme.co.uk") == (CompanyStatus.COPY_READY, None)
 
 
-def test_resume_by_hand_refuses_without_a_credit_and_says_when_credits_renew(
+def test_resume_by_hand_refuses_without_credits_and_says_when_they_renew(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
-    ws, pipeline, _ = started(engine, factory, platform)
-    limit(platform, ws, "research", 0)
-    add(pipeline, "acme.co.uk")
-    pipeline.runner.run_pipeline()
+    ws, pipeline = parked(engine, factory, platform, "acme.co.uk")
     with factory(ws) as uow:
         company = uow.companies.waiting_for_credits()[0]
     service = resume(factory, ws, pipeline)
-    with pytest.raises(NoCredits) as refused:
+    with pytest.raises(NoCredits, match="no AI credits left") as refused:
         service.resume_lead(company.id, actor="user:u1")
     assert refused.value.step is UsageStep.RESEARCH
-    assert refused.value.renews > datetime.now(UTC)  # the date the allowance comes back
+    assert refused.value.renews > datetime.now(UTC)  # the date the credits come back
     with pytest.raises(NoCredits):
         service.release_all(actor="user:u1")
     assert waiting_domains(factory, ws) == ["acme.co.uk"]  # nothing was changed by the refusals
 
-    grant(platform, ws, UsageStep.RESEARCH, 1)
+    grant(platform, ws, 100)
     assert service.resume_lead(company.id, actor="user:u1") is UsageStep.RESEARCH
     assert waiting_domains(factory, ws) == []
     with pytest.raises(NoCredits, match="not waiting"):
         service.resume_lead(company.id, actor="user:u1")
 
 
-def test_a_lead_that_already_paid_for_its_step_resumes_without_a_credit(
-    engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
-) -> None:
-    ws, pipeline, _ = started(engine, factory, platform)
-    add(pipeline, "acme.co.uk")
-    pipeline.runner.run_pipeline()  # researched, so charged for research
-    with factory(ws) as uow:
-        company = uow.companies.get(next(c.id for c in uow.companies.search()[0]))
-        uow.companies.wait_for_credit(company.id, UsageStep.RESEARCH)  # parked for a step it paid
-        uow.commit()
-    limit(platform, ws, "research", 0)
-    assert (
-        resume(factory, ws, pipeline).resume_lead(company.id, actor="user:u1") is UsageStep.RESEARCH
-    )
-
-
 def test_waiting_manual_rows_come_in_with_the_leads(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
     ws, pipeline, _ = started(engine, factory, platform)
-    add(pipeline, *(f"lead{n}.com" for n in range(7)))  # five fit, two wait as rows
+    monthly(platform, ws, 0)
+    add(pipeline, "lead0.com", "lead1.com")  # no credits: both wait as rows
     service = resume(factory, ws, pipeline)
     waiting_leads, waiting_rows = service.waiting()
     assert (sum(waiting_leads.values()), waiting_rows) == (0, 2)
-    grant(platform, ws, UsageStep.MANUAL, 1)
-    assert service.release_all(actor="user:u1").rows == 1
-    assert service.waiting()[1] == 1
+    grant(platform, ws, 10)
+    assert service.release_all(actor="user:u1").rows == 2
+    assert service.waiting()[1] == 0
 
 
 def test_a_workspace_that_may_not_run_releases_nothing_from_the_tick(
     engine: Engine, factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory
 ) -> None:
-    ws, pipeline, _ = started(engine, factory, platform)
-    limit(platform, ws, "research", 0)
-    add(pipeline, "acme.co.uk")
-    pipeline.runner.run_pipeline()
-    grant(platform, ws, UsageStep.RESEARCH, 1)
+    ws, pipeline = parked(engine, factory, platform, "acme.co.uk")
+    grant(platform, ws, 100)
     with platform() as p:
         p.plans.set_access_until(ws, datetime.now(UTC) - timedelta(days=1))
         p.commit()

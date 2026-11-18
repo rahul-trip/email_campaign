@@ -1,12 +1,26 @@
 /**
- * Money is integer micro-USD on the server (1 USD = 1,000,000). Totals read best with cents; a
- * single vendor call often costs a fraction of a cent, so small amounts keep more places.
+ * AI credits arrive as integer thousandths (milli-credits), so a small model call is not rounded
+ * to a whole credit. Large amounts read as whole credits; small ones keep a decimal or two.
  */
-export function usd(micro: number | null | undefined, places?: number): string {
-  const value = (micro ?? 0) / 1_000_000;
-  const digits = places ?? (value !== 0 && Math.abs(value) < 0.1 ? 4 : 2);
-  return `$${value.toFixed(digits)}`;
+export function credits(milli: number | null | undefined, unit = true): string {
+  const value = (milli ?? 0) / 1000;
+  const size = Math.abs(value);
+  const digits = value === 0 || size >= 10 ? 0 : size >= 1 ? 1 : 2;
+  const text = value.toLocaleString(undefined, { maximumFractionDigits: digits });
+  return unit ? `${text} ${size === 1 ? "credit" : "credits"}` : text;
 }
+
+/**
+ * What calls cost the platform, from integer micro-USD. For the admin console only: customers see
+ * AI credits, never dollars. Small amounts keep more places.
+ */
+export function usd(micro: number | null | undefined): string {
+  const value = (micro ?? 0) / 1_000_000;
+  return `$${value.toFixed(value !== 0 && Math.abs(value) < 0.1 ? 4 : 2)}`;
+}
+
+/** Whole AI credits (plans, grants, caps), or "No limit". */
+export const wholeCredits = (n: number | null | undefined): string => (n == null ? "No limit" : `${n.toLocaleString()} ${n === 1 ? "credit" : "credits"}`);
 
 export const percent = (share: number | null | undefined): string =>
   share === null || share === undefined ? "–" : `${Math.round(share * 100)}%`;

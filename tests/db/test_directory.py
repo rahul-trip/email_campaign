@@ -195,7 +195,8 @@ def test_hits_and_what_they_saved_show_in_the_figures(
         )
         uow.commit()
     figures = service(platform).overview().figures
-    assert figures.hits == 1 and figures.saved_micro_usd == 24_500 and figures.emails == 1
+    # a Hunter find (24,500 micro-USD) is 2.45 AI credits at the default rate
+    assert figures.hits == 1 and figures.saved_credits_milli == 2_450 and figures.emails == 1
 
 
 def test_a_lead_can_be_set_to_skip_the_directory(factory: UnitOfWorkFactory, ws: str) -> None:

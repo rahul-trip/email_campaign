@@ -8,7 +8,7 @@ import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
 import { Callout, Card, Facts, Label, Problem, Skeleton, Table, Td, Th } from "../ui/compat";
 import { cx } from "../lib/cx";
-import { usd, when, words } from "../lib/format";
+import { credits, when, words } from "../lib/format";
 import { callOutcome, describe } from "../lib/status";
 
 type Stage = Schemas["StageOut"];
@@ -57,7 +57,7 @@ export function JourneyView({ companyId }: { companyId: string }) {
 
       <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Tile icon={<Layers className="size-4" />} label="Stages done" value={`${finished} of ${trail.stages.length}`} />
-        <Tile icon={<Coins className="size-4" />} label="Spent on this lead" value={usd(trail.total_cost_micro_usd)} />
+        <Tile icon={<Coins className="size-4" />} label="AI credits used on this lead" value={credits(trail.total_credits_milli)} />
         <Tile icon={<Users className="size-4" />} label="People found" value={String(contacts.length)} />
         <Tile icon={<FileText className="size-4" />} label="Emails written" value={String(messages.length)} />
       </div>
@@ -166,7 +166,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
             </span>
           </span>
         }
-        actions={<span className="font-mono text-small text-muted">{usd(stage.cost_micro_usd)}</span>}
+        actions={<span className="font-mono text-small text-muted">{credits(stage.credits_milli)}</span>}
       >
         <p className="text-body leading-relaxed">{stage.summary || "Nothing recorded for this stage yet."}</p>
         {stage.reached_at && <p className="mt-1 text-label text-muted">Reached {when(stage.reached_at)}</p>}
@@ -219,7 +219,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
         {stage.calls.length > 0 && (
           <div className="mt-4">
             <Label className="mb-2 flex items-center gap-1.5">
-              <Coins className="size-3.5" aria-hidden /> Vendor calls · {usd(stage.cost_micro_usd)}
+              <Coins className="size-3.5" aria-hidden /> Vendor calls · {credits(stage.credits_milli)}
             </Label>
             <Table className="rounded-lg border border-line">
               <thead>
@@ -228,7 +228,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
                   <Th>Vendor</Th>
                   <Th>Call</Th>
                   <Th>Result</Th>
-                  <Th className="text-right">Cost</Th>
+                  <Th className="text-right">AI credits</Th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +240,7 @@ function StagePanel({ stage, lead }: { stage: Stage; lead: Schemas["LeadOut"] })
                     <Td>
                       <StatusBadge status={describe(callOutcome, call.outcome)} />
                     </Td>
-                    <Td className="tnum text-right text-small">{usd(call.cost_micro_usd)}</Td>
+                    <Td className="tnum text-right text-small">{credits(call.credits_milli)}</Td>
                   </tr>
                 ))}
               </tbody>

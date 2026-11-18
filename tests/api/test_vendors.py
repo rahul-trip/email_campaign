@@ -115,7 +115,7 @@ def test_a_vendor_that_spent_its_cap_is_paused_once(
 
     _, services = app_and_services
     staff.put("/api/admin/vendors/hunter/key", json={"key": PLACEHOLDER})
-    staff.put("/api/admin/vendors/hunter/cap", json={"cap_micro_usd": 1_000_000})
+    staff.put("/api/admin/vendors/hunter/cap", json={"cap_credits": 100})
     service = VendorService(services.container.platform, services.container.settings)
     assert service.enforce_caps() == []  # nothing spent yet
     with services.container.uow(services.workspace_id) as uow:
@@ -123,16 +123,15 @@ def test_a_vendor_that_spent_its_cap_is_paused_once(
             ProviderCallRow(
                 workspace_id=services.workspace_id, provider="hunter", operation="find",
                 request_hash="x" * 64,
-                outcome=CallOutcome.MISS, cost_micro_usd=1_500_000, created_at=datetime.now(UTC),
+                outcome=CallOutcome.MISS, cost_micro_usd=1_500_000, credits_milli=150_000,
+                created_at=datetime.now(UTC),
             )
         )  # fmt: skip
         uow.commit()
     assert service.enforce_caps() == ["hunter"]
     assert service.enforce_caps() == []  # already paused
     row = vendor(staff.get("/api/admin/vendors").json(), "hunter")
-    assert (
-        row["paused"] and row["spend_micro_usd"] == 1_500_000 and row["cap_micro_usd"] == 1_000_000
-    )
+    assert row["paused"] and row["credits_milli"] == 150_000 and row["cap_credits"] == 100
 
 
 # ---- testing a key, and a failing one

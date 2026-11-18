@@ -172,6 +172,7 @@ def test_a_lead_has_detail_a_timeline_and_a_waterfall(
             request_hash="h",
             outcome=CallOutcome.HIT,
             cost_micro_usd=24_500,
+            credits_milli=2_450,
             company_id=cid,
         )
         uow.commit()
@@ -183,7 +184,7 @@ def test_a_lead_has_detail_a_timeline_and_a_waterfall(
     }
     assert {("company", "created"), ("contact", "created")} <= kinds
     [step] = api.get(f"/api/companies/{cid}/waterfall").json()
-    assert (step["provider"], step["outcome"], step["cost_micro_usd"]) == ("hunter", "hit", 24_500)
+    assert (step["provider"], step["outcome"], step["credits_milli"]) == ("hunter", "hit", 2_450)
 
 
 def test_find_email_again_for_several_leads_queues_one_run(
@@ -391,8 +392,8 @@ def test_the_sender_profile_and_workspace_settings_can_be_edited(api: Api) -> No
 
 def test_settings_are_checked_for_type_and_size(api: Api) -> None:
     url = "/api/settings/workspace"
-    assert api.put(url, json={"budget_per_prospect_micro_usd": "lots"}).status_code == 422
-    assert api.put(url, json={"budget_per_prospect_micro_usd": -5}).status_code == 422
+    assert api.put(url, json={"budget_per_prospect_credits": "lots"}).status_code == 422
+    assert api.put(url, json={"budget_per_prospect_credits": -5}).status_code == 422
     assert api.put(url, json={"few_shot_examples": 99}).status_code == 422
     assert (
         api.put("/api/settings/sender-profile", json={"narrative": "x" * 20_000}).status_code == 422
@@ -407,11 +408,11 @@ def test_settings_are_checked_for_type_and_size(api: Api) -> None:
 
 def test_a_null_means_no_budget_ceiling_but_is_ignored_for_everything_else(api: Api) -> None:
     url = "/api/settings/workspace"
-    api.put(url, json={"budget_per_prospect_micro_usd": 250_000, "few_shot_examples": 3})
+    api.put(url, json={"budget_per_prospect_credits": 25, "few_shot_examples": 3})
     after = api.put(
-        url, json={"budget_per_prospect_micro_usd": None, "few_shot_examples": None}
+        url, json={"budget_per_prospect_credits": None, "few_shot_examples": None}
     ).json()
-    assert after["budget_per_prospect_micro_usd"] is None  # cleared: no ceiling
+    assert after["budget_per_prospect_credits"] is None  # cleared: no ceiling
     assert after["few_shot_examples"] == 3  # a null here would have crashed the writer
 
 
@@ -818,6 +819,7 @@ def test_a_lead_in_review_shows_each_finished_stage_and_what_it_cost(
             request_hash="h",
             outcome=CallOutcome.HIT,
             cost_micro_usd=24_500,
+            credits_milli=2_450,
             company_id=cid,
         )
         company = uow.companies.get(cid)
@@ -833,8 +835,8 @@ def test_a_lead_in_review_shows_each_finished_stage_and_what_it_cost(
     assert by_key["people"]["facts"][0]["value"].startswith("Jane Doe")
     assert "jane@acme.com" in by_key["email"]["facts"][0]["value"]
     # The call was made while the lead was working towards the stage it was recorded in.
-    assert journey["total_cost_micro_usd"] == 24_500
-    assert sum(s["cost_micro_usd"] for s in journey["stages"]) == 24_500
+    assert journey["total_credits_milli"] == 2_450
+    assert sum(s["credits_milli"] for s in journey["stages"]) == 2_450
 
 
 def test_a_held_lead_blocks_the_stage_that_held_it(
@@ -1145,18 +1147,18 @@ def test_a_runs_vendor_calls_are_added_up_by_vendor_and_operation(
         ):
             uow.calls.record(
                 provider="hunter", operation="find", request_hash="h" * 64, outcome=outcome,
-                cost_micro_usd=cost, latency_ms=ms, run_id=run["id"],
+                cost_micro_usd=cost, credits_milli=cost // 10, latency_ms=ms, run_id=run["id"],
             )  # fmt: skip
         uow.calls.record(
             provider="tavily", operation="search", request_hash="t" * 64,
-            outcome=CallOutcome.HIT, cost_micro_usd=8_000, run_id=run["id"],
+            outcome=CallOutcome.HIT, cost_micro_usd=8_000, credits_milli=800, run_id=run["id"],
         )  # fmt: skip
         uow.commit()
     hunter, tavily = api.get(f"/api/runs/{run['id']}/calls").json()  # costliest first
-    assert (hunter["provider"], hunter["calls"], hunter["cost_micro_usd"]) == ("hunter", 4, 49_000)
+    assert (hunter["provider"], hunter["calls"], hunter["credits_milli"]) == ("hunter", 4, 4_900)
     assert (hunter["found"], hunter["nothing"], hunter["reused"], hunter["errors"]) == (1, 1, 1, 1)
     assert hunter["avg_latency_ms"] == 150
-    assert (tavily["provider"], tavily["cost_micro_usd"]) == ("tavily", 8_000)
+    assert (tavily["provider"], tavily["credits_milli"]) == ("tavily", 800)
 
 
 def test_the_profile_file_has_every_key_and_uploads_back(api: Api) -> None:

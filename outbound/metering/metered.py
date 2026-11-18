@@ -21,6 +21,7 @@ from typing import Any
 
 from outbound.db.types import utcnow
 from outbound.db.uow import UnitOfWorkFactory
+from outbound.domain.credits import credits_for, llm_credits
 from outbound.domain.enums import CallOutcome
 from outbound.logging import get_logger
 from outbound.metering.budget import BudgetPolicy, check_budget
@@ -192,15 +193,28 @@ class Meter:
         latency_ms: int | None = None,
         reason: str | None = None,
         detail: dict[str, str] | None = None,
+        tokens: tuple[str, int, int] | None = None,
     ) -> None:
+        """``tokens`` (model, input, output) marks a model call: it uses the model's charge in
+        AI credits when one is set."""
         scope = current_scope()
         with self._uow(self._workspace_id) as uow:
+            credits = 0
+            if cost or tokens:
+                # AI credits at the charges in force now, stamped on the row.
+                settings, _ = uow.platform_settings.get()
+                charge = settings.llm_charges.get(tokens[0]) if tokens else None
+                if tokens and charge:
+                    credits = llm_credits(tokens[1], tokens[2], *charge)
+                else:
+                    credits = credits_for(cost, settings.credit_value_micro_usd)
             uow.calls.record(
                 provider=provider,
                 operation=operation,
                 request_hash=request_hash(provider, operation, request),
                 outcome=outcome,
                 cost_micro_usd=cost,
+                credits_milli=credits,
                 response=response,
                 latency_ms=latency_ms,
                 run_id=scope.run_id,
@@ -216,6 +230,7 @@ class Meter:
             operation=operation,
             outcome=outcome.value,
             cost_micro_usd=cost,
+            credits_milli=credits,
             latency_ms=latency_ms,
             **({"reason": reason} if reason else {}),
         )
@@ -234,6 +249,7 @@ class Meter:
         ttl: timedelta | None = None,
         asked: str = "",
         got: Callable[[T], str] | None = None,
+        tokens: Callable[[T], tuple[str, int, int]] | None = None,
     ) -> T:
         """Cache, cap, call, record. ``found`` false makes the entry a miss (still reusable).
         ``asked`` and ``got`` say in words what was asked and what came back; they are kept on
@@ -275,6 +291,7 @@ class Meter:
             response=encode(result),
             latency_ms=_elapsed_ms(started),
             detail=_detail(asked, got(result) if got else ""),
+            tokens=tokens(result) if tokens else None,
         )
         return result
 
@@ -579,6 +596,7 @@ class MeteredLlm:
             ttl=self._ttl,
             asked=f"{self.model}: {_quote(system, 80)}",
             got=lambda r: f"{r.input_tokens} tokens in, {r.output_tokens} out",
+            tokens=lambda r: (self.model, r.input_tokens, r.output_tokens),
         )
 
 

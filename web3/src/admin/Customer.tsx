@@ -6,13 +6,12 @@ import { useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { useMe } from "../app/session";
 import { Button, Callout, Card, Checkbox, Confirm, Dialog, Field, Input, Menu, PageHeader, Problem, QueryState, Select, Table, Tabs, Td, Textarea, Th } from "../ui/compat";
-import { usd } from "../lib/format";
+import { credits, usd, wholeCredits } from "../lib/format";
 import { AccessPill, Pill, UseBar, When, stepName } from "./bits";
 import { A, useId } from "./nav";
 
 type Detail = Schemas["CustomerDetailOut"];
 type Tab = "overview" | "limits" | "access" | "members" | "mailboxes" | "activity";
-const STEPS = ["discovery", "manual", "research", "email", "copy", "deliver", "rewrite"] as const;
 
 export function CustomerPage() {
   const id = useId();
@@ -84,13 +83,13 @@ function Header({ d, onChange }: { d: Detail; onChange: () => void }) {
             <Pill tone="muted">{row.plan_name}</Pill>
             <AccessPill row={row} />
             <span>
-              {row.members} member{row.members === 1 ? "" : "s"} · {row.mailboxes} mailbox{row.mailboxes === 1 ? "" : "es"} · {usd(row.spend_micro_usd)} vendor spend this month
+              {row.members} member{row.members === 1 ? "" : "s"} · {row.mailboxes} mailbox{row.mailboxes === 1 ? "" : "es"} · {credits(row.credits_milli)} used this month ({usd(row.cost_micro_usd)} platform cost)
             </span>
           </span>
         }
         actions={
           <div data-tour="admin-customer-actions" className="flex flex-wrap items-center gap-2">
-            <Button onClick={() => setAction("grant")}>Grant credits</Button>
+            <Button onClick={() => setAction("grant")}>Grant AI credits</Button>
             <Button variant="secondary" onClick={() => setAction("extend")}>
               Extend access
             </Button>
@@ -132,9 +131,9 @@ function RequestBanner({ d, onChange }: { d: Detail; onChange: () => void }) {
   });
   const latest = d.requests[0]!;
   return (
-    <Callout tone="attention" title="They asked for more credits" className="mb-4">
+    <Callout tone="attention" title="They asked for more AI credits" className="mb-4">
       <span>
-        {latest.data.step ? <strong>{stepName(String(latest.data.step))}</strong> : "No step named"}
+        {latest.data.amount ? <strong>{wholeCredits(Number(latest.data.amount))}</strong> : latest.data.step ? <strong>{stepName(String(latest.data.step))}</strong> : "No amount named"}
         {latest.note ? `: “${latest.note}”` : ""} · <When iso={latest.at} time />
       </span>
       <div className="mt-2">
@@ -157,21 +156,20 @@ function Note({ value, onChange }: { value: string; onChange: (v: string) => voi
 }
 
 function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; onDone: () => void }) {
-  const [step, setStep] = useState<(typeof STEPS)[number]>("manual");
-  const [amount, setAmount] = useState(10);
+  const [amount, setAmount] = useState(500);
   const [expiry, setExpiry] = useState<"period" | "date" | "never">("period");
   const [date, setDate] = useState("");
   const [note, setNote] = useState("");
   const [resume, setResume] = useState(true);
-  const waiting = step === "manual" ? d.row.waiting : d.row.waiting;
-  const current = d.row.steps.find((s) => s.step === step);
+  const waiting = d.row.waiting;
+  const remaining = d.row.credits.remaining_milli;
   const expires = expiry === "period" ? d.row.period_end : expiry === "date" && date ? new Date(`${date}T23:59:59`).toISOString() : null;
   const grant = useMutation({
-    mutationFn: () => ok(client.POST("/api/admin/customers/{workspace_id}/grants", { params: { path: { workspace_id: d.row.id } }, body: { step, amount, expires_at: expires, note, resume_now: resume } })),
+    mutationFn: () => ok(client.POST("/api/admin/customers/{workspace_id}/grants", { params: { path: { workspace_id: d.row.id } }, body: { amount, expires_at: expires, note, resume_now: resume } })),
   });
   return (
     <Dialog
-      title={`Grant credits · ${d.row.name}`}
+      title={`Grant AI credits · ${d.row.name}`}
       onClose={() => {
         if (grant.isSuccess) onDone();
         else onClose();
@@ -185,7 +183,7 @@ function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; o
               Cancel
             </Button>
             <Button busy={grant.isPending} disabled={amount < 1 || (expiry === "date" && !date)} onClick={() => grant.mutate()}>
-              Grant {amount} credit{amount === 1 ? "" : "s"}
+              Grant {wholeCredits(amount)}
             </Button>
           </>
         )
@@ -193,25 +191,14 @@ function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; o
     >
       {grant.isSuccess ? (
         <p role="status" className="text-body">
-          Granted {amount} credits for {stepName(step).toLowerCase()}.{" "}
+          Granted {wholeCredits(amount)}.{" "}
           {grant.data.resumed_leads + grant.data.resumed_rows > 0 ? `${grant.data.resumed_rows} waiting added as leads and ${grant.data.resumed_leads} lead(s) set going.` : "Nothing was waiting."}
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Step">
-              <Select value={step} onChange={(e) => setStep(e.target.value as typeof step)}>
-                {STEPS.map((s) => (
-                  <option key={s} value={s}>
-                    {stepName(s)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Credits">
-              <Input type="number" min={1} value={amount} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} className="w-full" />
-            </Field>
-          </div>
+          <Field label="AI credits" hint="Added to each month's allowance while the grant lasts.">
+            <Input type="number" min={1} step="100" value={amount} onChange={(e) => setAmount(Math.max(0, Math.round(Number(e.target.value))))} className="w-40" />
+          </Field>
           <fieldset className="space-y-1 text-body">
             <legend className="mb-1 text-small font-medium">Expires</legend>
             {(
@@ -230,7 +217,7 @@ function GrantDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; o
           </fieldset>
           <Note value={note} onChange={setNote} />
           <Checkbox label={`Set waiting work going now${waiting ? ` (${waiting} waiting)` : ""}`} checked={resume} onChange={setResume} />
-          {current && current.remaining !== null && <p className="text-small text-muted">Remaining after: {current.remaining + amount} for {stepName(step).toLowerCase()}.</p>}
+          {remaining !== null && <p className="text-small text-muted">Left after: {credits(remaining + amount * 1000)} this month.</p>}
           <Problem error={grant.error} />
         </>
       )}
@@ -322,7 +309,7 @@ function PlanDialog({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       </Field>
       {chosen && (
         <p className="text-small text-muted">
-          {chosen.name}: {Object.entries(chosen.limits).filter(([, v]) => v !== null).map(([k, v]) => `${stepName(k)} ${v}`).join(", ") || "no step limits"}; {chosen.seats ?? "any number of"} people, {chosen.mailboxes ?? "any number of"} mailboxes. Their own overrides and credits stay.
+          {chosen.name}: {wholeCredits(chosen.monthly_credits)} a month; {chosen.seats ?? "any number of"} people, {chosen.mailboxes ?? "any number of"} mailboxes. Their own overrides and grants stay.
         </p>
       )}
       <Note value={note} onChange={setNote} />
@@ -368,16 +355,10 @@ function StatusDialog({ d, to, onClose, onDone }: { d: Detail; to: "active" | "p
 // ------------------------------------------------------------------ tabs
 
 const Meters = ({ d }: { d: Detail }) => (
-  <ul className="space-y-2">
-    {d.row.steps
-      .filter((s) => s.limit !== null || s.used > 0)
-      .map((s) => (
-        <li key={s.step} className="flex items-center justify-between gap-3 text-body">
-          <span>{stepName(s.step)}</span>
-          <UseBar used={s.used} total={s.limit === null ? null : s.limit + s.granted} />
-        </li>
-      ))}
-  </ul>
+  <div className="flex items-center justify-between gap-3 text-body">
+    <span>AI credits</span>
+    <UseBar used={Math.round(d.row.credits.used_milli / 1000)} total={d.row.credits.allowance} />
+  </div>
 );
 
 function Overview({ d, onChange }: { d: Detail; onChange: () => void }) {
@@ -390,7 +371,7 @@ function Overview({ d, onChange }: { d: Detail; onChange: () => void }) {
       <Card title="This period" subtitle={`Renews ${new Date(d.row.period_end).toLocaleDateString()}`}>
         <Meters d={d} />
       </Card>
-      <Card title="Waiting work" subtitle="Stopped only because an allowance ran out. It continues by itself when credits exist.">
+      <Card title="Waiting work" subtitle="Stopped only because the AI credits ran out. It continues by itself when credits are back.">
         {d.row.waiting === 0 ? (
           <p className="text-body text-muted">Nothing is waiting.</p>
         ) : (
@@ -406,7 +387,8 @@ function Overview({ d, onChange }: { d: Detail; onChange: () => void }) {
       <Card title="Totals">
         <dl className="space-y-1.5 text-body">
           <Line label="Leads" value={d.row.leads} />
-          <Line label="Vendor spend this month" value={usd(d.row.spend_micro_usd)} />
+          <Line label="AI credits used this month" value={credits(d.row.credits_milli)} />
+          <Line label="What it cost the platform" value={usd(d.row.cost_micro_usd)} />
           <Line label="Last active" value={d.row.last_active ? new Date(d.row.last_active).toLocaleString() : "never"} />
           <Line label="On this plan since" value={d.plan_started_at ? new Date(d.plan_started_at).toLocaleDateString() : "—"} />
         </dl>
@@ -434,35 +416,31 @@ function Limits({ d, onChange }: { d: Detail; onChange: () => void }) {
   const live = d.overrides.filter((o) => !o.revoked_at);
   return (
     <div className="space-y-4">
-      <Card tour="admin-limits" title="Limits and credits" subtitle={`Period ${new Date(d.row.period_start).toLocaleDateString()} to ${new Date(d.row.period_end).toLocaleDateString()}`}>
+      <Card tour="admin-limits" title="AI credits" subtitle={`Period ${new Date(d.row.period_start).toLocaleDateString()} to ${new Date(d.row.period_end).toLocaleDateString()}`}>
         <Table>
           <thead>
             <tr>
-              <Th>Step</Th>
-              <Th>Plan</Th>
+              <Th>Plan, a month</Th>
               <Th>Override</Th>
               <Th>Grants</Th>
               <Th>Used</Th>
-              <Th>Remaining</Th>
+              <Th>Left</Th>
               <Th />
             </tr>
           </thead>
           <tbody>
-            {d.row.steps.map((s) => (
-              <tr key={s.step}>
-                <Td className="font-medium">{stepName(s.step)}</Td>
-                <Td>{s.plan_limit ?? "∞"}</Td>
-                <Td>{s.limit !== s.plan_limit ? (s.limit ?? "∞") : "—"}</Td>
-                <Td>{s.granted ? `+${s.granted}` : "—"}</Td>
-                <Td>{s.used}</Td>
-                <Td className={s.remaining === 0 ? "font-semibold text-error" : ""}>{s.remaining ?? "∞"}</Td>
-                <Td className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => setEdit(`limit.${s.step}`)}>
-                    Edit
-                  </Button>
-                </Td>
-              </tr>
-            ))}
+            <tr>
+              <Td>{wholeCredits(d.row.credits.plan_monthly)}</Td>
+              <Td>{d.row.credits.monthly !== d.row.credits.plan_monthly ? wholeCredits(d.row.credits.monthly) : "—"}</Td>
+              <Td>{d.row.credits.granted ? `+${wholeCredits(d.row.credits.granted)}` : "—"}</Td>
+              <Td>{credits(d.row.credits.used_milli)}</Td>
+              <Td className={d.row.credits.remaining_milli === 0 ? "font-semibold text-error" : ""}>{d.row.credits.remaining_milli == null ? "No limit" : credits(d.row.credits.remaining_milli)}</Td>
+              <Td className="text-right">
+                <Button size="sm" variant="ghost" onClick={() => setEdit("monthly_credits")}>
+                  Change monthly
+                </Button>
+              </Td>
+            </tr>
           </tbody>
         </Table>
       </Card>
@@ -470,8 +448,8 @@ function Limits({ d, onChange }: { d: Detail; onChange: () => void }) {
         <Problem error={revoke.error} className="mb-2" />
         <ul className="divide-y divide-line text-body">
           {[
-            ...d.grants.map((g) => ({ at: g.created_at, id: g.id, kind: "grant" as const, dead: g.revoked_at, text: `+${g.amount} ${stepName(g.step).toLowerCase()}`, extra: g.expires_at ? `expires ${new Date(g.expires_at).toLocaleDateString()}` : "never expires", note: g.note })),
-            ...d.overrides.map((o) => ({ at: o.created_at, id: o.id, kind: "override" as const, dead: o.revoked_at, text: `${o.key.replace("limit.", "limit: ").replace("feature.", "feature: ")} → ${o.value === null ? "unlimited" : String(o.value)}`, extra: o.expires_at ? `until ${new Date(o.expires_at).toLocaleDateString()}` : "no end", note: o.note })),
+            ...d.grants.map((g) => ({ at: g.created_at, id: g.id, kind: "grant" as const, dead: g.revoked_at, text: `+${wholeCredits(g.amount)}${g.step ? ` (was ${stepName(g.step).toLowerCase()})` : ""}`, extra: g.expires_at ? `expires ${new Date(g.expires_at).toLocaleDateString()}` : "never expires", note: g.note })),
+            ...d.overrides.map((o) => ({ at: o.created_at, id: o.id, kind: "override" as const, dead: o.revoked_at, text: `${o.key.replace("limit.", "old step limit: ").replace("feature.", "feature: ")} → ${o.value === null ? "unlimited" : String(o.value)}`, extra: o.expires_at ? `until ${new Date(o.expires_at).toLocaleDateString()}` : "no end", note: o.note })),
           ]
             .sort((a, b) => b.at.localeCompare(a.at))
             .map((item) => (
@@ -497,16 +475,17 @@ function Limits({ d, onChange }: { d: Detail; onChange: () => void }) {
 }
 
 const OVERRIDE_LABELS: Record<string, string> = {
+  monthly_credits: "AI credits a month",
   seats: "People (seats)",
   mailboxes: "Mailboxes",
   active_campaigns: "Active campaigns",
   max_leads_per_run: "Leads per run",
-  max_prospect_budget: "Most they may set as budget per prospect (micro-USD)",
+  max_prospect_budget: "Most they may set as budget per lead (AI credits)",
 };
 
 function OverrideDialog({ d, keyName, onClose, onDone }: { d: Detail; keyName: string; onClose: () => void; onDone: () => void }) {
-  const label = keyName.startsWith("limit.") ? `${stepName(keyName.slice(6))} limit` : (OVERRIDE_LABELS[keyName] ?? keyName);
-  const current = keyName.startsWith("limit.") ? d.row.steps.find((s) => s.step === keyName.slice(6))?.limit : { seats: d.row.seats, mailboxes: d.row.mailbox_limit, active_campaigns: d.row.active_campaigns, max_leads_per_run: d.row.max_leads_per_run, max_prospect_budget: d.row.max_prospect_budget_micro_usd }[keyName];
+  const label = OVERRIDE_LABELS[keyName] ?? keyName;
+  const current = { monthly_credits: d.row.credits.monthly, seats: d.row.seats, mailboxes: d.row.mailbox_limit, active_campaigns: d.row.active_campaigns, max_leads_per_run: d.row.max_leads_per_run, max_prospect_budget: d.row.max_prospect_budget_credits }[keyName];
   const [unlimited, setUnlimited] = useState(current === null);
   const [value, setValue] = useState(current ?? 0);
   const [until, setUntil] = useState("");
@@ -564,7 +543,7 @@ function Access({ d, onChange }: { d: Detail; onChange: () => void }) {
     ["mailboxes", d.row.mailbox_limit],
     ["active_campaigns", d.row.active_campaigns],
     ["max_leads_per_run", d.row.max_leads_per_run],
-    ["max_prospect_budget", d.row.max_prospect_budget_micro_usd],
+    ["max_prospect_budget", d.row.max_prospect_budget_credits],
   ];
   return (
     <div className="grid gap-4 lg:grid-cols-2">

@@ -236,3 +236,91 @@ def test_companies_rejected_by_word_matching_come_back_to_be_screened(fresh_url:
         assert back["lost"] == "rejected"
     finally:
         engine.dispose()
+
+
+def test_ai_credits_convert_old_settings_and_grants_but_not_past_calls(fresh_url: str) -> None:
+    """Migration 0029: a budget per prospect and a per-prospect override become AI credits, a
+    step grant becomes AI credits (x20), a per-step limit is withdrawn, the catalog gains Starter
+    and Pro, and calls already made keep no credits."""
+    import json
+
+    migrate.upgrade(fresh_url, "0028")
+    engine = create_engine(fresh_url)
+    now = "2026-11-18 00:00:00+00:00"
+    catalog = {"plans": [{"code": "free", "name": "Free", "limits": {"manual": 5}}],
+               "default_plan": "free"}  # fmt: skip
+    try:
+        with engine.begin() as connection:
+            run = connection.execute
+            run(
+                sa.text(
+                    "INSERT INTO workspaces (id, name, slug, join_code, status, sender_profile, "
+                    "settings, created_at, updated_at) VALUES ('w1', 'w1', 'w1', 'CODE0001', "
+                    "'active', '{}', :settings, :now, :now)"
+                ),
+                {"now": now, "settings": json.dumps({"budget_per_prospect_micro_usd": 500_000})},
+            )
+            run(
+                sa.text(
+                    "INSERT INTO credit_grants (id, workspace_id, step, amount, note, created_at) "
+                    "VALUES ('g1', 'w1', 'manual', 3, 'pilot', :now)"
+                ),
+                {"now": now},
+            )
+            for oid, key, value in (
+                ("o1", "limit.manual", 20),
+                ("o2", "max_prospect_budget", 250_000),
+            ):
+                run(
+                    sa.text(
+                        "INSERT INTO entitlement_overrides (id, workspace_id, key, value, note, "
+                        "created_at) VALUES (:id, 'w1', :key, :value, '', :now)"
+                    ),
+                    {"id": oid, "key": key, "value": json.dumps({"value": value}), "now": now},
+                )
+            run(
+                sa.text(
+                    "INSERT INTO platform_settings (id, data, version, updated_at) "
+                    "VALUES ('platform', :data, 1, :now)"
+                ),
+                {"data": json.dumps(catalog), "now": now},
+            )
+            run(
+                sa.text(
+                    "INSERT INTO provider_calls (id, workspace_id, provider, operation, "
+                    "request_hash, outcome, cost_micro_usd, created_at) VALUES ('p1', 'w1', "
+                    "'hunter', 'find', 'h', 'hit', 24500, :now)"
+                ),
+                {"now": now},
+            )
+        migrate.upgrade(fresh_url)
+        with engine.connect() as connection:
+            one = connection.execute
+
+            def loaded(value: object) -> dict:  # type: ignore[type-arg]
+                return json.loads(value) if isinstance(value, str) else value  # type: ignore[return-value]
+
+            settings = loaded(one(sa.text("SELECT settings FROM workspaces")).scalar_one())
+            grant = one(sa.text("SELECT step, amount, note FROM credit_grants")).one()
+            overrides = {
+                key: (loaded(value), revoked is not None)
+                for key, value, revoked in one(
+                    sa.text("SELECT key, value, revoked_at FROM entitlement_overrides")
+                )
+            }
+            data = loaded(one(sa.text("SELECT data FROM platform_settings")).scalar_one())
+            credits = one(sa.text("SELECT credits_milli FROM provider_calls")).scalar_one()
+        assert settings == {"budget_per_prospect_credits": 50}
+        assert (grant.step, grant.amount) == ("manual", 60) and "converted" in grant.note
+        assert overrides == {
+            "limit.manual": ({"value": 20}, True),  # withdrawn
+            "max_prospect_budget": ({"value": 25}, False),
+        }
+        assert [p["code"] for p in data["plans"]] == ["free", "starter", "pro"]
+        assert credits == 0  # past calls are not converted
+        migrate.downgrade(fresh_url, "0028")
+        with engine.connect() as connection:
+            back = connection.execute(sa.text("SELECT settings FROM workspaces")).scalar_one()
+        assert loaded(back) == {"budget_per_prospect_micro_usd": 500_000}
+    finally:
+        engine.dispose()

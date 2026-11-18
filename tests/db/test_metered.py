@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from outbound.db.platform import PlatformUnitOfWorkFactory
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CallOutcome, CompanySource
 from outbound.metering.budget import BudgetPolicy
@@ -133,6 +134,18 @@ def meter(
     )
 
 
+def rate(platform: PlatformUnitOfWorkFactory, micro_usd: int) -> None:
+    """Make one AI credit stand for ``micro_usd`` of cost."""
+    from dataclasses import replace
+
+    with platform() as p:
+        current, version = p.settings.get()
+        p.settings.save(
+            replace(current, credit_value_micro_usd=micro_usd), expected_version=version
+        )
+        p.commit()
+
+
 def ledger(factory: UnitOfWorkFactory, ws: str) -> list[tuple[str, CallOutcome, int]]:
     from sqlalchemy import select
 
@@ -243,7 +256,7 @@ def test_the_ledger_attributes_calls_to_the_run_company_and_contact(
     with call_scope(company_id=company_id):
         MeteredVerifier(FakeVerifier(), meter(factory, ws)).verify("jane@acme.com")
     with factory(ws) as uow:
-        assert uow.calls.spend_on_company(company_id) == 100
+        assert uow.calls.credits_on_company(company_id) == 10  # 100 micro-USD: 0.01 credit
 
 
 # ------------------------------------------------------------------ caps
@@ -258,7 +271,7 @@ def test_a_call_that_would_pass_the_monthly_cap_is_refused_and_recorded(
     finder.find(JANE, "acme.com")  # 1,000 spent
     with pytest.raises(BudgetExceeded) as caught:
         finder.find(PersonQuery(first_name="Joe", last_name="Bloggs"), "acme.com")
-    assert "monthly cap" in str(caught.value)
+    assert "monthly limit" in str(caught.value)
     assert inner.calls == 1
     assert ledger(factory, ws)[-1] == ("find", CallOutcome.BLOCKED_BY_CAP, 0)
 
@@ -284,9 +297,10 @@ def test_spend_from_last_month_does_not_count_against_this_months_cap(
 
 
 def test_the_per_prospect_ceiling_stops_paid_calls_for_that_company_only(
-    factory: UnitOfWorkFactory, ws: str
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory, ws: str
 ) -> None:
-    budget = BudgetPolicy(per_prospect=1_050)
+    rate(platform, 1_000)  # the finder's 1,000 micro-USD is one AI credit; the verifier 0.1
+    budget = BudgetPolicy(per_prospect=1)
     spender = new_company(factory, ws, "acme.com")
     fresh = new_company(factory, ws, "other.com")
     m = meter(factory, ws, budget)
@@ -294,10 +308,10 @@ def test_the_per_prospect_ceiling_stops_paid_calls_for_that_company_only(
     verifier = MeteredVerifier(FakeVerifier(), m)
 
     with call_scope(company_id=spender):
-        finder.find(JANE, "acme.com")  # 1,000
+        finder.find(JANE, "acme.com")  # one credit
         with pytest.raises(BudgetExceeded) as caught:
-            verifier.verify("jane@acme.com")  # +100 would be 1,100
-        assert "per-prospect" in str(caught.value)
+            verifier.verify("jane@acme.com")  # +0.1 would be 1.1
+        assert "budget per prospect" in str(caught.value) and "AI credits" in str(caught.value)
     with call_scope(company_id=fresh):
         verifier.verify("jane@other.com")
 
@@ -310,8 +324,8 @@ def test_no_company_in_scope_means_the_per_prospect_ceiling_does_not_apply(
 
 
 def test_budget_policy_reads_the_workspace_ceiling() -> None:
-    policy = BudgetPolicy.from_workspace_settings({"budget_per_prospect_micro_usd": 500_000})
-    assert policy.per_prospect == 500_000
+    policy = BudgetPolicy.from_workspace_settings({"budget_per_prospect_credits": 50})
+    assert policy.per_prospect == 50
     assert BudgetPolicy.from_workspace_settings({}).per_prospect is None
 
 
@@ -515,7 +529,7 @@ def test_pages_a_finder_and_a_blocked_call_say_what_they_asked(
     }
     assert found is not None and found["asked"] == "Jane Doe at acme.com"
     assert blocked is not None
-    assert blocked["asked"] == "Joe Bloggs at acme.com" and "monthly cap" in blocked["got"]
+    assert blocked["asked"] == "Joe Bloggs at acme.com" and "monthly limit" in blocked["got"]
 
 
 def test_a_failed_call_keeps_its_reason(factory: UnitOfWorkFactory, ws: str) -> None:
@@ -527,3 +541,50 @@ def test_a_failed_call_keeps_its_reason(factory: UnitOfWorkFactory, ws: str) -> 
         MeteredSearch(Failing(), meter(factory, ws)).search("Acme")
     (failed,) = details(factory, ws)
     assert failed is not None and "the vendor said no" in failed["got"]
+
+
+# ------------------------------------------------------------------ AI credits
+
+
+def test_each_paid_call_is_stamped_with_ai_credits_at_the_rate_in_force(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory, ws: str
+) -> None:
+    from sqlalchemy import select
+
+    from outbound.db.models import ProviderCallRow
+
+    finder = MeteredFinder(FakeFinder(), meter(factory, ws))
+    finder.find(JANE, "acme.com")  # 1,000 micro-USD at a cent a credit: 0.1
+    rate(platform, 500)
+    finder.find(PersonQuery(first_name="Joe", last_name="Bloggs"), "acme.com")  # now 2 credits
+    finder.find(JANE, "acme.com")  # answered from the cache: nothing
+    with factory(ws) as uow:
+        rows = uow.session.scalars(select(ProviderCallRow).order_by(ProviderCallRow.created_at))
+        assert [(r.cost_micro_usd, r.credits_milli) for r in rows] == [
+            (1000, 100), (1000, 2000), (0, 0),
+        ]  # fmt: skip
+
+
+def test_a_model_call_uses_its_charge_in_ai_credits_and_nothing_without_one(
+    factory: UnitOfWorkFactory, platform: PlatformUnitOfWorkFactory, ws: str
+) -> None:
+    from dataclasses import replace
+
+    from outbound.metering.metered import MeteredLlm
+    from tests.stages.fakes import FakeLlm
+
+    llm = MeteredLlm(FakeLlm(), meter(factory, ws))
+    llm.complete("judge how well a company matches", "acme")  # no charge set: free
+    with platform() as p:
+        current, version = p.settings.get()
+        charges = {"fake-model": (100.0, 500.0)}
+        p.settings.save(replace(current, llm_charges=charges), expected_version=version)
+        p.commit()
+    llm.complete("judge how well a company matches", "acme")  # 1,000 in and 200 out
+    with factory(ws) as uow:
+        assert uow.calls.credits_between(*_window()) == 200  # 0.1 + 0.1 credits
+
+
+def _window() -> tuple[datetime, datetime]:
+    now = datetime.now(UTC)
+    return now - timedelta(days=1), now + timedelta(days=1)
