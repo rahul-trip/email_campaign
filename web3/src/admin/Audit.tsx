@@ -37,7 +37,7 @@ export function AuditPage() {
           <Input type="date" value={since} onChange={(e) => setSince(e.target.value)} />
         </Field>
       </div>
-      <QueryState query={rows} rows={6}>
+      <QueryState query={rows} rows={6} shape="table">
         {(all) =>
           all.length === 0 ? (
             <Empty title="Nothing recorded for that" />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
 import { StatusBadge } from "../components/StatusBadge";
-import { Button, Callout, Card, Empty, PageHeader, Problem, QueryState, Stat, Table, Td, Th, buttonClass } from "../ui/compat";
+import { Button, Callout, Card, Empty, PageHeader, Problem, QueryState, Stat, Table, Td, Th, buttonClass, StartNow } from "../ui/compat";
 import { Chip, Segmented, Toggle } from "../ui/core";
 import { Drawer, useToast } from "../ui/overlay";
 import { cx } from "../lib/cx";
@@ -84,10 +84,10 @@ export function RunsPage() {
       )}
 
       <Card tour="recent-runs" title="Recent runs" className="p-0">
-        <QueryState query={runs}>
+        <QueryState query={runs} shape="table">
           {(rows) =>
             rows.length === 0 ? (
-              <Empty title="No runs yet">Start a run above once you have added leads.</Empty>
+              <Empty title="No runs yet" action={<StartNow label="Start your first run" />}>A run researches your leads and writes the first drafts. Add leads first, then start one.</Empty>
             ) : (
               <Table>
                 <thead>

@@ -55,7 +55,7 @@ export function VendorsPage() {
         subtitle="The third-party services the platform pays for. A vendor can have up to three keys: each call uses one at random and skips a key that is refused or out of credit. A new key reaches the worker on its next run; no restart."
       />
       <Problem error={rollback.error ?? remove.error ?? pause.error ?? reveal.error ?? test.error} className="mb-3" />
-      <QueryState query={vendors} rows={6}>
+      <QueryState query={vendors} rows={6} shape="table">
         {(data) => (
           <div className="space-y-4">
             <div className="overflow-x-auto rounded-xl border border-line bg-surface" data-tour="admin-vendors">

@@ -64,7 +64,7 @@ export function Mailboxes() {
 
       {imapOpen && <ImapDialog onClose={() => setImapOpen(false)} onDone={() => { setImapOpen(false); refresh(); }} />}
 
-      <QueryState query={boxes}>
+      <QueryState query={boxes} shape="cards" rows={3}>
         {(all) =>
           all.length === 0 ? (
             <Card>

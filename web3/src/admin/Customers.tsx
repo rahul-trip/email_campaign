@@ -56,7 +56,7 @@ export function CustomersPage() {
         <Checkbox label="Waiting for credits" checked={waiting} onChange={setWaiting} />
         <Checkbox label="Mailbox problem" checked={mailbox} onChange={setMailbox} />
       </div>
-      <QueryState query={rows} rows={6}>
+      <QueryState query={rows} rows={6} shape="table">
         {(all) =>
           all.length === 0 ? (
             <Empty title="No customer matches">Change the filters, or invite the first one.</Empty>

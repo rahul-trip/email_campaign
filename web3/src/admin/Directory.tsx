@@ -23,7 +23,7 @@ export function DirectoryPage() {
   return (
     <>
       <PageHeader title="Lead directory" subtitle="Verified facts shared between customers. Nothing here shows who contributed or looked something up." />
-      <QueryState query={overview} rows={4}>
+      <QueryState query={overview} rows={4} shape="table">
         {(data) => {
           const f = data.figures;
           return (

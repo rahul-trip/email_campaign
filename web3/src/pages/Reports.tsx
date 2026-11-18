@@ -44,7 +44,7 @@ export function ReportsPage() {
         <Problem error={cost.error ?? quality.error} className="mb-4" />
 
         <Label className="mb-2">Quality, since the start</Label>
-        <div data-tour="reports-quality" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div data-tour="reports-quality" className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Sent without an edit" value={percent(q?.unedited_share)} hint={q ? `${q.unedited} of ${q.sent} sent · target 80%` : undefined} tone={q?.unedited_share != null ? (q.unedited_share >= 0.8 ? "good" : "attention") : undefined} />
           <Stat label="Flagged by the checks" value={percent(q?.flag_rate)} hint={q ? `${q.flagged} of ${q.written} written` : undefined} />
           <Stat label="Catch-all addresses" value={percent(q?.catch_all_share)} hint="Servers that accept any address" />
@@ -54,7 +54,7 @@ export function ReportsPage() {
         <div className="mb-6 flex items-center justify-between">
           <Label>Spend, last {days === 365 ? "year" : `${days} days`}</Label>
         </div>
-        <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <Stat label="Total" value={usd(c?.total, 2)} hint={c ? `${c.paid_calls} paid calls` : undefined} />
           <Stat label="Per prospect" value={c?.per_prospect != null ? usd(c.per_prospect) : "–"} hint={ceiling == null ? "No ceiling set" : `Ceiling ${usd(ceiling, 2)}`} tone="primary" />
           <Stat label="Prospects" value={c?.prospects ?? "–"} hint="Companies with any spend" />

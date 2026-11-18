@@ -381,7 +381,7 @@
   [role="menuitem"],
   select,
   input:not([type="checkbox"]):not([type="radio"]),
-  a.press {
+  a:where([class*="flex"], [class*="block"]) {
     min-height: 44px;
   }
   button[aria-label]:not([data-bare]),

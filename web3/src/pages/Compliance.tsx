@@ -167,10 +167,10 @@ function Policies() {
       className="p-0 [&>header]:px-4 [&>header]:pt-4"
     >
       <Problem error={add.error} className="mx-4 mb-3" />
-      <QueryState query={policies}>
+      <QueryState query={policies} shape="table">
         {(rows) =>
           rows.length === 0 ? (
-            <Empty>No country rules yet. Countries without a rule are held until one is added.</Empty>
+            <Empty title="No country rules yet">Countries without a rule are held until one is added. Add the first rule with the form above.</Empty>
           ) : (
             <Table>
               <thead>
@@ -312,10 +312,10 @@ function Suppressions() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
       <Card title="Do not contact" subtitle="Anything on this list is never added and never emailed. Entries cannot be removed." className="p-0 [&>header]:px-4 [&>header]:pt-4">
-        <QueryState query={entries}>
+        <QueryState query={entries} shape="table">
           {(rows) =>
             rows.length === 0 ? (
-              <Empty>Nobody is on the list yet.</Empty>
+              <Empty title="Nobody is on the list yet">Add an address or domain above to stop all contact with it. Opt-outs found in replies are added here automatically.</Empty>
             ) : (
               <Table>
                 <thead>

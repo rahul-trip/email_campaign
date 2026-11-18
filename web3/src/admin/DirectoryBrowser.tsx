@@ -80,7 +80,7 @@ function People() {
         </div>
         <Button onClick={() => setEditing("new")}>Add a person</Button>
       </div>
-      <QueryState query={list} rows={4}>
+      <QueryState query={list} rows={4} shape="table">
         {(data) =>
           data.entries.length === 0 ? (
             <Empty title={q ? "Nothing matches" : "The directory is empty"} />
@@ -257,7 +257,7 @@ function Companies() {
         </div>
         <Button onClick={() => setEditing("new")}>Add a company</Button>
       </div>
-      <QueryState query={list} rows={3}>
+      <QueryState query={list} rows={3} shape="table">
         {(data) =>
           data.companies.length === 0 ? (
             <Empty title={q ? "Nothing matches" : "No company patterns yet"} />

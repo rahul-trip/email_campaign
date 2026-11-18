@@ -400,25 +400,25 @@ function Reader({ item, onDone }: { item: Item; onDone: (company: string) => str
           </div>
 
           {/* The action bar stays in view at the bottom of the email. */}
-          <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/95 px-6 py-4 backdrop-blur">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="lg" busy={approve.isPending} disabled={blockedBySkips} onClick={() => approve.mutate()}>
+          <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:px-6 sm:py-4">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <Button size="lg" className="flex-1 sm:flex-none" busy={approve.isPending} disabled={blockedBySkips} onClick={() => approve.mutate()}>
                 <Check className="size-4" aria-hidden /> {edited ? "Approve with my edit" : "Approve"}
-                <Kbd>Ctrl ↵</Kbd>
+                <span className="hidden sm:inline-flex"><Kbd>Ctrl ↵</Kbd></span>
               </Button>
-              <Button variant="secondary" disabled={!edited} onClick={() => setText(item.message.generated_body)}>
+              <Button variant="secondary" className="flex-1 sm:flex-none" disabled={!edited} onClick={() => setText(item.message.generated_body)}>
                 <RotateCcw className="size-4" aria-hidden /> Undo my edits
               </Button>
             </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" busy={rewrite.isPending} onClick={() => rewrite.mutate()} title="Cancel this email and have the next run write a new one to the same person">
+            <div className="flex w-full items-center gap-1 sm:w-auto">
+              <Button variant="ghost" className="flex-1 sm:flex-none" busy={rewrite.isPending} onClick={() => rewrite.mutate()} title="Cancel this email and have the next run write a new one to the same person">
                 <RotateCcw className="size-4" aria-hidden /> Write it again
               </Button>
-              <Button variant="danger" onClick={() => setRejecting(true)}>
+              <Button variant="danger" className="flex-1 sm:flex-none" onClick={() => setRejecting(true)}>
                 <X className="size-4" aria-hidden /> Reject…
               </Button>
             </div>
-            <p className="basis-full text-small text-muted">Approving sends nothing: within 15 minutes it is saved as a draft in your mailbox.</p>
+            <p className="hidden basis-full text-small text-muted sm:block">Approving sends nothing: within 15 minutes it is saved as a draft in your mailbox.</p>
             <Problem error={approve.error ?? rewrite.error} className="basis-full" />
           </div>
         </Card>

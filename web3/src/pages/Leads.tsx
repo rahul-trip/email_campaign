@@ -138,8 +138,8 @@ export function LeadsPage() {
       )}
 
       <Card data-tour="leads-list" className="overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 p-3">
-          <div className="relative max-w-sm min-w-[220px] flex-1">
+        <div className="grid grid-cols-2 items-center gap-2 border-b border-line bg-surface-2 p-3 sm:flex sm:flex-wrap">
+          <div className="relative col-span-2 min-w-[220px] flex-1 sm:max-w-sm">
             <Search className="absolute top-3 left-3 size-4 text-faint" aria-hidden />
             <input
               aria-label="Search by company or domain"
@@ -172,7 +172,7 @@ export function LeadsPage() {
               <X className="size-3.5" aria-hidden /> Clear
             </Button>
           )}
-          {moreOpen && <div className="flex basis-full flex-wrap items-center gap-2 border-t border-line pt-3">
+          {moreOpen && <div className="col-span-2 grid grid-cols-2 items-center gap-2 border-t border-line pt-3 sm:flex sm:basis-full sm:flex-wrap">
           <Select aria-label="Hold reason" value={search.hold ?? ""} onChange={(e) => set({ hold: e.target.value || undefined, status: e.target.value ? "held" : search.status })} className="w-auto">
             <option value="">Any hold</option>
             {HOLD_REASONS.map((h) => (
@@ -232,7 +232,7 @@ export function LeadsPage() {
               <thead className="text-label font-semibold tracking-wide text-faint uppercase">
                 <tr className="border-b border-line">
                   <th className="px-4 py-3">Company</th>
-                  <th className="px-3 py-3">Status</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Status</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Stage</th>
                   <th className="px-3 py-3 text-center">Fit</th>
                   <th className="hidden px-3 py-3 md:table-cell">Contact</th>
@@ -263,10 +263,14 @@ export function LeadsPage() {
                               {company.country_code && <span>· {company.country_code}</span>}
                               {company.priority !== 5 && <span title="Priority (1 is first)">· P{company.priority}</span>}
                             </div>
+                            <div className="mt-1 sm:hidden">
+                              <Chip tone={info.family}>{info.label}</Chip>
+                              {hold && <span className="ml-2 text-small text-attention">{hold.label}</span>}
+                            </div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3.5">
+                      <td className="hidden px-3 py-3.5 sm:table-cell">
                         <Chip tone={info.family}>{info.label}</Chip>
                         {hold && <div className="mt-1 text-small text-attention">{hold.label}</div>}
                         {company.status === "failed" && company.last_error && (

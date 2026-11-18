@@ -92,7 +92,7 @@ export function UsersPage() {
         <Input aria-label="Search users" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or email" className="w-full" />
       </div>
       <Problem error={enable.error ?? signOut.error ?? role.error} className="mb-3" />
-      <QueryState query={users} rows={5}>
+      <QueryState query={users} rows={5} shape="table">
         {(all) =>
           all.length === 0 ? (
             <Empty title="No one matches" />

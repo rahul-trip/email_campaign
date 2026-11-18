@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
-import { Card, Empty, PageHeader, QueryState, Segmented } from "../ui/compat";
+import { buttonClass, Card, Empty, PageHeader, QueryState, Segmented } from "../ui/compat";
 import { isViewing, useCurrent } from "../app/session";
 
 type State = "drafted" | "sent" | "skipped";
@@ -38,11 +38,11 @@ export function LinkedInPage() {
           ]}
         />
       </div>
-      <QueryState query={list} rows={4}>
+      <QueryState query={list} rows={4} shape="table">
         {(page) =>
           page.items.length === 0 ? (
             <Card>
-              <Empty title={state === "drafted" ? "Nothing to send yet" : "Nothing here"}>
+              <Empty title={state === "drafted" ? "Nothing to send yet" : "Nothing here"} action={<Link to="/leads" className={buttonClass("secondary", "sm")}>Browse leads</Link>}>
                 {state === "drafted" ? "Messages are written when a lead's people are found and a person with a LinkedIn profile is a confirmed decision-maker." : "Messages you mark here will be listed."}
               </Empty>
             </Card>
