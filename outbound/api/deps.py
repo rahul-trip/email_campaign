@@ -125,13 +125,20 @@ class ServicesSource(Protocol):
     ) -> Services: ...
 
 
+LiveVendors = Callable[[], tuple[SearchProvider | None, LlmClient | None]]
+
+
 @dataclass(frozen=True)
 class ServicesFactory:
-    """Builds a request's services: shared vendor clients, this workspace's meters."""
+    """Builds a request's services: shared vendor clients, this workspace's meters.
+
+    ``live`` gives the clients built from the keys an admin manages in the console (the ones the
+    worker uses), rebuilt when they change; without it, the fixed ``search`` and ``writer``."""
 
     container: Container
     search: SearchProvider | None = None  # raw; metered per workspace
     writer: LlmClient | None = None  # raw; metered per workspace
+    live: LiveVendors | None = None
 
     def for_tenant(
         self, workspace_id: str, *, actor: str = OPERATOR, read_only: bool = False
@@ -139,12 +146,13 @@ class ServicesFactory:
         from outbound.pipeline import mailboxes_for, meter_search, meter_writer
 
         container = self.container
+        search, writer = self.live() if self.live else (self.search, self.writer)
         return build_services(
             container,
             workspace_id,
-            search=meter_search(container, workspace_id, self.search) if self.search else None,
+            search=meter_search(container, workspace_id, search) if search else None,
             mailboxes=mailboxes_for(container, workspace_id),
-            writer=meter_writer(container, workspace_id, self.writer) if self.writer else None,
+            writer=meter_writer(container, workspace_id, writer) if writer else None,
             actor=actor,
             read_only=read_only,
         )

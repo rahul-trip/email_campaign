@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, ClipboardCheck, Flame, Info, Pause, PlayCircle, TriangleAlert, UserPlus, X, type LucideIcon } from "lucide-react";
+import { Bell, Check, ClipboardCheck, Flame, Info, Pause, PlayCircle, ShieldAlert, TriangleAlert, UserPlus, X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { go, inWorkspace, rememberWorkspace } from "./session";
@@ -46,6 +46,12 @@ export function describe(n: Notice): { text: string; to: string | null; icon: Lu
       return { text: `Automatic discovery is paused: Review holds ${num(d.waiting)} drafts`, to: at("review"), icon: Pause };
     case "account":
       return { text: typeof d.text === "string" ? d.text : "A notice about your account", to: slug ? inWorkspace(slug) : null, icon: Info };
+    case "platform_alert": {
+      // For platform staff only: a vendor key refused or out of credit, or a crash.
+      const title = typeof d.title === "string" ? d.title : "Something needs the platform team";
+      const detail = typeof d.text === "string" ? d.text.split("\n")[0] : "";
+      return { text: detail ? `${title}: ${detail}` : title, to: typeof d.link === "string" && d.link.startsWith("/admin") ? d.link : "/admin", icon: ShieldAlert };
+    }
   }
 }
 
@@ -107,7 +113,7 @@ export function NotificationBell() {
                   <button type="button" onClick={() => open1(n)} className={cx("flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-body hover:bg-surface-2", !n.read && "bg-primary-soft")}>
                     {(() => {
                       const Icon = describe(n).icon;
-                      return <Icon className={cx("mt-0.5 size-4 shrink-0", n.kind === "hot_lead" ? "text-attention" : n.kind === "run_failed" ? "text-error" : "text-muted")} aria-hidden />;
+                      return <Icon className={cx("mt-0.5 size-4 shrink-0", n.kind === "hot_lead" ? "text-attention" : n.kind === "run_failed" || n.kind === "platform_alert" ? "text-error" : "text-muted")} aria-hidden />;
                     })()}
                     <span className="min-w-0">
                       <span className={cx("block", !n.read && "font-semibold")}>{describe(n).text}</span>

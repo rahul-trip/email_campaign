@@ -335,6 +335,9 @@ class NotificationKind(StrEnum):
     RUN_FAILED = "run_failed"
     DISCOVERY_PAUSED = "discovery_paused"  # Review is full, so no search by itself
     ACCOUNT = "account"  # credits running out, access ending
+    # To platform staff (``services.staff_alerts``): a vendor key refused or out of credit, a
+    # crash in a run, the worker or the server.
+    PLATFORM_ALERT = "platform_alert"
 
 
 class AuthTokenPurpose(StrEnum):

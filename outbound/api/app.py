@@ -6,6 +6,8 @@ process executes them, so the app stays responsive and a long run survives a pag
 
 from __future__ import annotations
 
+import threading
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -44,11 +46,15 @@ from outbound.api.routers import (
     webhook,
 )
 from outbound.bootstrap import Container
+from outbound.logging import get_logger
 from outbound.providers.ports import TransactionalEmail
 from outbound.services.admin import AdminService
 from outbound.services.directory import DirectoryService, finder_price
 from outbound.services.identity import IdentityService
-from outbound.services.vendors import VendorService
+from outbound.services.staff_alerts import StaffAlerts
+from outbound.services.vendors import LiveProviders, VendorService
+
+log = get_logger(__name__)
 
 # The built web apps; ``WEB_APP`` picks one. web3 is the app; web2 stays in the repo, unused.
 ROOT = Path(__file__).resolve().parents[2]
@@ -114,6 +120,7 @@ def create_app(
     app.state.superadmin_views = set()
     app.state.throttle = LoginThrottle()
     app.state.cookie_secure = config.cookie_secure
+    app.state.alerts = StaffAlerts(container.identity)
     errors.install(app)
 
     @app.middleware("http")
@@ -212,15 +219,43 @@ def _file_inside(root: Path, requested: str) -> Path | None:
     return candidate
 
 
+def checked_every[T](
+    seconds: float, get: Callable[[], T], fallback: Callable[[], T]
+) -> Callable[[], T]:
+    """``get``, asked at most once every ``seconds``; between times its last answer. If it
+    fails, its last answer (or ``fallback``'s, the first time) serves, and it is asked again next
+    time."""
+    lock = threading.Lock()
+    state: dict[str, Any] = {"at": float("-inf"), "value": None}
+
+    def current() -> T:
+        with lock:
+            if time.monotonic() - state["at"] < seconds and state["value"] is not None:
+                return state["value"]  # type: ignore[no-any-return]
+            try:
+                state["value"] = get()
+                state["at"] = time.monotonic()
+            # Any failure to read the console's keys (the database away, a bad row) must not
+            # stop every request: keep serving with what was read last.
+            except Exception as error:  # noqa: BLE001
+                log.warning("vendors_unreadable", error_type=type(error).__name__)
+                if state["value"] is None:
+                    state["value"] = fallback()
+            return state["value"]  # type: ignore[no-any-return]
+
+    return current
+
+
 def create_app_from_container(container: Container) -> FastAPI:
-    """Build the app for a real run: search only if a Tavily key is set."""
-    from outbound.pipeline import search_or_none, writer_or_none
+    """Build the app for a real run. Search and the writer model use the keys and model
+    settings an admin manages in the console, as the worker does (the environment's when the
+    console has none), checked for a change at most every 30 seconds."""
+    from outbound.pipeline import api_vendors
 
     config = container.settings
     container.require_database()
+    live = LiveProviders(VendorService(container.platform, config), api_vendors)
     factory = ServicesFactory(
-        container,
-        search=search_or_none(config),
-        writer=writer_or_none(config),
+        container, live=checked_every(30, live.get, lambda: api_vendors(config))
     )
     return create_app(factory, web_dist=web_dist_for(config.web_app))

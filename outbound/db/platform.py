@@ -131,8 +131,9 @@ class AdminQueries:
         )
         return {name: int(total) for name, total in self._session.execute(stmt)}
 
-    def key_failures(self, since: datetime) -> dict[str, int]:
+    def key_failures(self, since: datetime, error: str = "ProviderAuthError") -> dict[str, int]:
         """How many calls each provider refused our key for since ``since`` (all workspaces).
+        ``error="BudgetExceeded"`` counts the vendor saying our account is out of credit instead.
 
         A refusal made before the vendor's live key was saved was a refusal of the old key, so
         it is not counted: replacing a refused key clears the warning at once. The language
@@ -149,7 +150,7 @@ class AdminQueries:
         stmt = select(ProviderCallRow.provider, ProviderCallRow.created_at).where(
             ProviderCallRow.created_at >= since,
             ProviderCallRow.outcome == CallOutcome.ERROR,
-            ProviderCallRow.response["error"].as_string() == "ProviderAuthError",
+            ProviderCallRow.response["error"].as_string() == error,
         )
         out: dict[str, int] = {}
         for provider, at in self._session.execute(stmt):

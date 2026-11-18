@@ -540,12 +540,13 @@ class AdminService:
             p.commit()
         return updated, saved
 
-    def key_refusals(self, since: datetime) -> dict[str, int]:
-        """Calls each vendor refused our key for since ``since``; the model under its own name."""
+    def key_refusals(self, since: datetime, error: str = "ProviderAuthError") -> dict[str, int]:
+        """Calls each vendor refused our key for since ``since``; the model under its own name.
+        ``error="BudgetExceeded"``: calls the vendor refused because our account ran out."""
         from outbound.domain.vendors import BY_CODE
 
         with self._platform() as p:
-            found = p.figures.key_failures(since)
+            found = p.figures.key_failures(since, error)
         out = {code: n for code, n in found.items() if code in BY_CODE}
         refused_llm = sum(n for name, n in found.items() if name not in BY_CODE)
         if refused_llm:

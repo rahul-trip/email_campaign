@@ -38,7 +38,9 @@ This is where a process gets its settings and builds its objects. Settings come 
 | `outbound/pipeline.py::mailboxes_for` | function | The workspace's own connected mailboxes (`StoredMailboxes`, DB-backed, OAuth-refreshed), or a test/script's injected single mailbox |
 | `outbound/pipeline.py::execute_run` | function | Discovery unless `mode` is `manual`, then `runner.run_pipeline` |
 | `outbound/pipeline.py::discover_companies` | function | Search for companies that fit the campaign and add them through intake |
-| `outbound/pipeline.py::metered_search_or_none` | function | Tavily behind the meter, or `None` without a key (the API's intake) |
+| `outbound/pipeline.py::metered_search_or_none` | function | Tavily behind the meter, or `None` without a key (scripts) |
+| `outbound/pipeline.py::api_vendors` | function | The raw Tavily and writer-model clients a web request may use, from the console's keys and model settings (`api/app.py::create_app_from_container` wraps it in `LiveProviders` and `checked_every(30, ...)`, so the API and the worker use the same keys) |
+| `outbound/services/staff_alerts.py::StaffAlerts` | class | Alerts in the admin console's bell for every active platform staff member: one per key (a key carries the day or the hour), never raising |
 
 ## How settings load
 

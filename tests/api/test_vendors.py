@@ -309,3 +309,91 @@ def test_one_key_left_means_no_pool(staff: Api, app_and_services: tuple[FastAPI,
     settings, _ = service.effective_settings()
     assert settings.exa_api_key.get_secret_value() == "placeholder-exa-two"
     assert "exa" not in settings.vendor_key_pools
+
+
+def test_staff_see_a_vendor_out_of_credit_in_the_admin_bell_once_a_day(
+    staff: Api, app_and_services: tuple[FastAPI, Services], outbox: LogEmail
+) -> None:
+    # Seen on 2026-11-18: Tavily said "plan or pay-as-you-go limit reached" and nobody was told.
+    from datetime import UTC, datetime
+
+    from outbound.db.models import ProviderCallRow
+    from outbound.domain.enums import CallOutcome
+    from outbound.services.admin import AdminService
+    from outbound.services.notices import NoticeService
+
+    _, services = app_and_services
+    c = services.container
+    with c.uow(services.workspace_id) as uow:
+        uow.session.add(
+            ProviderCallRow(
+                workspace_id=services.workspace_id, provider="tavily", operation="search",
+                request_hash="c" * 64, outcome=CallOutcome.ERROR,
+                response={"error": "BudgetExceeded"}, created_at=datetime.now(UTC),
+            )
+        )  # fmt: skip
+        uow.commit()
+    notices = NoticeService(
+        AdminService(c.platform, c.identity, c.uow), c.identity, outbox, "https://app.example"
+    )
+    notices.run()
+    assert [m for m in outbox.sent if m.subject == "tavily is out of credit"]
+    bell = staff.get("/api/me/notifications").json()
+    alerts = [n for n in bell["items"] if n["kind"] == "platform_alert"]
+    assert len(alerts) == 1 and alerts[0]["data"]["link"] == "/admin/vendors"
+    assert "out of credit" in alerts[0]["data"]["title"] and bell["unread"] >= 1
+    notices.run()  # the same day: not again
+    bell = staff.get("/api/me/notifications").json()
+    assert len([n for n in bell["items"] if n["kind"] == "platform_alert"]) == 1
+
+
+def test_a_crash_is_an_alert_for_staff_at_most_hourly_and_never_for_customers(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    from datetime import UTC, datetime
+
+    from outbound.services.staff_alerts import StaffAlerts
+
+    _, services = app_and_services
+    now = datetime(2026, 11, 18, 9, 5, tzinfo=UTC)
+    alerts = StaffAlerts(services.container.identity, now=lambda: now)
+    assert alerts.error("a run", RuntimeError("boom"), detail="Run r1.") == 1
+    assert alerts.error("a run", RuntimeError("again")) == 0  # same place, error and hour
+    items = staff.get("/api/me/notifications").json()["items"]
+    crash = [n for n in items if n["kind"] == "platform_alert"]
+    assert len(crash) == 1 and "RuntimeError in a run" in crash[0]["data"]["text"]
+    customer = sign_in(app_and_services[0], ADMIN)
+    assert not [
+        n for n in customer.get("/api/me/notifications").json()["items"]
+        if n["kind"] == "platform_alert"
+    ]  # fmt: skip
+
+
+def test_an_alert_that_cannot_be_written_does_not_break_the_caller() -> None:
+    from outbound.services.staff_alerts import StaffAlerts
+
+    def broken():  # type: ignore[no-untyped-def]
+        raise RuntimeError("database away")
+
+    assert StaffAlerts(broken).error("the worker", ValueError("x")) == 0  # type: ignore[arg-type]
+
+
+def test_an_unexpected_server_error_reaches_staff_in_the_admin_bell(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    from fastapi.routing import APIRoute
+    from fastapi.testclient import TestClient
+
+    app, _ = app_and_services
+
+    def boom() -> None:
+        raise KeyError("a bug")
+
+    app.router.routes.insert(0, APIRoute("/api/boom", boom, methods=["GET"]))
+    answer = TestClient(app, raise_server_exceptions=False).get("/api/boom")
+    assert answer.status_code == 500 and "Reference" in answer.json()["detail"]
+    crash = [
+        n for n in staff.get("/api/me/notifications").json()["items"]
+        if n["kind"] == "platform_alert"
+    ]  # fmt: skip
+    assert len(crash) == 1 and "KeyError in the server (GET /api/boom)" in crash[0]["data"]["text"]

@@ -49,6 +49,20 @@ def test_the_first_search_result_that_names_the_person_is_used() -> None:
     assert find_linkedin(nothing, "Jane Doe", "Acme", "acme.com") is None
 
 
+def test_the_search_uses_the_company_name_without_inc_or_ltd() -> None:
+    # Seen on daxa.ai: '"Daxa inc"' as an exact phrase found nobody; profiles say "Daxa".
+    search = FakeSearch(
+        hits=[hit("https://www.linkedin.com/in/jane-doe", "Jane Doe - CTO - Daxa | LinkedIn")]
+    )
+    assert find_linkedin(search, "Jane Doe", "Daxa inc", "daxa.ai") == (
+        "https://www.linkedin.com/in/jane-doe"
+    )
+    assert '"Daxa"' in search.searches[0] and "inc" not in search.searches[0]
+    only_noise = FakeSearch()
+    find_linkedin(only_noise, "Jane Doe", "Ltd.", "acme.com")
+    assert '"acme.com"' in only_noise.searches[0]  # nothing left of the name: the website
+
+
 def lead(
     factory: UnitOfWorkFactory,
     ws: str,

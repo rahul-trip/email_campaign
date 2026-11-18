@@ -9,6 +9,7 @@ import typer
 from outbound.bootstrap import Container, build_container
 from outbound.cli.common import DatabaseUrl, settings_for
 from outbound.db.isolation import isolation_problems
+from outbound.db.types import utcnow
 from outbound.domain.enums import MembershipRole, PlatformRole
 from outbound.domain.errors import ConfigurationError
 from outbound.logging import get_logger
@@ -149,6 +150,7 @@ def register(app: typer.Typer) -> None:
 
         from outbound.pipeline import NotConfigured, assemble, real_providers
         from outbound.services.activity_notices import ActivityNotifier
+        from outbound.services.staff_alerts import StaffAlerts
         from outbound.worker import Worker, workspace_names
 
         container = build_container(settings_for(database_url))
@@ -201,6 +203,7 @@ def register(app: typer.Typer) -> None:
                 activity.prune,
             ],
             notifier=activity,
+            alerts=StaffAlerts(container.identity),
         )
         try:
             engine.run_forever(poll_seconds=poll_seconds)
@@ -214,4 +217,6 @@ def _enforce_caps(vendors: VendorService, notices: NoticeService) -> None:
         notices.to_staff(
             "A vendor was paused: its monthly cap was reached",
             f"Paused: {', '.join(paused)}. Raise the cap or resume it in the admin console.",
+            key=f"paused:{','.join(sorted(paused))}:{utcnow():%Y-%m-%d}",
+            link="/admin/vendors",
         )

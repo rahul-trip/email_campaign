@@ -63,6 +63,13 @@ def company_tokens(name: str) -> list[str]:
     return [t for t in _plain(name) if t not in COMPANY_NOISE]
 
 
+def search_name(name: str) -> str:
+    """A company's name as people write it in a profile: ``"Daxa inc"`` is ``"Daxa"``, ``"Acme
+    Energy Ltd."`` is ``"Acme Energy"``. Empty when nothing but Ltd, Inc... is left."""
+    kept = [w for w in name.split() if not set(_plain(w)) <= COMPANY_NOISE]
+    return " ".join(kept).strip(" ,.")
+
+
 def domain_label(domain: str) -> str:
     """``"tilt-energy.com"`` becomes ``"tiltenergy"``: the name part of a website."""
     return domain.lower().split(".")[0].replace("-", "")
