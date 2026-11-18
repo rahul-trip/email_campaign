@@ -262,7 +262,8 @@ CREATE TABLE notifications (           -- what a person should see in the app's 
   user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   kind          TEXT NOT NULL CHECK (kind IN ('join_requested','join_approved','join_rejected',
                   'drafts_ready','hot_lead','needs_attention','auto_approved','run_finished',
-                  'run_failed','discovery_paused','account')),  -- the last eight added in 0023
+                  'run_failed','discovery_paused','account','platform_alert')),
+                  -- 'drafts_ready'..'account' added in 0023; 'platform_alert' (staff only, workspace_id NULL) in 0028
   workspace_id  TEXT REFERENCES workspaces(id),
   data          JSON NOT NULL,        -- counts and ids for the line; always the workspace's slug and name
   read_at       TIMESTAMP,

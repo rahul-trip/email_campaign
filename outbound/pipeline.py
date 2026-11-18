@@ -385,6 +385,11 @@ def search_or_none(settings: Settings) -> SearchProvider | None:
     return build_search(settings) if settings.tavily_api_key.get_secret_value() else None
 
 
+def api_vendors(settings: Settings) -> tuple[SearchProvider | None, LlmClient | None]:
+    """The raw clients a web request may use: Tavily and the writer model, either None."""
+    return search_or_none(settings), writer_or_none(settings)
+
+
 def meter_writer(container: Container, workspace_id: str, writer: LlmClient) -> LlmClient:
     """The writer behind this workspace's meter (revisions asked for on Review)."""
     prices = {**DEFAULT_LLM_PRICES, **container.settings.llm_prices}

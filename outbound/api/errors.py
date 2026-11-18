@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from outbound.api.request_log import request_id_for
 from outbound.db.errors import ConcurrencyConflict, NotFound
@@ -92,6 +93,14 @@ def install(app: FastAPI) -> None:
             path=route,
             error_type=type(error).__name__,
         )
+        alerts = getattr(request.app.state, "alerts", None)
+        if alerts is not None:  # staff see it in the admin console, at most hourly per route
+            await run_in_threadpool(
+                alerts.error,
+                f"the server ({request.method} {route})",
+                error,
+                detail=f"Reference {reference}.",
+            )
         response = problem(500, "internal_error", f"Something went wrong. Reference: {reference}.")
         response.headers["X-Request-ID"] = reference
         return response

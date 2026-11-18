@@ -10,7 +10,7 @@ import re
 import unicodedata
 from urllib.parse import urlsplit
 
-from outbound.domain.names import read_profile_title
+from outbound.domain.names import read_profile_title, search_name
 from outbound.domain.placement import Placement, place_by_rules
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import SearchProvider
@@ -61,7 +61,8 @@ def find_linkedin_many(
     headline names the same person and does not place them at another company; a name nobody
     clearly fits is left out (the lead page's button looks again).
     """
-    employer = company_name.strip() or domain
+    # Profiles say "Daxa", not "Daxa inc": an exact phrase with Inc or Ltd finds no one.
+    employer = search_name(company_name) or domain
     found: dict[str, str] = {}
     taken: set[str] = set()
     for start in range(0, len(names), NAMES_PER_SEARCH):

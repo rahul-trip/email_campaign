@@ -33,6 +33,7 @@ from outbound.pipeline import Pipeline, execute_run
 from outbound.services.activity_notices import ActivityNotifier
 from outbound.services.autodiscovery import REVIEW_FULL, AutoDiscovery
 from outbound.services.runs import RunRequest
+from outbound.services.staff_alerts import StaffAlerts
 
 log = get_logger(__name__)
 
@@ -74,6 +75,7 @@ class Worker:
         periodic: Sequence[Callable[[], object]] = (),
         now: Callable[[], datetime] = utcnow,
         notifier: ActivityNotifier | None = None,
+        alerts: StaffAlerts | None = None,
     ) -> None:
         self._container = container
         self._assemble = assemble
@@ -83,6 +85,7 @@ class Worker:
         self._tick_limit = tick_limit
         self._periodic = list(periodic)  # platform-wide jobs, once per tick interval
         self._notifier = notifier  # tells the workspace's people what a run or tick did
+        self._alerts = alerts  # tells the platform's staff when something crashed
         self._now = now
         self._last_served: dict[str, datetime] = {}
         self._last_tick: dict[str, datetime] = {}
@@ -157,6 +160,7 @@ class Worker:
         except Exception as error:
             log.exception("run_failed", run_id=claimed.id, error_type=type(error).__name__)
             self._fail(workspace_id, claimed.id, error)
+            self._alert("a run", error, f"Run {claimed.id}, workspace {workspace_id}.")
             reason = f"{type(error).__name__}: {error}"
             self._notify(workspace_id, lambda n: n.run_failed(workspace_id, claimed.id, reason))
         else:
@@ -175,6 +179,7 @@ class Worker:
             log.info("tick_skipped", workspace_id=workspace_id, reason="a run is in progress")
         except Exception as error:  # one workspace's broken tick must not stop the others
             log.exception("tick_failed", workspace_id=workspace_id, error_type=type(error).__name__)
+            self._alert("the 15-minute pass", error, f"Workspace {workspace_id}.")
         return True
 
     def _queue_discovery(self, workspace_id: str, pipeline: Pipeline) -> None:
@@ -206,6 +211,10 @@ class Worker:
                 "notify_failed", workspace_id=workspace_id, error_type=type(error).__name__
             )
 
+    def _alert(self, where: str, error: Exception, detail: str = "") -> None:
+        if self._alerts is not None:
+            self._alerts.error(where, error, detail=detail)
+
     def _fail(self, workspace_id: str, run_id: str, error: Exception) -> None:
         with self._container.uow(workspace_id) as uow:
             counts = {"error": f"{type(error).__name__}: {error}"[:300]}
@@ -221,6 +230,9 @@ class Worker:
                 job()
             except Exception as error:
                 log.exception("periodic_failed", error_type=type(error).__name__)
+                self._alert(
+                    "a platform job", error, f"Job {getattr(job, '__qualname__', job)!s:.80}."
+                )
 
     def run_once(self) -> bool:
         """One pass in this thread (tests, scripts): every planned job, one after another.
@@ -253,4 +265,5 @@ class Worker:
                         running[pool.submit(self.execute, job)] = job.workspace_id
                 except Exception as error:  # a database hiccup must not end the worker
                     log.exception("worker_error", error_type=type(error).__name__)
+                    self._alert("the worker", error)
                 time.sleep(poll_seconds)

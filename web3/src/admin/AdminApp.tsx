@@ -8,6 +8,7 @@ import { SIGNED_OUT, actIn, client } from "../api/client";
 import { go, useMe } from "../app/session";
 import { Button, Empty } from "../ui/compat";
 import { A as Link } from "./nav";
+import { NotificationBell } from "../app/Bell";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -39,6 +40,7 @@ function Layout() {
             <span className="text-lg font-bold tracking-tight">Outbound</span>
           </Link>
           <div className="ml-auto flex items-center gap-3 text-body">
+            <NotificationBell />
             <span className="hidden text-muted sm:inline">
               {me.data?.user.email} · {staff}
             </span>

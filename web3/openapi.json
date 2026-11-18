@@ -4942,7 +4942,8 @@
               "run_finished",
               "run_failed",
               "discovery_paused",
-              "account"
+              "account",
+              "platform_alert"
             ],
             "title": "Kind",
             "type": "string"

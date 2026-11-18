@@ -169,6 +169,7 @@ class NotificationOut(Out):
         "run_failed",
         "discovery_paused",
         "account",
+        "platform_alert",
     ]
     workspace_id: str | None
     data: dict[str, Any]

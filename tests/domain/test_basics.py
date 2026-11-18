@@ -144,3 +144,13 @@ def test_letters_that_accent_stripping_leaves_alone_are_spelled_as_websites_spel
     name: str, tokens: list[str]
 ) -> None:
     assert company_tokens(name) == tokens
+
+
+def test_a_company_is_searched_for_without_its_legal_form() -> None:
+    from outbound.domain.names import search_name
+
+    assert search_name("Daxa inc") == "Daxa"
+    assert search_name("Acme Energy Ltd.") == "Acme Energy"
+    assert search_name("Acme, Inc.") == "Acme"
+    assert search_name("AT&T") == "AT&T"
+    assert search_name("Ltd") == ""

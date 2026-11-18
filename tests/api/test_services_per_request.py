@@ -53,3 +53,42 @@ def test_what_a_person_does_is_recorded_as_them_not_as_the_operator(
             ).scalars()
         )
     assert f"user:{user_id}" in actors and "operator" not in actors
+
+
+def test_a_request_uses_the_live_vendors_and_their_change(
+    engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    """The web server uses the keys an admin manages (as the worker does), not only the ones it
+    started with: a request built after a change gets the new client."""
+    first, second = FakeSearch(), FakeSearch()
+    live = {"search": first}
+    services = ServicesFactory(
+        container_for(Settings(_env_file=None), engine),
+        search=FakeSearch(),  # what it started with: never used when ``live`` is given
+        live=lambda: (live["search"], None),
+    )
+    services.for_tenant(ws).intake.run([{"Company": "Acme Energy"}])
+    live["search"] = second
+    services.for_tenant(ws).intake.run([{"Company": "Bolt Grid"}])
+    assert first.searches and second.searches
+
+
+def test_the_live_vendors_are_read_at_most_every_interval_and_survive_a_failure() -> None:
+    from outbound.api.app import checked_every
+
+    calls = {"n": 0}
+
+    def get() -> str:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("database away")
+        return f"v{calls['n']}"
+
+    every_time = checked_every(0, get, lambda: "env")
+    assert every_time() == "v1"
+    assert every_time() == "v1"  # the read failed: the last answer serves
+    assert every_time() == "v3"
+    failing = checked_every(0, lambda: (_ for _ in ()).throw(RuntimeError()), lambda: "env")
+    assert failing() == "env"  # never read: the environment's
+    cached = checked_every(3600, get, lambda: "env")
+    assert cached() == cached()  # within the interval it is not asked again

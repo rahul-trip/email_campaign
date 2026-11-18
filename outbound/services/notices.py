@@ -17,6 +17,7 @@ from outbound.logging import get_logger
 from outbound.providers.errors import ProviderError
 from outbound.providers.ports import OutgoingEmail, TransactionalEmail
 from outbound.services.admin import AdminService
+from outbound.services.staff_alerts import StaffAlerts
 
 log = get_logger(__name__)
 
@@ -39,6 +40,7 @@ class NoticeService:
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._admin = admin
+        self._alerts = StaffAlerts(identity, now=now)
         self._identity = identity
         self._email = email
         self._base = app_base_url.rstrip("/")
@@ -115,18 +117,34 @@ class NoticeService:
                 count += self.to_staff(
                     "A customer asked for more credits",
                     f"{ask['note'] or 'No note.'}\n\nOpen the admin console: {self._base}/admin",
+                    key=f"request:{ask['id']}",
                 )
         return count
 
     def _failing_keys(self, now: datetime) -> int:
-        """A vendor that keeps refusing our key: staff hear once a day until it is fixed."""
+        """A vendor that keeps refusing our key, or says our account is out of credit: staff
+        hear once a day until it is fixed."""
         count = 0
-        for vendor, refused in self._admin.key_refusals(now - timedelta(days=1)).items():
-            if refused >= FAILING_AT and self._once(None, f"keyfail:{vendor}:{now:%Y-%m-%d}"):
+        day = f"{now:%Y-%m-%d}"
+        since = now - timedelta(days=1)
+        for vendor, refused in self._admin.key_refusals(since).items():
+            if refused >= FAILING_AT and self._once(None, f"keyfail:{vendor}:{day}"):
                 count += self.to_staff(
                     f"The {vendor} key is being refused",
                     f"{refused} calls in the last day were rejected for a bad key. Replace it in "
                     f"the admin console, under Vendors and keys: {self._base}/admin/vendors",
+                    key=f"keyfail:{vendor}:{day}",
+                    link="/admin/vendors",
+                )
+        for vendor, refused in self._admin.key_refusals(since, "BudgetExceeded").items():
+            if self._once(None, f"nocredit:{vendor}:{day}"):
+                count += self.to_staff(
+                    f"{vendor} is out of credit",
+                    f"{refused} calls in the last day were refused because the {vendor} account "
+                    "ran out of credit or reached its plan limit. Top it up, or add another key "
+                    f"under Vendors and keys: {self._base}/admin/vendors",
+                    key=f"nocredit:{vendor}:{day}",
+                    link="/admin/vendors",
                 )
         return count
 
@@ -179,7 +197,9 @@ class NoticeService:
             ]
         return self._send(people, subject, text)
 
-    def to_staff(self, subject: str, text: str) -> int:
+    def to_staff(self, subject: str, text: str, *, key: str, link: str = "/admin") -> int:
+        """Email every active staff member, and put it in the admin console's bell."""
+        self._alerts.alert(key, subject, text, link=link)
         with self._identity() as ids:
             people = [
                 u.email

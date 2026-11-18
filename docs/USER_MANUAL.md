@@ -643,7 +643,7 @@ Each tick the engine reads the inbox of every connected mailbox for replies to y
 
 ## 14a. The admin console (platform staff)
 
-Platform admins and superadmins open **Admin console** from the user menu (or the workspace chooser). An amber **ADMIN · ALPHA** strip marks it. It has eight pages:
+Platform admins and superadmins open **Admin console** from the user menu (or the workspace chooser). An amber **ADMIN · ALPHA** strip marks it. Its header has a bell for the platform team: it says when a vendor's key is being refused, when a vendor is out of credit (for example Tavily's plan limit), and when something crashed (a run, the 15-minute pass, a platform job, or a server error, with the reference to look up in the log). Each alert appears once a day for a key and at most once an hour for a crash; key and credit alerts are also emailed. Clicking one opens the page that fixes it, usually **Vendors and keys**. It has eight pages:
 
 - **Overview:** customers, leads added, drafts made, spend, what waits for credits, and what needs a decision (credit requests, expiring access, mailbox problems).
 - **Customers:** search and filter; **Invite customer** creates the workspace and emails its first admin. A customer's page has **Grant credits** (optionally resuming waiting work at once), **Extend access**, a plan change, a status change (active, paused, suspended), per-step limit overrides, members, mailboxes and activity. A customer past its access date is read-only until you extend it.
