@@ -38,6 +38,14 @@ class HoldReason(StrEnum):
     LINKEDIN_CONTACTED = "linkedin_contacted"
 
 
+class FailureKind(StrEnum):
+    """Why a lead is in ``failed``: a broken step, or a normal answer of "nobody to write to"."""
+
+    ERROR = "error"  # a step broke (a timeout, a refused key, a bug): worth retrying soon
+    NO_PERSON = "no_person"  # no decision-maker could be found or confirmed
+    NO_EMAIL = "no_email"  # people were found, but no address could be proven
+
+
 class LinkedInState(StrEnum):
     DRAFTED = "drafted"  # written, waiting for the operator to copy it into LinkedIn
     SENT = "sent"  # the operator says they sent it (nothing is ever sent from here)

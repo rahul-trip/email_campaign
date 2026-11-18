@@ -20,6 +20,7 @@ from outbound.domain.enums import (
     WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     EmailStatus,
+    FailureKind,
     HoldReason,
     Provenance,
 )
@@ -111,7 +112,8 @@ class EmailStage:
         if not (asked or people):
             raise StageFailure(
                 "nobody at this lead is a decision-maker or was chosen: add the person you want"
-                " to write to on the lead page, then retry"
+                " to write to on the lead page, then retry",
+                FailureKind.NO_PERSON,
             )
         people = (asked or people)[:MAX_CONTACTS]
         target = Target(
@@ -226,7 +228,9 @@ class EmailStage:
                 f"no {what} is answering{detail or ' (none is available)'}: the lead waits and"
                 " is tried again by itself"
             )
-        raise StageFailure(f"no valid email found for {len(people)} contact(s){detail}")
+        raise StageFailure(
+            f"no valid email found for {len(people)} contact(s){detail}", FailureKind.NO_EMAIL
+        )
 
 
 def _contribute(

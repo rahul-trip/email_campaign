@@ -38,6 +38,7 @@ from outbound.domain.enums import (
 )
 from outbound.domain.errors import InvalidInput
 from outbound.domain.names import read_profile_title, same_person, search_name, split_name
+from outbound.domain.outcomes import Bucket
 from outbound.domain.placement import Placement, place_by_rules
 from outbound.domain.policies import PolicyOutcome
 from outbound.domain.state_machines import (
@@ -205,6 +206,7 @@ class LeadService:
         hot: bool | None = None,
         source: CompanySource | None = None,
         country: str | None = None,
+        bucket: Bucket | None = None,
         sort: str = "newest",
         direction: str | None = None,
         limit: int = 50,
@@ -221,6 +223,7 @@ class LeadService:
                 hot=hot,
                 source=source,
                 country=country,
+                bucket=bucket,
                 sort=sort,
                 direction=direction,
                 limit=limit,

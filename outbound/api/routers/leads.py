@@ -40,6 +40,7 @@ from outbound.api.schemas import (
     WaterfallOut,
 )
 from outbound.domain.enums import CompanySource, CompanyStatus, HoldReason
+from outbound.domain.outcomes import Bucket
 from outbound.domain.permissions import Permission as P
 from outbound.services.leads import LeadDetail
 from outbound.services.runs import RunRequest
@@ -74,6 +75,7 @@ def companies(
     hot: bool | None = None,
     source: CompanySource | None = None,
     country: Annotated[str | None, Query(min_length=2, max_length=2)] = None,
+    bucket: Bucket | None = None,
     sort: Literal[
         "newest", "fit", "updated", "name", "status", "country", "source", "priority"
     ] = "newest",
@@ -92,6 +94,7 @@ def companies(
         hot=hot,
         source=source,
         country=country,
+        bucket=bucket,
         sort=sort,
         direction=direction,
         limit=limit,

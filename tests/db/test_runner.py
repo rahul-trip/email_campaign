@@ -98,7 +98,7 @@ def make_runner(
     *,
     budget: BudgetPolicy | None = None,
     clock: Clock | None = None,
-    max_attempts: int = 3,
+    max_attempts: int = 5,
 ) -> Runner:
     return Runner(
         factory,
@@ -443,6 +443,51 @@ def test_the_wait_grows_with_each_failure_and_attempts_run_out(
     clock.advance(hours=2)
     assert runner.retry_failed() == 0  # two attempts used
     assert status_of(factory, ws, cid) is C.FAILED
+
+
+def test_nobody_to_write_to_waits_a_day_and_gets_three_tries(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from outbound.domain.enums import FailureKind
+    from outbound.stages.base import StageFailure
+
+    def nobody(ctx: StageContext) -> StageResult | None:
+        raise StageFailure("no decision-maker was found", FailureKind.NO_PERSON)
+
+    cid = add_company(factory, ws, "acme.com")
+    clock = Clock()
+    runner = make_runner(
+        factory, ws, [FakeStage("research", C.NEW, C.RESEARCHED, action=nobody)], clock=clock
+    )
+    runner.run_pipeline()
+    found = company(factory, ws, cid)
+    assert found.failure_kind is FailureKind.NO_PERSON
+    assert found.next_action_at == clock.moment + timedelta(hours=24)  # not minutes
+
+    for _ in range(2):  # tries two and three
+        clock.advance(hours=25)
+        assert runner.retry_failed() == 1
+        runner.run_pipeline()
+    clock.advance(hours=25)
+    assert runner.retry_failed() == 0  # three tries used, so it stays screened out
+    assert company(factory, ws, cid).attempts == 3
+
+
+def test_a_broken_step_keeps_five_tries(factory: UnitOfWorkFactory, ws: str) -> None:
+    cid = add_company(factory, ws, "acme.com")
+    clock = Clock()
+    runner = make_runner(
+        factory, ws, [FakeStage("research", C.NEW, C.RESEARCHED, action=boom)], clock=clock
+    )
+    runner.run_pipeline()
+    retried = 0
+    for _ in range(8):
+        clock.advance(hours=3)
+        if runner.retry_failed():
+            retried += 1
+            runner.run_pipeline()
+    assert retried == 4  # the first try plus four retries make five
+    assert company(factory, ws, cid).attempts == 5
 
 
 # ------------------------------------------------------------------ guards

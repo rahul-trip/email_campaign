@@ -11,6 +11,7 @@ from outbound.domain.enums import (
     CandidateVerdict,
     CompanyStatus,
     ConsentBasis,
+    FailureKind,
     HoldReason,
     PolicyRule,
     PolicyStage,
@@ -18,6 +19,7 @@ from outbound.domain.enums import (
     SuppressionKind,
     SuppressionReason,
 )
+from outbound.domain.outcomes import Bucket, bucket_of, tries_allowed
 from outbound.domain.qualification import is_hot
 from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
@@ -242,6 +244,8 @@ class CompanyOut(Out):
     hold_reason: HoldReason | None
     failed_stage: str | None
     last_error: str | None
+    failure_kind: FailureKind | None = None
+    attempts: int = 0
     credit_wait_step: StepName | None = None  # waiting, in place, for a credit on this step
     country_code: str | None
     legal_entity_type: str
@@ -264,6 +268,25 @@ class CompanyOut(Out):
     def hot(self) -> bool:
         """A fit score above 80: shown with a flame, and never approved automatically."""
         return is_hot(self.fit_score)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def max_tries(self) -> int:
+        """How many tries a failed lead gets in all (shown as "try 2 of 5")."""
+        return tries_allowed(self.failure_kind)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def bucket(self) -> Bucket:
+        """Where the lead stands for a person: ready, working, needs a decision, screened out."""
+        return bucket_of(
+            self.status,
+            hold_reason=self.hold_reason,
+            failure_kind=self.failure_kind,
+            attempts=self.attempts,
+            fit_score=self.fit_score,
+            waiting_for_credit=self.credit_wait_step is not None,
+        )
 
 
 class LeadSummaryOut(Out):
@@ -741,6 +764,7 @@ class StatusOut(Out):
     by_status: dict[str, int]
     held: dict[str, int]
     waiting_for_review: int
+    buckets: dict[str, int]  # ready, working, decision, screened_out, done
 
 
 class QualityOut(Out):

@@ -16,11 +16,19 @@ from typing import Any, Protocol
 from outbound.db.repositories.companies import UNSET, Unset
 from outbound.db.uow import UnitOfWork, UnitOfWorkFactory
 from outbound.domain.entities import Campaign, Company, Workspace
-from outbound.domain.enums import CompanyStatus, HoldReason
+from outbound.domain.enums import CompanyStatus, FailureKind, HoldReason
 
 
 class StageFailure(Exception):
-    """A lead cannot go on, for a reason the operator should read (shown as its last error)."""
+    """A lead cannot go on, for a reason the operator should read (shown as its last error).
+
+    ``kind`` says whether a step broke or the answer was simply "nobody to write to"; the runner
+    retries the two on different schedules and the app groups them differently.
+    """
+
+    def __init__(self, message: str, kind: FailureKind = FailureKind.ERROR) -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 class VendorUnavailable(StageFailure):

@@ -540,6 +540,17 @@
         "title": "Body_upload_targets_api_targets_upload_post",
         "type": "object"
       },
+      "Bucket": {
+        "enum": [
+          "ready",
+          "working",
+          "decision",
+          "screened_out",
+          "done"
+        ],
+        "title": "Bucket",
+        "type": "string"
+      },
       "CallOut": {
         "properties": {
           "asked": {
@@ -1063,6 +1074,16 @@
       },
       "CompanyOut": {
         "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "bucket": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "Where the lead stands for a person: ready, working, needs a decision, screened out.",
+            "readOnly": true
+          },
           "campaign_id": {
             "anyOf": [
               {
@@ -1132,6 +1153,16 @@
             ],
             "title": "Failed Stage"
           },
+          "failure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fit_reason": {
             "anyOf": [
               {
@@ -1195,6 +1226,12 @@
             },
             "title": "Manual Fields",
             "type": "array"
+          },
+          "max_tries": {
+            "description": "How many tries a failed lead gets in all (shown as \"try 2 of 5\").",
+            "readOnly": true,
+            "title": "Max Tries",
+            "type": "integer"
           },
           "name": {
             "anyOf": [
@@ -1317,7 +1354,9 @@
           "row_version",
           "created_at",
           "updated_at",
-          "hot"
+          "hot",
+          "max_tries",
+          "bucket"
         ],
         "title": "CompanyOut",
         "type": "object"
@@ -1409,6 +1448,16 @@
       },
       "CompanyRowOut": {
         "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "bucket": {
+            "$ref": "#/components/schemas/Bucket",
+            "description": "Where the lead stands for a person: ready, working, needs a decision, screened out.",
+            "readOnly": true
+          },
           "campaign_id": {
             "anyOf": [
               {
@@ -1478,6 +1527,16 @@
             ],
             "title": "Failed Stage"
           },
+          "failure_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "fit_reason": {
             "anyOf": [
               {
@@ -1541,6 +1600,12 @@
             },
             "title": "Manual Fields",
             "type": "array"
+          },
+          "max_tries": {
+            "description": "How many tries a failed lead gets in all (shown as \"try 2 of 5\").",
+            "readOnly": true,
+            "title": "Max Tries",
+            "type": "integer"
           },
           "name": {
             "anyOf": [
@@ -1673,7 +1738,9 @@
           "row_version",
           "created_at",
           "updated_at",
-          "hot"
+          "hot",
+          "max_tries",
+          "bucket"
         ],
         "title": "CompanyRowOut",
         "type": "object"
@@ -3416,6 +3483,16 @@
         ],
         "title": "FactOut",
         "type": "object"
+      },
+      "FailureKind": {
+        "description": "Why a lead is in ``failed``: a broken step, or a normal answer of \"nobody to write to\".",
+        "enum": [
+          "error",
+          "no_person",
+          "no_email"
+        ],
+        "title": "FailureKind",
+        "type": "string"
       },
       "FindEmailAgainIn": {
         "additionalProperties": false,
@@ -8152,6 +8229,13 @@
       },
       "StatusOut": {
         "properties": {
+          "buckets": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Buckets",
+            "type": "object"
+          },
           "by_status": {
             "additionalProperties": {
               "type": "integer"
@@ -8174,7 +8258,8 @@
         "required": [
           "by_status",
           "held",
-          "waiting_for_review"
+          "waiting_for_review",
+          "buckets"
         ],
         "title": "StatusOut",
         "type": "object"
@@ -12960,6 +13045,22 @@
                 }
               ],
               "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Bucket"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bucket"
             }
           },
           {

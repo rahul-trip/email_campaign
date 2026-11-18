@@ -14,6 +14,7 @@ from outbound.domain.enums import (
     WORKABLE_CONTACT_STATUSES,
     CompanyStatus,
     ContactStatus,
+    FailureKind,
     Provenance,
 )
 from outbound.domain.ranking import RankedContact, can_be_written_to, rank_contacts
@@ -50,21 +51,26 @@ class ContactsStage:
             if everyone and all(c.status is ContactStatus.NOT_HERE for c in everyone):
                 raise StageFailure(
                     "everyone a search found works at another company: add a person you know"
-                    " on the lead page"
+                    " on the lead page",
+                    FailureKind.NO_PERSON,
                 )
             if any(c.status is ContactStatus.UNCONFIRMED for c in everyone):
                 raise StageFailure(
                     "the only people found could not be confirmed to work here: confirm one on"
                     " the lead page, or add a person you know"
                 )
-            raise StageFailure("no decision-maker was found on the site or in a public search")
+            raise StageFailure(
+                "no decision-maker was found on the site or in a public search",
+                FailureKind.NO_PERSON,
+            )
         wanted = ctx.campaign.target_titles if ctx.campaign else ()
         chosen = ctx.read(lambda uow: operator_chosen(uow, usable))
         if not any(can_be_written_to(c, wanted, chosen) for c in usable):
             raise StageFailure(
                 "people were found, but none is a decision-maker (a founder, C-level, vice"
                 " president, director or one of the campaign's job titles): add the person you"
-                " want to write to on the lead page, then retry"
+                " want to write to on the lead page, then retry",
+                FailureKind.NO_PERSON,
             )
         ranked = rank_contacts(usable, wanted, chosen)
         written = self._drafts(ctx, [r.contact for r in ranked], wanted, chosen)

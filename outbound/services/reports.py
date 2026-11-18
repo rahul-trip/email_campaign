@@ -25,6 +25,7 @@ from outbound.domain.enums import (
     HoldReason,
     MessageState,
 )
+from outbound.domain.outcomes import Bucket
 
 CATCH_ALL_HOLDS = (HoldReason.CATCH_ALL_RESOLVING, HoldReason.CATCH_ALL_UNVERIFIED)
 QUALITY_TARGET = 0.8  # the Phase 2 gate: 8 of the first 10 sent without edits
@@ -83,6 +84,7 @@ class StatusReport:
     by_status: dict[CompanyStatus, int]
     held: dict[HoldReason, int]
     waiting_for_review: int
+    buckets: dict[Bucket, int]
 
 
 @dataclass(frozen=True)
@@ -186,6 +188,7 @@ class ReportService:
                 by_status=uow.companies.count_by_status(),
                 held=uow.reports.company_counts()[1],
                 waiting_for_review=uow.messages.count_in_state(MessageState.GENERATED),
+                buckets=uow.companies.count_buckets(),
             )
 
     def quality(self) -> QualityReport:

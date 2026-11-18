@@ -25,18 +25,27 @@ from outbound.domain.entities import Company
 from outbound.domain.enums import (
     CompanyStatus,
     EntityType,
+    FailureKind,
     HoldReason,
     MessageState,
     RunKind,
     RunStatus,
 )
 from outbound.domain.errors import ConfigurationError
+from outbound.domain.outcomes import ERROR_TRIES, OUTCOME_TRIES
 from outbound.domain.state_machines import STAGE_INPUT_STATUS, retry_status_for
 from outbound.logging import bind, get_logger, unbind
 from outbound.metering.metered import call_scope
 from outbound.metering.quota import STAGE_CHARGES
 from outbound.runner.guards import Guards, Refusal, RefusalKind
-from outbound.stages.base import Reader, Stage, StageContext, StageResult, VendorUnavailable
+from outbound.stages.base import (
+    Reader,
+    Stage,
+    StageContext,
+    StageFailure,
+    StageResult,
+    VendorUnavailable,
+)
 
 log = get_logger(__name__)
 
@@ -78,7 +87,9 @@ class Runner:
         retry_delay: timedelta = timedelta(minutes=15),
         defer_delay: timedelta = timedelta(hours=1),
         vendor_wait: timedelta = timedelta(hours=2),
-        max_attempts: int = 3,
+        outcome_delay: timedelta = timedelta(hours=24),
+        max_attempts: int = ERROR_TRIES,
+        max_outcome_attempts: int = OUTCOME_TRIES,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._uow = uow_factory
@@ -88,7 +99,9 @@ class Runner:
         self._retry_delay = retry_delay
         self._vendor_wait = vendor_wait
         self._defer_delay = defer_delay
+        self._outcome_delay = outcome_delay
         self._max_attempts = max_attempts
+        self._max_outcome_attempts = max_outcome_attempts
         self._read = Reader(uow_factory, workspace_id)
         self._now = now
         self._run_id: str | None = None  # the run whose lead is being processed, for its events
@@ -346,7 +359,12 @@ class Runner:
                     return Outcome.SKIPPED
                 if stage.name in STAGE_INPUT_STATUS:
                     self._fail(
-                        uow, stage, current, message, vendor=isinstance(error, VendorUnavailable)
+                        uow,
+                        stage,
+                        current,
+                        message,
+                        vendor=isinstance(error, VendorUnavailable),
+                        kind=error.kind if isinstance(error, StageFailure) else FailureKind.ERROR,
                     )
                     outcome = Outcome.FAILED
                 else:
@@ -358,18 +376,32 @@ class Runner:
         return outcome
 
     def _fail(
-        self, uow: UnitOfWork, stage: Stage, company: Company, message: str, *, vendor: bool = False
+        self,
+        uow: UnitOfWork,
+        stage: Stage,
+        company: Company,
+        message: str,
+        *,
+        vendor: bool = False,
+        kind: FailureKind = FailureKind.ERROR,
     ) -> None:
         # Back off a little longer after each failure so a broken vendor is not hammered. When no
         # vendor could answer, the lead is not at fault: it waits a fixed while and no attempt
         # is counted, so it is picked up again whenever a vendor is back.
-        wait = self._vendor_wait if vendor else self._retry_delay * (company.attempts + 1)
+        # "Nobody to write to" is an answer, not a breakage: ask again a day later, not in minutes.
+        if vendor:
+            wait = self._vendor_wait
+        elif kind is not FailureKind.ERROR:
+            wait = self._outcome_delay
+        else:
+            wait = self._retry_delay * (company.attempts + 1)
         uow.companies.transition(
             company.id,
             CompanyStatus.FAILED,
             expected_version=company.row_version,
             failed_stage=stage.name,
             last_error=message,
+            failure_kind=kind,
             next_action_at=self._now() + wait,
             run_id=self._run_id,
             vendor_wait=vendor,
@@ -422,7 +454,12 @@ class Runner:
         retried = 0
         with self._uow(self._workspace_id) as uow:
             for company in uow.companies.due(CompanyStatus.FAILED, limit, self._now()):
-                if company.attempts >= self._max_attempts or company.failed_stage is None:
+                limit = (
+                    self._max_attempts
+                    if company.failure_kind in (None, FailureKind.ERROR)
+                    else self._max_outcome_attempts
+                )
+                if company.attempts >= limit or company.failed_stage is None:
                     continue
                 uow.companies.transition(
                     company.id,
