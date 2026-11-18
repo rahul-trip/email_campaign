@@ -13,7 +13,7 @@ Public (no sidebar)        Sign in · Forgot / reset password · Invitation acce
                            · Remove my data · Workspace picker / create · Join request
 Onboarding (no sidebar)    /w/{slug}/onboarding — 5 steps + "what Outbound does for you" panel
 Workspace app  /w/{slug}
-  Work        Today · Review (badge) · Needs attention (badge) · LinkedIn (badge)
+  Work        Today · Emails ready (badge) · Hot leads (badge) · Needs a decision (badge)
   Leads       Leads · Add leads · Discovery runs · Campaigns
   Workspace   Reports · Policies & privacy · Settings
   Everywhere  ⌘K command palette · notifications bell · credits meter · theme (light/dark/system)
@@ -41,7 +41,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Pipeline counts | `status`, `companies` | Today pipeline flow (each stage links to filtered Leads) |
 | Review queue, show one | `review`, `review/{id}` | Review (3-pane, keyboard J/K/A/E/R) |
 | Approve / reject / revise / AI rewrite | `review/{id}/approve|reject|revise|rewrite` | Review action bar + editor with diff |
-| Needs attention: holds, failures, websites | `companies` (filters), `targets/waiting` | Needs attention (tabs by reason, bulk bar) |
+| Needs a decision: holds, stopped steps, websites, with fit, tries, person and credits per row | `companies` (`bucket=decision`, `include=summary`), `targets/waiting` | Needs a decision (tabs by reason, filters and sort, row details, bulk bar) |
 | Retry one / many failed (by step) | `companies/{id}/retry`, `companies/retry` | Needs attention · Lead detail |
 | Release one / many holds, policy holds | `release-hold`, `release-holds`, `release-policy-holds` | Needs attention · Policies |
 | Find email again (one / all catch-all) | `companies/find-email-again`, `contacts/{id}/retry-email` | Needs attention · Lead detail |
@@ -66,7 +66,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Timeline / Activity (vendor call detail) | `companies/{id}/timeline` | Lead detail Activity tab |
 | Journey (8 stages, how it arrived) | `companies/{id}/journey` | Lead detail Journey tab (was separate page) |
 | LinkedIn lookup per person | `contacts/{id}/find-linkedin` | Lead detail People card |
-| LinkedIn drafts: write, edit, sent, skip, restore | `contacts/{id}/linkedin`, `linkedin*`, `companies/{id}/linkedin` | LinkedIn page · Lead detail |
+| LinkedIn drafts: write, edit, sent, skip, restore | `contacts/{id}/linkedin`, `linkedin*`, `companies/{id}/linkedin` | Hot leads page (filters, sort, folding rows; Today's sideways strip) · Lead detail |
 | Add one company | `targets` | Add leads → Single |
 | Upload a list | `targets/upload` | Add leads → Upload (drag-drop, column mapping preview) |
 | Intake webhook info / rotate secret | `integrations/webhook*` | Add leads → Webhook · Settings → Integrations |

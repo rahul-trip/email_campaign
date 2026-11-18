@@ -148,6 +148,10 @@ Done: Vendors → AI models adds a model with provider type, model name, base UR
 
 Normal drop-outs ("no decision-maker found", "no email we could prove") are no longer shown as failures. `failure_kind` on a failed lead; outcomes are asked again 24 hours later, 3 tries, then screened out; a broken step gets 5 tries. Every lead is in one bucket (`domain/outcomes.py`). Sidebar: Emails ready, Hot leads, Needs a decision (neutral badge, only what a person can unblock). Today leads with the emails ready (approvable there) and the hot leads, with a grey "Behind the scenes" bar. Hot leads list best fit first and includes a hot lead nobody could email. Open: look at it with real data on the deployed workspace; the Today mockup is in Stitch (see [phase 6i](phase-6i-outcomes-first.md)).
 
+## Hot leads and decisions (2026-11-19, branch `phase-6/hot-leads-and-decisions`, no migration)
+
+Hot leads page revamped (search, hot, no/has email, fit, country, sort; folding rows; `GET /api/linkedin` gained the filters); Hot leads sit above Needs a decision in the sidebar; Needs a decision rows show fit, why it fits, tries, person, source and credits, with a retry hint, Details, filters and sort; Today's Hot leads are a compact sideways strip. Shared controls in `web3/src/ui/filters.tsx`. Open: a Stitch mockup of the Hot leads page was requested and had not appeared; look at the page with the live workspace's data.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.
