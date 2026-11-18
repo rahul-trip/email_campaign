@@ -15,10 +15,13 @@ from outbound.api.schemas import (
     JoinIn,
     MyJoinRequestOut,
     MyWorkspace,
+    MyWorkspaceRequestOut,
     NotificationOut,
     NotificationsOut,
     ReadIn,
+    WorkspaceRequestIn,
 )
+from outbound.db.types import utcnow
 from outbound.services.identity import CurrentUser, IdentityError, IdentityService, MyJoinRequest
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -44,6 +47,27 @@ def create_workspace(body: CreateWorkspaceIn, user: User, ids: Ids) -> MyWorkspa
         raise ApiError(error.status, error.code, error.detail) from None
     return MyWorkspace(
         id=made.id, slug=made.slug, name=made.name, status=made.status.value, role="admin"
+    )
+
+
+@router.get("/workspace-request", response_model=MyWorkspaceRequestOut | None)
+def my_workspace_request(user: User, ids: Ids) -> MyWorkspaceRequestOut | None:
+    """The open request for a new workspace, if this person made one."""
+    found = ids.my_workspace_request(user)
+    if found is None:
+        return None
+    return MyWorkspaceRequestOut(name=(found["data"] or {}).get("name", ""), created_at=found["at"])
+
+
+@router.post("/workspace-request", response_model=MyWorkspaceRequestOut, status_code=201)
+def request_workspace(body: WorkspaceRequestIn, user: User, ids: Ids) -> MyWorkspaceRequestOut:
+    """Ask the platform staff for a new workspace, after one was deleted."""
+    try:
+        ids.request_workspace(user, body.name, website=body.website, note=body.note)
+    except IdentityError as error:
+        raise ApiError(error.status, error.code, error.detail) from None
+    return my_workspace_request(user, ids) or MyWorkspaceRequestOut(
+        name=body.name, created_at=utcnow()
     )
 
 

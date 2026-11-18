@@ -439,7 +439,7 @@ function Workspaces({ me }: { me: Me }) {
           ))}
         </ul>
       )}
-      <GetStarted none={none} />
+      <GetStarted none={none} askStaff={me.needs_new_workspace ?? false} />
       {me.user.platform_role && (
         <a href="/admin" className="flex h-9 w-full items-center justify-center rounded-lg border border-line-strong text-body font-semibold hover:bg-surface-2">
           Admin console
@@ -452,8 +452,48 @@ function Workspaces({ me }: { me: Me }) {
   );
 }
 
+/** After their workspace was deleted, a person asks the platform team for a new one. */
+function AskForWorkspace() {
+  const [name, setName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [note, setNote] = useState("");
+  const asked = useQuery({ queryKey: ["workspace-request"], queryFn: () => ok(client.GET("/api/me/workspace-request")) });
+  const ask = useMutation({
+    mutationFn: () => ok(client.POST("/api/me/workspace-request", { body: { name: name.trim(), website: website.trim(), note: note.trim() } })),
+    onSuccess: () => void asked.refetch(),
+  });
+  if (asked.data) {
+    return <Callout tone="primary">You asked for a new workspace, {asked.data.name}. The platform team will set it up and email you.</Callout>;
+  }
+  return (
+    <form
+      className="space-y-2 rounded-lg border border-line p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        ask.mutate();
+      }}
+    >
+      <div className="text-body font-semibold">Your workspace was deleted</div>
+      <p className="text-label text-muted">Your account is still here. Ask the platform team for a new workspace, and you become its admin.</p>
+      <Field label="Company name">
+        <Input aria-label="Company name" value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-full" />
+      </Field>
+      <Field label="Website" hint="Optional.">
+        <Input aria-label="Website" value={website} onChange={(e) => setWebsite(e.target.value)} className="h-9 w-full" />
+      </Field>
+      <Field label="Anything the team should know" hint="Optional.">
+        <Input aria-label="Note" value={note} onChange={(e) => setNote(e.target.value)} className="h-9 w-full" />
+      </Field>
+      <Problem error={ask.error} />
+      <Button type="submit" busy={ask.isPending} disabled={!name.trim()} className="h-9 w-full">
+        Ask for a new workspace
+      </Button>
+    </form>
+  );
+}
+
 /** Make a workspace (and be its admin), or ask to join one with the code its team shares. */
-function GetStarted({ none }: { none: boolean }) {
+function GetStarted({ none, askStaff }: { none: boolean; askStaff: boolean }) {
   const [name, setName] = useState("");
   const [website, setWebsite] = useState("");
   const [code, setCode] = useState("");
@@ -482,6 +522,13 @@ function GetStarted({ none }: { none: boolean }) {
   useEffect(() => {
     if ((requests.data ?? []).some((r) => r.status === "approved") && none) go("/");
   }, [requests.data, none]);
+  if (askStaff) {
+    return (
+      <div className="space-y-4" data-tour="get-started">
+        <AskForWorkspace />
+      </div>
+    );
+  }
   return (
     <div className="space-y-4" data-tour="get-started">
       {none && <p className="text-body text-muted">You are not in a workspace yet. Start your own, or ask to join your team's.</p>}

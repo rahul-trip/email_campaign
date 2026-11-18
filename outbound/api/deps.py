@@ -253,7 +253,8 @@ def tenant(request: Request, user: Annotated[CurrentUser, Depends(workspace_user
         status = _workspace_status(request, workspace_id)
     if status is None:
         raise ApiError(404, "not_found", "No such workspace.")
-    if status in (WorkspaceStatus.SUSPENDED, WorkspaceStatus.DELETED) and not superadmin_view:
+    closed = (WorkspaceStatus.SUSPENDED, WorkspaceStatus.PENDING_DELETION, WorkspaceStatus.DELETED)
+    if status in closed and not superadmin_view:
         raise ApiError(403, "workspace_closed", "This workspace is closed. Contact support.")
     principal = Principal(
         user_id=user.user.id,

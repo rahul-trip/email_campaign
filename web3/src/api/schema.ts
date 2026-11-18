@@ -93,6 +93,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/customers/{workspace_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Customer
+         * @description Close a customer and delete it after the grace period, or now. Members keep accounts.
+         */
+        post: operations["delete_customer_api_admin_customers__workspace_id__delete_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/customers/{workspace_id}/dismiss-request": {
         parameters: {
             query?: never;
@@ -228,6 +248,26 @@ export interface paths {
         head?: never;
         /** Change Plan */
         patch: operations["change_plan_api_admin_customers__workspace_id__plan_patch"];
+        trace?: never;
+    };
+    "/api/admin/customers/{workspace_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Customer
+         * @description Take back a deletion that is not due yet.
+         */
+        post: operations["restore_customer_api_admin_customers__workspace_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/admin/customers/{workspace_id}/resume": {
@@ -830,6 +870,60 @@ export interface paths {
          * @description One small real call with the slot's stored key, to show whether it works.
          */
         post: operations["test_vendor_key_api_admin_vendors__vendor__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/workspace-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace Requests */
+        get: operations["workspace_requests_api_admin_workspace_requests_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/workspace-requests/{user_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve Workspace Request
+         * @description Give the person a new workspace, with them as its admin.
+         */
+        post: operations["approve_workspace_request_api_admin_workspace_requests__user_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/workspace-requests/{user_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dismiss Workspace Request */
+        post: operations["dismiss_workspace_request_api_admin_workspace_requests__user_id__dismiss_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2094,6 +2188,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/workspace-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Workspace Request
+         * @description The open request for a new workspace, if this person made one.
+         */
+        get: operations["my_workspace_request_api_me_workspace_request_get"];
+        put?: never;
+        /**
+         * Request Workspace
+         * @description Ask the platform staff for a new workspace, after one was deleted.
+         */
+        post: operations["request_workspace_api_me_workspace_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me/workspaces": {
         parameters: {
             query?: never;
@@ -3180,6 +3298,16 @@ export interface components {
             /** Row Version */
             row_version?: number | null;
         };
+        /** ApproveWorkspaceIn */
+        ApproveWorkspaceIn: {
+            /** Name */
+            name: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
         /** AttentionOut */
         AttentionOut: {
             /** Detail */
@@ -3188,7 +3316,9 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "credit_request" | "access_ending" | "mailbox";
+            kind: "credit_request" | "access_ending" | "mailbox" | "deletion_due" | "workspace_request";
+            /** User Id */
+            user_id?: string | null;
             /** Workspace Id */
             workspace_id: string;
             /** Workspace Name */
@@ -3739,6 +3869,8 @@ export interface components {
             credits: components["schemas"]["AdminCreditsOut"];
             /** Credits Milli */
             credits_milli: number;
+            /** Deletion Due At */
+            deletion_due_at?: string | null;
             /** Features */
             features: string[];
             /** Id */
@@ -3833,6 +3965,21 @@ export interface components {
         DeleteAccountIn: {
             /** Password */
             password: string;
+        };
+        /** DeleteCustomerIn */
+        DeleteCustomerIn: {
+            /** Confirm */
+            confirm: string;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+            /**
+             * Now
+             * @default false
+             */
+            now?: boolean;
         };
         /** DeleteLeadIn */
         DeleteLeadIn: {
@@ -4648,6 +4795,11 @@ export interface components {
         };
         /** Me */
         Me: {
+            /**
+             * Needs New Workspace
+             * @default false
+             */
+            needs_new_workspace?: boolean;
             user: components["schemas"]["UserOut"];
             /** Workspaces */
             workspaces: components["schemas"]["MyWorkspace"][];
@@ -4732,6 +4884,16 @@ export interface components {
             slug: string;
             /** Status */
             status: string;
+        };
+        /** MyWorkspaceRequestOut */
+        MyWorkspaceRequestOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Name */
+            name: string;
         };
         /** NotHereIn */
         NotHereIn: {
@@ -5946,6 +6108,39 @@ export interface components {
             /** Secret */
             secret: string;
         };
+        /** WorkspaceRequestIn */
+        WorkspaceRequestIn: {
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note?: string;
+            /**
+             * Website
+             * @default
+             */
+            website?: string;
+        };
+        /** WorkspaceRequestOut */
+        WorkspaceRequestOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Name */
+            name: string;
+            /** Note */
+            note: string;
+            /** User Id */
+            user_id: string;
+            /** Website */
+            website: string;
+        };
         /**
          * WorkspaceSettingsIn
          * @description Only the settings an operator may change, each with its real type.
@@ -6178,6 +6373,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CustomerDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_customer_api_admin_customers__workspace_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteCustomerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetailOut"] | null;
                 };
             };
             /** @description Validation Error */
@@ -6464,6 +6694,37 @@ export interface operations {
                 "application/json": components["schemas"]["PlanChangeIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_customer_api_admin_customers__workspace_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -7736,6 +7997,90 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["KeyCheckOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    workspace_requests_api_admin_workspace_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceRequestOut"][];
+                };
+            };
+        };
+    };
+    approve_workspace_request_api_admin_workspace_requests__user_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveWorkspaceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dismiss_workspace_request_api_admin_workspace_requests__user_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -10037,6 +10382,59 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_workspace_request_api_me_workspace_request_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyWorkspaceRequestOut"] | null;
+                };
+            };
+        };
+    };
+    request_workspace_api_me_workspace_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkspaceRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyWorkspaceRequestOut"];
+                };
             };
             /** @description Validation Error */
             422: {

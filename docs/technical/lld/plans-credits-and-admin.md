@@ -104,6 +104,10 @@ A grant adds its credits to every period while it is active, so the console defa
 
 `outbound/api/routers/admin.py` behind `require_platform(...)`: platform admins (`ADMIN_READ`, `ADMIN_WRITE`) see every plan and customer, grant and withdraw AI credits, override settings, set access and status, set vendor caps in AI credits and model charges (`ADMIN_KEYS`). Superadmins also hold `ADMIN_PLANS`: they edit the plan catalog, choose the default plan and set what an AI credit stands for (`PUT /api/admin/plans/credit-value`). The console shows customers' use in AI credits and, for staff only, what those calls cost the platform in dollars. Every write goes through `PlatformUnitOfWork` with its `audit_log` row.
 
+### Deleting a customer
+
+`AdminService::schedule_deletion` (`POST /api/admin/customers/{id}/delete`, the customer's name typed as `confirm`) sets `pending_deletion` with `deletion_due_at` 30 days on (`DELETION_GRACE`; `now: true` makes it due at once and purges in the request) and revokes every member's sessions; `deps.py::tenant` refuses a `pending_deletion` workspace like a suspended one. `AdminService::restore` takes it back to `active`. The worker's periodic `AdminService::purge_due` purges what is due: `ErasureRepository::purge_workspace` (as the tenant, under row-level security) blanks `provider_calls` answers and links and deletes the tenant's own rows children first; `IdentityUnitOfWork::forget_workspace` deletes its invitations, join requests and notifications; the row becomes `deleted`. Kept: the workspace row, plan, overrides, grants, usage events, vendor-call costs, audit log and memberships. A membership of a deleted workspace is how `IdentityService::lost_a_workspace` knows a person must ask staff for a new one (`/api/me/workspace-request`, audited as `workspace_requested`); staff answer with `/api/admin/workspace-requests/{user_id}/approve` (a new workspace, the person its admin) or `/dismiss`. Open requests are read from the audit log, like credit requests.
+
 ## Invariants
 
 - What is left is never shown below zero, though use may pass the allowance by what one started stage cost.
@@ -144,12 +148,14 @@ Platform vendor keys and workspace entitlements are platform data with `ADMIN_KE
 | `tests/db/test_metered.py` | Each call stamped at the rate in force; model charges; budget per lead in credits |
 | `tests/db/test_credits.py`, `tests/db/test_resume.py` | Waiting in place without credits, resuming after a grant, discovery and rewrites refused, finished stages may overdraw |
 | `tests/api/test_admin.py` | Superadmin-only plans and credit rate; grants in AI credits; model charges; staff see dollar cost |
+| `tests/api/test_customer_deletion.py` | Typed confirmation, closed at once, restore, the purge after the grace period keeps only the books, members keep accounts and ask staff for a new workspace |
 
 ## Known limitations
 
 - Calls made before migration 0029 have no AI credits; a period that spans the migration counts only later calls.
 - A model with no charge set is free to customers until a charge is entered.
 - `max_prospect_budget_credits` is shown but not yet enforced when a customer saves their budget per lead.
+- Purging a customer deletes its mailbox secrets but does not revoke OAuth tokens at Microsoft or Google; they lapse or the customer revokes them.
 
 ## Planned
 

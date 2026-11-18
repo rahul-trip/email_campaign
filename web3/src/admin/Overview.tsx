@@ -1,13 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { client, ok } from "../api/client";
-import { Card, Empty, PageHeader, QueryState, Stat } from "../ui/compat";
+import { client, ok, type Schemas } from "../api/client";
+import { Button, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Stat } from "../ui/compat";
 import { credits, usd } from "../lib/format";
 import { A } from "./nav";
 import { When } from "./bits";
 
-const KIND = { credit_request: "Asked for more credits", access_ending: "Access ending", mailbox: "Mailbox needs attention" } as const;
-const FIX = { credit_request: "Grant", access_ending: "Extend", mailbox: "Open" } as const;
+const KIND = { credit_request: "Asked for more credits", access_ending: "Access ending", mailbox: "Mailbox needs attention", deletion_due: "Waiting to be deleted", workspace_request: "New workspace" } as const;
+const FIX = { credit_request: "Grant", access_ending: "Extend", mailbox: "Open", deletion_due: "Open", workspace_request: "Open" } as const;
 
 export function OverviewPage() {
   const overview = useQuery({ queryKey: ["admin", "overview"], queryFn: () => ok(client.GET("/api/admin/overview")), refetchInterval: 30_000 });
@@ -18,6 +19,7 @@ export function OverviewPage() {
         {(o) => {
           const providers = Object.entries(o.credits_by_provider).sort((a, b) => b[1] - a[1]);
           const top = Math.max(1, ...providers.map(([, v]) => v));
+          const attention = o.attention.filter((a) => a.kind !== "workspace_request"); // those have their own card
           return (
             <div className="space-y-5">
               <div data-tour="admin-figures" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -28,15 +30,16 @@ export function OverviewPage() {
                 <Stat label="Platform cost" value={usd(o.cost_micro_usd)} hint="what vendors and the model billed, this month" />
                 <Stat label="Waiting for credits" value={o.waiting} hint={o.waiting_customers ? `${o.waiting_customers} customer${o.waiting_customers === 1 ? "" : "s"}` : undefined} tone={o.waiting ? "attention" : undefined} />
               </div>
+              <WorkspaceRequests />
               <div className="grid gap-5 lg:grid-cols-2">
                 <Card tour="admin-attention" title="Needs attention">
-                  {o.attention.length === 0 ? (
+                  {attention.length === 0 ? (
                     <Empty icon={<CheckCircle2 className="size-7 text-good" />} title="Nothing needs you">
                       Credit requests, access that is about to end and mailbox problems show here.
                     </Empty>
                   ) : (
                     <ul className="divide-y divide-line">
-                      {o.attention.map((a, i) => (
+                      {attention.map((a, i) => (
                         <li key={i} className="flex items-center justify-between gap-3 py-2.5 text-body">
                           <span>
                             <strong>{a.workspace_name}</strong>
@@ -98,3 +101,50 @@ export function OverviewPage() {
   );
 }
 
+
+/** People whose workspace was deleted and who asked for a new one. Shown only when there are some. */
+function WorkspaceRequests() {
+  const requests = useQuery({ queryKey: ["admin", "workspace-requests"], queryFn: () => ok(client.GET("/api/admin/workspace-requests")), refetchInterval: 30_000 });
+  if (!requests.data?.length) return null;
+  return (
+    <Card title="Asked for a new workspace" subtitle="Their workspace was deleted. Approving makes a new, empty workspace with them as its admin.">
+      <ul className="divide-y divide-line">
+        {requests.data.map((r) => (
+          <RequestRow key={r.user_id} r={r} />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function RequestRow({ r }: { r: Schemas["WorkspaceRequestOut"] }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState(r.name);
+  const done = () => void queryClient.invalidateQueries({ queryKey: ["admin"] });
+  const path = { params: { path: { user_id: r.user_id } } };
+  const approve = useMutation({
+    mutationFn: () => ok(client.POST("/api/admin/workspace-requests/{user_id}/approve", { ...path, body: { name: name.trim(), website: r.website } })),
+    onSuccess: done,
+  });
+  const dismiss = useMutation({ mutationFn: () => ok(client.POST("/api/admin/workspace-requests/{user_id}/dismiss", path)), onSuccess: done });
+  return (
+    <li className="space-y-2 py-3 text-body">
+      <div>
+        <strong>{r.email}</strong> <When iso={r.created_at} />
+        {r.note && <span className="block text-small text-muted">“{r.note}”</span>}
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Field label="Workspace name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} className="h-8 w-64" />
+        </Field>
+        <Button size="sm" busy={approve.isPending} disabled={!name.trim()} onClick={() => approve.mutate()}>
+          Make the workspace
+        </Button>
+        <Button size="sm" variant="secondary" busy={dismiss.isPending} onClick={() => dismiss.mutate()}>
+          Dismiss
+        </Button>
+      </div>
+      <Problem error={approve.error ?? dismiss.error} />
+    </li>
+  );
+}

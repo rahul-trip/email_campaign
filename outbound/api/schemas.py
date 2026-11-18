@@ -60,6 +60,8 @@ class MyWorkspace(Out):
 class Me(Out):
     user: UserOut
     workspaces: list[MyWorkspace]
+    # A workspace of theirs was deleted: they ask the staff for a new one instead of making one.
+    needs_new_workspace: bool = False
 
 
 class RemovalIn(In):
@@ -142,6 +144,17 @@ class DecideJoinIn(In):
 class CreateWorkspaceIn(In):
     name: str = Field(min_length=1, max_length=200)
     website: str = Field(default="", max_length=255)
+
+
+class WorkspaceRequestIn(In):
+    name: str = Field(min_length=1, max_length=200)
+    website: str = Field(default="", max_length=255)
+    note: str = Field(default="", max_length=1000)
+
+
+class MyWorkspaceRequestOut(Out):
+    name: str
+    created_at: datetime
 
 
 class JoinIn(In):
@@ -1031,6 +1044,7 @@ class CustomerRowOut(Out):
     name: str
     slug: str
     status: str
+    deletion_due_at: datetime | None = None  # set while it waits to be deleted
     plan_code: str
     plan_name: str
     access: Literal["full", "read_only", "locked"]
@@ -1091,10 +1105,31 @@ class CustomerDetailOut(Out):
 
 
 class AttentionOut(Out):
-    kind: Literal["credit_request", "access_ending", "mailbox"]
+    kind: Literal["credit_request", "access_ending", "mailbox", "deletion_due", "workspace_request"]
     workspace_id: str
     workspace_name: str
     detail: str
+    user_id: str | None = None
+
+
+class DeleteCustomerIn(In):
+    confirm: str = Field(max_length=200)  # the customer's name, typed again
+    now: bool = False  # skip the grace period
+    note: str = Field(default="", max_length=500)
+
+
+class WorkspaceRequestOut(Out):
+    user_id: str
+    email: str
+    name: str
+    website: str
+    note: str
+    created_at: datetime
+
+
+class ApproveWorkspaceIn(In):
+    name: str = Field(min_length=1, max_length=200)
+    website: str = Field(default="", max_length=255)
 
 
 class OverviewOut(Out):

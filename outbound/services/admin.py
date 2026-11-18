@@ -45,8 +45,10 @@ from outbound.services.resume import Released, ResumeService
 log = get_logger(__name__)
 
 SOON = timedelta(days=7)
+DELETION_GRACE = timedelta(days=30)  # a deleted customer can be restored until then
 SUPER = PlatformRole.SUPERADMIN
 ANSWERED = ("credits_granted", "credits_dismissed")
+WORKSPACE_ANSWERED = ("workspace_request_approved", "workspace_request_dismissed")
 
 
 @dataclass(frozen=True)
@@ -89,10 +91,23 @@ class UserRow:
 
 @dataclass(frozen=True)
 class Attention:
-    kind: str  # credit_request, access_ending, mailbox
+    kind: str  # credit_request, access_ending, mailbox, deletion_due, workspace_request
     workspace_id: str
     workspace_name: str
     detail: str
+    user_id: str | None = None  # a workspace_request comes from a person, not a workspace
+
+
+@dataclass(frozen=True)
+class WorkspaceRequest:
+    """Someone whose workspace was deleted asks the staff for a new one."""
+
+    user_id: str
+    email: str
+    name: str
+    website: str
+    note: str
+    at: datetime
 
 
 @dataclass(frozen=True)
@@ -164,6 +179,21 @@ class AdminService:
             Attention("mailbox", r.workspace.id, r.workspace.name, "a mailbox needs attention")
             for r in rows
             if r.mailbox_problems
+        ]
+        attention += [
+            Attention(
+                "deletion_due", r.workspace.id, r.workspace.name,
+                f"will be deleted {r.workspace.deletion_due_at:%d %b}",
+            )
+            for r in rows
+            if r.workspace.status is WorkspaceStatus.PENDING_DELETION
+            and r.workspace.deletion_due_at
+        ]  # fmt: skip
+        attention += [
+            Attention(
+                "workspace_request", "", w.name, f"{w.email} asks for a new workspace", w.user_id
+            )
+            for w in self.workspace_requests()
         ]
         return Overview(
             customers=sum(r.workspace.status is WorkspaceStatus.ACTIVE for r in rows),
@@ -311,6 +341,136 @@ class AdminService:
                 for member, _ in ids.memberships.members(workspace_id):
                     ids.sessions.revoke_for_user(member.user_id)
                 ids.commit()
+
+    # ------------------------------------------------------------------ deleting a customer
+
+    def schedule_deletion(
+        self, workspace_id: str, *, by: str, note: str = "", now_: bool = False
+    ) -> datetime:
+        """Close a customer and delete it when the grace period ends (``now_``: right away).
+        Everyone in it is signed out; their accounts stay. Returns when it is (or was) deleted."""
+        due = self._now() + (timedelta(0) if now_ else DELETION_GRACE)
+        with self._platform() as p:
+            before = p.workspaces.get(workspace_id)
+            if before is None:
+                raise NotFound(f"workspace {workspace_id}")
+            if before.status not in (
+                WorkspaceStatus.ACTIVE, WorkspaceStatus.PAUSED, WorkspaceStatus.SUSPENDED,
+                WorkspaceStatus.PENDING_DELETION,
+            ):  # fmt: skip
+                raise AdminError(409, "already_deleted", "This customer is already deleted.")
+            if before.status is WorkspaceStatus.PENDING_DELETION:
+                p.workspaces.set_status(workspace_id, WorkspaceStatus.ACTIVE)  # to move the date
+            p.workspaces.set_status(
+                workspace_id, WorkspaceStatus.PENDING_DELETION, deletion_due_at=due
+            )
+            p.audit.record(
+                "deletion_scheduled", actor_user_id=by, workspace_id=workspace_id,
+                target_type="workspace", target_id=workspace_id, note=note or None,
+                data={"from": before.status.value, "due": due.isoformat()},
+            )  # fmt: skip
+            p.commit()
+        with self._identity() as ids:
+            for member, _ in ids.memberships.members(workspace_id):
+                ids.sessions.revoke_for_user(member.user_id)
+            ids.commit()
+        if now_:
+            self.purge(workspace_id, by=by)
+        return due
+
+    def restore(self, workspace_id: str, *, by: str, note: str = "") -> None:
+        """Take back a deletion before it is due. The customer is active again."""
+        with self._platform() as p:
+            before = p.workspaces.get(workspace_id)
+            if before is None:
+                raise NotFound(f"workspace {workspace_id}")
+            if before.status is not WorkspaceStatus.PENDING_DELETION:
+                raise AdminError(409, "not_pending", "This customer is not waiting to be deleted.")
+            p.workspaces.set_status(workspace_id, WorkspaceStatus.ACTIVE)
+            p.audit.record(
+                "deletion_cancelled", actor_user_id=by, workspace_id=workspace_id,
+                target_type="workspace", target_id=workspace_id, note=note or None,
+            )  # fmt: skip
+            p.commit()
+
+    def purge(self, workspace_id: str, *, by: str | None = None) -> dict[str, int]:
+        """Delete a customer whose deletion is due: its leads, mailboxes, settings, invitations
+        and notifications. The workspace row stays as a ``deleted`` tombstone, with its plan,
+        credits, usage, vendor-call costs and audit trail, and members keep their accounts."""
+        with self._platform() as p:
+            found = p.workspaces.get(workspace_id)
+            if found is None or found.status is not WorkspaceStatus.PENDING_DELETION:
+                raise AdminError(409, "not_pending", "This customer is not waiting to be deleted.")
+        with self._uow(workspace_id) as uow:
+            counts = uow.erasure.purge_workspace()
+            uow.commit()
+        with self._identity() as ids:
+            ids.forget_workspace(workspace_id)
+            ids.commit()
+        with self._platform() as p:
+            p.workspaces.set_status(workspace_id, WorkspaceStatus.DELETED)
+            p.audit.record(
+                "customer_deleted", actor_user_id=by, workspace_id=workspace_id,
+                target_type="workspace", target_id=workspace_id,
+                data={"rows": sum(counts.values())},
+            )  # fmt: skip
+            p.commit()
+        log.info("customer_deleted", workspace_id=workspace_id, rows=sum(counts.values()))
+        return counts
+
+    def purge_due(self) -> list[str]:
+        """The worker's job: delete every customer whose grace period is over."""
+        with self._platform() as p:
+            due = p.workspaces.deletion_due(self._now())
+        done = []
+        for workspace_id in due:
+            try:
+                self.purge(workspace_id)
+                done.append(workspace_id)
+            except Exception as error:  # one failure must not stop the others
+                log.exception(
+                    "customer_delete_failed", workspace_id=workspace_id,
+                    error_type=type(error).__name__,
+                )  # fmt: skip
+        return done
+
+    # ------------------------------------------------------------------ new-workspace requests
+
+    def workspace_requests(self) -> list[WorkspaceRequest]:
+        """Open requests for a new workspace, the newest first."""
+        with self._identity() as ids:
+            entries = ids.audit.recent(limit=1000)
+            answered: set[str] = set()
+            found: list[WorkspaceRequest] = []
+            for entry in entries:  # newest first
+                user_id = entry.get("target_id") or entry.get("actor_user_id")
+                if not user_id:
+                    continue
+                if entry["action"] in WORKSPACE_ANSWERED:
+                    answered.add(user_id)
+                elif entry["action"] == "workspace_requested" and user_id not in answered:
+                    answered.add(user_id)  # only the latest request counts
+                    try:
+                        user = ids.users.get(user_id)
+                    except NotFound:
+                        continue  # the account was deleted since
+                    data = entry.get("data") or {}
+                    found.append(
+                        WorkspaceRequest(
+                            user_id, user.email, str(data.get("name", "")),
+                            str(data.get("website", "")), entry.get("note") or "",
+                            entry["at"],
+                        )
+                    )  # fmt: skip
+        return found
+
+    def dismiss_workspace_request(self, user_id: str, *, by: str, note: str = "") -> None:
+        with self._identity() as ids:
+            ids.audit.record(
+                "workspace_request_dismissed", actor_user_id=by, target_type="user",
+                target_id=user_id, note=note or None,
+            )  # fmt: skip
+            ids.commit()
 
     # ------------------------------------------------------------------ overrides and credits
 

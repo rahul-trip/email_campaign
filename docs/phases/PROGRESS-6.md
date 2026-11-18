@@ -137,6 +137,13 @@ Gates still open: set the live model's charge after deploying 0029; the migratio
 
 Done: Vendors → AI models adds a model with provider type, model name, base URL, its own encrypted key, temperature, max tokens, reasoning effort and AI-credit charges; staff choose the default and writer models, live from the next call (`VendorService.effective_settings` via `_model_update`); each model can be tested. No default chosen: the LLM_* settings apply as before. Dialogs now scroll on short screens. Gate: choose the production default model and set its charge after deploying.
 
+## Deleting a customer (2026-11-18, branch `phase-6/model-test-fix`, no migration, R-51)
+
+- [x] Console: **Delete the customer** (typed name), closed at once, restorable for 30 days or purged now; the worker purges what is due, keeping the tombstone, plan, credits, costs and audit log. Members keep their accounts.
+- [x] A person left with only deleted workspaces asks staff for a new one; staff approve or dismiss on the Overview.
+- [x] Fixed: 204 answers no longer show an error in web3 (deleting a user or an account).
+- [ ] Live check on the VM: delete a test customer with *now*, confirm the Supabase role may delete every purged table.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.
