@@ -1,6 +1,6 @@
 # Phase 6i — Outcomes first (proposal)
 
-**Status:** built 2026-11-19 on branch `phase-6/outcomes-first` (one PR, separate commits), after the team's answers: one PR; tries are counted (3 for "nobody to write to", 5 for a broken step); pages are renamed; a draft is approvable from anywhere. See [ADR 0036](../technical/adr/0036-outcomes-are-not-failures.md). Mockups: to be added to Stitch project `538951827606035367` (design system `assets/7e894524ff6145c38495eb09a009b16a`). The first attempt at the Today screen timed out.
+**Status:** built 2026-11-19 on branch `phase-6/outcomes-first` (one PR, separate commits), after the team's answers: one PR; tries are counted (3 for "nobody to write to", 5 for a broken step); pages are renamed; a draft is approvable from anywhere. See [ADR 0036](../technical/adr/0036-outcomes-are-not-failures.md). Mockup: Stitch project `538951827606035367`, screen "Outbound — Today Dashboard (Warm Attio Style)" (`screens/cee5732553df465f833834aba2056510`), design system `assets/7e894524ff6145c38495eb09a009b16a`. It shows the order built: emails ready with three previews, hot leads on LinkedIn, the week's wins, then a grey Behind the scenes and a small Decision required card. Do not copy its invented details ("Syncing continuous", "+1.4% benchmark", Google Workspace, profile photos).
 
 ## The problem
 
