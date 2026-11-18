@@ -97,34 +97,37 @@ export function LinkedInPage() {
       </div>
 
       <Card className="mb-4 overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-surface-2 p-3">
+        <div className="flex flex-col gap-2 border-b border-line bg-surface-2 p-3 sm:flex-row sm:flex-wrap sm:items-center">
           <SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={typed} onChange={setTyped} />
-          <FilterChip active={!!search.hot} onClick={() => set({ hot: search.hot ? undefined : true })}>
-            <Flame className="size-3.5" aria-hidden /> Hot only
-          </FilterChip>
-          <FilterChip active={search.email === "none"} onClick={() => set({ email: search.email === "none" ? undefined : "none" })}>
-            No email
-          </FilterChip>
-          <FilterChip active={search.email === "has"} onClick={() => set({ email: search.email === "has" ? undefined : "has" })}>
-            Has email
-          </FilterChip>
-          <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })}>
-            <option value="">Any fit</option>
-            {[60, 70, 80, 90].map((n) => (
-              <option key={n} value={n}>
-                Fit {n}+
-              </option>
-            ))}
-          </Select>
-          <input
-            aria-label="Country code"
-            value={search.country ?? ""}
-            maxLength={2}
-            placeholder="Country"
-            onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
-            className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
-          />
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          {/* On a phone the filters sit in one row that scrolls sideways, so they take one line, not five. */}
+          <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:shrink-0">
+            <FilterChip active={!!search.hot} onClick={() => set({ hot: search.hot ? undefined : true })}>
+              <Flame className="size-3.5" aria-hidden /> Hot only
+            </FilterChip>
+            <FilterChip active={search.email === "none"} onClick={() => set({ email: search.email === "none" ? undefined : "none" })}>
+              No email
+            </FilterChip>
+            <FilterChip active={search.email === "has"} onClick={() => set({ email: search.email === "has" ? undefined : "has" })}>
+              Has email
+            </FilterChip>
+            <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })}>
+              <option value="">Any fit</option>
+              {[60, 70, 80, 90].map((n) => (
+                <option key={n} value={n}>
+                  Fit {n}+
+                </option>
+              ))}
+            </Select>
+            <input
+              aria-label="Country code"
+              value={search.country ?? ""}
+              maxLength={2}
+              placeholder="Country"
+              onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
+              className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
             <SortControl value={sort} options={SORTS} direction={direction} onSort={(v) => set({ sort: v, dir: undefined })} onDirection={() => set({ dir: direction === "asc" ? "desc" : "asc" })} />
             {filtered && (
               <Button variant="ghost" size="sm" onClick={() => void navigate({ search: { state: search.state }, replace: true })}>
@@ -180,15 +183,18 @@ function LeadRow({ row, open, onToggle, readOnly, onChanged }: { row: Row; open:
   const name = row.company_name ?? row.domain;
   const noEmail = hasNoEmail(row);
   const id = `lead-row-${row.item.id}`;
+  const quick = row.item.state === "drafted" && !readOnly;
   return (
-    <Card className="p-0">
-      <div className="flex flex-wrap items-center gap-3 p-3 sm:flex-nowrap sm:p-4">
-        <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <ChevronDown className={cx("size-4 shrink-0 text-muted transition-transform", !open && "-rotate-90")} aria-hidden />
+    <Card className="min-w-0 overflow-hidden p-0">
+      {/* On a phone the pieces stack: who and what on top, the one-tap button underneath. */}
+      <div className="flex flex-col sm:flex-row sm:items-center">
+        <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle} className="flex min-w-0 flex-1 items-start gap-3 p-3 text-left sm:p-4">
+          <ChevronDown className={cx("mt-2.5 size-4 shrink-0 text-muted transition-transform", !open && "-rotate-90")} aria-hidden />
           <LeadIcon domain={row.domain} name={name} />
           <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-2">
-              <span className="font-semibold text-ink">{name}</span>
+            <span className="block break-words font-semibold text-ink">{name}</span>
+            <span className="block break-words text-small text-muted">{[row.person, row.title].filter(Boolean).join(" · ") || "Decision-maker"}</span>
+            <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {row.hot && (
                 <Chip tone="attention" title="A fit score above 80">
                   <Flame className="size-3.5" aria-hidden /> Hot
@@ -198,15 +204,20 @@ function LeadRow({ row, open, onToggle, readOnly, onChanged }: { row: Row; open:
               {row.country_code && <Chip>{row.country_code}</Chip>}
               {row.item.state === "sent" && <Chip tone="good">Sent {ago(row.item.sent_at)}</Chip>}
             </span>
-            <span className="block truncate text-small text-muted">{[row.person, row.title].filter(Boolean).join(" · ") || "Decision-maker"}</span>
-            {!open && <span className="mt-0.5 block truncate text-small text-ink-2">“{row.item.note}”</span>}
+            {!open && <span className="mt-1.5 line-clamp-2 block break-words text-small text-ink-2">“{row.item.note}”</span>}
+          </span>
+          <span className="shrink-0">
+            <FitRing score={row.fit_score} size={40} />
           </span>
         </button>
-        <FitRing score={row.fit_score} size={40} />
-        {row.item.state === "drafted" && !readOnly && <CopyNoteButton note={row.item.note} profile={row.profile} />}
+        {quick && (
+          <div className="px-3 pb-3 sm:shrink-0 sm:p-4 sm:pl-0">
+            <CopyNoteButton note={row.item.note} profile={row.profile} className="w-full justify-center sm:w-auto" />
+          </div>
+        )}
       </div>
       {open && (
-        <div id={id} className="space-y-3 border-t border-line p-3 sm:p-4">
+        <div id={id} className="min-w-0 space-y-3 border-t border-line p-3 sm:p-4">
           {row.fit_reason && (
             <p className="text-small text-muted">
               <span className="font-semibold text-ink-2">Why it fits: </span>

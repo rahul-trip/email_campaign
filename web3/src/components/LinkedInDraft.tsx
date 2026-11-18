@@ -22,9 +22,9 @@ function Copyable({ label, text, hint, open }: { label: string; text: string; hi
   const target = safeLink(open);
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-2">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
         <span className="text-small font-medium text-ink">{label}</span>
-        <span className="flex items-center gap-2">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
           {hint && <span className="text-label text-muted">{hint}</span>}
           <Button
             variant={target ? "primary" : "secondary"}
@@ -54,13 +54,14 @@ function Copyable({ label, text, hint, open }: { label: string; text: string; hi
  * One button that copies the connection note and opens the person's LinkedIn profile in a new
  * tab, ready to paste. Without a profile link it only copies. Nothing is ever sent from here.
  */
-export function CopyNoteButton({ note, profile, size = "sm", variant = "primary" }: { note: string; profile?: string | null; size?: "sm" | "md"; variant?: "primary" | "secondary" }) {
+export function CopyNoteButton({ note, profile, size = "sm", variant = "primary", className }: { note: string; profile?: string | null; size?: "sm" | "md"; variant?: "primary" | "secondary"; className?: string }) {
   const [copied, setCopied] = useState(false);
   const target = safeLink(profile);
   return (
     <Button
       variant={variant}
       size={size}
+      className={className}
       title={target ? "Copies the note, then opens their profile in a new tab: paste it there" : "Copies the note"}
       onClick={() => {
         void navigator.clipboard?.writeText(note);
@@ -123,7 +124,7 @@ export function LinkedInDraftCard({
   const isSent = draft.state === "sent";
   const skipped = draft.state === "skipped";
   return (
-    <div className={cx("space-y-3 rounded-lg border border-line p-3", skipped && "opacity-70")}>
+    <div className={cx("min-w-0 space-y-3 rounded-lg border border-line p-3", skipped && "opacity-70")}>
       <div className="flex flex-wrap items-center gap-2">
         {person && <span className="font-semibold">{person}</span>}
         {safeLink(profile) && (
