@@ -39,15 +39,15 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "review",
-    title: "Review",
+    title: "Emails ready",
     place: "/review",
     steps: [{ target: "review-queue", icon: "✍️", title: "Approve in one keystroke", body: "Every email waits here, hot leads first. Edit it, ask for changes, or press Ctrl+Enter. Nothing is sent until you approve." }],
   },
   {
     id: "attention",
-    title: "Needs attention",
+    title: "Needs a decision",
     place: "/attention",
-    steps: [{ target: "attention-filter", icon: "🧲", title: "Unstick leads in one click", body: "Holds and failures say why in plain words and come with the fix: Retry, Find email again, Release." }],
+    steps: [{ target: "attention-filter", icon: "🧲", title: "Unstick leads in one click", body: "Only what you can unblock lands here: holds and steps that broke on every try. Each says why in plain words and has the fix. Companies that do not fit are screened out quietly." }],
   },
   {
     id: "leads",

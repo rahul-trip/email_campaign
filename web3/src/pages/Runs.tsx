@@ -168,7 +168,7 @@ function RunStats({ runs }: { runs: Run[] }) {
       <Stat label="Runs this week" value={week.length} hint={failedRuns ? `${failedRuns} failed` : "none failed"} tone={failedRuns ? "error" : undefined} />
       <Stat label="Steps completed" value={moved} hint="leads moved on, step by step" tone="good" />
       <Stat label="New leads found" value={sum((t) => t.newLeads)} hint={`${sum((t) => t.alreadyLeads)} were already yours`} />
-      <Stat label="Held or failed" value={attention} hint={attention ? "see Needs attention" : "nothing stuck"} tone={attention ? "attention" : undefined} />
+      <Stat label="Held or stopped" value={attention} hint={attention ? "see Needs a decision" : "nothing stuck"} tone={attention ? "attention" : undefined} />
       <Stat label="AI credits this week" value={credits(spend)} hint={moved ? `${credits(spend / moved)} per step completed` : "no paid calls"} />
     </div>
   );

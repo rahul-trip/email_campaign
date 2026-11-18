@@ -23,7 +23,7 @@ export function LinkedInPage() {
   return (
     <>
       <PageHeader
-        title="LinkedIn"
+        title="Hot leads"
         subtitle="A connection note and a first message for each confirmed decision-maker, written before their email is found. Copy them into LinkedIn yourself: nothing is sent from here."
       />
       <div className="mb-5" data-tour="linkedin-filter">
