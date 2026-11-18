@@ -7,6 +7,8 @@ import pytest
 from outbound.db.errors import NotFound  # noqa: F401  (a missing person is NotFound)
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.domain.enums import CompanySource, CompanyStatus, ContactSource, HoldReason
+from outbound.domain.errors import InvalidInput
+from outbound.domain.state_machines import retry_status_for
 from outbound.providers.ports import SearchHit
 from outbound.services.leads import LeadError, LeadService
 from outbound.stages.research.linkedin import (
@@ -245,3 +247,56 @@ def test_several_people_are_looked_up_a_few_names_per_search() -> None:
         "Ann Ames": "https://www.linkedin.com/in/p0",
         "Gus Gale": "https://www.linkedin.com/in/p6",
     }  # Dee Dunn's namesake works at another company
+
+
+def test_a_linkedin_profile_can_be_set_by_hand_made_plain_and_removed(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    person = lead(factory, ws)
+    service = LeadService(factory, ws)
+    saved = service.update_person(person, linkedin_url="uk.linkedin.com/in/jane-doe-1?trk=x")
+    assert saved.contact.linkedin_url == "https://www.linkedin.com/in/jane-doe-1"
+    assert "linkedin_url" in saved.contact.manual_fields  # research will not overwrite it
+    with pytest.raises(InvalidInput, match="LinkedIn profile link"):
+        service.update_person(person, linkedin_url="https://example.com/jane")
+    assert service.update_person(person, linkedin_url="").contact.linkedin_url is None
+    untouched = service.update_person(person, title="CTO")
+    assert untouched.contact.linkedin_url is None and untouched.contact.title == "CTO"
+
+
+def test_a_profile_another_person_holds_is_refused(factory: UnitOfWorkFactory, ws: str) -> None:
+    first = lead(factory, ws)
+    second = lead(factory, ws, domain="bolt.com")
+    service = LeadService(factory, ws)
+    service.update_person(first, linkedin_url="https://www.linkedin.com/in/jane-doe")
+    with pytest.raises(InvalidInput, match="already has that LinkedIn profile"):
+        service.update_person(second, linkedin_url="https://www.linkedin.com/in/jane-doe")
+    # Saving the same profile on the same person again is fine.
+    service.update_person(first, linkedin_url="https://www.linkedin.com/in/jane-doe")
+
+
+def test_find_people_again_adds_who_decides_and_retries_a_lead_that_had_nobody(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    person = lead(factory, ws, status=C.FAILED)  # failed at the email step: nobody to write to
+    with factory(ws) as uow:
+        company_id = uow.contacts.get(person).company_id
+    search = FakeSearch(
+        hits=[
+            hit("https://www.linkedin.com/in/max-power", "Max Power - CEO - Acme | LinkedIn"),
+            hit("https://www.linkedin.com/in/jane-doe-2", "Jane Doe - CFO - Acme | LinkedIn"),
+            hit(
+                "https://www.linkedin.com/in/al-other", "Al Other - CEO - Elsewhere Inc | LinkedIn"
+            ),
+        ]
+    )
+    found = LeadService(factory, ws, search=search).find_people_again(company_id)
+    assert (found.found, found.added, found.works_here) == (3, 1, 1)  # Jane is already there
+    assert found.retried
+    assert '"Acme"' in search.searches[0] and "Founder" in search.searches[0]  # no campaign
+    with factory(ws) as uow:
+        names = {c.full_name for c in uow.contacts.for_company(company_id)}
+        assert names == {"Jane Doe", "Max Power"}  # the one at another company is not added
+        assert uow.companies.get(company_id).status is retry_status_for("email")
+    with pytest.raises(LeadError, match="not set up"):
+        LeadService(factory, ws).find_people_again(company_id)

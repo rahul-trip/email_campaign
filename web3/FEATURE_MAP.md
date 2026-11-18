@@ -48,6 +48,10 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Resume leads waiting for credits | `companies/resume`, `companies/{id}/resume`, `targets/resume` | Needs attention · credits meter popover |
 | Confirm website for uploaded rows | `targets/{row_id}/confirm` | Needs attention → Websites · Add leads |
 | Leads list with filters in URL | `companies` | Leads (saved views, filter pills, fit pill, status chip) |
+| Sort leads by any column, either way | `companies?sort&direction` | Leads (Sort menu, direction arrow, column titles) |
+| Lead website icons | DuckDuckGo icon service (CSP `img-src`) | Leads (`ui/lead.tsx::LeadIcon`, initials if none) |
+| Set or remove a person's LinkedIn profile | `PATCH contacts/{id}` (`linkedin_url`) | Lead page: person **Remove**, **Edit** field |
+| Find people again | `POST companies/{id}/find-people` | Lead page, under People when nobody can be written to |
 | Lead detail: status, next actions, edit fields | `companies/{id}` GET/PATCH | Lead detail header + inline edit (manual fields marked) |
 | Research again / requalify | `research-again`, `requalify` | Lead detail actions |
 | Qualification breakdown | `companies/{id}` | Lead detail "Why this lead" card |

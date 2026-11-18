@@ -71,11 +71,15 @@ class ResearchStage:
             updates["country_code"] = output.country_code
         if output.legal_entity_type is not LegalEntityType.UNKNOWN:
             updates["legal_entity_type"] = output.legal_entity_type
+
+        def write(uow: UnitOfWork) -> None:
+            save_people(uow, company.id, output.people)
+
         return StageResult(
             CompanyStatus.RESEARCHED,
             reason="researched",
             company_updates=updates,
-            write=lambda uow: _save_people(uow, company.id, output.people),
+            write=write,
         )
 
 
@@ -86,15 +90,18 @@ _STATUS = {
 }
 
 
-def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -> None:
+def save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -> int:
+    """Add the people not already at the lead (by name or profile); returns how many."""
     known = uow.contacts.for_company(company_id)
     rank = len(known)
+    added = 0
     for person in people:
         if person.linkedin_url and uow.contacts.linkedin_taken(person.linkedin_url):
             continue
         if any(same_person(c.full_name, person.name) for c in known):
             continue
         rank += 1
+        added += 1
         first, _, last = person.name.partition(" ")
         uow.contacts.add(
             company_id,
@@ -108,3 +115,4 @@ def _save_people(uow: UnitOfWork, company_id: str, people: tuple[Person, ...]) -
             status=_STATUS[person.placement],
             placement_note=person.reason or None,
         )
+    return added

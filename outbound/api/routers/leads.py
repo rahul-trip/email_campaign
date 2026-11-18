@@ -26,6 +26,7 @@ from outbound.api.schemas import (
     NoteOut,
     NotHereIn,
     PeopleCheckOut,
+    PeopleFoundOut,
     PersonIn,
     PersonPatch,
     PolicySkipIn,
@@ -73,7 +74,10 @@ def companies(
     hot: bool | None = None,
     source: CompanySource | None = None,
     country: Annotated[str | None, Query(min_length=2, max_length=2)] = None,
-    sort: Literal["newest", "fit", "updated", "name"] = "newest",
+    sort: Literal[
+        "newest", "fit", "updated", "name", "status", "country", "source", "priority"
+    ] = "newest",
+    direction: Literal["asc", "desc"] | None = None,
     include: Literal["summary"] | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -89,6 +93,7 @@ def companies(
         source=source,
         country=country,
         sort=sort,
+        direction=direction,
         limit=limit,
         offset=offset,
     )
@@ -282,7 +287,11 @@ def edit_person(
     contact_id: str, body: PersonPatch, svc: Annotated[Services, Depends(services)]
 ) -> ContactOut:
     updated = svc.leads.update_person(
-        contact_id, full_name=body.full_name, title=body.title, email=body.email
+        contact_id,
+        full_name=body.full_name,
+        title=body.title,
+        email=body.email,
+        linkedin_url=body.linkedin_url,
     )
     return ContactOut.model_validate(
         {**updated.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in updated.emails]}
@@ -416,6 +425,16 @@ def not_here(
 def check_people(company_id: str, svc: Annotated[Services, Depends(services)]) -> PeopleCheckOut:
     """Look again at who works here: set aside people whose profile says otherwise."""
     return PeopleCheckOut.model_validate(svc.leads.check_people(company_id).__dict__)
+
+
+@router.post(
+    "/companies/{company_id}/find-people",
+    response_model=PeopleFoundOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def find_people(company_id: str, svc: Annotated[Services, Depends(services)]) -> PeopleFoundOut:
+    """Search again for the people who decide at this lead (up to two searches, one model call)."""
+    return PeopleFoundOut.model_validate(svc.leads.find_people_again(company_id).__dict__)
 
 
 @router.post(

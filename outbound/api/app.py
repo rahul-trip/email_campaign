@@ -69,7 +69,9 @@ SECURITY_HEADERS = {
     # Everything the page loads comes from this server; nothing may frame it (an invisible
     # frame over the Approve button would be click-jacking); nothing is guessed from content.
     "Content-Security-Policy": (
-        "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; "
+        # Lead website icons come from DuckDuckGo's icon service, and only from there.
+        "default-src 'self'; img-src 'self' data: https://icons.duckduckgo.com; "
+        "frame-ancestors 'none'; "
         "object-src 'none'; base-uri 'none'; form-action 'self'"
     ),
     "X-Content-Type-Options": "nosniff",

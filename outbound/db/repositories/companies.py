@@ -52,6 +52,20 @@ EDITABLE_FIELDS = frozenset(
 )
 
 
+# What the leads list may be sorted by, and each column's natural direction.
+_SORTS: dict[str, tuple[Any, str]] = {
+    "newest": (CompanyRow.created_at, "desc"),
+    "fit": (CompanyRow.fit_score, "desc"),
+    "updated": (CompanyRow.updated_at, "desc"),
+    "name": (func.lower(func.coalesce(CompanyRow.name, CompanyRow.domain)), "asc"),
+    "status": (CompanyRow.status, "asc"),
+    "country": (CompanyRow.country_code, "asc"),
+    "source": (CompanyRow.source, "asc"),
+    "priority": (CompanyRow.priority, "asc"),
+}
+SORTABLE = tuple(_SORTS)
+
+
 class CompanyRepository(ScopedRepository):
     def _in_a_live_campaign(self) -> Any:
         """A lead is worked on only while its campaign is the active one. A lead with no
@@ -180,11 +194,15 @@ class CompanyRepository(ScopedRepository):
         source: CompanySource | None = None,
         country: str | None = None,
         sort: str = "newest",
+        direction: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[list[Company], int]:
-        """A page of companies and how many match in all. ``sort`` is ``newest`` (the default),
-        ``fit`` (best fit first, unscored last), ``updated`` or ``name``."""
+        """A page of companies and how many match in all. ``sort`` names a column (``newest`` is
+        the date added; also ``fit``, ``updated``, ``name``, ``status``, ``country``, ``source``,
+        ``priority``); ``direction`` is ``asc`` or ``desc``, else the column's natural order
+        (newest, best fit and latest change first; names and the rest A to Z). Empty values go
+        last either way."""
         filters = [CompanyRow.workspace_id == self._workspace_id]
         if min_fit is not None:
             filters.append(CompanyRow.fit_score >= min_fit)
@@ -214,11 +232,10 @@ class CompanyRepository(ScopedRepository):
                 )
             )
         total = self._session.scalar(select(func.count()).select_from(CompanyRow).where(*filters))
-        order: tuple[Any, ...] = {
-            "fit": (CompanyRow.fit_score.desc().nulls_last(), CompanyRow.created_at.desc()),
-            "updated": (CompanyRow.updated_at.desc(), CompanyRow.created_at.desc()),
-            "name": (func.lower(func.coalesce(CompanyRow.name, CompanyRow.domain)),),
-        }.get(sort, (CompanyRow.created_at.desc(),))
+        column, natural = _SORTS.get(sort, _SORTS["newest"])
+        descending = (direction or natural) == "desc"
+        key = column.desc() if descending else column.asc()
+        order: tuple[Any, ...] = (key.nulls_last(), CompanyRow.created_at.desc())
         stmt = (
             select(CompanyRow)
             .where(*filters)
