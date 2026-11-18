@@ -164,10 +164,10 @@ function Row({ company, detail, children }: { company: Company; detail: ReactNod
         <Avatar name={company.name ?? company.domain} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/leads/$companyId" params={{ companyId: company.id }} className="truncate font-semibold text-ink hover:text-primary">
+            <Link to="/leads/$companyId" params={{ companyId: company.id }} className="block truncate py-2.5 font-semibold text-ink hover:text-primary sm:py-0">
               {company.name ?? company.domain}
             </Link>
-            <Mono className="text-muted">{company.domain}</Mono>
+            {company.name && <Mono className="text-muted">{company.domain}</Mono>}
             {company.country_code && <Chip>{company.country_code}</Chip>}
           </div>
           <div className="mt-0.5 text-small text-muted">{detail}</div>

@@ -61,7 +61,7 @@ export function ReportsPage() {
           <Stat label="Answered from cache" value={calls ? percent((outcomes.cache_hit ?? 0) / calls) : "–"} hint={`${outcomes.cache_hit ?? 0} calls reused at no cost`} tone={outcomes.cache_hit ? "good" : undefined} />
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
           <Card title="Spend by vendor">
             {cost.isPending ? (
               <Skeleton />

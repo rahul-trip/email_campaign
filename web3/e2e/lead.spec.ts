@@ -34,6 +34,7 @@ test("edit a lead; delete needs the typed domain and removes it", async ({ page 
   await addTarget(page, { website: domain, country: "US" });
   await page.goto(`/leads/${await leadId(page, domain)}`);
 
+  await page.getByRole("button", { name: /Edit this lead/ }).click();
   await page.getByRole("textbox", { name: "Name", exact: true }).last().fill("Delete Me Ltd");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByRole("heading", { name: "Delete Me Ltd" })).toBeVisible();

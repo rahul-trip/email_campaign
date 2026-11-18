@@ -139,3 +139,4 @@ Done: LinkedIn profile lookups in research ask for five people per search (a lea
 - `WEB_APP` picks the app; the default is web3.
 - Guided tour and the full browser suite run on web3 (40 tests, in CI). The admin console has its own staff header. The user manual describes web3 (§5a).
 - **web3 is the app (2026-11-17).** The Docker image builds web3 and `WEB_APP` defaults to it (image build checked locally); CI tests web3 only; web2 stays in the repo, unused. The tour is nine short steps. The shared component layer was restyled, so every screen matches. Left: deploy to the VM and look at it with real data (no `WEB_APP` change needed).
+- **web3 polish (2026-11-18, branch `phase-6/web3-polish`).** Hairline cards, AA contrast, semantic tokens, 44 px touch targets, shaped skeletons, Filters disclosure on Leads, next steps in empty states, phone layouts for Today, Leads, Review and the lead page; `e2e/mobile.spec.ts` added (41 browser tests). Not yet deployed.

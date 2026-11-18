@@ -259,8 +259,8 @@ export function LeadsPage() {
                               {company.name ?? company.domain}
                             </Link>
                             <div className="flex items-center gap-1.5 text-small text-muted">
-                              <Mono>{company.domain}</Mono>
-                              {company.country_code && <span>· {company.country_code}</span>}
+                              {company.name && <Mono>{company.domain}</Mono>}
+                              {company.country_code && <span>{company.name ? "· " : ""}{company.country_code}</span>}
                               {company.priority !== 5 && <span title="Priority (1 is first)">· P{company.priority}</span>}
                             </div>
                             <div className="mt-1 sm:hidden">
