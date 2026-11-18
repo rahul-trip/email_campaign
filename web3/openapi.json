@@ -4438,6 +4438,10 @@
       "LinkedInDraftRowOut": {
         "description": "A message with who it is for, for the LinkedIn page.",
         "properties": {
+          "company_bucket": {
+            "$ref": "#/components/schemas/Bucket",
+            "default": "working"
+          },
           "company_name": {
             "anyOf": [
               {
@@ -4452,6 +4456,22 @@
           "domain": {
             "title": "Domain",
             "type": "string"
+          },
+          "fit_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Score"
+          },
+          "hot": {
+            "readOnly": true,
+            "title": "Hot",
+            "type": "boolean"
           },
           "item": {
             "$ref": "#/components/schemas/LinkedInDraftOut"
@@ -4496,7 +4516,8 @@
           "domain",
           "person",
           "title",
-          "profile"
+          "profile",
+          "hot"
         ],
         "title": "LinkedInDraftRowOut",
         "type": "object"
@@ -14962,7 +14983,7 @@
     },
     "/api/linkedin": {
       "get": {
-        "description": "Every message in one state, newest first, with who it is for.",
+        "description": "Every message in one state with who it is for: waiting ones best fit first, others newest.",
         "operationId": "drafts_api_linkedin_get",
         "parameters": [
           {
@@ -14972,6 +14993,22 @@
             "schema": {
               "$ref": "#/components/schemas/LinkedInState",
               "default": "drafted"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hot",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hot"
             }
           },
           {

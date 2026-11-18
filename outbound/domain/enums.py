@@ -337,7 +337,7 @@ class NotificationKind(StrEnum):
     # What the engine has to tell everyone in a workspace (``services.activity_notices``):
     DRAFTS_READY = "drafts_ready"  # emails are waiting in Review
     HOT_LEAD = "hot_lead"  # a lead scored above 80
-    NEEDS_ATTENTION = "needs_attention"  # leads were held or failed
+    NEEDS_ATTENTION = "needs_attention"  # leads wait on a person: a hold, or a step that broke
     AUTO_APPROVED = "auto_approved"  # cold leads' emails approved without a person
     RUN_FINISHED = "run_finished"  # a run a person started
     RUN_FAILED = "run_failed"

@@ -1880,7 +1880,7 @@ export interface paths {
         };
         /**
          * Drafts
-         * @description Every message in one state, newest first, with who it is for.
+         * @description Every message in one state with who it is for: waiting ones best fit first, others newest.
          */
         get: operations["drafts_api_linkedin_get"];
         put?: never;
@@ -4633,10 +4633,16 @@ export interface components {
          * @description A message with who it is for, for the LinkedIn page.
          */
         LinkedInDraftRowOut: {
+            /** @default working */
+            company_bucket?: components["schemas"]["Bucket"];
             /** Company Name */
             company_name: string | null;
             /** Domain */
             domain: string;
+            /** Fit Score */
+            fit_score?: number | null;
+            /** Hot */
+            readonly hot: boolean;
             item: components["schemas"]["LinkedInDraftOut"];
             /** Person */
             person: string | null;
@@ -9934,6 +9940,7 @@ export interface operations {
         parameters: {
             query?: {
                 state?: components["schemas"]["LinkedInState"];
+                hot?: boolean | null;
                 limit?: number;
                 offset?: number;
             };

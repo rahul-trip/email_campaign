@@ -283,3 +283,37 @@ def test_everyone_at_a_lead_is_drafted_in_one_call_and_only_failures_are_rewritt
     assert "Recipient 2: your previous draft" in llm.users["linkedin"]
     assert "Recipient 1:" not in llm.users["linkedin"]  # the good ones are not asked again
     assert [d is not None and not d.issues for d in out] == [True, False, True]
+
+
+def test_waiting_messages_list_hot_leads_first_and_can_be_filtered(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from outbound.domain.actors import SYSTEM
+    from outbound.domain.outcomes import Bucket
+
+    with factory(ws) as uow:
+        ids = {}
+        for domain, fit in (("cool.com", 40), ("hot.com", 95), ("blank.com", None)):
+            company = uow.companies.create(domain=domain, source=CompanySource.MANUAL)
+            if fit is not None:
+                uow.companies.update_fields(
+                    company.id,
+                    {"fit_score": fit},
+                    actor=SYSTEM,
+                    expected_version=company.row_version,
+                )
+            contact = uow.contacts.add(
+                company.id, rank=1, source=ContactSource.OPERATOR, full_name="Pat Doe"
+            )
+            uow.linkedin.create(
+                company_id=company.id, contact_id=contact.id, note="n", message="m", issues=[]
+            )
+            ids[domain] = company.id
+        uow.commit()
+        everyone, _ = uow.linkedin.page(LinkedInState.DRAFTED, limit=10, offset=0)
+        assert everyone[0].domain == "hot.com"
+        hot_only, total = uow.linkedin.page(LinkedInState.DRAFTED, limit=10, offset=0, hot=True)
+        assert ([r.domain for r in hot_only], total) == (["hot.com"], 1)
+        rest, _ = uow.linkedin.page(LinkedInState.DRAFTED, limit=10, offset=0, hot=False)
+        assert {r.domain for r in rest} == {"cool.com", "blank.com"}
+        assert everyone[0].company_bucket is Bucket.WORKING

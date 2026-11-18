@@ -31,11 +31,12 @@ def _out(message: object) -> LinkedInDraftOut:
 def drafts(
     svc: Svc,
     state: LinkedInState = LinkedInState.DRAFTED,
+    hot: bool | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> LinkedInDraftPage:
-    """Every message in one state, newest first, with who it is for."""
-    rows, total = svc.linkedin.page(state, limit=limit, offset=offset)
+    """Every message in one state with who it is for: waiting ones best fit first, others newest."""
+    rows, total = svc.linkedin.page(state, limit=limit, offset=offset, hot=hot)
     return LinkedInDraftPage(
         items=[
             LinkedInDraftRowOut(
@@ -45,6 +46,8 @@ def drafts(
                 person=r.person,
                 title=r.title,
                 profile=r.profile,
+                fit_score=r.fit_score,
+                company_bucket=r.company_bucket,
             )
             for r in rows
         ],

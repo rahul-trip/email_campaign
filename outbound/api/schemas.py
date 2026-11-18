@@ -1605,6 +1605,13 @@ class LinkedInDraftRowOut(Out):
     person: str | None
     title: str | None
     profile: str | None
+    fit_score: int | None = None
+    company_bucket: Bucket = Bucket.WORKING
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def hot(self) -> bool:
+        return is_hot(self.fit_score)
 
 
 class LinkedInDraftPage(Out):
