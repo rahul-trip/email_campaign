@@ -45,9 +45,8 @@ def check_key(vendor: str, settings: Settings, client: httpx.Client | None = Non
         return KeyCheck(None, "This vendor is tested by its first real use; it has no cheap check.")
     try:
         if vendor == "llm":
-            build_llm(settings, client).complete(
-                "Reply with the single word OK.", "ping", max_tokens=8
-            )
+            # The model's own token limit: a reasoning model spends a small cap thinking.
+            build_llm(settings, client).complete("Reply with the single word OK.", "ping")
         elif vendor == "tavily":
             build_search(settings, client).search("outbound key test", max_results=1)
         elif vendor == "companies_house":
@@ -60,5 +59,10 @@ def check_key(vendor: str, settings: Settings, client: httpx.Client | None = Non
     except ProviderAuthError:
         return KeyCheck(False, "The vendor rejected this key. Replace it with a working one.")
     except ProviderError as error:
+        if "cut off at the token limit" in str(error):
+            # The provider took the key and answered; only the reply ran long.
+            return KeyCheck(
+                True, f"The key works ({WHAT[vendor]}), but the reply hit the token limit."
+            )
         return KeyCheck(False, f"The key was not confirmed: {str(error)[:200]}")
     return KeyCheck(True, f"The key works ({WHAT[vendor]}).")
