@@ -176,6 +176,10 @@ On the live site the emails row of Today appeared about 14 s after the rest of t
 
 `LeadIcon` (the website's icon, initials when it has none) gets a large size and now marks the lead on its own page (beside the name, in the heading), on each Emails ready queue card (the fit ring moved to the right, as on Hot leads), in the reader's header (it showed initials before) and on Today's email cards. Browser test: `web3/e2e/lead-logos.spec.ts` (the icon service is stubbed).
 
+## LinkedIn ready, and the notifications panel on a phone (2026-11-19, branch `phase-6/linkedin-ready-and-bell`, no migration)
+
+The Hot leads page is renamed **LinkedIn ready**, beside Emails ready (same `/linkedin` path; "hot lead" still means a fit above 80). On a phone the notifications panel hung from the bell, which is not at the screen's edge, so it ran off the left side; it was also see-through. It now spans the screen with a gutter under the header and is solid; larger screens keep the dropdown. Browser test: `web3/e2e/notifications-mobile.spec.ts`.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

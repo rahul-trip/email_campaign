@@ -587,7 +587,7 @@ function DraftPreview({ item, readOnly }: { item: Schemas["ReviewItemOut"]; read
 /**
  * The hot leads whose LinkedIn message is written: a compact strip that scrolls sideways (swipe,
  * arrow buttons or the keyboard). Each card copies the note and opens the profile; the full
- * message, editing and "mark sent" are on the Hot leads page.
+ * message, editing and "mark sent" are on the LinkedIn ready page.
  */
 function HotLeads({ data, loading, readOnly }: { data?: Schemas["LinkedInDraftPage"]; loading: boolean; readOnly: boolean }) {
   const track = useRef<HTMLDivElement>(null);
@@ -598,7 +598,7 @@ function HotLeads({ data, loading, readOnly }: { data?: Schemas["LinkedInDraftPa
     <section data-tour="hot-leads" aria-labelledby="hot-leads-title" className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center gap-3">
         <h2 id="hot-leads-title" className="flex items-center gap-2 text-heading font-semibold text-ink">
-          <Flame className="size-5 text-attention-dot" aria-hidden /> Hot leads: reach them on LinkedIn
+          <Flame className="size-5 text-attention-dot" aria-hidden /> LinkedIn ready: hot leads to message
         </h2>
         <Chip tone="attention">
           {data.total} message{data.total === 1 ? "" : "s"} written
@@ -615,7 +615,7 @@ function HotLeads({ data, loading, readOnly }: { data?: Schemas["LinkedInDraftPa
           </Link>
         </div>
       </div>
-      <div ref={track} tabIndex={0} role="region" aria-label="Hot leads, scroll sideways" className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-primary">
+      <div ref={track} tabIndex={0} role="region" aria-label="LinkedIn ready, scroll sideways" className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-primary">
         {data.items.map((row) => {
           const name = row.company_name ?? row.domain;
           return (

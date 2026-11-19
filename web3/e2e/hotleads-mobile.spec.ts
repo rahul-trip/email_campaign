@@ -1,6 +1,6 @@
 import { expect, signIn, test } from "./helpers";
 
-// The Hot leads page on a phone, with rows like the live workspace's: long names, a long
+// The LinkedIn ready page on a phone, with rows like the live workspace's: long names, a long
 // "why it fits", both flags and a fit ring. Nothing may overlap or run off the screen.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -31,7 +31,7 @@ const row = (n: number, name: string, fit: number) => ({
   fit_reason: "Meets 5 of 6 must-haves; missing: remote-friendly with US Eastern/Pacific overlap; signs they may buy now: recent seed, Series A or Series B funding round, open roles for AI, LLM or agent engineers",
 });
 
-test("Hot leads rows fit a phone: nothing overlaps and nothing runs off the screen", async ({ page }) => {
+test("LinkedIn ready rows fit a phone: nothing overlaps and nothing runs off the screen", async ({ page }) => {
   await signIn(page);
   const rows = [row(1, "Luminal", 89), row(2, "Morph", 86), row(3, "Lightning", 91)];
   await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
@@ -80,7 +80,7 @@ test("Hot leads rows fit a phone: nothing overlaps and nothing runs off the scre
 });
 
 // On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.
-test("Hot leads filters fold into one line on a phone and say how many are on", async ({ page }) => {
+test("LinkedIn ready filters fold into one line on a phone and say how many are on", async ({ page }) => {
   await signIn(page);
   const rows = [row(1, "Luminal", 89), row(2, "Morph", 86)];
   await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
