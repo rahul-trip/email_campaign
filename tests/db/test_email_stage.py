@@ -729,3 +729,24 @@ def test_a_person_the_operator_moved_to_the_front_is_written_to_whatever_their_t
     run_stage(factory, ws, [finder], Verifier({"eve.engineer@acme.com": V.VALID}))
     assert finder.calls == ["Engineer"]  # rank 1: chosen, as "write to someone else" leaves it
     assert company(factory, ws, cid).status is C.EMAIL_READY
+
+
+def test_a_vendor_that_stays_unavailable_is_asked_less_and_less_often(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    """No finder is available (out of credit, or down): the lead waits 2 hours, then 4, 8, 16,
+    and a day at most, and no attempt is counted, so it is never given up on for this."""
+    cid = lead(factory, ws, [("Jane", "Doe")])
+    waits = []
+    for _ in range(7):
+        run_stage(factory, ws, [], Verifier({}))
+        after = company(factory, ws, cid)
+        assert after.attempts == 0 and after.next_action_at is not None
+        waits.append(after.next_action_at - NOW)
+        with factory(ws) as uow:  # the operator (or the next pass) puts it back at the step
+            uow.companies.transition(
+                cid, C.CONTACTS_FOUND, expected_version=after.row_version, next_action_at=None
+            )
+            uow.commit()
+    hours = [int(wait.total_seconds() // 3600) for wait in waits]
+    assert hours == [2, 4, 8, 16, 24, 24, 24]

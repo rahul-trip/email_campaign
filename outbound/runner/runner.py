@@ -97,6 +97,7 @@ class Runner:
         retry_delay: timedelta = timedelta(minutes=15),
         defer_delay: timedelta = timedelta(hours=1),
         vendor_wait: timedelta = timedelta(hours=2),
+        vendor_wait_cap: timedelta = timedelta(hours=24),
         outcome_delay: timedelta = timedelta(hours=24),
         max_attempts: int = ERROR_TRIES,
         max_outcome_attempts: int = OUTCOME_TRIES,
@@ -110,6 +111,7 @@ class Runner:
         self._guards = guards
         self._retry_delay = retry_delay
         self._vendor_wait = vendor_wait
+        self._vendor_wait_cap = vendor_wait_cap
         self._defer_delay = defer_delay
         self._outcome_delay = outcome_delay
         self._max_attempts = max_attempts
@@ -486,15 +488,22 @@ class Runner:
         kind: FailureKind = FailureKind.ERROR,
     ) -> None:
         # Back off a little longer after each failure so a broken vendor is not hammered. When no
-        # vendor could answer, the lead is not at fault: it waits a fixed while and no attempt
-        # is counted, so it is picked up again whenever a vendor is back.
+        # vendor could answer, the lead is not at fault: no attempt is counted, so it is picked
+        # up again whenever a vendor is back, after a wait that grows.
         # "Nobody to write to" is an answer, not a breakage: ask again a day later, not in minutes.
         if vendor:
-            wait = self._vendor_wait
+            # No attempt is counted, so the wait itself grows: 2 hours, then 4, 8, 16, and a day
+            # at most, for as long as vendors stay unavailable. Each try can cost credits.
+            earlier = uow.events.vendor_waits_since(
+                EntityType.COMPANY, company.id, self._now() - 2 * self._vendor_wait_cap
+            )
+            wait = min(self._vendor_wait * 2**earlier, self._vendor_wait_cap)
         elif kind is not FailureKind.ERROR:
             wait = self._outcome_delay
         else:
-            wait = self._retry_delay * (company.attempts + 1)
+            wait = min(
+                self._retry_delay * 2**company.attempts, self._vendor_wait_cap
+            )  # 15m, 30m, 1h, 2h, 4h
         uow.companies.transition(
             company.id,
             CompanyStatus.FAILED,

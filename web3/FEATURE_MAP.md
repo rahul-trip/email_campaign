@@ -13,7 +13,7 @@ Public (no sidebar)        Sign in · Forgot / reset password · Invitation acce
                            · Remove my data · Workspace picker / create · Join request
 Onboarding (no sidebar)    /w/{slug}/onboarding — 5 steps + "what Outbound does for you" panel
 Workspace app  /w/{slug}
-  Work        Today · Emails ready (badge) · LinkedIn ready (badge) · Needs a decision (badge)
+  Work        Today · Emails ready (badge) · LinkedIn ready (badge) · Failed leads (badge)
   Leads       Leads · Add leads · Discovery runs · Campaigns
   Workspace   Reports · Policies & privacy · Settings
   Everywhere  ⌘K command palette · notifications bell · credits meter · theme (light/dark/system)
@@ -41,17 +41,17 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Pipeline counts | `status`, `companies` | Today pipeline flow (each stage links to filtered Leads) |
 | Review queue, show one | `review`, `review/{id}` | Review (3-pane, keyboard J/K/A/E/R) |
 | Approve / reject / revise / AI rewrite | `review/{id}/approve|reject|revise|rewrite` | Review action bar + editor with diff |
-| Needs a decision: holds, stopped steps, websites, with fit, tries, person and credits per row | `companies` (`bucket=decision`, `include=summary`), `targets/waiting` | Needs a decision (tabs by reason, filters and sort, row details, bulk bar) |
-| Retry one / many failed (by step) | `companies/{id}/retry`, `companies/retry` | Needs attention · Lead detail |
-| Release one / many holds, policy holds | `release-hold`, `release-holds`, `release-policy-holds` | Needs attention · Policies |
-| Find email again (one / all catch-all) | `companies/find-email-again`, `contacts/{id}/retry-email` | Needs attention · Lead detail |
-| Resume leads waiting for credits | `companies/resume`, `companies/{id}/resume`, `targets/resume` | Needs attention · credits meter popover |
-| Confirm website for uploaded rows | `targets/{row_id}/confirm` | Needs attention → Websites · Add leads |
+| Failed leads: holds, stopped steps, websites, with fit, tries, person and credits per row | `companies` (`bucket=decision`, `include=summary`), `targets/waiting` | Needs a decision (tabs by reason, filters and sort, row details, bulk bar) |
+| Retry one / many failed (by step) | `companies/{id}/retry`, `companies/retry` | Failed leads · Lead detail |
+| Release one / many holds, policy holds | `release-hold`, `release-holds`, `release-policy-holds` | Failed leads · Policies |
+| Find email again (one / all catch-all) | `companies/find-email-again`, `contacts/{id}/retry-email` | Failed leads · Lead detail |
+| Resume leads waiting for credits | `companies/resume`, `companies/{id}/resume`, `targets/resume` | Failed leads · credits meter popover |
+| Confirm website for uploaded rows | `targets/{row_id}/confirm` | Failed leads → Websites · Add leads |
 | Leads list with filters in URL | `companies` | Leads (saved views, filter pills, fit pill, status chip) |
 | Sort leads by any column, either way | `companies?sort&direction` | Leads (Sort menu, direction arrow, column titles) |
 | Lead website icons | DuckDuckGo icon service (CSP `img-src`) | Leads (`ui/lead.tsx::LeadIcon`, initials if none) |
 | Set or remove a person's LinkedIn profile | `PATCH contacts/{id}` (`linkedin_url`) | Lead page: person **Remove**, **Edit** field |
-| Find people again | `POST companies/{id}/find-people` | Lead page, under People when nobody can be written to |
+| Find more people by role, with email, LinkedIn, both or neither | `POST companies/{id}/find-people`, `POST companies/find-people` | Lead page (People) · Leads page (the leads shown) |
 | Lead detail: status, next actions, edit fields | `companies/{id}` GET/PATCH | Lead detail header + inline edit (manual fields marked) |
 | Research again / requalify | `research-again`, `requalify` | Lead detail actions |
 | Qualification breakdown | `companies/{id}` | Lead detail "Why this lead" card |

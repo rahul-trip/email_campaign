@@ -1,6 +1,6 @@
 import { addTarget, expect, runEngine, signIn, test, unique } from "./helpers";
 
-test("Needs a decision can be searched and filtered, and a row opens its details", async ({ page }) => {
+test("Failed leads can be searched and filtered, and a row opens its details", async ({ page }) => {
   await signIn(page);
   const first = unique("decide-a", "in");
   const second = unique("decide-b", "in");

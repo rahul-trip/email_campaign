@@ -6,14 +6,16 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Flame, GitFork, Plus, Search, SlidersHorizontal, UserSearch, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
+import { isViewing, useCurrent } from "../app/session";
 import type { LeadsSearch } from "../router";
 import { cx } from "../lib/cx";
 import { ago, credits, plainError, when } from "../lib/format";
 import { HOLD_REASONS, LEAD_STATUSES, STAGES, companyStatus, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
 import { Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
+import { FindPeopleDialog } from "../ui/FindPeople";
 import { LeadIcon } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 
@@ -28,7 +30,7 @@ const VIEWS: { key: string; label: string; filters: Partial<LeadsSearch>; count?
   { key: "ready", label: "Ready for you", filters: { bucket: "ready" }, count: "ready" },
   { key: "hot", label: "Hot", filters: { view: "hot", sort: "fit" } },
   { key: "working", label: "Working on it", filters: { bucket: "working" }, count: "working" },
-  { key: "decision", label: "Needs a decision", filters: { bucket: "decision" }, count: "decision" },
+  { key: "decision", label: "Failed leads", filters: { bucket: "decision" }, count: "decision" },
   { key: "done", label: "Approved & sent", filters: { bucket: "done" }, count: "done" },
   { key: "screened", label: "Screened out", filters: { bucket: "screened_out" }, count: "screened_out" },
   { key: "all", label: "All", filters: {} },
@@ -97,6 +99,8 @@ export function LeadsPage() {
   });
   const status = useQuery({ queryKey: ["status"], queryFn: () => ok(client.GET("/api/status")), refetchInterval: 10000 });
 
+  const [finding, setFinding] = useState(false);
+  const { workspace } = useCurrent();
   const total = leads.data?.total ?? 0;
   const items = leads.data?.items ?? [];
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -132,11 +136,19 @@ export function LeadsPage() {
         title="Leads"
         subtitle={leads.isSuccess ? `${total.toLocaleString()} ${filtered ? "matching " : ""}compan${total === 1 ? "y" : "ies"}` : "Loading…"}
         actions={
-          <Link to="/targets" className={buttonClass("primary")}>
-            <Plus className="size-4" aria-hidden /> Add leads
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {items.length > 0 && !isViewing(workspace) && (
+              <Button variant="secondary" onClick={() => setFinding(true)} title="Search the leads shown here (the first 20) for more people: recruiters, a head of engineering, any role. You choose whether to find their email, write a LinkedIn message, or both">
+                <UserSearch className="size-4" aria-hidden /> Find more people{items.length > 1 ? ` (${Math.min(items.length, 20)})` : ""}
+              </Button>
+            )}
+            <Link to="/targets" className={buttonClass("primary")}>
+              <Plus className="size-4" aria-hidden /> Add leads
+            </Link>
+          </div>
         }
       />
+      {finding && <FindPeopleDialog targets={items.slice(0, 20).map((c) => ({ id: c.id, name: c.name ?? c.domain }))} onClose={() => setFinding(false)} onDone={() => void leads.refetch()} />}
 
       {/* Saved views */}
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label="Views">

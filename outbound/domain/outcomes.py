@@ -4,8 +4,8 @@ Most companies a campaign looks at are meant to drop out: they do not fit, nobod
 there, or no address can be proven. Showing those as failures buries the few leads that matter,
 so every lead belongs to exactly one bucket, and only one of them asks anything of a person.
 
-* ``READY``: an email waits for approval, or a hot lead that cannot be emailed can be written to
-  on LinkedIn.
+* ``READY``: an email waits for approval, or a person at the lead can be written to on LinkedIn
+  (a message is written for them), or a hot lead that cannot be emailed has no one yet.
 * ``WORKING``: the engine is on it, or will try again by itself.
 * ``DECISION``: only a person can unblock it (a hold, or a step that broke on every try).
 * ``SCREENED_OUT``: a normal end: not a fit, rejected, suppressed, or nobody to write to.
@@ -73,7 +73,11 @@ def bucket_of(
     attempts: int = 0,
     fit_score: int | None = None,
     waiting_for_credit: bool = False,
+    has_linkedin: bool = False,
 ) -> Bucket:
+    """``has_linkedin``: a LinkedIn message is written (or sent) for someone at the lead. A lead
+    that stopped for want of an address, or whose last step broke, still has a way in, so it is
+    ready for a person to use, not a failure."""
     if status is CompanyStatus.COPY_READY:
         return Bucket.READY
     if status in _DONE:
@@ -85,6 +89,8 @@ def bucket_of(
     if status is CompanyStatus.FAILED:
         if waiting_for_credit:
             return Bucket.WORKING
+        if has_linkedin:
+            return Bucket.READY
         if gave_up_for_want_of_a_person(status, failure_kind, attempts):
             # A hot lead with nobody to email is still worth a LinkedIn message.
             return Bucket.READY if is_hot(fit_score) else Bucket.SCREENED_OUT

@@ -60,3 +60,18 @@ def test_approved_and_later_are_done() -> None:
 def test_outcomes_get_fewer_tries_than_breakages() -> None:
     assert tries_allowed(K.ERROR) == ERROR_TRIES == 5
     assert tries_allowed(K.NO_EMAIL) == tries_allowed(K.NO_PERSON) == OUTCOME_TRIES == 3
+
+
+@pytest.mark.parametrize("kind", [K.NO_PERSON, K.NO_EMAIL, K.ERROR])
+def test_a_stopped_lead_with_a_linkedin_message_is_ready_not_failed(kind: K) -> None:
+    """Someone there can be written to on LinkedIn, so it is a way in whatever stopped the email."""
+    for fit in (None, 40, 95):
+        assert (
+            bucket_of(S.FAILED, failure_kind=kind, attempts=9, fit_score=fit, has_linkedin=True)
+            is Bucket.READY
+        )
+    assert bucket_of(S.FAILED, failure_kind=kind, attempts=9, fit_score=40) is not Bucket.READY
+
+
+def test_a_lead_waiting_for_credits_stays_working_even_with_a_linkedin_message() -> None:
+    assert bucket_of(S.FAILED, waiting_for_credit=True, has_linkedin=True) is Bucket.WORKING

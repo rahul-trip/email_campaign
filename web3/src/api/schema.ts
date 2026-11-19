@@ -1194,6 +1194,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/find-people": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Find People Many
+         * @description The same search for up to 20 leads at once. Each lead costs AI credits; a lead whose
+         *     search fails is reported on its own row and the rest go on.
+         */
+        post: operations["find_people_many_api_companies_find_people_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/release-holds": {
         parameters: {
             query?: never;
@@ -1408,7 +1429,9 @@ export interface paths {
         put?: never;
         /**
          * Find People
-         * @description Search again for the people who decide at this lead (up to two searches, one model call).
+         * @description Search again for people at this lead (up to two searches, one model call): the people who
+         *     decide by default, or the roles asked for. What is done for those found is the caller's
+         *     choice: nothing, find their email, write a LinkedIn message, or both.
          */
         post: operations["find_people_api_companies__company_id__find_people_post"];
         delete?: never;
@@ -3609,6 +3632,11 @@ export interface components {
             fit_reason: string | null;
             /** Fit Score */
             fit_score: number | null;
+            /**
+             * Has Linkedin
+             * @default false
+             */
+            has_linkedin?: boolean;
             hold_reason: components["schemas"]["HoldReason"] | null;
             /**
              * Hot
@@ -3702,6 +3730,11 @@ export interface components {
             fit_reason: string | null;
             /** Fit Score */
             fit_score: number | null;
+            /**
+             * Has Linkedin
+             * @default false
+             */
+            has_linkedin?: boolean;
             hold_reason: components["schemas"]["HoldReason"] | null;
             /**
              * Hot
@@ -4350,6 +4383,40 @@ export interface components {
             /** Skipped */
             skipped: number;
         };
+        /**
+         * FindPeopleIn
+         * @description Roles to look for (blank: the campaign's job titles) and what to do with who is found.
+         */
+        FindPeopleIn: {
+            /**
+             * Reach
+             * @default none
+             * @enum {string}
+             */
+            reach?: "none" | "email" | "linkedin" | "both";
+            /** Roles */
+            roles?: string[];
+        };
+        /** FindPeopleManyIn */
+        FindPeopleManyIn: {
+            /** Company Ids */
+            company_ids: string[];
+            /**
+             * Reach
+             * @default none
+             * @enum {string}
+             */
+            reach?: "none" | "email" | "linkedin" | "both";
+            /** Roles */
+            roles?: string[];
+        };
+        /** FindPeopleManyOut */
+        FindPeopleManyOut: {
+            /** Leads */
+            leads: components["schemas"]["FoundForLeadOut"][];
+            /** Queued Run Id */
+            queued_run_id?: string | null;
+        };
         /** FitBandOut */
         FitBandOut: {
             /** Count */
@@ -4381,6 +4448,21 @@ export interface components {
         ForgotIn: {
             /** Email */
             email: string;
+        };
+        /** FoundForLeadOut */
+        FoundForLeadOut: {
+            /** Added */
+            added: number;
+            /** Company Id */
+            company_id: string;
+            /** Email Asked */
+            email_asked: number;
+            /** Error */
+            error: string;
+            /** Found */
+            found: number;
+            /** People */
+            people: components["schemas"]["ReachedPersonOut"][];
         };
         /** FunnelOut */
         FunnelOut: {
@@ -5167,6 +5249,13 @@ export interface components {
             added: number;
             /** Found */
             found: number;
+            /**
+             * People
+             * @default []
+             */
+            people?: components["schemas"]["ReachedPersonOut"][];
+            /** Queued Run Id */
+            queued_run_id?: string | null;
             /** Retried */
             retried: boolean;
             /** Unsure */
@@ -5467,6 +5556,23 @@ export interface components {
             unedited_share: number | null;
             /** Written */
             written: number;
+        };
+        /** ReachedPersonOut */
+        ReachedPersonOut: {
+            /** Confirmed */
+            confirmed: boolean;
+            /** Contact Id */
+            contact_id: string;
+            /** Email */
+            email: string;
+            /** Linkedin */
+            linkedin: string;
+            /** Linkedin Url */
+            linkedin_url: string | null;
+            /** Name */
+            name: string;
+            /** Title */
+            title: string | null;
         };
         /** ReadIn */
         ReadIn: {
@@ -8707,6 +8813,39 @@ export interface operations {
             };
         };
     };
+    find_people_many_api_companies_find_people_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FindPeopleManyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindPeopleManyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     release_many_api_companies_release_holds_post: {
         parameters: {
             query?: never;
@@ -9090,7 +9229,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["FindPeopleIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

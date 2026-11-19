@@ -328,7 +328,7 @@ function NeedsYou({ status }: { status?: Schemas["StatusOut"] }) {
       id="needs"
       tour="needs-you"
       icon={<TriangleAlert className="size-5" />}
-      title="Needs a decision"
+      title="Failed leads"
       summary={items.length ? items.map((i) => i.label).join(" · ") : "Nothing needs a decision."}
       chip={items.length ? <Chip tone="stopped">{total} to decide</Chip> : <Chip tone="good">All clear</Chip>}
     >
@@ -364,7 +364,7 @@ function BehindTheScenes({ status }: { status?: Schemas["StatusOut"] }) {
   const parts = [
     { key: "ready", label: "Reached you", n: reached, bucket: undefined as string | undefined, color: "var(--good-dot)" },
     { key: "working", label: "Being worked on", n: b.working ?? 0, bucket: "working", color: "var(--working-dot)" },
-    { key: "decision", label: "Needs a decision", n: b.decision ?? 0, bucket: "decision", color: "var(--attention-dot)" },
+    { key: "decision", label: "Failed leads", n: b.decision ?? 0, bucket: "decision", color: "var(--attention-dot)" },
     { key: "screened_out", label: "Screened out", n: b.screened_out ?? 0, bucket: "screened_out", color: "var(--surface-3)" },
   ];
   return (

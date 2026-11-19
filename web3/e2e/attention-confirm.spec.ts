@@ -1,6 +1,6 @@
 import { addTarget, expect, signIn, test } from "./helpers";
 
-// A held lead makes its section the first on "Needs a decision". Picking the "Websites to confirm"
+// A held lead makes its section the first on "Failed leads". Picking the "Websites to confirm"
 // tab hides it, and the section left must then be open: it is the only one, and the person came for it.
 test("with a held lead on the page, the websites-to-confirm tab opens its section", async ({ page }) => {
   await signIn(page);

@@ -1,9 +1,9 @@
 import { addTarget, expect, runEngine, signIn, test, unique } from "./helpers";
 
-// Needs a decision on a phone: the richer rows and the filter bar stay on the screen.
+// Failed leads on a phone: the richer rows and the filter bar stay on the screen.
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-test("Needs a decision rows and filters fit a phone", async ({ page }) => {
+test("Failed leads rows and filters fit a phone", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page);
   const domain = unique("decide-phone", "in");

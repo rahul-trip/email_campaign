@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
@@ -118,6 +118,17 @@ class LeadError(Exception):
 
 
 @dataclass(frozen=True)
+class FreshPerson:
+    """Someone a people search added to the lead."""
+
+    contact_id: str
+    name: str
+    title: str | None
+    status: ContactStatus
+    linkedin_url: str | None
+
+
+@dataclass(frozen=True)
 class PeopleFound:
     """What "Find people again" did."""
 
@@ -126,6 +137,7 @@ class PeopleFound:
     works_here: int
     unsure: int
     retried: bool
+    people: tuple[FreshPerson, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -244,6 +256,11 @@ class LeadService:
                 notes=uow.notes.for_company(company_id),
             )
 
+    def with_linkedin(self, company_ids: list[str]) -> set[str]:
+        """Which of these leads have a LinkedIn message written or sent for someone there."""
+        with self._uow(self._workspace_id) as uow:
+            return uow.companies.with_linkedin_messages(company_ids)
+
     def timeline(self, company_id: str) -> list[TimelineEntry]:
         """Everything that happened to the lead, its people, addresses and messages."""
         with self._uow(self._workspace_id) as uow:
@@ -337,13 +354,21 @@ class LeadService:
             uow.commit()
         return link
 
-    def find_people_again(self, company_id: str, *, actor: str | None = None) -> PeopleFound:
-        """Search again for people who decide at this lead, by the campaign's job titles (or
-        founder, CEO and CTO without a campaign). Up to two searches and one model call.
+    def find_people_again(
+        self,
+        company_id: str,
+        *,
+        roles: Sequence[str] = (),
+        actor: str | None = None,
+    ) -> PeopleFound:
+        """Search again for people at this lead: those who decide, by the campaign's job titles
+        (or founder, CEO and CTO without a campaign), or the ``roles`` asked for (recruiters, a
+        head of engineering, ...). Up to two searches and one model call.
 
         New people are added as research adds them: placed at the company, or unconfirmed for
         you to check; nobody already at the lead is touched. A lead that had failed because
-        nobody could be written to goes back to the people step.
+        nobody could be written to goes back to the people step, but only for the default
+        search: people of a role you chose are written to, or not, as you decide.
         """
         actor = actor or self._actor
         if self._search is None:
@@ -351,7 +376,10 @@ class LeadService:
         with self._uow(self._workspace_id) as uow:
             company = uow.companies.get(company_id)
             campaign = uow.campaigns.get(company.campaign_id) if company.campaign_id else None
-        titles = [*(campaign.target_titles if campaign else ())] or list(_FOUNDER_TITLES)
+        asked_roles = [r.strip() for r in roles if r.strip()]
+        titles = (
+            asked_roles or [*(campaign.target_titles if campaign else ())] or list(_FOUNDER_TITLES)
+        )
         name = search_name(company.name or "") or company.name or company.domain
         site_text = str((company.research or {}).get("summary") or "")
         with call_scope(company_id=company_id):
@@ -378,7 +406,8 @@ class LeadService:
             # The people step (or the email step, which writes only to someone who decides) failed
             # for want of a person: with someone new to write to, it runs again.
             retried = (
-                company.status is CompanyStatus.FAILED
+                not asked_roles
+                and company.status is CompanyStatus.FAILED
                 and company.failed_stage in ("contacts", "email")
                 and any(c.status in WORKABLE_CONTACT_STATUSES for c in fresh)
             )
@@ -397,6 +426,10 @@ class LeadService:
             works_here=sum(c.status in WORKABLE_CONTACT_STATUSES for c in fresh),
             unsure=sum(c.status is ContactStatus.UNCONFIRMED for c in fresh),
             retried=retried,
+            people=tuple(
+                FreshPerson(c.id, c.full_name or "", c.title, c.status, c.linkedin_url)
+                for c in fresh
+            ),
         )
 
     def retry_email(self, contact_id: str, *, actor: str | None = None) -> Company:
