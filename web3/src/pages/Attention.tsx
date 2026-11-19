@@ -1,5 +1,5 @@
 /**
- * Needs attention: everything waiting on a person except email review. Tabs with counts; each
+ * Failed leads: everything waiting on a person except email review. Tabs with counts; each
  * group is a folding section (the first open) with its plain cause, its fix and a bulk action.
  * Same actions as web2: retry one, by step or all; release; find email again (one or all);
  * use the suggested country and release; resume after waiting for AI credits; confirm websites.
@@ -99,8 +99,8 @@ export function AttentionPage() {
   return (
     <>
       <PageHeader
-        title="Needs a decision"
-        subtitle={total ? `${total} lead${total === 1 ? "" : "s"} need a choice only you can make. Everything else runs by itself.` : "Holds, websites to confirm and leads waiting for AI credits land here. Companies that do not fit are not a problem: the engine screens most out."}
+        title="Failed leads"
+        subtitle={total ? `${total} lead${total === 1 ? "" : "s"} stopped for something only you can fix or decide. Retrying costs AI credits, so the engine retries on its own with longer and longer waits, and you can look first.` : "Holds, websites to confirm and leads waiting for AI credits land here. Companies that do not fit are not a problem: the engine screens most out."}
         actions={
           filter !== "credits" &&
           failed.length > 1 &&
@@ -274,7 +274,7 @@ function Row({ company, detail, children }: { company: Company; detail: ReactNod
       : company.fit_score < minFit
         ? { tone: "stopped" as const, text: `Fit ${company.fit_score} is below your minimum (${minFit}): probably not worth retrying` }
         : company.hot
-          ? { tone: "attention" as const, text: "Hot lead: worth the retry" }
+          ? { tone: "attention" as const, text: "A hot lead (fit above 80): worth a look before the others" }
           : null;
   return (
     <li className="py-3.5">
@@ -289,8 +289,8 @@ function Row({ company, detail, children }: { company: Company; detail: ReactNod
               {company.name && <Mono className="text-muted">{company.domain}</Mono>}
               {company.country_code && <Chip>{company.country_code}</Chip>}
               {company.hot && (
-                <Chip tone="attention" title="A fit score above 80">
-                  <Flame className="size-3.5" aria-hidden /> Hot
+                <Chip tone="attention" title="A fit score above 80: a strong match, so look at this one before the others">
+                  <Flame className="size-3.5" aria-hidden /> Worth checking
                 </Chip>
               )}
             </div>

@@ -104,7 +104,7 @@ Your workspace is on a **plan** that gives a number of **AI credits** a month, c
 When the AI credits run out nothing is lost and nothing fails:
 
 - A company you add is saved as **waiting for AI credits** (on **Add leads**), and becomes a lead when credits are back.
-- A lead stops before its next step that uses credits, keeps its status (an approved email stays approved, and is still saved to your mailbox, which uses none) and appears under **Needs a decision → Waiting for AI credits**. A step that had already started finishes, so you may go a little past your allowance (a little more than before, as several leads are worked on side by side).
+- A lead stops before its next step that uses credits, keeps its status (an approved email stays approved, and is still saved to your mailbox, which uses none) and appears under **Failed leads → Waiting for AI credits**. A step that had already started finishes, so you may go a little past your allowance (a little more than before, as several leads are worked on side by side).
 - Search for new companies, **Write it again** and **Ask for changes** wait until credits are back.
 
 Waiting work continues **by itself** as soon as credits are back: when the month renews, when the team who runs the service gives you extra credits or a larger plan, or when they extend your access. **Resume** (on a lead, or **Resume all now**) tries at once; without credits it says when they renew. Past the **access date** the workspace is read-only: you can read everything, but nothing can be added or run until access is extended. **Settings → Plan and usage** has **Ask for more AI credits** (say how many if you know), which works even then.
@@ -112,7 +112,7 @@ Waiting work continues **by itself** as soon as credits are back: when the month
 ### 3.4 The guided tour
 
 The first time you sign in on a browser (once setup is done), a one-minute tour opens by itself:
-nine steps across seven stops — Welcome, Today, ⌘K search, Emails ready, Needs a decision, Leads,
+nine steps across seven stops — Welcome, Today, ⌘K search, Emails ready, Failed leads, Leads,
 Discovery runs, Campaigns, and a send-off. Each step spotlights the part of the screen it is
 about, with a short line on what it does for you; a little rocket moves along the track as you go.
 
@@ -142,7 +142,7 @@ step per screen that matters. Give the element `data-tour="name"` and use that n
 
 ## 5. The screens
 
-The menu on the left groups the screens by what you do there. The numbers next to **Emails ready** and **Needs a decision** are how many items wait for you there; the second counts only what a person can unblock, so a company the engine screened out is never in it. **LinkedIn ready** (the LinkedIn page) shows how many messages are written. **Replies** and **Sending** are marked *Soon*: they arrive in later phases.
+The menu on the left groups the screens by what you do there. The numbers next to **Emails ready** and **Failed leads** are how many items wait for you there; the second counts only what a person can unblock, so a company the engine screened out is never in it. **LinkedIn ready** (the LinkedIn page) shows how many messages are written. **Replies** and **Sending** are marked *Soon*: they arrive in later phases.
 
 Across the top:
 
@@ -161,10 +161,10 @@ The first screen after signing in.
 **The bell** in the top bar (on every page) lists what the engine did, newest first, and each line opens the page it is about: *drafts waiting for review* (and how many are hot), *a hot lead* (once for each lead), *leads that need a decision* (a hold, or a step that broke on every try), *cold drafts approved automatically*, *your run finished* (only for runs you started), *a run failed*, *automatic discovery is paused*, and credit and access warnings. A line you have not read is updated instead of repeated, so a busy day is a few lines, not a list. **Mark all read** clears the count; lines older than 90 days are removed.
 
 - **Emails ready:** the big card at the top says how many emails are waiting, and shows the best three (hot leads first) with the subject and the start of the email; on a phone they are a row you swipe sideways, up to ten emails. **Approve** approves one on the spot (it is saved to your mailbox as a draft within 15 minutes); an email with a skipped check says **Check and approve** and opens it in Review. **Start reviewing** opens the whole queue.
-- **LinkedIn ready: hot leads to message:** a compact strip of up to ten hot leads (fit above 80) whose LinkedIn message is written. Swipe or use the arrows to scroll sideways. Each card has the fit score, the start of the note and **Copy note & open**, which copies the note and opens the person's profile; **Full message** opens the LinkedIn ready page, where you can edit, mark sent or skip. Some of these leads have no email we could prove, so LinkedIn is the way in. The strip sits above *Needs a decision*, as the sidebar does.
+- **LinkedIn ready: hot leads to message:** a compact strip of up to ten hot leads (fit above 80) whose LinkedIn message is written. Swipe or use the arrows to scroll sideways. Each card has the fit score, the start of the note and **Copy note & open**, which copies the note and opens the person's profile; **Full message** opens the LinkedIn ready page, where you can edit, mark sent or skip. Some of these leads have no email we could prove, so LinkedIn is the way in. The strip sits above *Failed leads*, as the sidebar does.
 - **This week:** emails approved, how many went out unedited, and new leads.
 - **Behind the scenes:** where every company went: *reached you*, *being worked on*, *needs a decision*, *screened out*. Most companies are meant to drop out (they do not fit your brief, nobody suitable works there, or no address could be proven), so a long grey *screened out* bar means the engine is working, not failing. Each box opens those leads.
-- **Needs a decision:** only what you can unblock: holds (with the reasons), steps that broke on every try, websites to confirm and leads waiting for credits. It is empty on a good day.
+- **Failed leads:** only what you can unblock: holds (with the reasons), steps that broke on every try, websites to confirm and leads waiting for credits. It is empty on a good day.
 - **AI credits** used over the last 30 days, per vendor and per prospect against your budget; **Quality** (how many sent emails went out without an edit, against the 80% target); and **Engine activity**, the last run and what it did.
 
 ### 5.2 Emails ready (Review)
@@ -207,17 +207,19 @@ Every lead is in one of five groups, and the app words them calmly:
 |---|---|---|
 | **Ready for you** | an email waiting for approval; a hot lead nobody could email, with its LinkedIn message | Emails ready, LinkedIn ready |
 | **Working on it** | still being researched, or tried again by itself (*Trying again, try 2 of 5*), or a catch-all being resolved | Leads → Working on it |
-| **Needs a decision** | a hold only you can resolve, or a step that broke on every try (*Stopped after 5 tries*) | Needs a decision |
+| **Failed leads** | a hold only you can resolve, or a step that broke on every try (*Stopped after 5 tries*) | Failed leads |
 | **Approved & sent** | approved, in your mailbox, in a sequence, replied | Leads → Approved & sent |
 | **Screened out** | does not fit, rejected, suppressed, or nobody to write to (*No decision-maker found*, *No email we could prove*) | Leads → Screened out (grey) |
 
 *Nobody to write to* is an answer, not a breakage: the engine asks again **3 times, a day apart**, in case people or addresses turn up, and then the lead is screened out. A step that really broke (a timeout, a refused key) is tried again soon, up to **5 times**. You can always press **Find people again** or **Find email again** on a screened-out lead. A hot lead (fit above 80) that ends this way moves to *Ready for you* so you can message the person on LinkedIn.
 
-### 5.3 Needs a decision
+### 5.3 Failed leads
+
+*(Called Needs a decision until 2026-11-20. Retrying a lead costs AI credits, so the page is named for what it holds and the engine retries by itself, with longer waits each time.)*
 
 **Filters and sort.** Under the tabs: search by company, website or person; **Hot only**; minimum fit; the step a lead stopped at; its source (found by discovery, added by you, imported, referral); country (when leads are in more than one); and **Sort** by best fit, waiting longest, newest or company, with a button to reverse it. *Showing N of M leads* says how many are left; **Clear** removes every filter.
 
-**What each row tells you, so you can decide whether to retry.** The fit ring and a *Hot* flag; the person who would be written to; *Try 3 of 5* and the step that stopped; where the lead came from; the AI credits spent on it so far; and a hint: *Fit 34 is below your minimum (60): probably not worth retrying*, or *Hot lead: worth the retry*. **Details** opens why it fits, the full error and the criterion-by-criterion qualification.
+**What each row tells you, so you can decide whether to retry.** The fit ring and a *Worth checking* flag on hot leads (fit above 80), which are the ones to look at first; the person who would be written to; *Try 3 of 5* and the step that stopped; where the lead came from; the AI credits spent on it so far; and a hint: *Fit 34 is below your minimum (60): probably not worth retrying*, or *A hot lead (fit above 80): worth a look before the others*. **Details** opens why it fits, the full error and the criterion-by-criterion qualification.
 
 Only what waits on a choice of yours, apart from review, grouped by reason, each group saying in plain words why and what fixes it. A lead that is still being tried again, or that the engine screened out, is not here: see *Where a lead goes* below.
 
@@ -249,7 +251,7 @@ Other fields: job title, country (for example `UK`, `DE`, or a name like `German
 
 **Upload a file.** A CSV or Excel file, up to 2 MB. Column names are matched loosely (for example `Company`, `Website`, `Email`, `Person`, `Title`, `LinkedIn`, `Country`, `Notes`, `Priority`). Press **1. Preview** first: it shows what each row would become and saves nothing. Then **2. Import**.
 
-**Websites to confirm.** The same list as on Needs a decision.
+**Websites to confirm.** The same list as on Failed leads.
 
 **Results for each row**
 
@@ -269,11 +271,11 @@ For each confirmed decision-maker who has a LinkedIn profile, the engine writes 
 
 **Nothing is ever sent from this application**: you copy the text into LinkedIn yourself.
 
-- The **LinkedIn ready** page (named LinkedIn in the address; it was called *Hot leads* until 2026-11-19) lists every message in three tabs: *To send*, *Sent* and *Skipped*. Above the list: search (company, website or person), **Hot only**, **No email** (leads nobody could find a provable address for) and **Has email**, minimum fit, country, and **Sort** (best fit, newest, company A to Z, with a reverse button). The choices are kept in the address, so a filtered view can be bookmarked. The header counts the messages to send, how many are hot and how many have no email we could prove. Each message is a **folding row**: collapsed, it shows the company, person, fit ring, *Hot* and *No email we could prove* flags, the start of the note and **Copy note & open**; opened, it shows the full note and message, why the lead fits and the buttons below. The first row starts open; **Expand all** and **Collapse all** are above the list. 50 rows load at a time (**Show more**). **On a phone** the filters are one line, the search and a **Filters** button that shows how many are on and opens the chips, menus and sort underneath (Needs a decision works the same way), and the leads are cards in a row: swipe sideways from one to the next (each snaps into place, and the next one peeks in from the right); from a tablet up they are a list. By default waiting messages list the best fit first (hot leads on top). For each, **Copy & open LinkedIn** beside the note copies it and opens the person's profile in a new tab, ready to paste; the same button beside the message does the same once they accept. Then **Mark sent on LinkedIn**. Without a profile link the buttons only **Copy**; **Open their LinkedIn** still opens the profile on its own. The lead's name links to the lead page.
+- The **LinkedIn ready** page (named LinkedIn in the address; it was called *Hot leads* until 2026-11-19) lists every message in three tabs: *To send*, *Sent* and *Skipped*. Above the list: search (company, website or person), **Hot only**, **No email** (leads nobody could find a provable address for) and **Has email**, minimum fit, country, and **Sort** (best fit, newest, company A to Z, with a reverse button). The choices are kept in the address, so a filtered view can be bookmarked. The header counts the messages to send, how many are hot and how many have no email we could prove. Each message is a **folding row**: collapsed, it shows the company, person, fit ring, *Hot* and *No email we could prove* flags, the start of the note and **Copy note & open**; opened, it shows the full note and message, why the lead fits and the buttons below. The first row starts open; **Expand all** and **Collapse all** are above the list. 50 rows load at a time (**Show more**). **On a phone** the filters are one line, the search and a **Filters** button that shows how many are on and opens the chips, menus and sort underneath (Failed leads works the same way), and the leads are cards in a row: swipe sideways from one to the next (each snaps into place, and the next one peeks in from the right); from a tablet up they are a list. By default waiting messages list the best fit first (hot leads on top). For each, **Copy & open LinkedIn** beside the note copies it and opens the person's profile in a new tab, ready to paste; the same button beside the message does the same once they accept. Then **Mark sent on LinkedIn**. Without a profile link the buttons only **Copy**; **Open their LinkedIn** still opens the profile on its own. The lead's name links to the lead page.
 - The lead page has the same messages in its **LinkedIn** card, under *People and addresses*.
 - **Edit** changes the words; what you save is yours and the checks no longer apply. **Rewrite** writes a fresh pair. **Skip** sets one aside (**Use it again** undoes it).
 - A message the checks still object to (too long, a link, a leftover placeholder, wording that reads like a template) shows what is wrong in a yellow note, so you edit it before you use it.
-- **Mark sent on LinkedIn** is final and holds the lead's email: the lead goes on hold as *Messaged on LinkedIn*, so the person is not contacted twice at once, and an email waiting for review is withdrawn. Release the hold (on the lead page, or under Needs a decision) when you want the email found and written as well; it then says in one clause that you already wrote on LinkedIn. A lead whose email is already in the mailbox or sent is not held: the message is only recorded.
+- **Mark sent on LinkedIn** is final and holds the lead's email: the lead goes on hold as *Messaged on LinkedIn*, so the person is not contacted twice at once, and an email waiting for review is withdrawn. Release the hold (on the lead page, or under Failed leads) when you want the email found and written as well; it then says in one clause that you already wrote on LinkedIn. A lead whose email is already in the mailbox or sent is not held: the message is only recorded.
 - Forgetting a person (Policies and privacy) deletes their messages.
 
 ### 5.5 Leads

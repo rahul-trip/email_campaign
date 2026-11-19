@@ -1,6 +1,6 @@
 /**
  * The small controls every filterable list uses: a search box, toggle chips and a sort menu.
- * Leads, LinkedIn ready and Needs a decision share them so they look and behave the same.
+ * Leads, LinkedIn ready and Failed leads share them so they look and behave the same.
  */
 import { ArrowDown, ArrowUp, ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";

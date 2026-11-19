@@ -12,7 +12,7 @@ export const NAV: NavGroup[] = [
       { to: "/", label: "Today", icon: LayoutDashboard },
       { to: "/review", label: "Emails ready", icon: ClipboardCheck, badge: "review" },
       { to: "/linkedin", label: "LinkedIn ready", icon: Flame, badge: "linkedin" },
-      { to: "/attention", label: "Needs a decision", icon: TriangleAlert, badge: "attention" },
+      { to: "/attention", label: "Failed leads", icon: TriangleAlert, badge: "attention" },
     ],
   },
   {

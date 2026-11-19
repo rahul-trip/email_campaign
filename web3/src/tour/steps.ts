@@ -45,7 +45,7 @@ export const SECTIONS: Section[] = [
   },
   {
     id: "attention",
-    title: "Needs a decision",
+    title: "Failed leads",
     place: "/attention",
     steps: [{ target: "attention-filter", icon: "🧲", title: "Unstick leads in one click", body: "Only what you can unblock lands here: holds and steps that broke on every try. Each says why in plain words and has the fix. Companies that do not fit are screened out quietly." }],
   },

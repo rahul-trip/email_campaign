@@ -28,7 +28,7 @@ const VIEWS: { key: string; label: string; filters: Partial<LeadsSearch>; count?
   { key: "ready", label: "Ready for you", filters: { bucket: "ready" }, count: "ready" },
   { key: "hot", label: "Hot", filters: { view: "hot", sort: "fit" } },
   { key: "working", label: "Working on it", filters: { bucket: "working" }, count: "working" },
-  { key: "decision", label: "Needs a decision", filters: { bucket: "decision" }, count: "decision" },
+  { key: "decision", label: "Failed leads", filters: { bucket: "decision" }, count: "decision" },
   { key: "done", label: "Approved & sent", filters: { bucket: "done" }, count: "done" },
   { key: "screened", label: "Screened out", filters: { bucket: "screened_out" }, count: "screened_out" },
   { key: "all", label: "All", filters: {} },
