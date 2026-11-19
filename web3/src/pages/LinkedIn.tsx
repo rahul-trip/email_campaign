@@ -9,7 +9,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flame, Keyboard, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
@@ -20,6 +20,7 @@ import { Button, buttonClass, Card, Chip, Empty, Kbd, Label, PageHeader, Problem
 import { FilterBar, FilterChip, SearchBox, SortControl, useDebounced } from "../ui/filters";
 import { EmailChip, LeadIcon } from "../ui/lead";
 import { Dialog } from "../ui/overlay";
+import { Section, SectionGroup } from "../ui/sections";
 import { FitRing } from "../ui/viz";
 
 type Row = Schemas["LinkedInDraftRowOut"];
@@ -395,102 +396,132 @@ function Reader({ group, readOnly, onChanged }: { group: Group; readOnly: boolea
           </div>
         </div>
         {head.fit_reason && (
-          <p className="px-4 pt-3 text-small text-muted sm:px-6">
+          <p className="px-4 py-3 text-small text-muted sm:px-6">
             <span className="font-semibold text-ink-2">Why it fits: </span>
             {head.fit_reason}
           </p>
         )}
-        <div className="px-4 pb-4 pt-3 sm:px-6">
-          {lead.isPending ? <Skeleton rows={3} /> : lead.isError ? <Problem error={lead.error} /> : <CompanyBrief lead={lead.data} />}
-        </div>
       </Card>
 
-      <section aria-label={`Messages for ${name}`} className="flex min-w-0 flex-col gap-3">
-        <Label className="px-1">
-          People at {name} ({group.rows.length})
-        </Label>
-        {group.rows.map((row) => {
+      <EmailNote lead={lead.data} />
+
+      <SectionGroup storageKey="linkedin" className="space-y-3" toolbar={group.rows.length > 1 || Boolean(lead.data)}>
+        {lead.isPending ? <Skeleton rows={3} /> : lead.isError ? <Problem error={lead.error} /> : <CompanySections lead={lead.data} />}
+        {group.rows.map((row, index) => {
           const contact = contacts.get(row.item.contact_id);
+          const draft = row.item;
+          const waiting = draft.state === "drafted";
+          const preview = draft.note.length > 90 ? `${draft.note.slice(0, 90).trimEnd()}…` : draft.note;
           return (
-            <LinkedInDraftCard
-              key={row.item.id}
-              draft={row.item}
-              person={row.person}
-              title={row.title}
-              profile={row.profile}
-              readOnly={readOnly}
-              onChanged={onChanged}
-              details={contact && lead.data ? <PersonFacts contact={contact} lead={lead.data} /> : undefined}
-            />
+            <Section
+              key={draft.id}
+              id={`person-${row.item.contact_id}`}
+              title={row.person ?? "Decision-maker"}
+              summary={[draft.state === "sent" ? "Sent" : draft.state === "skipped" ? "Skipped" : draft.issues.length > 0 ? "Check wording" : "", row.title, `“${preview}”`].filter(Boolean).join(" · ")}
+              chip={<PersonChip state={draft.state} issues={draft.issues.length} first={contact?.rank === 1} />}
+              // The person to write to first stays open, and so does any whose draft needs a look; the rest wait folded.
+              defaultOpen={(waiting && index === 0) || (waiting && draft.issues.length > 0)}
+            >
+              <LinkedInDraftCard
+                draft={draft}
+                person={row.person}
+                title={row.title}
+                profile={row.profile}
+                readOnly={readOnly}
+                onChanged={onChanged}
+                details={contact && lead.data ? <PersonFacts contact={contact} lead={lead.data} /> : undefined}
+              />
+            </Section>
           );
         })}
-      </section>
+      </SectionGroup>
     </div>
   );
 }
 
-/** What research found that helps write to them: what they do, what to mention, why now, the news, hiring, and any email already on its way. */
-function CompanyBrief({ lead }: { lead: Lead }) {
-  const [more, setMore] = useState(false);
-  const research = (lead.company.research ?? {}) as Record<string, unknown>;
-  const summary = String(research.summary ?? "").trim();
-  const hiring = String(research.hiring ?? "").trim();
-  const hooks = ((research.hooks as string[] | undefined) ?? []).filter(Boolean);
-  const whyNow = String((research.qualification as { why_now?: string } | undefined)?.why_now ?? "").trim();
-  const news = [...((research.triggers as NewsItem[] | undefined) ?? []), ...((research.news_items as NewsItem[] | undefined) ?? [])].filter((n) => n?.headline).slice(0, 3);
+/** An email to someone here that is waiting or already sent: said above the sections, because it changes what to send. */
+function EmailNote({ lead }: { lead?: Lead }) {
+  if (!lead) return null;
   const person = (id: string) => lead.contacts.find((c) => c.id === id)?.full_name ?? "someone here";
   const waiting = lead.messages.find((m) => m.state === "generated" || m.state === "approved");
   const sent = lead.messages.find((m) => m.state === "sent" || m.sent_at);
-  if (!summary && !hiring && !hooks.length && !whyNow && !news.length && !waiting && !sent) return <p className="text-small text-muted">Research found nothing more to show. The lead page has everything that is known.</p>;
+  if (!waiting && !sent) return null;
   return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {(waiting || sent) && (
-        <div className="rounded-lg border border-attention-dot/40 bg-attention-soft p-3 text-small text-ink lg:col-span-2" role="note">
-          {sent ? (
-            <>
-              <span className="font-semibold">Already emailed:</span> {person(sent.contact_id)}
-              {sent.sent_at && ` ${ago(sent.sent_at)}`}. Say so in your note, or write to someone else.
-            </>
-          ) : (
-            <>
-              <span className="font-semibold">An email to {person(waiting!.contact_id)} is {waiting!.state === "approved" ? "approved and on its way to your drafts" : "waiting for you"}.</span>{" "}
-              {waiting!.state === "generated" && (
-                <Link to="/review" search={{ message: waiting!.id }} className="font-semibold text-primary hover:underline">
-                  Open it in Emails ready
-                </Link>
-              )}{" "}
-              Marking a LinkedIn message as sent withdraws an email still waiting for review.
-            </>
-          )}
-        </div>
+    <div className="rounded-lg border border-attention-dot/40 bg-attention-soft p-3 text-small text-ink" role="note">
+      {sent ? (
+        <>
+          <span className="font-semibold">Already emailed:</span> {person(sent.contact_id)}
+          {sent.sent_at && ` ${ago(sent.sent_at)}`}. Say so in your note, or write to someone else.
+        </>
+      ) : (
+        <>
+          <span className="font-semibold">An email to {person(waiting!.contact_id)} is {waiting!.state === "approved" ? "approved and on its way to your drafts" : "waiting for you"}.</span>{" "}
+          {waiting!.state === "generated" && (
+            <Link to="/review" search={{ message: waiting!.id }} className="font-semibold text-primary hover:underline">
+              Open it in Emails ready
+            </Link>
+          )}{" "}
+          Marking a LinkedIn message as sent withdraws an email still waiting for review.
+        </>
       )}
-      {summary && (
-        <Brief title="What they do" className="lg:col-span-2">
-          <p className={cx("whitespace-pre-line", !more && "line-clamp-4")}>{summary}</p>
-          {summary.length > 320 && (
-            <button type="button" className="mt-1 text-small font-semibold text-primary hover:underline" onClick={() => setMore(!more)}>
-              {more ? "Show less" : "Show all"}
-            </button>
-          )}
-        </Brief>
+    </div>
+  );
+}
+
+const brief = (text: string, n = 110) => (text.length > n ? `${text.slice(0, n).trimEnd()}…` : text);
+
+/**
+ * What research found, as folding sections. A section opens by itself only when it is short, so a
+ * long one never pushes the messages off the screen; it shows a one-line summary instead. What the
+ * person opens or closes is remembered.
+ */
+function CompanySections({ lead }: { lead: Lead }) {
+  const research = (lead.company.research ?? {}) as Record<string, unknown>;
+  const summary = String(research.summary ?? "").trim();
+  const hiring = String(research.hiring ?? "").trim();
+  const hooks = ((research.hooks as string[] | undefined) ?? []).filter(Boolean).slice(0, 6);
+  const whyNow = String((research.qualification as { why_now?: string } | undefined)?.why_now ?? "").trim();
+  const news = [...((research.triggers as NewsItem[] | undefined) ?? []), ...((research.news_items as NewsItem[] | undefined) ?? [])].filter((n) => n?.headline).slice(0, 4);
+  if (!summary && !hiring && !hooks.length && !whyNow && !news.length) return <p className="px-1 text-small text-muted">Research found nothing more to show. The lead page has everything that is known.</p>;
+  const aboutText = [summary, hiring && `Hiring: ${hiring}`].filter(Boolean).join(" ");
+  const points = hooks.length + (whyNow ? 1 : 0);
+  return (
+    <>
+      {(summary || hiring) && (
+        <Section id="about" title="What they do" summary={brief(aboutText)} chip={hiring ? <Chip>Hiring</Chip> : undefined} defaultOpen={aboutText.length <= 260}>
+          <div className="space-y-2 text-body leading-relaxed text-ink-2">
+            {summary && <p className="whitespace-pre-line">{summary}</p>}
+            {hiring && (
+              <p>
+                <span className="font-semibold text-ink">Hiring: </span>
+                {hiring}
+              </p>
+            )}
+          </div>
+        </Section>
       )}
-      {hooks.length > 0 && (
-        <Brief title={`Worth mentioning (${hooks.length})`}>
-          <ul className="list-disc space-y-1 pl-5">
-            {hooks.slice(0, 5).map((hook) => (
-              <li key={hook}>{hook}</li>
-            ))}
-          </ul>
-        </Brief>
-      )}
-      {whyNow && (
-        <Brief title="Why now">
-          <p>{whyNow}</p>
-        </Brief>
+      {points > 0 && (
+        <Section id="mention" title="Worth mentioning" summary={brief(whyNow || hooks[0] || "")} chip={<Chip tone="primary">{points}</Chip>} defaultOpen={points <= 3}>
+          <div className="space-y-3 text-body leading-relaxed text-ink-2">
+            {whyNow && (
+              <p>
+                <span className="font-semibold text-ink">Why now: </span>
+                {whyNow}
+              </p>
+            )}
+            {hooks.length > 0 && (
+              <ul className="list-disc space-y-1 pl-5">
+                {hooks.map((hook) => (
+                  <li key={hook}>{hook}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </Section>
       )}
       {news.length > 0 && (
-        <Brief title="In the news">
-          <ul className="space-y-1.5">
+        <Section id="news" title="In the news" summary={brief(news[0]!.headline)} chip={<Chip>{news.length}</Chip>} defaultOpen={news.length <= 2}>
+          <ul className="space-y-2 text-body text-ink-2">
             {news.map((item) => (
               <li key={item.url + item.headline}>
                 {safeLink(item.url) ? (
@@ -504,23 +535,19 @@ function CompanyBrief({ lead }: { lead: Lead }) {
               </li>
             ))}
           </ul>
-        </Brief>
+        </Section>
       )}
-      {hiring && (
-        <Brief title="Hiring">
-          <p>{hiring}</p>
-        </Brief>
-      )}
-    </div>
+    </>
   );
 }
 
-function Brief({ title, className, children }: { title: string; className?: string; children: ReactNode }) {
+/** Where a person's message stands, in the section's header, so a folded one still says what it needs. */
+function PersonChip({ state, issues, first }: { state: string; issues: number; first: boolean }) {
   return (
-    <div className={cx("min-w-0 rounded-lg border border-line bg-surface p-3 text-small leading-relaxed text-ink-2", className)}>
-      <div className="mb-1 text-label font-semibold uppercase tracking-wide text-muted">{title}</div>
-      {children}
-    </div>
+    <span className="flex items-center gap-1.5">
+      {first && <Chip tone="primary">First choice</Chip>}
+      {state === "sent" ? <Chip tone="good">Sent</Chip> : state === "skipped" ? <Chip>Skipped</Chip> : issues > 0 ? <Chip tone="attention">Check wording</Chip> : <Chip tone="primary">To send</Chip>}
+    </span>
   );
 }
 

@@ -35,7 +35,7 @@ const row = (n: number, name: string, fit: number) => ({
 const second = (n: number, name: string) => ({ ...row(n, name, 89), item: { ...row(n, name, 89).item, id: `li-${n}b`, contact_id: `ct-${n}b` }, person: "Priya Rao", title: "Head of Talent" });
 
 // What the lead page would say about the company and its people: research, and who is at it.
-const lead = (companyId: string) => ({
+const lead = (companyId: string, summary = "Luminal builds a compiler for machine-learning models and sells cloud inference to teams that cannot run their own GPUs.") => ({
   company: {
     id: companyId,
     name: "Luminal",
@@ -43,7 +43,7 @@ const lead = (companyId: string) => ({
     status: "failed",
     research: {
       sector: "Developer tools",
-      summary: "Luminal builds a compiler for machine-learning models and sells cloud inference to teams that cannot run their own GPUs.",
+      summary,
       hooks: ["Raised a seed round in October", "Hiring a founding kernel engineer"],
       hiring: "Three open engineering roles, all in San Francisco.",
       qualification: { why_now: "A fresh round and open roles in exactly what we sell." },
@@ -83,21 +83,25 @@ test("LinkedIn ready fits a phone: companies are a row to swipe, the people at o
   expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 50);
   expect(sizes.first).toBeLessThan(390);
 
-  // The chosen company reads below with both people, and its buttons stay on the screen.
+  // The chosen company reads below. Every part folds: the person to write to first is open and the
+  // other waits folded with a line saying who they are; short research is open.
   const reader = page.locator("[data-tour=linkedin-reader]");
-  await expect(reader.getByText("People at Luminal (2)")).toBeVisible();
-  await expect(reader.getByText("Justin Burke", { exact: true })).toBeVisible();
-  await expect(reader.getByText("Priya Rao", { exact: true })).toBeVisible();
-  await expect(reader.getByText("Connection note").first()).toBeVisible();
+  const section = (name: RegExp) => reader.getByRole("button", { name, expanded: undefined }).first();
+  await expect(section(/^Justin Burke/)).toHaveAttribute("aria-expanded", "true");
+  await expect(section(/^Priya Rao/)).toHaveAttribute("aria-expanded", "false");
+  await expect(section(/^Priya Rao/)).toContainText("Head of Talent");
+  await expect(reader.getByText("Connection note").filter({ visible: true })).toHaveCount(1); // only Justin's is open
+  await expect(section(/^What they do/)).toHaveAttribute("aria-expanded", "true");
 
   // Before sending, what is known: the company's research, and each person's standing.
-  await expect(reader.getByText("What they do")).toBeVisible();
-  await expect(reader.getByText("compiler for machine-learning models")).toBeVisible();
+  await expect(reader.getByText("compiler for machine-learning models").first()).toBeVisible();
   await expect(reader.getByText("Hiring a founding kernel engineer")).toBeVisible();
-  await expect(reader.getByText("A fresh round and open roles")).toBeVisible();
+  await expect(reader.getByText("A fresh round and open roles").first()).toBeVisible();
   await expect(reader.getByRole("link", { name: "Luminal raises a $5M seed" })).toBeVisible();
   await expect(reader.getByText("An email to Justin Burke is waiting for you")).toBeVisible();
-  await expect(reader.getByText("First choice")).toBeVisible();
+  await expect(reader.getByText("First choice").filter({ visible: true }).first()).toBeVisible();
+  await section(/^Priya Rao/).click();
+  await expect(section(/^Priya Rao/)).toHaveAttribute("aria-expanded", "true");
   await expect(reader.getByText("Unconfirmed: check they work here")).toBeVisible();
   await expect(reader.getByText("Her profile does not name the company")).toBeVisible();
   // The company is a link to its lead.
@@ -115,8 +119,27 @@ test("LinkedIn ready fits a phone: companies are a row to swipe, the people at o
 
   // Picking another company shows its people instead.
   await strip.locator(":scope > li").nth(1).getByRole("button").click();
-  await expect(reader.getByText("People at Morph (1)")).toBeVisible();
-  await expect(reader.getByText("Priya Rao", { exact: true })).toBeHidden();
+  await expect(section(/^Justin Burke/)).toHaveAttribute("aria-expanded", "true");
+  await expect(reader.getByRole("button", { name: /^Priya Rao/ })).toHaveCount(0);
+});
+
+// Smart folding: long research starts folded, with one line to say what is inside.
+test("LinkedIn ready folds long research and says what is inside, and Expand all opens it", async ({ page }) => {
+  await signIn(page);
+  const rows = [row(1, "Luminal", 89)];
+  const long = "Luminal builds a compiler for machine-learning models. ".repeat(10);
+  await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
+  await page.route("**/api/companies/co-*", (route) => route.fulfill({ json: lead("co-1", long) }));
+  await page.goto("/w/default/linkedin");
+  const reader = page.locator("[data-tour=linkedin-reader]");
+  const about = reader.getByRole("button", { name: /^What they do/ });
+  await expect(about).toHaveAttribute("aria-expanded", "false");
+  await expect(about).toContainText("Luminal builds a compiler"); // the one line shown while folded
+  await expect(reader.getByRole("button", { name: /^Justin Burke/ })).toHaveAttribute("aria-expanded", "true"); // the messages are never pushed away
+  await reader.getByRole("button", { name: "Expand all" }).click();
+  await expect(about).toHaveAttribute("aria-expanded", "true");
+  await reader.getByRole("button", { name: "Collapse all" }).click();
+  await expect(about).toHaveAttribute("aria-expanded", "false");
 });
 
 // On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.
