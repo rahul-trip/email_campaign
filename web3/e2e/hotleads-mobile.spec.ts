@@ -31,52 +31,92 @@ const row = (n: number, name: string, fit: number) => ({
   fit_reason: "Meets 5 of 6 must-haves; missing: remote-friendly with US Eastern/Pacific overlap; signs they may buy now: recent seed, Series A or Series B funding round, open roles for AI, LLM or agent engineers",
 });
 
-test("LinkedIn ready rows fit a phone: nothing overlaps and nothing runs off the screen", async ({ page }) => {
+// A second person at the same company: they sit together under it.
+const second = (n: number, name: string) => ({ ...row(n, name, 89), item: { ...row(n, name, 89).item, id: `li-${n}b`, contact_id: `ct-${n}b` }, person: "Priya Rao", title: "Head of Talent" });
+
+// What the lead page would say about the company and its people: research, and who is at it.
+const lead = (companyId: string) => ({
+  company: {
+    id: companyId,
+    name: "Luminal",
+    domain: "luminal.example",
+    status: "failed",
+    research: {
+      sector: "Developer tools",
+      summary: "Luminal builds a compiler for machine-learning models and sells cloud inference to teams that cannot run their own GPUs.",
+      hooks: ["Raised a seed round in October", "Hiring a founding kernel engineer"],
+      hiring: "Three open engineering roles, all in San Francisco.",
+      qualification: { why_now: "A fresh round and open roles in exactly what we sell." },
+      news_items: [{ headline: "Luminal raises a $5M seed", date: "2026-10-02", url: "https://news.example/luminal" }],
+    },
+  },
+  contacts: [
+    { id: "ct-1", rank: 1, full_name: "Justin Burke", title: "Founding Engineer and Co-founder", seniority: "founder", linkedin_url: null, source: "search", status: "candidate", emails: [], refresh_email: false, placement_note: null },
+    { id: "ct-1b", rank: 2, full_name: "Priya Rao", title: "Head of Talent", seniority: "head", linkedin_url: null, source: "search", status: "unconfirmed", emails: [], refresh_email: false, placement_note: "Her profile does not name the company" },
+  ],
+  messages: [{ id: "em-1", contact_id: "ct-1", state: "generated", sent_at: null }],
+  notes: [],
+  held_at: null,
+});
+
+test("LinkedIn ready fits a phone: companies are a row to swipe, the people at one are together, nothing runs off the screen", async ({ page }) => {
   await signIn(page);
-  const rows = [row(1, "Luminal", 89), row(2, "Morph", 86), row(3, "Lightning", 91)];
+  const rows = [row(1, "Luminal", 89), second(1, "Luminal"), row(2, "Morph", 86), row(3, "Lightning", 91)];
   await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
+  await page.route("**/api/companies/co-*", (route) => route.fulfill({ json: lead(route.request().url().split("/").pop()!) }));
   await page.goto("/w/default/linkedin");
   await expect(page.getByText("Luminal").first()).toBeVisible();
 
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(await overflow()).toBeLessThanOrEqual(1);
 
-  // Collapsed: the flags sit above the one-tap button, not under the fit ring or the button.
-  const first = page.locator("[data-tour=linkedin-list] > div").first();
-  const flag = first.getByText("No email we could prove");
-  const copy = first.getByRole("button", { name: /Copy note/ });
-  const ring = first.locator("svg").first();
-  const [f, c] = [await flag.boundingBox(), await copy.boundingBox()];
-  expect({ flag: f, copy: c }).toBeTruthy();
-  expect(c!.y, `flag ${JSON.stringify(f)} copy ${JSON.stringify(c)}`).toBeGreaterThanOrEqual(f!.y + f!.height - 1);
-  expect(f!.x + f!.width).toBeLessThanOrEqual(390);
-  await expect(ring).toBeVisible();
+  // Three companies, not four messages: Luminal's two people share one card.
+  const strip = page.locator("[data-tour=linkedin-strip] > ul");
+  await expect(strip.locator(":scope > li")).toHaveCount(3);
+  const luminal = strip.locator(":scope > li").first();
+  await expect(luminal).toContainText("2 people");
+  await expect(luminal).toContainText("Justin Burke");
+  await expect(luminal).toContainText("Priya Rao");
 
-  // The cards are a row to swipe: the first fills most of the screen, the next waits to its right.
-  const strip = page.locator("[data-tour=linkedin-list]");
+  // The cards are a row to swipe: more than fits the screen, the first one narrower than it.
   const sizes = await strip.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, first: (el.children[0] as HTMLElement).getBoundingClientRect().width }));
-  expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 100);
-  expect(sizes.first).toBeGreaterThan(390 * 0.8);
+  expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 50);
   expect(sizes.first).toBeLessThan(390);
-  const second = strip.locator("> div").nth(1);
-  await strip.evaluate((el) => (el.children[1] as HTMLElement).scrollIntoView({ inline: "start", block: "nearest" }));
-  await expect.poll(async () => Math.round((await second.boundingBox())!.x)).toBeLessThan(40);
-  await strip.evaluate((el) => el.scrollTo({ left: 0 }));
 
-  // Expanded: the draft card's buttons stay on the screen too.
-  await page.getByRole("button", { name: "Expand all" }).click();
-  await expect(page.getByText("Connection note").first()).toBeVisible();
+  // The chosen company reads below with both people, and its buttons stay on the screen.
+  const reader = page.locator("[data-tour=linkedin-reader]");
+  await expect(reader.getByText("People at Luminal (2)")).toBeVisible();
+  await expect(reader.getByText("Justin Burke", { exact: true })).toBeVisible();
+  await expect(reader.getByText("Priya Rao", { exact: true })).toBeVisible();
+  await expect(reader.getByText("Connection note").first()).toBeVisible();
+
+  // Before sending, what is known: the company's research, and each person's standing.
+  await expect(reader.getByText("What they do")).toBeVisible();
+  await expect(reader.getByText("compiler for machine-learning models")).toBeVisible();
+  await expect(reader.getByText("Hiring a founding kernel engineer")).toBeVisible();
+  await expect(reader.getByText("A fresh round and open roles")).toBeVisible();
+  await expect(reader.getByRole("link", { name: "Luminal raises a $5M seed" })).toBeVisible();
+  await expect(reader.getByText("An email to Justin Burke is waiting for you")).toBeVisible();
+  await expect(reader.getByText("First choice")).toBeVisible();
+  await expect(reader.getByText("Unconfirmed: check they work here")).toBeVisible();
+  await expect(reader.getByText("Her profile does not name the company")).toBeVisible();
+  // The company is a link to its lead.
+  await expect(reader.getByRole("link", { name: "Luminal", exact: true }).first()).toHaveAttribute("href", /\/leads\/co-1$/);
   expect(await overflow()).toBeLessThanOrEqual(1);
   const past = await page.evaluate(() => {
     const out: string[] = [];
-    // Cards after the first are meant to sit off to the right until swiped to.
-    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-list] > div:first-child button, [data-tour=linkedin-list] > div:first-child a")) {
+    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-reader] button, [data-tour=linkedin-reader] a")) {
       const box = el.getBoundingClientRect();
       if (box.width > 1 && box.right > document.documentElement.clientWidth + 1) out.push((el.textContent ?? "").trim().slice(0, 30));
     }
     return out;
   });
   expect(past).toEqual([]);
+
+  // Picking another company shows its people instead.
+  await strip.locator(":scope > li").nth(1).getByRole("button").click();
+  await expect(reader.getByText("People at Morph (1)")).toBeVisible();
+  await expect(reader.getByText("Priya Rao", { exact: true })).toBeHidden();
 });
 
 // On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.

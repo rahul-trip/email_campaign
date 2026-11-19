@@ -66,7 +66,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Timeline / Activity (vendor call detail) | `companies/{id}/timeline` | Lead detail Activity tab |
 | Journey (8 stages, how it arrived) | `companies/{id}/journey` | Lead detail Journey tab (was separate page) |
 | LinkedIn lookup per person | `contacts/{id}/find-linkedin` | Lead detail People card |
-| LinkedIn drafts: write, edit, sent, skip, restore | `contacts/{id}/linkedin`, `linkedin*`, `companies/{id}/linkedin` | LinkedIn ready page (filters, sort, folding rows; Today's sideways strip) · Lead detail |
+| LinkedIn drafts: write, edit, sent, skip, restore | `contacts/{id}/linkedin`, `linkedin*`, `companies/{id}/linkedin` | LinkedIn ready page (filters, sort; companies on the left with their people grouped, the chosen company's messages on the right, J/K; Today's sideways strip) · Lead detail |
 | Add one company | `targets` | Add leads → Single |
 | Upload a list | `targets/upload` | Add leads → Upload (drag-drop, column mapping preview) |
 | Intake webhook info / rotate secret | `integrations/webhook*` | Add leads → Webhook · Settings → Integrations |

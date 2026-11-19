@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Check, Copy, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { cx } from "../lib/cx";
 import { ago, when } from "../lib/format";
@@ -84,12 +84,17 @@ export function CopyNoteButton({ note, profile, size = "sm", variant = "primary"
 export function LinkedInDraftCard({
   draft,
   person,
+  title,
+  details,
   profile,
   readOnly,
   onChanged,
 }: {
   draft: Draft;
   person?: string | null;
+  title?: string | null;
+  /** What else is known about the person, shown under their name (the LinkedIn page passes it). */
+  details?: ReactNode;
   profile?: string | null;
   readOnly?: boolean;
   onChanged: () => void;
@@ -127,6 +132,7 @@ export function LinkedInDraftCard({
     <div className={cx("min-w-0 space-y-3 rounded-lg border border-line p-3", skipped && "opacity-70")}>
       <div className="flex flex-wrap items-center gap-2">
         {person && <span className="font-semibold">{person}</span>}
+        {title && <span className="text-small text-muted">{title}</span>}
         {safeLink(profile) && (
           <a href={safeLink(profile)!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
             Open their LinkedIn <ExternalLink className="size-3" aria-hidden />
@@ -140,6 +146,7 @@ export function LinkedInDraftCard({
         {skipped && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-label font-medium text-muted">Skipped</span>}
         {draft.edited && !isSent && <span className="text-label text-muted">edited by you</span>}
       </div>
+      {details}
 
       {draft.issues.length > 0 && !isSent && (
         <Callout tone="attention" title="Check this before you send it">
