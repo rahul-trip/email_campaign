@@ -24,7 +24,7 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
   const [editing, setEditing] = useState<Model | "new" | "current" | null>(null);
   const [tested, setTested] = useState<Record<string, { ok: boolean | null; message: string }>>({});
   const choose = useMutation({
-    mutationFn: (body: { default_model: string; writer_model: string }) => ok(client.PUT("/api/admin/models/default", { body })),
+    mutationFn: (body: { default_model: string; writer_model: string; extract_model: string }) => ok(client.PUT("/api/admin/models/default", { body })),
     onSuccess: onSaved,
   });
   const remove = useMutation({
@@ -35,7 +35,10 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
     mutationFn: async (code: string) => ({ code, result: await ok(client.POST("/api/admin/models/{code}/test", { params: { path: { code } } })) }),
     onSuccess: ({ code, result }) => setTested((all) => ({ ...all, [code]: result })),
   });
-  const { models, default_model: current, writer_model: writer } = data;
+  const { models, default_model: current, writer_model: writer, extract_model: reader } = data;
+  /** The three choices as they stand, with a change. Changing the default clears the other two. */
+  const pick = (change: Partial<{ default_model: string; writer_model: string; extract_model: string }>) =>
+    choose.mutate({ default_model: current, writer_model: writer, extract_model: reader, ...change });
   const fallback = `${data.llm.llm_provider ?? ""} · ${data.llm.llm_model ?? ""}`;
   return (
     <Card
@@ -76,6 +79,7 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
                       {m.label}
                       {m.code === current && <Pill tone="good">default</Pill>}
                       {m.code === writer && <Pill tone="muted">writes emails</Pill>}
+                      {m.code === reader && <Pill tone="muted">reads sites and news</Pill>}
                     </div>
                     <div className="font-mono text-label text-muted">{m.model}</div>
                     <div className="text-label text-muted">
@@ -103,17 +107,27 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
                   <Td className="font-mono text-small">{m.key || <span className="font-sans text-muted">the Language model key</span>}</Td>
                   <Td className="space-x-1 whitespace-nowrap text-right">
                     {m.code !== current && (
-                      <Button size="sm" variant="secondary" busy={choose.isPending} onClick={() => choose.mutate({ default_model: m.code, writer_model: "" })}>
+                      <Button size="sm" variant="secondary" busy={choose.isPending} onClick={() => pick({ default_model: m.code, writer_model: "", extract_model: "" })}>
                         Make default
                       </Button>
                     )}
                     {current && m.code !== current && m.code !== writer && (
-                      <Button size="sm" variant="ghost" onClick={() => choose.mutate({ default_model: current, writer_model: m.code })} title="Must use the same provider and address as the default">
+                      <Button size="sm" variant="ghost" onClick={() => pick({ writer_model: m.code })} title="Must use the same provider and address as the default">
                         Use for writing
                       </Button>
                     )}
+                    {current && m.code !== current && m.code !== reader && (
+                      <Button size="sm" variant="ghost" onClick={() => pick({ extract_model: m.code })} title="A fast, cheap model for reading sites, news and people. Must use the same provider and address as the default">
+                        Use for research
+                      </Button>
+                    )}
+                    {m.code === reader && (
+                      <Button size="sm" variant="ghost" onClick={() => pick({ extract_model: "" })}>
+                        Stop reading
+                      </Button>
+                    )}
                     {m.code === writer && (
-                      <Button size="sm" variant="ghost" onClick={() => choose.mutate({ default_model: current, writer_model: "" })}>
+                      <Button size="sm" variant="ghost" onClick={() => pick({ writer_model: "" })}>
                         Stop writing
                       </Button>
                     )}
@@ -123,7 +137,7 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
                     <Button size="sm" variant="ghost" onClick={() => setEditing(m)}>
                       Edit
                     </Button>
-                    {m.code !== current && m.code !== writer && (
+                    {m.code !== current && m.code !== writer && m.code !== reader && (
                       <Button size="sm" variant="ghost" busy={remove.isPending && remove.variables === m.code} onClick={() => remove.mutate(m.code)}>
                         Remove
                       </Button>
@@ -137,7 +151,7 @@ export function ModelsCard({ data, onSaved }: { data: Listing; onSaved: (data: u
       )}
       {current && (
         <div className="mt-3">
-          <Button size="sm" variant="ghost" onClick={() => choose.mutate({ default_model: "", writer_model: "" })}>
+          <Button size="sm" variant="ghost" onClick={() => pick({ default_model: "", writer_model: "", extract_model: "" })}>
             Go back to the environment's settings
           </Button>
         </div>

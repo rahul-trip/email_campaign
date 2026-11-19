@@ -88,7 +88,7 @@ Unknown variables are ignored (`extra="ignore"`). In the container, `.dockerigno
 1. Reads the workspace, and builds `BudgetPolicy.live_from(MONTHLY_CAPS_MICRO_USD)` and the meter (`DEFAULT_PRICES` merged with `PROVIDER_PRICES`).
 2. Wraps every vendor:
    - `MeteredSearch`;
-   - `MeteredLlm` (`DEFAULT_LLM_PRICES` merged with `LLM_PRICES`; a separate `MeteredLlm` for `LLM_COPY_MODEL` if set, else the same instance is reused for research and copy);
+   - `MeteredLlm` (`DEFAULT_LLM_PRICES` merged with `LLM_PRICES`; a separate `MeteredLlm` for `LLM_COPY_MODEL` if set (copy and the people step), and one for `LLM_EXTRACT_MODEL` if set (research); else the same instance is reused);
    - `MeteredRegistry` (if Companies House is configured);
    - the shared [lead directory](lead-directory.md) as the first finder, always, wrapped with `ttl=None` (never cached — every lookup is its own ledger row, `billed=False`, so hit rate and savings can be read back exactly), then one `MeteredFinder` per configured vendor finder;
    - `MeteredVerifier`;

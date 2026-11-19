@@ -210,6 +210,7 @@ const LLM_LABELS: [string, string][] = [
   ["llm_base_url", "Base URL"],
   ["llm_model", "Model"],
   ["llm_copy_model", "Writer model (blank: same)"],
+  ["llm_extract_model", "Research model (blank: same)"],
   ["llm_temperature", "Temperature"],
   ["llm_max_tokens", "Max tokens"],
 ];
@@ -219,7 +220,7 @@ type ChargeRow = { model: string; input: string; output: string };
 
 /** The models in use, each with its charge (or a blank row to fill in), then any others set. */
 function chargeRows(llm: Record<string, string | number>, charges: Charge[]): ChargeRow[] {
-  const inUse = [String(llm.llm_model ?? ""), String(llm.llm_copy_model ?? "")].filter(Boolean);
+  const inUse = [String(llm.llm_model ?? ""), String(llm.llm_copy_model ?? ""), String(llm.llm_extract_model ?? "")].filter(Boolean);
   const models = [...new Set([...inUse, ...charges.map((c) => c.model)])];
   return models.map((model) => {
     const found = charges.find((c) => c.model === model);
@@ -231,7 +232,7 @@ function LlmCard({ llm, charges, onSaved }: { llm: Record<string, string | numbe
   const [form, setForm] = useState<Record<string, string>>(Object.fromEntries(Object.entries(llm).map(([k, v]) => [k, String(v)])));
   const [rows, setRows] = useState<ChargeRow[]>(() => chargeRows(llm, charges));
   const priced = rows.filter((r) => r.model.trim() && r.input.trim() !== "" && r.output.trim() !== "");
-  const unpriced = [form.llm_model, form.llm_copy_model].filter((m) => m && m.trim() && !priced.some((r) => r.model.trim() === m.trim()));
+  const unpriced = [form.llm_model, form.llm_copy_model, form.llm_extract_model].filter((m) => m && m.trim() && !priced.some((r) => r.model.trim() === m.trim()));
   const setRow = (i: number, change: Partial<ChargeRow>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...change } : r)));
   const save = useMutation({
     mutationFn: () =>
@@ -242,6 +243,7 @@ function LlmCard({ llm, charges, onSaved }: { llm: Record<string, string | numbe
             llm_base_url: form.llm_base_url,
             llm_model: form.llm_model,
             llm_copy_model: form.llm_copy_model,
+            llm_extract_model: form.llm_extract_model,
             llm_temperature: Number(form.llm_temperature),
             llm_max_tokens: Number(form.llm_max_tokens),
             charges: priced.map((r) => ({ model: r.model.trim(), per_million_input: Number(r.input), per_million_output: Number(r.output) })),

@@ -471,7 +471,7 @@ export interface paths {
         get?: never;
         /**
          * Choose Models
-         * @description The model every call uses, and the one that writes emails.
+         * @description The model every call uses, the one that writes emails and the one that reads sites.
          */
         put: operations["choose_models_api_admin_models_default_put"];
         post?: never;
@@ -3573,6 +3573,11 @@ export interface components {
              */
             default_model?: string;
             /**
+             * Extract Model
+             * @default
+             */
+            extract_model?: string;
+            /**
              * Writer Model
              * @default
              */
@@ -4796,6 +4801,8 @@ export interface components {
             llm_base_url?: string | null;
             /** Llm Copy Model */
             llm_copy_model?: string | null;
+            /** Llm Extract Model */
+            llm_extract_model?: string | null;
             /** Llm Max Tokens */
             llm_max_tokens?: number | null;
             /** Llm Model */
@@ -6145,6 +6152,8 @@ export interface components {
         VendorsOut: {
             /** Default Model */
             default_model: string;
+            /** Extract Model */
+            extract_model: string;
             /** Llm */
             llm: {
                 [key: string]: string | number;

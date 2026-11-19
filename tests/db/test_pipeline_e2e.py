@@ -238,6 +238,23 @@ def test_the_email_is_written_by_the_writer_model_when_one_is_set(
     assert "actor" in writer.calls and "site" not in writer.calls
 
 
+def test_research_is_read_by_the_extraction_model_when_one_is_set(
+    engine: Engine, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    """Only research (site, news, people, fit) uses LLM_EXTRACT_MODEL; the rest stays as it was."""
+    world = World()
+    reader = FakeLlm()
+    reader.model = "fast/extraction-model"
+    pipeline, _ = build(
+        engine, factory, ws, world, providers=replace(world.providers(), extract_llm=reader)
+    )
+    pipeline.intake.run(ROWS)
+    pipeline.runner.run_pipeline()
+    assert "site" in reader.calls and "fit" in reader.calls
+    assert "site" not in world.llm.calls and "fit" not in world.llm.calls
+    assert "actor" in world.llm.calls  # who decides, and the copy, are not research
+
+
 def test_a_run_lists_every_lead_it_moved_held_or_failed_with_each_step(
     engine: Engine, factory: UnitOfWorkFactory, ws: str
 ) -> None:

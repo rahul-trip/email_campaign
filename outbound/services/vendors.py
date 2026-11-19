@@ -506,8 +506,10 @@ class VendorService:
             current, version = p.settings.get()
             if code not in current.models:
                 raise InvalidInput(f"there is no model {code!r}")
-            if code in (current.default_model, current.writer_model):
-                raise InvalidInput("choose another default (and writer) model before removing it")
+            if code in (current.default_model, current.writer_model, current.extract_model):
+                raise InvalidInput(
+                    "choose another default (writer, extraction) model before removing it"
+                )
             if p.vendor_keys.summaries().get(f"model:{code}"):
                 p.vendor_keys.remove(f"model:{code}", 1)
             models = {k: v for k, v in current.models.items() if k != code}
@@ -517,16 +519,19 @@ class VendorService:
             )  # fmt: skip
             p.commit()
 
-    def choose_models(self, default: str, writer: str, *, by: str | None) -> None:
-        """The model every call uses, and the one that writes emails ("": the default). An empty
-        default goes back to the LLM_* settings."""
+    def choose_models(
+        self, default: str, writer: str, extractor: str = "", *, by: str | None
+    ) -> None:
+        """The model every call uses, the one that writes emails and the one that reads sites,
+        news and people in research ("": the default). An empty default goes back to the LLM_*
+        settings."""
         with self._platform() as p:
             current, version = p.settings.get()
-            for code in (default, writer):
+            for code in (default, writer, extractor):
                 if code and code not in current.models:
                     raise InvalidInput(f"there is no model {code!r}")
-            if writer and not default:
-                raise InvalidInput("choose a default model before a writer model")
+            if (writer or extractor) and not default:
+                raise InvalidInput("choose a default model before a writer or extraction model")
             chosen = current.models.get(default)
             if (
                 chosen is not None
@@ -535,19 +540,23 @@ class VendorService:
                 and not self._fallback_key()
             ):
                 raise InvalidInput(f"{chosen.label} has no API key: add one before choosing it")
-            if writer and default:
-                one, two = current.models[default], current.models[writer]
-                if (one.provider, one.base_url) != (two.provider, two.base_url):
-                    raise InvalidInput(
-                        "the writer model must use the same provider and address as the default"
-                    )
+            for role, code in (("writer", writer), ("extraction", extractor)):
+                if code and default:
+                    one, two = current.models[default], current.models[code]
+                    if (one.provider, one.base_url) != (two.provider, two.base_url):
+                        raise InvalidInput(
+                            f"the {role} model must use the same provider and address "
+                            "as the default"
+                        )
             p.settings.save(
-                replace(current, default_model=default, writer_model=writer),
+                replace(
+                    current, default_model=default, writer_model=writer, extract_model=extractor
+                ),
                 expected_version=version,
             )
             p.audit.record(
                 "models_chosen", actor_user_id=by, target_type="model", target_id=default or None,
-                data={"default": default, "writer": writer},
+                data={"default": default, "writer": writer, "extraction": extractor},
             )  # fmt: skip
             p.commit()
 
@@ -560,7 +569,7 @@ class VendorService:
             if code not in current.models:
                 raise InvalidInput(f"there is no model {code!r}")
             keys = p.vendor_keys.current()
-        trial = replace(current, default_model=code, writer_model="")
+        trial = replace(current, default_model=code, writer_model="", extract_model="")
         update: dict[str, Any] = {**current.llm, **_model_update(trial, keys, {})}
         if "llm" in keys and "llm_api_key" not in update:
             update["llm_api_key"] = SecretStr(keys["llm"][0])
@@ -642,6 +651,7 @@ def _model_update(
     if chosen is None:
         return {}
     writer = settings.models.get(settings.writer_model)
+    extractor = settings.models.get(settings.extract_model)
     update: dict[str, Any] = {
         "llm_provider": chosen.provider,
         "llm_model": chosen.model,
@@ -650,6 +660,7 @@ def _model_update(
         "llm_max_tokens": chosen.max_tokens,
         "llm_reasoning_effort": chosen.reasoning_effort,
         "llm_copy_model": writer.model if writer else "",
+        "llm_extract_model": extractor.model if extractor else "",
     }
     own = keys.get(chosen.key_name)
     if own and "llm" not in settings.paused_vendors:

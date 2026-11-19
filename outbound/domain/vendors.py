@@ -42,6 +42,7 @@ LLM_FIELDS: dict[str, type] = {
     "llm_model": str,
     "llm_base_url": str,
     "llm_copy_model": str,
+    "llm_extract_model": str,
     "llm_temperature": float,
     "llm_max_tokens": int,
 }

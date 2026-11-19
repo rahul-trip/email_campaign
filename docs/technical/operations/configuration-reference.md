@@ -87,6 +87,7 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `COPILOT_API_KEY` | str | — | yes | D | Key for `github_copilot` |
 | `LLM_API_KEY` | str | — | yes | D | Key for `openai_compatible`, and the fallback for any preset |
 | `LLM_COPY_MODEL` | str | — (falls back to `LLM_MODEL`) | | D if different | A separate, usually stronger, model for the copy stage; research can stay on a cheaper model |
+| `LLM_EXTRACT_MODEL` | str | — (falls back to `LLM_MODEL`) | | D if different | A separate, usually faster and cheaper, model for research (reading a site, news, judging people, fit). Same provider, key and address as `LLM_MODEL`. Staff choose it under Vendors → AI models ("Use for research"), which sets this at run time |
 | `LLM_REASONING_EFFORT` | `low` \| `medium` \| `high` \| `""` | `""` | | D if used | Sent as `reasoning.effort` to a model that accepts it (e.g. via OpenRouter); counts against `LLM_MAX_TOKENS` |
 
 ## Mailboxes and OAuth

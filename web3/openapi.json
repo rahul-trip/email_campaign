@@ -1062,6 +1062,12 @@
             "title": "Default Model",
             "type": "string"
           },
+          "extract_model": {
+            "default": "",
+            "maxLength": 60,
+            "title": "Extract Model",
+            "type": "string"
+          },
           "writer_model": {
             "default": "",
             "maxLength": 60,
@@ -4903,6 +4909,18 @@
               }
             ],
             "title": "Llm Copy Model"
+          },
+          "llm_extract_model": {
+            "anyOf": [
+              {
+                "maxLength": 10000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Llm Extract Model"
           },
           "llm_max_tokens": {
             "anyOf": [
@@ -9089,6 +9107,10 @@
             "title": "Default Model",
             "type": "string"
           },
+          "extract_model": {
+            "title": "Extract Model",
+            "type": "string"
+          },
           "llm": {
             "additionalProperties": {
               "anyOf": [
@@ -9146,6 +9168,7 @@
           "models",
           "default_model",
           "writer_model",
+          "extract_model",
           "providers"
         ],
         "title": "VendorsOut",
@@ -11249,7 +11272,7 @@
     },
     "/api/admin/models/default": {
       "put": {
-        "description": "The model every call uses, and the one that writes emails.",
+        "description": "The model every call uses, the one that writes emails and the one that reads sites.",
         "operationId": "choose_models_api_admin_models_default_put",
         "requestBody": {
           "content": {

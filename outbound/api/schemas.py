@@ -1366,6 +1366,7 @@ class LlmModelIn(In):
 class ChooseModelsIn(In):
     default_model: str = Field(default="", max_length=60)  # "": the LLM_* settings
     writer_model: str = Field(default="", max_length=60)  # "": the default model writes too
+    extract_model: str = Field(default="", max_length=60)  # "": the default reads sites and news
 
 
 class VendorsOut(Out):
@@ -1375,6 +1376,7 @@ class VendorsOut(Out):
     models: list[LlmModelOut]
     default_model: str
     writer_model: str
+    extract_model: str
     providers: list[LlmProviderOut]
 
 
@@ -1397,6 +1399,7 @@ class LlmSettingsIn(In):
     llm_model: str | None = None
     llm_base_url: str | None = None
     llm_copy_model: str | None = None
+    llm_extract_model: str | None = None
     llm_temperature: float | None = None
     llm_max_tokens: int | None = None
     # Replaces every model's charge when given; omitted: the charges stay as they are.

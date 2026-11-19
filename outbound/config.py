@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     # Writer model for the first email; blank means LLM_MODEL (same provider, key and address).
     # Research can stay on a cheap model while the email is written by a stronger one.
     llm_copy_model: str = ""
+    # Model for the research steps (reading a site, news, judging people, fit): extraction, not
+    # writing, so a fast cheap model does it. Blank means LLM_MODEL (same provider, key, address).
+    llm_extract_model: str = ""
     # "low", "medium" or "high" for a reasoning model that accepts it (OpenRouter's
     # ``reasoning.effort``); blank sends nothing. Reasoning tokens count against LLM_MAX_TOKENS,
     # so a reasoning model with no limit can use the whole budget thinking and cut its answer.
