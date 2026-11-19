@@ -3560,6 +3560,101 @@
         "title": "FindEmailAgainOut",
         "type": "object"
       },
+      "FindPeopleIn": {
+        "additionalProperties": false,
+        "description": "Roles to look for (blank: the campaign's job titles) and what to do with who is found.",
+        "properties": {
+          "reach": {
+            "default": "none",
+            "enum": [
+              "none",
+              "email",
+              "linkedin",
+              "both"
+            ],
+            "title": "Reach",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "title": "FindPeopleIn",
+        "type": "object"
+      },
+      "FindPeopleManyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "company_ids": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Company Ids",
+            "type": "array"
+          },
+          "reach": {
+            "default": "none",
+            "enum": [
+              "none",
+              "email",
+              "linkedin",
+              "both"
+            ],
+            "title": "Reach",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 4,
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company_ids"
+        ],
+        "title": "FindPeopleManyIn",
+        "type": "object"
+      },
+      "FindPeopleManyOut": {
+        "properties": {
+          "leads": {
+            "items": {
+              "$ref": "#/components/schemas/FoundForLeadOut"
+            },
+            "title": "Leads",
+            "type": "array"
+          },
+          "queued_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued Run Id"
+          }
+        },
+        "required": [
+          "leads"
+        ],
+        "title": "FindPeopleManyOut",
+        "type": "object"
+      },
       "FitBandOut": {
         "properties": {
           "count": {
@@ -3669,6 +3764,47 @@
           "email"
         ],
         "title": "ForgotIn",
+        "type": "object"
+      },
+      "FoundForLeadOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "company_id": {
+            "title": "Company Id",
+            "type": "string"
+          },
+          "email_asked": {
+            "title": "Email Asked",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "found": {
+            "title": "Found",
+            "type": "integer"
+          },
+          "people": {
+            "items": {
+              "$ref": "#/components/schemas/ReachedPersonOut"
+            },
+            "title": "People",
+            "type": "array"
+          }
+        },
+        "required": [
+          "company_id",
+          "found",
+          "added",
+          "people",
+          "email_asked",
+          "error"
+        ],
+        "title": "FoundForLeadOut",
         "type": "object"
       },
       "FunnelOut": {
@@ -6004,6 +6140,25 @@
             "title": "Found",
             "type": "integer"
           },
+          "people": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReachedPersonOut"
+            },
+            "title": "People",
+            "type": "array"
+          },
+          "queued_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued Run Id"
+          },
           "retried": {
             "title": "Retried",
             "type": "boolean"
@@ -7023,6 +7178,63 @@
           "catch_all_share"
         ],
         "title": "QualityOut",
+        "type": "object"
+      },
+      "ReachedPersonOut": {
+        "properties": {
+          "confirmed": {
+            "title": "Confirmed",
+            "type": "boolean"
+          },
+          "contact_id": {
+            "title": "Contact Id",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "linkedin": {
+            "title": "Linkedin",
+            "type": "string"
+          },
+          "linkedin_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Url"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "contact_id",
+          "name",
+          "title",
+          "linkedin_url",
+          "confirmed",
+          "email",
+          "linkedin"
+        ],
+        "title": "ReachedPersonOut",
         "type": "object"
       },
       "ReadIn": {
@@ -13392,6 +13604,48 @@
         ]
       }
     },
+    "/api/companies/find-people": {
+      "post": {
+        "description": "The same search for up to 20 leads at once. Each lead costs AI credits; a lead whose\nsearch fails is reported on its own row and the rest go on.",
+        "operationId": "find_people_many_api_companies_find_people_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FindPeopleManyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindPeopleManyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Find People Many",
+        "tags": [
+          "leads"
+        ]
+      }
+    },
     "/api/companies/release-holds": {
       "post": {
         "description": "Release leads held only by your own choice (messaged on LinkedIn), in one run now.",
@@ -13904,7 +14158,7 @@
     },
     "/api/companies/{company_id}/find-people": {
       "post": {
-        "description": "Search again for the people who decide at this lead (up to two searches, one model call).",
+        "description": "Search again for people at this lead (up to two searches, one model call): the people who\ndecide by default, or the roles asked for. What is done for those found is the caller's\nchoice: nothing, find their email, write a LinkedIn message, or both.",
         "operationId": "find_people_api_companies__company_id__find_people_post",
         "parameters": [
           {
@@ -13917,6 +14171,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/FindPeopleIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

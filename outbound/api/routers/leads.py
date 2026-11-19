@@ -18,6 +18,10 @@ from outbound.api.schemas import (
     EmailOut,
     FindEmailAgainIn,
     FindEmailAgainOut,
+    FindPeopleIn,
+    FindPeopleManyIn,
+    FindPeopleManyOut,
+    FoundForLeadOut,
     JourneyOut,
     LeadOut,
     LeadSummaryOut,
@@ -30,6 +34,7 @@ from outbound.api.schemas import (
     PersonIn,
     PersonPatch,
     PolicySkipIn,
+    ReachedPersonOut,
     RecipientIn,
     ReleaseIn,
     RetryEmailOut,
@@ -42,7 +47,8 @@ from outbound.api.schemas import (
 from outbound.domain.enums import CompanySource, CompanyStatus, HoldReason
 from outbound.domain.outcomes import Bucket
 from outbound.domain.permissions import Permission as P
-from outbound.services.leads import LeadDetail
+from outbound.services.leads import LeadDetail, LeadError
+from outbound.services.people import Reach
 from outbound.services.runs import RunRequest
 
 router = APIRouter(prefix="/api", tags=["leads"])
@@ -440,9 +446,56 @@ def check_people(company_id: str, svc: Annotated[Services, Depends(services)]) -
     response_model=PeopleFoundOut,
     dependencies=[Depends(require(P.LEADS_WRITE))],
 )
-def find_people(company_id: str, svc: Annotated[Services, Depends(services)]) -> PeopleFoundOut:
-    """Search again for the people who decide at this lead (up to two searches, one model call)."""
-    return PeopleFoundOut.model_validate(svc.leads.find_people_again(company_id).__dict__)
+def find_people(
+    company_id: str,
+    svc: Annotated[Services, Depends(services)],
+    body: FindPeopleIn | None = None,
+) -> PeopleFoundOut:
+    """Search again for people at this lead (up to two searches, one model call): the people who
+    decide by default, or the roles asked for. What is done for those found is the caller's
+    choice: nothing, find their email, write a LinkedIn message, or both."""
+    body = body or FindPeopleIn()
+    result = svc.people.find(company_id, body.roles, Reach(body.reach))
+    if result.error:
+        raise LeadError(result.error)
+    run = svc.runs.queue(RunRequest()) if result.email_asked else None
+    return PeopleFoundOut(
+        found=result.found,
+        added=result.added,
+        works_here=result.works_here,
+        unsure=result.unsure,
+        retried=result.retried,
+        people=[ReachedPersonOut.model_validate(p) for p in result.people],
+        queued_run_id=run.id if run else None,
+    )
+
+
+@router.post(
+    "/companies/find-people",
+    response_model=FindPeopleManyOut,
+    dependencies=[Depends(require(P.LEADS_WRITE))],
+)
+def find_people_many(
+    body: FindPeopleManyIn, svc: Annotated[Services, Depends(services)]
+) -> FindPeopleManyOut:
+    """The same search for up to 20 leads at once. Each lead costs AI credits; a lead whose
+    search fails is reported on its own row and the rest go on."""
+    results = svc.people.find_many(body.company_ids, body.roles, Reach(body.reach))
+    run = svc.runs.queue(RunRequest()) if any(r.email_asked for r in results) else None
+    return FindPeopleManyOut(
+        leads=[
+            FoundForLeadOut(
+                company_id=r.company_id,
+                found=r.found,
+                added=r.added,
+                people=[ReachedPersonOut.model_validate(p) for p in r.people],
+                email_asked=r.email_asked,
+                error=r.error,
+            )
+            for r in results
+        ],
+        queued_run_id=run.id if run else None,
+    )
 
 
 @router.post(

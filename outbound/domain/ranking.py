@@ -56,7 +56,7 @@ _ROLE_NOUNS = frozenset(
     """chief officer president founder cofounder owner partner director head manager lead
     principal engineer developer analyst scientist architect consultant specialist trader
     strategist advisor adviser executive coordinator administrator controller planner buyer
-    procurement""".split()  # noqa: SIM905 - a long word list reads better as text
+    procurement recruiter recruiting recruitment talent hr sourcer staffing""".split()  # noqa: SIM905 - a long word list reads better as text
 )
 
 

@@ -10,6 +10,7 @@ import { FitBadge } from "../components/FitBadge";
 import { PolicySkip } from "../components/PolicySkip";
 import { SkipCheck } from "../components/SkipCheck";
 import { StatusBadge } from "../components/StatusBadge";
+import { FindPeopleDialog } from "../ui/FindPeople";
 import {
   Button,
   buttonClass,
@@ -613,32 +614,20 @@ function CheckPeople({ company, contacts, onDone }: { company: Company; contacts
     mutationFn: () => ok(client.POST("/api/companies/{company_id}/check-people", { params: { path: { company_id: company.id } } })),
     onSuccess: onDone,
   });
-  const findPeople = useMutation({
-    mutationFn: () => ok(client.POST("/api/companies/{company_id}/find-people", { params: { path: { company_id: company.id } } })),
-    onSuccess: onDone,
-  });
+  const [finding, setFinding] = useState(false);
   // Offered when nobody at the lead can be written to, or the people or email step failed for it.
   const nobody = !contacts.some((c) => WORKABLE.has(c.status));
   const stuck = company.status === "failed" && (company.failed_stage === "contacts" || company.failed_stage === "email");
   if (isViewing(workspace)) return null;
   return (
     <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3" data-tour="lead-check-people">
-      {(nobody || stuck) && (
-        <Button size="sm" busy={findPeople.isPending} onClick={() => findPeople.mutate()} title="Up to two searches for the people who decide here (the campaign's job titles), and one model call to place them">
-          Find people again
-        </Button>
-      )}
+      <Button size="sm" variant={nobody || stuck ? "primary" : "secondary"} onClick={() => setFinding(true)} title="Search this company for more people: the ones who decide, recruiters, or any role you name. You choose whether to find their email, write a LinkedIn message, or both">
+        {nobody || stuck ? "Find people again" : "Find more people"}
+      </Button>
       <Button size="sm" variant="secondary" busy={check.isPending} onClick={() => check.mutate()} title="One search per person and one model call: sets aside people whose profile says they work elsewhere">
         Check who works here
       </Button>
-      {findPeople.data && (
-        <span className="text-small text-muted" role="status">
-          {findPeople.data.added === 0
-            ? `Found ${findPeople.data.found}, nobody new.`
-            : `Added ${findPeople.data.added}: ${findPeople.data.works_here} work here, ${findPeople.data.unsure} to confirm.${findPeople.data.retried ? " The lead goes on at the next run." : ""}`}
-        </span>
-      )}
-      <Problem error={findPeople.error} />
+      {finding && <FindPeopleDialog targets={[{ id: company.id, name: company.name ?? company.domain }]} onClose={() => setFinding(false)} onDone={onDone} />}
       {check.data && (
         <span className="text-small text-muted" role="status">
           {check.data.checked === 0

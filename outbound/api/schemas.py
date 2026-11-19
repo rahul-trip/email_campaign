@@ -1496,12 +1496,49 @@ class PeopleCheckOut(Out):
     unsure: int
 
 
+class FindPeopleIn(In):
+    """Roles to look for (blank: the campaign's job titles) and what to do with who is found."""
+
+    roles: list[str] = Field(default_factory=list, max_length=4)
+    reach: Literal["none", "email", "linkedin", "both"] = "none"
+
+
+class ReachedPersonOut(Out):
+    contact_id: str
+    name: str
+    title: str | None
+    linkedin_url: str | None
+    confirmed: bool  # placed at the company; the rest wait for you to confirm them
+    email: str  # "asked", or why not; blank when not asked for
+    linkedin: str  # "written", or why not; blank when not asked for
+
+
 class PeopleFoundOut(Out):
     found: int  # profiles the search returned
     added: int  # new people at the lead (the rest were already there)
     works_here: int  # of those added, placed at the company
     unsure: int  # of those added, waiting for you to confirm
     retried: bool  # the lead had failed for want of a person and goes back to the people step
+    people: list[ReachedPersonOut] = []  # who was added, and what was done for each
+    queued_run_id: str | None = None  # a run is looking for the email addresses asked for
+
+
+class FindPeopleManyIn(FindPeopleIn):
+    company_ids: list[str] = Field(min_length=1, max_length=20)
+
+
+class FoundForLeadOut(Out):
+    company_id: str
+    found: int
+    added: int
+    people: list[ReachedPersonOut]
+    email_asked: int
+    error: str  # the search failed for this lead
+
+
+class FindPeopleManyOut(Out):
+    leads: list[FoundForLeadOut]
+    queued_run_id: str | None = None
 
 
 class NotHereIn(In):
