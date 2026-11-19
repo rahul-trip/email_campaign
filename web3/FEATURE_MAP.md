@@ -51,7 +51,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Sort leads by any column, either way | `companies?sort&direction` | Leads (Sort menu, direction arrow, column titles) |
 | Lead website icons | DuckDuckGo icon service (CSP `img-src`) | Leads (`ui/lead.tsx::LeadIcon`, initials if none) |
 | Set or remove a person's LinkedIn profile | `PATCH contacts/{id}` (`linkedin_url`) | Lead page: person **Remove**, **Edit** field |
-| Find people again | `POST companies/{id}/find-people` | Lead page, under People when nobody can be written to |
+| Find more people by role, with email, LinkedIn, both or neither | `POST companies/{id}/find-people`, `POST companies/find-people` | Lead page (People) · Leads page (the leads shown) |
 | Lead detail: status, next actions, edit fields | `companies/{id}` GET/PATCH | Lead detail header + inline edit (manual fields marked) |
 | Research again / requalify | `research-again`, `requalify` | Lead detail actions |
 | Qualification breakdown | `companies/{id}` | Lead detail "Why this lead" card |

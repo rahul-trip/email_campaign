@@ -501,7 +501,9 @@ class Runner:
         elif kind is not FailureKind.ERROR:
             wait = self._outcome_delay
         else:
-            wait = self._retry_delay * (company.attempts + 1)
+            wait = min(
+                self._retry_delay * 2**company.attempts, self._vendor_wait_cap
+            )  # 15m, 30m, 1h, 2h, 4h
         uow.companies.transition(
             company.id,
             CompanyStatus.FAILED,
