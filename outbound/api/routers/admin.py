@@ -75,6 +75,7 @@ from outbound.api.schemas import (
     VendorOut,
     VendorPauseIn,
     VendorsOut,
+    WorkerOut,
     WorkspaceRequestOut,
 )
 from outbound.db.errors import NotFound
@@ -265,6 +266,7 @@ def overview(_: Reader, service: Admin) -> OverviewOut:
         cost_by_provider=found.cost_by_provider,
         waiting=found.waiting,
         waiting_customers=found.waiting_customers,
+        worker=WorkerOut(**found.worker.__dict__),
         attention=[
             AttentionOut(
                 kind=a.kind,

@@ -1160,6 +1160,16 @@ class ApproveWorkspaceIn(In):
     website: str = Field(default="", max_length=255)
 
 
+class WorkerOut(Out):
+    alive: bool  # reported within the last three minutes
+    last_beat_at: datetime | None
+    threads: int | None  # workspaces it can work on at once
+    busy: int | None  # workspaces it was working on at its last report
+    overdue_ticks: int | None  # workspaces whose 15-minute pass is more than half an interval late
+    queued: int  # runs waiting for it, now
+    oldest_queued_seconds: int | None  # how long the longest-waiting one has waited
+
+
 class OverviewOut(Out):
     customers: int
     expiring: int
@@ -1171,6 +1181,7 @@ class OverviewOut(Out):
     cost_by_provider: dict[str, int]
     waiting: int
     waiting_customers: int
+    worker: WorkerOut
     attention: list[AttentionOut]
     activity: list[AuditOut]
 

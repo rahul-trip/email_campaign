@@ -41,6 +41,10 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `DATABASE_URL` | str | — | (holds a password) | — | Overrides the switch (tests, `--database-url`) |
 | `PLATFORM_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_PLATFORM_URL`'s resolution |
 | `MIGRATE_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_MIGRATE_URL`'s resolution |
+| `DATABASE_POOL_TIMEOUT` | float | 30 | | D if needed | Seconds a request for a database connection waits when all are in use (a queue, not a failure) |
+| `WORKER_DATABASE_POOL_SIZE` | int | 8 | | D if needed | Connections the worker keeps (it writes for several leads at once); count it in the pooler's client limit ([deployment](deployment.md)) |
+| `WORKER_THREADS` | int | 6 | | D if needed | Workspaces the worker works on at once (`outbound worker --threads`) |
+| `WORKER_LEAD_CONCURRENCY` | int | 4 | | D if needed | Leads in flight inside one stage of one workspace's run (`--lead-concurrency`); lower it if a vendor answers 429 ([ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)) |
 | `DATABASE_POOL_SIZE` | int | 5 | | D if needed | Connections per process, per engine; lower it for small Supabase plans ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
 
 ## Logging

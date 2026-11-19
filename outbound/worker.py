@@ -43,6 +43,8 @@ from outbound.services.staff_alerts import StaffAlerts
 
 log = get_logger(__name__)
 
+STATUS_EVERY = 60.0  # seconds between status lines and heartbeats
+
 Assemble = Callable[[str], Pipeline]  # workspace id -> a freshly assembled pipeline
 
 
@@ -144,6 +146,37 @@ class Worker:
                 and self._last_due_check.get(ws, never) <= checked_before
             ]
         return sorted(jobs, key=lambda job: self._last_served.get(job.workspace_id, never))
+
+    def status(self) -> dict[str, int | None]:
+        """How the worker is keeping up: what waits, for how long, and how late its ticks are."""
+        now = self._now()
+        with self._container.platform() as platform:
+            queued, oldest = platform.scheduler.queue_lag(now)
+            active = set(platform.scheduler.active_workspaces(now)) if self._tick_every else set()
+        late = (
+            sum(
+                1
+                for ws, at in self._last_tick.items()
+                if ws in active and at <= now - 1.5 * self._tick_every
+            )
+            if self._tick_every is not None
+            else 0
+        )
+        return {
+            "threads": self._threads,
+            "busy": len(self._busy),
+            "queued": queued,
+            "oldest_queued_seconds": int((now - oldest).total_seconds()) if oldest else None,
+            "overdue_ticks": late,
+        }
+
+    def heartbeat(self) -> None:
+        """Log the status and record that the worker is alive (the admin Overview reads it)."""
+        status = self.status()
+        log.info("worker_status", **status)
+        with self._container.platform() as platform:
+            platform.settings.beat_worker(dict(status))
+            platform.commit()
 
     def recover_stale(self) -> list[str]:
         """Fail running runs whose worker stopped; returns their ids."""
@@ -318,6 +351,7 @@ class Worker:
         running: dict[Future[bool], str] = {}
         last_recovery = 0.0
         last_periodic = 0.0
+        last_heartbeat = -STATUS_EVERY  # the first pass reports at once
         with ThreadPoolExecutor(max_workers=self._threads, thread_name_prefix="work") as pool:
             while not stop():
                 for future in [f for f in running if f.done()]:
@@ -326,6 +360,9 @@ class Worker:
                     if time.monotonic() - last_recovery > 60:
                         self.recover_stale()
                         last_recovery = time.monotonic()
+                    if time.monotonic() - last_heartbeat >= STATUS_EVERY:
+                        last_heartbeat = time.monotonic()
+                        self.heartbeat()
                     every = self._tick_every.total_seconds() if self._tick_every else None
                     if every and time.monotonic() - last_periodic > every:
                         last_periodic = time.monotonic()

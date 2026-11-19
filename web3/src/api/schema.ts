@@ -5131,6 +5131,7 @@ export interface components {
             waiting: number;
             /** Waiting Customers */
             waiting_customers: number;
+            worker: components["schemas"]["WorkerOut"];
         };
         /** PendingInviteOut */
         PendingInviteOut: {
@@ -6229,6 +6230,23 @@ export interface components {
             path: string;
             /** Secret */
             secret: string;
+        };
+        /** WorkerOut */
+        WorkerOut: {
+            /** Alive */
+            alive: boolean;
+            /** Busy */
+            busy: number | null;
+            /** Last Beat At */
+            last_beat_at: string | null;
+            /** Oldest Queued Seconds */
+            oldest_queued_seconds: number | null;
+            /** Overdue Ticks */
+            overdue_ticks: number | null;
+            /** Queued */
+            queued: number;
+            /** Threads */
+            threads: number | null;
         };
         /** WorkspaceRequestIn */
         WorkspaceRequestIn: {

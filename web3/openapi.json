@@ -5900,6 +5900,9 @@
           "waiting_customers": {
             "title": "Waiting Customers",
             "type": "integer"
+          },
+          "worker": {
+            "$ref": "#/components/schemas/WorkerOut"
           }
         },
         "required": [
@@ -5913,6 +5916,7 @@
           "cost_by_provider",
           "waiting",
           "waiting_customers",
+          "worker",
           "attention",
           "activity"
         ],
@@ -9343,6 +9347,85 @@
           "secret"
         ],
         "title": "WebhookSecretOut",
+        "type": "object"
+      },
+      "WorkerOut": {
+        "properties": {
+          "alive": {
+            "title": "Alive",
+            "type": "boolean"
+          },
+          "busy": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Busy"
+          },
+          "last_beat_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Beat At"
+          },
+          "oldest_queued_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oldest Queued Seconds"
+          },
+          "overdue_ticks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overdue Ticks"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "threads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threads"
+          }
+        },
+        "required": [
+          "alive",
+          "last_beat_at",
+          "threads",
+          "busy",
+          "overdue_ticks",
+          "queued",
+          "oldest_queued_seconds"
+        ],
+        "title": "WorkerOut",
         "type": "object"
       },
       "WorkspaceRequestIn": {

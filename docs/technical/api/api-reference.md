@@ -97,7 +97,7 @@ Behind `require_platform`, never a workspace permission — see [identity and ac
 
 | Method and path | Permission | Purpose |
 |---|---|---|
-| `GET /api/admin/overview`, `/customers` | `ADMIN_READ` | Platform-wide figures; the customer list |
+| `GET /api/admin/overview`, `/customers` | `ADMIN_READ` | Platform-wide figures (with `worker`: `alive`, `last_beat_at`, `threads`, `busy`, `overdue_ticks` as the worker last reported, and `queued` and `oldest_queued_seconds` read live); the customer list |
 | `GET /api/admin/customers/{workspace_id}` | `ADMIN_READ` | One customer's detail: plan, quota, members, mailboxes |
 | `PATCH /api/admin/customers/{workspace_id}/plan`, `/status` | `ADMIN_WRITE` | Change a customer's plan or `WorkspaceStatus` |
 | `POST /api/admin/customers/{workspace_id}/access` | `ADMIN_WRITE` | Set `access_until` |

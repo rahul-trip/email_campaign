@@ -126,3 +126,24 @@ def test_a_tick_more_than_an_interval_late_comes_before_the_queued_run(
     worker._last_tick[other_ws] = clock.at - EVERY_TICK  # merely due: its run goes first
     jobs = {job.workspace_id: job.task for job in worker.plan()}
     assert jobs == {ws: Task.TICK, other_ws: Task.RUN}
+
+
+def test_the_worker_reports_what_waits_and_who_is_late_and_records_that_it_is_alive(
+    worker_container: Container, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    clock = Clock()
+    worker = timed(worker_container, no_pipeline, clock)
+    assert worker.status() == {
+        "threads": 4, "busy": 0, "queued": 0, "oldest_queued_seconds": None, "overdue_ticks": 0,
+    }  # fmt: skip
+    queue(factory, ws)
+    clock.at += timedelta(minutes=5)
+    worker._busy = {ws}
+    worker._last_tick[ws] = clock.at - 2 * EVERY_TICK  # twice as late as it should be
+    status = worker.status()
+    assert status["busy"] == 1 and status["queued"] == 1 and status["overdue_ticks"] == 1
+    assert status["oldest_queued_seconds"] is not None and status["oldest_queued_seconds"] >= 299
+    worker.heartbeat()
+    with worker_container.platform() as platform:
+        beat = platform.settings.worker_beat()
+    assert beat is not None and beat[0]["queued"] == 1 and beat[0]["threads"] == 4

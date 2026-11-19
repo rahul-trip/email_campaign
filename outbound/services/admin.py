@@ -110,6 +110,23 @@ class WorkspaceRequest:
     at: datetime
 
 
+WORKER_ALIVE_WITHIN = timedelta(minutes=3)  # the worker reports every minute
+
+
+@dataclass(frozen=True)
+class WorkerStatus:
+    """How the one worker is keeping up. The queue is read live; the rest is what the worker
+    last reported about itself."""
+
+    alive: bool
+    last_beat_at: datetime | None
+    threads: int | None
+    busy: int | None
+    overdue_ticks: int | None
+    queued: int
+    oldest_queued_seconds: int | None
+
+
 @dataclass(frozen=True)
 class Overview:
     customers: int
@@ -122,6 +139,7 @@ class Overview:
     cost_by_provider: dict[str, int]
     waiting: int
     waiting_customers: int
+    worker: WorkerStatus
     attention: list[Attention]
     activity: list[dict[str, Any]]
 
@@ -161,6 +179,9 @@ class AdminService:
             cost_by_provider = figures.cost_by_provider(start, end)
             leads, drafts = figures.leads_added(start, end), figures.drafts_made(start, end)
             activity = p.audit.recent(limit=12)
+            beat = p.settings.worker_beat()
+            queued, oldest = p.scheduler.queue_lag(now)
+        reported = beat[0] if beat else {}
         names = {r.workspace.id: r.workspace.name for r in rows}
         attention = [
             Attention("credit_request", r.workspace.id, r.workspace.name, "asked for more credits")
@@ -209,6 +230,15 @@ class AdminService:
             cost_by_provider=cost_by_provider,
             waiting=sum(r.waiting for r in rows),
             waiting_customers=sum(1 for r in rows if r.waiting),
+            worker=WorkerStatus(
+                alive=bool(beat and now - beat[1] < WORKER_ALIVE_WITHIN),
+                last_beat_at=beat[1] if beat else None,
+                threads=reported.get("threads"),
+                busy=reported.get("busy"),
+                overdue_ticks=reported.get("overdue_ticks"),
+                queued=queued,
+                oldest_queued_seconds=int((now - oldest).total_seconds()) if oldest else None,
+            ),
             attention=attention,
             activity=[{**a, "workspace": names.get(a["workspace_id"] or "", "")} for a in activity],
         )

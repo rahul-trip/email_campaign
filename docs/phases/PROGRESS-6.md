@@ -180,6 +180,14 @@ On the live site the emails row of Today appeared about 14 s after the rest of t
 
 The Hot leads page is renamed **LinkedIn ready**, beside Emails ready (same `/linkedin` path; "hot lead" still means a fit above 80). On a phone the notifications panel hung from the bell, which is not at the screen's edge, so it ran off the left side; it was also see-through. It now spans the screen with a gutter under the header and is solid; larger screens keep the dropdown. Browser test: `web3/e2e/notifications-mobile.spec.ts`.
 
+## The worker for 10–15 workspaces (2026-11-19, branch `phase-6/worker-scale`, no migration, [ADR 0037](../technical/adr/0037-one-worker-process-leads-in-parallel.md))
+
+One worker process, sized for about 15 workspaces. In order of the commits: `scripts/lead_timings.py` (read-only: where a lead's time goes, the slowest calls); leads of a stage in parallel inside a run (`Runner(lead_concurrency)`, delivery stays one at a time); each lead carried through every stage back to back (`lead_flow`) so the first drafts come early; a two-minute light check for due leads and an immediate look after a pass that moved leads (the 15-minute tick keeps the mailbox work); searches made together inside a lead's research (`stages/together.py`; the meter's cache already covers repeats across runs); staff may choose a faster research model (Vendors → AI models → Use for research, `LLM_EXTRACT_MODEL`); settings `WORKER_THREADS` 6, `WORKER_LEAD_CONCURRENCY` 4, `WORKER_DATABASE_POOL_SIZE` 8, `DATABASE_POOL_TIMEOUT`; a tick a whole interval late goes before the queued run; `worker_status` every minute and a Worker card on the admin Overview (a heartbeat row in `platform_settings`, `id = 'worker'`).
+
+**Measured with `scripts/worker_load.py`** (fake vendors, every call 300 ms, 8 workspaces of 12 leads, SQLite): the first draft of a workspace after a median of 40 s with four threads and one lead at a time, stage by stage, and 3 s with the new settings; every run done in 68 s, and in 19 s with the new settings. It shows how the work is scheduled, not how fast Postgres or the real vendors are.
+
+**Open (live checks):** after the deploy run `scripts/lead_timings.py` against the live database and compare (time per lead, time to the first draft); confirm the worker's database clients plus the api's stay under the pooler's limit (`pg_stat_activity`; lower `DATABASE_POOL_SIZE` to 3 on a small plan); watch vendor 429s (`provider_retry` lines) at 4 leads in flight and lower `WORKER_LEAD_CONCURRENCY` if they appear ([R-55](../technical/tech-debt-and-risks.md)).
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.
