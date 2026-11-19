@@ -2,9 +2,13 @@
  * Collapsible sections, the page rule for web3: every section can fold, the first is open by
  * default, the rest closed, each shows a one-line summary while closed, and a group offers
  * "Expand all / Collapse all". A section remembers its state for this browser per page.
+ *
+ * "First" means first on the page, as the person sees it: sections appear as their data arrives
+ * and a filter can hide some, so the group reads the order from the page after each render
+ * rather than trusting the order in which the sections happened to mount.
  */
 import { ChevronDown, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cx } from "../lib/cx";
 
 type Group = {
@@ -29,7 +33,9 @@ function stored(key: string): Record<string, boolean> {
  */
 export function SectionGroup({ storageKey, children, className, toolbar = true }: { storageKey: string; children: ReactNode; className?: string; toolbar?: boolean }) {
   const key = `outbound.sections.${storageKey}`;
-  const order = useRef<string[]>([]);
+  const order = useRef<string[]>([]); // the order they first mounted: a guess until the page is read
+  const shown = useRef<HTMLDivElement>(null);
+  const [onPage, setOnPage] = useState<string[]>([]); // the order they are on the page
   const [state, setState] = useState<Record<string, boolean>>(() => stored(key));
   const [version, setVersion] = useState(0);
 
@@ -41,10 +47,18 @@ export function SectionGroup({ storageKey, children, className, toolbar = true }
     }
   }, [key, state]);
 
-  const register = useCallback((id: string) => {
-    if (!order.current.includes(id)) order.current.push(id);
-    return order.current.indexOf(id);
-  }, []);
+  useLayoutEffect(() => {
+    const ids = [...(shown.current?.querySelectorAll<HTMLElement>("[data-section-id]") ?? [])].map((el) => el.dataset.sectionId ?? "");
+    setOnPage((before) => (before.length === ids.length && before.every((id, i) => id === ids[i]) ? before : ids));
+  });
+
+  const register = useCallback(
+    (id: string) => {
+      if (!order.current.includes(id)) order.current.push(id);
+      return onPage.includes(id) ? onPage.indexOf(id) : order.current.indexOf(id);
+    },
+    [onPage],
+  );
   const isOpen = useCallback((id: string, index: number) => (id in state ? state[id]! : index === 0), [state]);
   const set = useCallback((id: string, open: boolean) => setState((s) => ({ ...s, [id]: open })), []);
   const all = (open: boolean) => {
@@ -55,7 +69,7 @@ export function SectionGroup({ storageKey, children, className, toolbar = true }
 
   return (
     <GroupContext.Provider value={value}>
-      <div className={cx("space-y-6", className)}>
+      <div ref={shown} className={cx("space-y-6", className)}>
         {toolbar && (
           <div className="-mb-2 flex justify-end gap-1 text-label">
             <button type="button" onClick={() => all(true)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-muted hover:bg-surface-2 hover:text-ink">
@@ -111,6 +125,7 @@ export function Section({
   return (
     <section
       data-tour={tour}
+      data-section-id={id}
       className={cx(
         "card overflow-hidden",
         tone === "attention" && "border-attention-dot/40",
