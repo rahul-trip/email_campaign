@@ -262,6 +262,21 @@ class ProviderCallRepository(ScopedRepository):
         self._session.flush()
         return row.id
 
+    def latencies_since(self, since: datetime, limit: int = 50_000) -> list[tuple[str, str, int]]:
+        """(vendor, operation, milliseconds) of the calls made since ``since`` that were really
+        made (an answer reused from the cache has no latency), newest first. For timing reports."""
+        stmt = (
+            select(ProviderCallRow.provider, ProviderCallRow.operation, ProviderCallRow.latency_ms)
+            .where(
+                ProviderCallRow.workspace_id == self._workspace_id,
+                ProviderCallRow.created_at >= since,
+                ProviderCallRow.latency_ms.is_not(None),
+            )
+            .order_by(ProviderCallRow.created_at.desc())
+            .limit(limit)
+        )
+        return [(p, o, int(ms)) for p, o, ms in self._session.execute(stmt) if ms is not None]
+
     def summary_for_run(self, run_id: str) -> list[RunCallSummary]:
         """The run's vendor calls grouped by vendor and operation, the costliest first."""
         stmt = (
