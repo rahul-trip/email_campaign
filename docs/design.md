@@ -99,6 +99,10 @@ Gently rounded: 6px on buttons and inputs, 8px on cards, pill-shaped status badg
 - Banner: full width under the header; attention or error colours.
 - Legal footer in emails: shaded block with a lock icon; it cannot be edited.
 
+## Logo
+
+The mark is **The Infinite Vector** (Stitch project `538951827606035367`, board "'O' Monogram Exploration Board", variation 3D): an indigo loop that closes into the letter O, and a teal arrow leaving it to the top right, beside the Inter wordmark "Outbound" in bold with tight tracking. In code it is `web3/src/ui/Logo.tsx::LogoMark`; the indigo is `--primary` and the teal is `--teal` (`#0d9488`, `#2dd4bf` in dark), so it follows both themes. Its detail depends on size: from 56px the loop carries a faint inner swirl, from 40px it curls round to meet the arrow, and below that it is the plain open loop with a heavier stroke, which stays clear at 16px. The favicon is `web3/public/favicon.svg`, the small version with fixed colours that switch for a dark browser. Use it bare, not in a coloured square.
+
 ## Collapsible cards
 
 A long page keeps its detail behind collapsible cards (`Card collapsible`). The title row is one button with a chevron (down when open, right when closed) and `aria-expanded`; the subtitle stays visible when closed and carries a one-line summary (a count, a cost, the latest event). Cards the reader acts in stay open; reference cards (tables, history, research, danger actions) start closed. A card opens by itself when the page expects the reader to act there (`forceOpen`), and the reader can still close it.

@@ -7,7 +7,8 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Check, Compass, Inbox, LogOut, Mail, Radar, ShieldCheck, Sparkles, Target, Users, Wand2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Compass, Inbox, LogOut, Mail, Radar, ShieldCheck, Sparkles, Target, Users } from "lucide-react";
+import { LogoMark } from "../ui/Logo";
 import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { useCurrent } from "../app/session";
@@ -240,9 +241,7 @@ function Frame({ children, progress, stepLabel }: { children?: ReactNode; progre
     <div className="min-h-screen bg-bg">
       <header className="glass sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line px-4 sm:px-6">
         <span className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet text-white shadow-2">
-            <Wand2 className="size-4" aria-hidden />
-          </span>
+          <LogoMark size={36} />
           <span className="text-heading font-bold text-ink">Outbound</span>
         </span>
         {progress !== undefined && (

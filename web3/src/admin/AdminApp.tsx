@@ -1,7 +1,8 @@
 /** The platform's own console (/admin): a separate shell so staff never mistake it for a
  * customer's workspace. Only platform admins and the alpha's superadmin get in. */
 import { Outlet, RouterProvider, createRootRoute, createRoute, createRouter, lazyRouteComponent } from "@tanstack/react-router";
-import { ArrowLeft, ClipboardList, Database, KeyRound, LayoutDashboard, LogOut, Settings, ShieldCheck, SlidersHorizontal, Users, UserCog, Zap } from "lucide-react";
+import { ArrowLeft, ClipboardList, Database, KeyRound, LayoutDashboard, LogOut, Settings, ShieldCheck, SlidersHorizontal, Users, UserCog } from "lucide-react";
+import { LogoMark } from "../ui/Logo";
 import { useMemo, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { SIGNED_OUT, actIn, client } from "../api/client";
@@ -34,9 +35,7 @@ function Layout() {
         </div>
         <header className="glass flex h-12 items-center gap-3 border-b border-line px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#5b21b6] to-primary text-white">
-              <Zap size={14} aria-hidden />
-            </span>
+            <LogoMark size={28} />
             <span className="text-lg font-bold tracking-tight">Outbound</span>
           </Link>
           <div className="ml-auto flex items-center gap-3 text-body">
