@@ -74,7 +74,7 @@ jobs:
       - run: uv run pytest tests
 
   web3:
-    name: web app, web3 (types, build, generated client, route parity with web2, browser tests with the tour)
+    name: web app, web3 (types, build, generated client, route parity with web2)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -101,9 +101,49 @@ jobs:
       - name: Every API route web2 uses is used by web3
         working-directory: web3
         run: npm run check:parity
-      - run: npx playwright install --with-deps chromium
+
+  # The browser tests take about 3.5 minutes in one piece. Each shard is a separate runner with its
+  # own server and database (scripts/e2e_server.py), so they cannot disturb each other, and the
+  # slowest one sets the time. Four shards bring the job to about two minutes.
+  web3-browser:
+    name: web app, web3 browser tests with the tour (${{ matrix.shard }} of 4)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web3/package-lock.json
+      - run: uv sync --frozen
+      - run: npm ci
         working-directory: web3
-      - run: npx playwright test
+      - run: npm run build
+        working-directory: web3
+      - name: Browser download, kept between runs
+        id: browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web3/package-lock.json') }}
+      - name: Install the browser
+        if: steps.browsers.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+        working-directory: web3
+      - name: Install the browser's system libraries
+        if: steps.browsers.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+        working-directory: web3
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
         working-directory: web3
 
   image:

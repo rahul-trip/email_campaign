@@ -14,7 +14,7 @@ GitHub Actions runs CI on every push to `main` and every pull request, and the m
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `.github/workflows/ci.yml` (`ci`) | push to `main`, pull request, `workflow_call` | Lint and types; tests on SQLite and on Postgres 16; `web` and `web2` builds and browser tests (with a stale-client check); Docker image build; security (gitleaks over full history, pip-audit, npm audit) |
+| `.github/workflows/ci.yml` (`ci`) | push to `main`, pull request, `workflow_call` | Lint and types; tests on SQLite and on Postgres 16; `web3` build and stale-client check, and its browser tests in four parallel shards; Docker image build; security (gitleaks over full history, pip-audit, npm audit) |
 | `.github/workflows/deploy.yml` (`deploy`) | `workflow_dispatch` (manual) | Optionally runs `ci.yml`, then deploys a commit to the VM over SSH |
 | `.github/dependabot.yml` | weekly | Update PRs for `uv`, `npm` in `/web` (not `/web2`) and GitHub Actions ([R-16](../tech-debt-and-risks.md#r-16--p2--supply-chain-gaps-in-update-and-pinning-coverage)) |
 
