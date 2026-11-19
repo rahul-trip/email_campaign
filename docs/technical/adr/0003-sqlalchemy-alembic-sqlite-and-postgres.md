@@ -34,4 +34,4 @@ One SQLAlchemy 2 model and one Alembic migration history serve both SQLite and P
 
 - `outbound/db/types.py` (`Json`, `UtcDateTime`, enum columns with `CHECK`); `outbound/db/migrations/env.py` (`render_as_batch=True`).
 - `tests/db/test_constraints.py` (CHECK lists equal the enums); `tests/db/conftest.py` (`TEST_DATABASE_URL`).
-- CI jobs `tests (SQLite)` and `tests (Postgres 16)` in `.github/workflows/ci.yml`.
+- CI jobs `Python tests on SQLite` and `Python tests on Postgres 16` in `.github/workflows/ci.yml`.
