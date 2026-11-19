@@ -9,15 +9,16 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flame, Keyboard, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
 import { cx } from "../lib/cx";
+import { ago, words } from "../lib/format";
 import type { LinkedInSearch } from "../router";
 import { Button, buttonClass, Card, Chip, Empty, Kbd, Label, PageHeader, Problem, Segmented, Select, Skeleton } from "../ui/core";
 import { FilterBar, FilterChip, SearchBox, SortControl, useDebounced } from "../ui/filters";
-import { LeadIcon } from "../ui/lead";
+import { EmailChip, LeadIcon } from "../ui/lead";
 import { Dialog } from "../ui/overlay";
 import { FitRing } from "../ui/viz";
 
@@ -342,10 +343,22 @@ function QueueStrip({ groups, current, onPick }: { groups: Group[]; current: str
   );
 }
 
-/** The company, why it fits, and a message card for each person written to there. */
+type Lead = Schemas["LeadOut"];
+type Contact = Schemas["ContactOut"];
+type NewsItem = { date?: string; headline: string; url: string };
+const WORKABLE = new Set(["candidate", "active"]);
+const safeLink = (url?: string | null) => (url && /^https?:\/\//i.test(url) ? url : null);
+
+/** The company, what research found that helps write to them, and a message card for each person there. */
 function Reader({ group, readOnly, onChanged }: { group: Group; readOnly: boolean; onChanged: () => void }) {
   const head = group.rows[0]!;
   const name = head.company_name ?? head.domain;
+  const companyId = head.item.company_id;
+  // The lead page's own query: opening the lead afterwards shows it at once.
+  const lead = useQuery({ queryKey: ["lead", companyId], queryFn: () => ok(client.GET("/api/companies/{company_id}", { params: { path: { company_id: companyId } } })) });
+  const contacts = new Map((lead.data?.contacts ?? []).map((c) => [c.id, c]));
+  const research = (lead.data?.company.research ?? {}) as Record<string, unknown>;
+  const sector = String(research.sector ?? "").trim();
   return (
     <div className="flex min-w-0 flex-col gap-4" data-tour="linkedin-reader">
       <Card className="overflow-hidden p-0">
@@ -353,13 +366,19 @@ function Reader({ group, readOnly, onChanged }: { group: Group; readOnly: boolea
           <div className="flex min-w-0 items-start gap-3">
             <LeadIcon domain={head.domain} name={name} />
             <div className="min-w-0">
-              <div className="break-words text-heading font-semibold text-ink">{name}</div>
+              <Link to="/leads/$companyId" params={{ companyId }} className="break-words text-heading font-semibold text-ink hover:text-primary hover:underline" title="Open the lead">
+                {name}
+              </Link>
+              <a href={`https://${head.domain}`} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 text-small text-muted hover:text-primary">
+                {head.domain} <ExternalLink className="size-3" aria-hidden />
+              </a>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {head.hot && (
                   <Chip tone="attention" title="A fit score above 80">
                     <Flame className="size-3.5" aria-hidden /> Hot
                   </Chip>
                 )}
+                {sector && <Chip tone="primary">{sector}</Chip>}
                 {hasNoEmail(head) && <Chip title="No email address could be proven, so LinkedIn is the way in">No email we could prove</Chip>}
                 {head.country_code && <Chip>{head.country_code}</Chip>}
                 <Chip>
@@ -370,29 +389,170 @@ function Reader({ group, readOnly, onChanged }: { group: Group; readOnly: boolea
           </div>
           <div className="flex items-center gap-3">
             <FitRing score={head.fit_score} size={44} />
-            <Link to="/leads/$companyId" params={{ companyId: head.item.company_id }} className="inline-flex items-center gap-1 text-small font-semibold text-primary hover:underline">
+            <Link to="/leads/$companyId" params={{ companyId }} className="inline-flex items-center gap-1 text-small font-semibold text-primary hover:underline">
               Open lead <ExternalLink className="size-3.5" aria-hidden />
             </Link>
           </div>
         </div>
         {head.fit_reason && (
-          <p className="px-4 py-3 text-small text-muted sm:px-6">
+          <p className="px-4 pt-3 text-small text-muted sm:px-6">
             <span className="font-semibold text-ink-2">Why it fits: </span>
             {head.fit_reason}
           </p>
         )}
+        <div className="px-4 pb-4 pt-3 sm:px-6">
+          {lead.isPending ? <Skeleton rows={3} /> : lead.isError ? <Problem error={lead.error} /> : <CompanyBrief lead={lead.data} />}
+        </div>
       </Card>
 
       <section aria-label={`Messages for ${name}`} className="flex min-w-0 flex-col gap-3">
         <Label className="px-1">
           People at {name} ({group.rows.length})
         </Label>
-        {group.rows.map((row) => (
-          <div key={row.item.id} className="min-w-0">
-            <LinkedInDraftCard draft={row.item} person={row.person} title={row.title} profile={row.profile} readOnly={readOnly} onChanged={onChanged} />
-          </div>
-        ))}
+        {group.rows.map((row) => {
+          const contact = contacts.get(row.item.contact_id);
+          return (
+            <LinkedInDraftCard
+              key={row.item.id}
+              draft={row.item}
+              person={row.person}
+              title={row.title}
+              profile={row.profile}
+              readOnly={readOnly}
+              onChanged={onChanged}
+              details={contact && lead.data ? <PersonFacts contact={contact} lead={lead.data} /> : undefined}
+            />
+          );
+        })}
       </section>
+    </div>
+  );
+}
+
+/** What research found that helps write to them: what they do, what to mention, why now, the news, hiring, and any email already on its way. */
+function CompanyBrief({ lead }: { lead: Lead }) {
+  const [more, setMore] = useState(false);
+  const research = (lead.company.research ?? {}) as Record<string, unknown>;
+  const summary = String(research.summary ?? "").trim();
+  const hiring = String(research.hiring ?? "").trim();
+  const hooks = ((research.hooks as string[] | undefined) ?? []).filter(Boolean);
+  const whyNow = String((research.qualification as { why_now?: string } | undefined)?.why_now ?? "").trim();
+  const news = [...((research.triggers as NewsItem[] | undefined) ?? []), ...((research.news_items as NewsItem[] | undefined) ?? [])].filter((n) => n?.headline).slice(0, 3);
+  const person = (id: string) => lead.contacts.find((c) => c.id === id)?.full_name ?? "someone here";
+  const waiting = lead.messages.find((m) => m.state === "generated" || m.state === "approved");
+  const sent = lead.messages.find((m) => m.state === "sent" || m.sent_at);
+  if (!summary && !hiring && !hooks.length && !whyNow && !news.length && !waiting && !sent) return <p className="text-small text-muted">Research found nothing more to show. The lead page has everything that is known.</p>;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {(waiting || sent) && (
+        <div className="rounded-lg border border-attention-dot/40 bg-attention-soft p-3 text-small text-ink lg:col-span-2" role="note">
+          {sent ? (
+            <>
+              <span className="font-semibold">Already emailed:</span> {person(sent.contact_id)}
+              {sent.sent_at && ` ${ago(sent.sent_at)}`}. Say so in your note, or write to someone else.
+            </>
+          ) : (
+            <>
+              <span className="font-semibold">An email to {person(waiting!.contact_id)} is {waiting!.state === "approved" ? "approved and on its way to your drafts" : "waiting for you"}.</span>{" "}
+              {waiting!.state === "generated" && (
+                <Link to="/review" search={{ message: waiting!.id }} className="font-semibold text-primary hover:underline">
+                  Open it in Emails ready
+                </Link>
+              )}{" "}
+              Marking a LinkedIn message as sent withdraws an email still waiting for review.
+            </>
+          )}
+        </div>
+      )}
+      {summary && (
+        <Brief title="What they do" className="lg:col-span-2">
+          <p className={cx("whitespace-pre-line", !more && "line-clamp-4")}>{summary}</p>
+          {summary.length > 320 && (
+            <button type="button" className="mt-1 text-small font-semibold text-primary hover:underline" onClick={() => setMore(!more)}>
+              {more ? "Show less" : "Show all"}
+            </button>
+          )}
+        </Brief>
+      )}
+      {hooks.length > 0 && (
+        <Brief title={`Worth mentioning (${hooks.length})`}>
+          <ul className="list-disc space-y-1 pl-5">
+            {hooks.slice(0, 5).map((hook) => (
+              <li key={hook}>{hook}</li>
+            ))}
+          </ul>
+        </Brief>
+      )}
+      {whyNow && (
+        <Brief title="Why now">
+          <p>{whyNow}</p>
+        </Brief>
+      )}
+      {news.length > 0 && (
+        <Brief title="In the news">
+          <ul className="space-y-1.5">
+            {news.map((item) => (
+              <li key={item.url + item.headline}>
+                {safeLink(item.url) ? (
+                  <a href={safeLink(item.url)!} target="_blank" rel="noreferrer" className="font-medium text-ink hover:text-primary hover:underline">
+                    {item.headline}
+                  </a>
+                ) : (
+                  <span className="font-medium text-ink">{item.headline}</span>
+                )}
+                {item.date && <span className="text-muted"> · {item.date}</span>}
+              </li>
+            ))}
+          </ul>
+        </Brief>
+      )}
+      {hiring && (
+        <Brief title="Hiring">
+          <p>{hiring}</p>
+        </Brief>
+      )}
+    </div>
+  );
+}
+
+function Brief({ title, className, children }: { title: string; className?: string; children: ReactNode }) {
+  return (
+    <div className={cx("min-w-0 rounded-lg border border-line bg-surface p-3 text-small leading-relaxed text-ink-2", className)}>
+      <div className="mb-1 text-label font-semibold uppercase tracking-wide text-muted">{title}</div>
+      {children}
+    </div>
+  );
+}
+
+/** One person: how senior, who found them, whether they are confirmed, their address and any email to them. */
+function PersonFacts({ contact, lead }: { contact: Contact; lead: Lead }) {
+  const address = contact.emails.find((e) => e.is_primary) ?? contact.emails[0];
+  const email = lead.messages.find((m) => m.contact_id === contact.id && m.state !== "rejected");
+  const confirmed = WORKABLE.has(contact.status);
+  return (
+    <div className="space-y-1.5 text-small">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {contact.rank === 1 && <Chip tone="primary" title="The engine's first choice at this company">First choice</Chip>}
+        {contact.seniority && contact.seniority !== "other" && <Chip>{words(contact.seniority)}</Chip>}
+        <Chip>{contact.source === "operator" ? "Added by you" : `Found by ${words(contact.source)}`}</Chip>
+        {!confirmed && <Chip tone="attention">{contact.status === "not_here" ? "No longer here" : "Unconfirmed: check they work here"}</Chip>}
+        {email && (
+          <Chip tone={email.state === "sent" ? "good" : "attention"}>
+            {email.state === "sent" ? `Emailed ${ago(email.sent_at)}` : email.state === "approved" ? "Email approved" : email.state === "generated" ? "Email waiting for you" : `Email ${words(email.state)}`}
+          </Chip>
+        )}
+      </div>
+      {!confirmed && contact.placement_note && <p className="text-muted">{contact.placement_note}</p>}
+      <div className="flex flex-wrap items-center gap-2 text-muted">
+        {address ? (
+          <>
+            <EmailChip address={address} />
+            <span className="break-all font-mono text-label">{address.email}</span>
+          </>
+        ) : (
+          <span>No email address found{contact.refresh_email ? " yet: the next run looks again" : ""}</span>
+        )}
+      </div>
     </div>
   );
 }

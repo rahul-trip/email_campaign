@@ -34,10 +34,36 @@ const row = (n: number, name: string, fit: number) => ({
 // A second person at the same company: they sit together under it.
 const second = (n: number, name: string) => ({ ...row(n, name, 89), item: { ...row(n, name, 89).item, id: `li-${n}b`, contact_id: `ct-${n}b` }, person: "Priya Rao", title: "Head of Talent" });
 
+// What the lead page would say about the company and its people: research, and who is at it.
+const lead = (companyId: string) => ({
+  company: {
+    id: companyId,
+    name: "Luminal",
+    domain: "luminal.example",
+    status: "failed",
+    research: {
+      sector: "Developer tools",
+      summary: "Luminal builds a compiler for machine-learning models and sells cloud inference to teams that cannot run their own GPUs.",
+      hooks: ["Raised a seed round in October", "Hiring a founding kernel engineer"],
+      hiring: "Three open engineering roles, all in San Francisco.",
+      qualification: { why_now: "A fresh round and open roles in exactly what we sell." },
+      news_items: [{ headline: "Luminal raises a $5M seed", date: "2026-10-02", url: "https://news.example/luminal" }],
+    },
+  },
+  contacts: [
+    { id: "ct-1", rank: 1, full_name: "Justin Burke", title: "Founding Engineer and Co-founder", seniority: "founder", linkedin_url: null, source: "search", status: "candidate", emails: [], refresh_email: false, placement_note: null },
+    { id: "ct-1b", rank: 2, full_name: "Priya Rao", title: "Head of Talent", seniority: "head", linkedin_url: null, source: "search", status: "unconfirmed", emails: [], refresh_email: false, placement_note: "Her profile does not name the company" },
+  ],
+  messages: [{ id: "em-1", contact_id: "ct-1", state: "generated", sent_at: null }],
+  notes: [],
+  held_at: null,
+});
+
 test("LinkedIn ready fits a phone: companies are a row to swipe, the people at one are together, nothing runs off the screen", async ({ page }) => {
   await signIn(page);
   const rows = [row(1, "Luminal", 89), second(1, "Luminal"), row(2, "Morph", 86), row(3, "Lightning", 91)];
   await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
+  await page.route("**/api/companies/co-*", (route) => route.fulfill({ json: lead(route.request().url().split("/").pop()!) }));
   await page.goto("/w/default/linkedin");
   await expect(page.getByText("Luminal").first()).toBeVisible();
 
@@ -60,9 +86,22 @@ test("LinkedIn ready fits a phone: companies are a row to swipe, the people at o
   // The chosen company reads below with both people, and its buttons stay on the screen.
   const reader = page.locator("[data-tour=linkedin-reader]");
   await expect(reader.getByText("People at Luminal (2)")).toBeVisible();
-  await expect(reader.getByText("Justin Burke")).toBeVisible();
-  await expect(reader.getByText("Priya Rao")).toBeVisible();
+  await expect(reader.getByText("Justin Burke", { exact: true })).toBeVisible();
+  await expect(reader.getByText("Priya Rao", { exact: true })).toBeVisible();
   await expect(reader.getByText("Connection note").first()).toBeVisible();
+
+  // Before sending, what is known: the company's research, and each person's standing.
+  await expect(reader.getByText("What they do")).toBeVisible();
+  await expect(reader.getByText("compiler for machine-learning models")).toBeVisible();
+  await expect(reader.getByText("Hiring a founding kernel engineer")).toBeVisible();
+  await expect(reader.getByText("A fresh round and open roles")).toBeVisible();
+  await expect(reader.getByRole("link", { name: "Luminal raises a $5M seed" })).toBeVisible();
+  await expect(reader.getByText("An email to Justin Burke is waiting for you")).toBeVisible();
+  await expect(reader.getByText("First choice")).toBeVisible();
+  await expect(reader.getByText("Unconfirmed: check they work here")).toBeVisible();
+  await expect(reader.getByText("Her profile does not name the company")).toBeVisible();
+  // The company is a link to its lead.
+  await expect(reader.getByRole("link", { name: "Luminal", exact: true }).first()).toHaveAttribute("href", /\/leads\/co-1$/);
   expect(await overflow()).toBeLessThanOrEqual(1);
   const past = await page.evaluate(() => {
     const out: string[] = [];
@@ -77,7 +116,7 @@ test("LinkedIn ready fits a phone: companies are a row to swipe, the people at o
   // Picking another company shows its people instead.
   await strip.locator(":scope > li").nth(1).getByRole("button").click();
   await expect(reader.getByText("People at Morph (1)")).toBeVisible();
-  await expect(reader.getByText("Priya Rao")).toBeHidden();
+  await expect(reader.getByText("Priya Rao", { exact: true })).toBeHidden();
 });
 
 // On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.

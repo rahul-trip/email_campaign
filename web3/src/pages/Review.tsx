@@ -314,7 +314,11 @@ function Reader({ item, onDone }: { item: Item; onDone: (company: string) => str
                   {address?.verification_skipped && <Chip tone="attention">Not verified: you skipped the check</Chip>}
                 </div>
                 <div className="truncate text-small text-muted">
-                  {item.contact.title ?? "Title unknown"} at {name} · <Mono>{address?.email ?? "no address"}</Mono>
+                  {item.contact.title ?? "Title unknown"} at{" "}
+                  <Link to="/leads/$companyId" params={{ companyId: company.id }} className="font-medium text-ink-2 underline decoration-line-strong underline-offset-2 hover:text-primary hover:decoration-primary">
+                    {name}
+                  </Link>{" "}
+                  · <Mono>{address?.email ?? "no address"}</Mono>
                 </div>
                 {address && (
                   <div className="mt-0.5 text-label text-faint">

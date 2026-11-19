@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Check, Copy, ExternalLink } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { cx } from "../lib/cx";
 import { ago, when } from "../lib/format";
@@ -85,6 +85,7 @@ export function LinkedInDraftCard({
   draft,
   person,
   title,
+  details,
   profile,
   readOnly,
   onChanged,
@@ -92,6 +93,8 @@ export function LinkedInDraftCard({
   draft: Draft;
   person?: string | null;
   title?: string | null;
+  /** What else is known about the person, shown under their name (the LinkedIn page passes it). */
+  details?: ReactNode;
   profile?: string | null;
   readOnly?: boolean;
   onChanged: () => void;
@@ -143,6 +146,7 @@ export function LinkedInDraftCard({
         {skipped && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-label font-medium text-muted">Skipped</span>}
         {draft.edited && !isSent && <span className="text-label text-muted">edited by you</span>}
       </div>
+      {details}
 
       {draft.issues.length > 0 && !isSent && (
         <Callout tone="attention" title="Check this before you send it">
