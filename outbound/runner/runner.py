@@ -10,6 +10,7 @@ answer is already in the ledger.
 from __future__ import annotations
 
 import contextvars
+import itertools
 import threading
 import time
 from collections import Counter
@@ -100,6 +101,7 @@ class Runner:
         max_attempts: int = ERROR_TRIES,
         max_outcome_attempts: int = OUTCOME_TRIES,
         lead_concurrency: int = 1,
+        lead_flow: bool = False,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._uow = uow_factory
@@ -113,6 +115,7 @@ class Runner:
         self._max_attempts = max_attempts
         self._max_outcome_attempts = max_outcome_attempts
         self._lead_concurrency = max(1, lead_concurrency)  # leads of one stage worked on at once
+        self._lead_flow = lead_flow  # carry each lead through the stages, not stage by stage
         self._read = Reader(uow_factory, workspace_id)
         self._now = now
 
@@ -148,9 +151,19 @@ class Runner:
             limit_per_stage=limit,
         )
         try:
-            for stage in self._stages:
-                if only and stage.name not in only:
-                    continue
+            active = [stage for stage in self._stages if not only or stage.name in only]
+            rest = active
+            if self._lead_flow and not only:
+                # Each lead goes through as many stages as it can in one go; what is left (a stage
+                # that works one lead at a time, such as delivery) runs as a pass of its own.
+                flowing = list(itertools.takewhile(lambda s: getattr(s, "parallel", True), active))
+                rest = active[len(flowing) :]
+                report.counts.update({stage.name: Counter() for stage in flowing})
+                self._run_flow(flowing, run_id, limit, report.counts)
+                if self._cancelled(run_id):
+                    status = RunStatus.CANCELLED
+                    rest = []
+            for stage in rest:
                 report.counts[stage.name] = self._run_stage(stage, run_id, limit)
                 if self._cancelled(run_id):
                     status = RunStatus.CANCELLED
@@ -214,6 +227,56 @@ class Runner:
                 if outcome is not None:
                     counts[outcome.value] += 1
         return counts
+
+    def _run_flow(
+        self,
+        stages: Sequence[Stage],
+        run_id: str,
+        limit: int,
+        counts: dict[str, Counter[str]],
+    ) -> None:
+        """Take every due lead through the stages one after another, several leads at a time.
+
+        A lead starts at the stage its status is waiting for and goes on while each step
+        advances it; it stops where it is held, failed, deferred, refused or finished. Leads
+        furthest along are taken first, so their drafts do not wait behind new leads' research.
+        Each step is the same ``_process`` as in a stage-by-stage run, so each writes its own
+        row and events; only the order in which leads and stages are visited differs.
+        """
+        with self._uow(self._workspace_id) as uow:
+            starts = [
+                (index, company.id)
+                for index in reversed(range(len(stages)))
+                for company in uow.companies.due(stages[index].input_status, limit, self._now())
+            ]
+        lock = threading.Lock()
+        stop = threading.Event()
+
+        def lead(start: int, company_id: str) -> None:
+            index = start
+            while index < len(stages):
+                if stop.is_set() or self._cancelled(run_id):
+                    stop.set()
+                    return
+                stage = stages[index]
+                outcome = self._process(stage, company_id, run_id)
+                if index > start and outcome is Outcome.SKIPPED:
+                    return  # no stage waits for it here: nothing was tried, so nothing is counted
+                with lock:
+                    counts[stage.name][outcome.value] += 1
+                if outcome is not Outcome.ADVANCED:
+                    return
+                index += 1
+
+        with ThreadPoolExecutor(
+            max_workers=self._lead_concurrency, thread_name_prefix="lead"
+        ) as pool:
+            futures = [
+                pool.submit(contextvars.copy_context().run, lead, start, company_id)
+                for start, company_id in starts
+            ]
+            for future in futures:
+                future.result()
 
     def _finish(self, run_id: str, status: RunStatus, report: RunReport) -> None:
         with self._uow(self._workspace_id) as uow:
