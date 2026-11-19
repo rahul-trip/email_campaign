@@ -452,6 +452,8 @@ class CompanyRepository(ScopedRepository):
             detail["failed_stage"] = row.failed_stage
             detail["error"] = last_error
             detail["kind"] = failure_kind.value
+            if vendor_wait:
+                detail["vendor_wait"] = True  # counted back from here to lengthen the next wait
         if run_id:
             detail["run_id"] = run_id
         self._events.append(EntityType.COMPANY, row.id, "status_changed", actor, detail)

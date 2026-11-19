@@ -215,7 +215,7 @@ Every lead is in one of five groups, and the app words them calmly:
 
 ### 5.3 Failed leads
 
-*(Called Needs a decision until 2026-11-20. Retrying a lead costs AI credits, so the page is named for what it holds and the engine retries by itself, with longer waits each time.)*
+*(Called Needs a decision until 2026-11-20. When no vendor can answer (out of credit, or down), a lead waits two hours, then four, eight, sixteen and a day at most, and no try is counted. Retrying a lead costs AI credits, so the page is named for what it holds and the engine retries by itself, with longer waits each time.)*
 
 A lead that stopped for want of an address, or whose last step broke, but has a LinkedIn message written for someone there, is **not** listed here: it counts as a success (*Message on LinkedIn*) and is on **LinkedIn ready**, whatever its fit.
 

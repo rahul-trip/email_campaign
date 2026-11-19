@@ -81,6 +81,18 @@ class EventRepository:
         )
         return [snapshot(row, Event) for row in self._session.scalars(stmt)]
 
+    def vendor_waits_since(self, entity_type: EntityType, entity_id: str, since: datetime) -> int:
+        """How many times this row failed because no vendor could answer, since ``since``. The
+        runner lengthens the wait after each, so a vendor that stays down is asked less often."""
+        stmt = select(EventRow.data).where(
+            EventRow.workspace_id == self._workspace_id,
+            EventRow.entity_type == entity_type,
+            EventRow.entity_id == entity_id,
+            EventRow.type == "status_changed",
+            EventRow.created_at >= since,
+        )
+        return sum(1 for data in self._session.scalars(stmt) if data.get("vendor_wait"))
+
     def status_changes_since(
         self, entity_type: EntityType, since: datetime
     ) -> list[tuple[str, str, datetime]]:
