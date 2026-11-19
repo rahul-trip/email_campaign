@@ -37,6 +37,7 @@ import {
 } from "../ui/compat";
 import { cx } from "../lib/cx";
 import { Chip } from "../ui/core";
+import { LeadIcon } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 import { ago, credits, plainError, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
@@ -134,7 +135,12 @@ export function LeadDetailPage() {
               / <span className="text-ink">{company.name ?? company.domain}</span>
             </>
           }
-          title={company.name ?? company.domain}
+          title={
+            <span className="flex min-w-0 items-center gap-3">
+              <LeadIcon domain={company.domain} name={company.name ?? company.domain} size="lg" />
+              <span className="min-w-0 break-words">{company.name ?? company.domain}</span>
+            </span>
+          }
           subtitle={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <a href={`https://${company.domain}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-mono text-small hover:text-primary">

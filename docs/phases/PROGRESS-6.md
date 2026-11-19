@@ -172,6 +172,10 @@ Signed in to the deployed app and went through every screen on a laptop (1440) a
 
 On the live site the emails row of Today appeared about 14 s after the rest of the page: `GET /api/review` took 11.7 s and sent 689 KB for 44 waiting emails, because the queue was read a few rows at a time for every email (about six queries each, with the database 30 ms away) and carried each lead's whole research record; the other requests queued behind it. The queue is now read in six queries however long it is; `GET /api/review` takes `limit`, `best` and `slim`; the status answer has `waiting_hot`; Today asks for its ten best, slim, every 30 s, shows placeholders while they arrive and takes its "N are hot leads" from the status. Browser test: `web3/e2e/today-fast.spec.ts`; backend: `tests/db/test_review_queue.py`.
 
+## Company logos on the lead page and Emails ready (2026-11-19, branch `phase-6/lead-logos`, no migration)
+
+`LeadIcon` (the website's icon, initials when it has none) gets a large size and now marks the lead on its own page (beside the name, in the heading), on each Emails ready queue card (the fit ring moved to the right, as on Hot leads), in the reader's header (it showed initials before) and on Today's email cards. Browser test: `web3/e2e/lead-logos.spec.ts` (the icon service is stubbed).
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

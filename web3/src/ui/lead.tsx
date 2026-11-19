@@ -11,13 +11,14 @@ import { Avatar, Chip } from "./core";
  * allows only that host). Only a plain domain is asked for; anything else, or an icon that does
  * not load, shows the lead's initials instead.
  */
-export function LeadIcon({ domain, name, className }: { domain: string; name: string; className?: string }) {
+export function LeadIcon({ domain, name, className, size = "md" }: { domain: string; name: string; className?: string; size?: "md" | "lg" }) {
   const [failed, setFailed] = useState(false);
   const plain = /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain) ? domain.toLowerCase() : null;
-  if (!plain || failed) return <Avatar name={name} className={className} />;
+  const big = size === "lg"; // "lg" is for a page's own header; "md" is for rows and cards
+  if (!plain || failed) return <Avatar name={name} className={cx(big && "size-12 text-heading", className)} />;
   return (
-    <span aria-hidden className={cx("inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-line bg-surface", className)}>
-      <img src={`https://icons.duckduckgo.com/ip3/${plain}.ico`} alt="" width={20} height={20} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="size-5" />
+    <span aria-hidden data-lead-logo className={cx("inline-flex shrink-0 items-center justify-center overflow-hidden border border-line bg-surface", big ? "size-12 rounded-2xl" : "size-9 rounded-xl", className)}>
+      <img src={`https://icons.duckduckgo.com/ip3/${plain}.ico`} alt="" width={big ? 28 : 20} height={big ? 28 : 20} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className={big ? "size-7" : "size-5"} />
     </span>
   );
 }
