@@ -32,10 +32,10 @@ test("Needs a decision can be searched and filtered, and a row opens its details
   await expect(rows.filter({ hasText: first })).toBeVisible();
 });
 
-test("Hot leads has filters and sort in the address, and a clear way back", async ({ page }) => {
+test("LinkedIn ready has filters and sort in the address, and a clear way back", async ({ page }) => {
   await signIn(page);
   await page.goto("/linkedin");
-  await expect(page.getByRole("heading", { name: "Hot leads" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "LinkedIn ready" })).toBeVisible();
   await page.getByRole("button", { name: /Hot only/ }).click();
   await expect(page).toHaveURL(/hot=true/);
   await page.getByLabel("Sort by").selectOption("company");

@@ -1,5 +1,5 @@
 /**
- * Hot leads: every LinkedIn message written for a confirmed decision-maker, best fit first. Filter
+ * LinkedIn ready: every LinkedIn message written for a confirmed decision-maker, best fit first. Filter
  * by state, hot, whether an email could be proven, fit, country and text; sort any way; each row
  * folds (the first is open) and has a one-click "copy the note and open their profile".
  * Nothing is sent from here: the messages are pasted into LinkedIn by hand.
@@ -70,7 +70,7 @@ export function LinkedInPage() {
   return (
     <>
       <PageHeader
-        title="Hot leads"
+        title="LinkedIn ready"
         subtitle="Hot leads first. A connection note and a first message for each confirmed decision-maker, written before their email is found, so a lead with no email we could prove still has a way in. Copy them into LinkedIn yourself: nothing is sent from here."
         actions={
           <div className="flex flex-wrap gap-2">
@@ -171,7 +171,7 @@ export function LinkedInPage() {
         // On a phone the leads are cards to swipe through, one after another; from a tablet up they are a list.
         <div
           role="region"
-          aria-label="Hot leads, swipe sideways on a phone"
+          aria-label="LinkedIn messages, swipe sideways on a phone"
           tabIndex={0}
           className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto scroll-px-4 px-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-primary sm:mx-0 sm:block sm:space-y-3 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[88%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto"
           data-tour="linkedin-list"

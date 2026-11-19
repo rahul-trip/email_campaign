@@ -95,7 +95,13 @@ export function NotificationBell() {
         {unread > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-error-dot px-1 text-center font-mono text-label font-semibold leading-4 text-white">{unread}</span>}
       </button>
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-full z-50 mt-2 w-96 max-w-[calc(100vw-1.5rem)] rounded-2xl border border-line shadow-3 glass animate-rise">
+        <div
+          role="dialog"
+          aria-label="Notifications"
+          // On a phone the bell is not at the screen's edge, so a panel hung from it ran off the left side: there it spans
+          // the screen (with a gutter) just under the header. It is solid, not see-through, so the page does not show through.
+          className="fixed inset-x-3 z-50 mt-2 rounded-2xl border border-line bg-surface shadow-3 animate-rise sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-96"
+        >
           <div className="flex items-center justify-between border-b border-line px-3 py-2 text-small">
             <span className="font-semibold">Notifications</span>
             {unread > 0 && (
@@ -107,7 +113,7 @@ export function NotificationBell() {
           {(notices.data?.items ?? []).length === 0 ? (
             <p className="px-3 py-6 text-center text-small text-muted">Nothing yet.</p>
           ) : (
-            <ul className="max-h-96 divide-y divide-line overflow-y-auto">
+            <ul className="max-h-[min(24rem,70dvh)] divide-y divide-line overflow-y-auto">
               {notices.data!.items.map((n) => (
                 <li key={n.id}>
                   <button type="button" onClick={() => open1(n)} className={cx("flex w-full items-start gap-2.5 px-3 py-2.5 text-left text-body hover:bg-surface-2", !n.read && "bg-primary-soft")}>
