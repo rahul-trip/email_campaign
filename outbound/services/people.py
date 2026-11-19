@@ -14,6 +14,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import StrEnum
 
+from sqlalchemy.exc import IntegrityError
+
 from outbound.db.errors import NotFound
 from outbound.domain.enums import WORKABLE_CONTACT_STATUSES
 from outbound.providers.errors import ProviderError
@@ -67,7 +69,10 @@ class PeopleSearch:
         found, and do ``reach`` for those placed at the company. A failure for one person is
         recorded on that person; a failed search is recorded on the lead."""
         try:
-            found = self._leads.find_people_again(company_id, roles=roles)
+            try:
+                found = self._leads.find_people_again(company_id, roles=roles)
+            except IntegrityError:  # another lead, searched at the same moment, took that profile
+                found = self._leads.find_people_again(company_id, roles=roles)
         except (LeadError, ProviderError, NotFound) as error:
             return FoundForLead(company_id, error=str(error)[:300])
         people = tuple(self._reach(p, reach) for p in found.people)
