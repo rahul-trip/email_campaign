@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import partial
 from urllib.parse import urlsplit
 
 from outbound.domain.names import mentions_company, read_profile_title, search_name
 from outbound.domain.placement import Placed, Placement, place_by_rules, without_name
 from outbound.providers.errors import ProviderError
-from outbound.providers.ports import SearchProvider
+from outbound.providers.ports import SearchHit, SearchProvider
+from outbound.stages.together import together_tolerant
 
 
 def _words(text: str) -> list[str]:
@@ -108,17 +110,24 @@ def find_linkedin_many(
     employer = search_name(company_name) or domain
     found: dict[str, str] = {}
     taken: set[str] = set()
-    for start in range(0, len(names), NAMES_PER_SEARCH):
-        chunk = names[start : start + NAMES_PER_SEARCH]
+    chunks = [
+        names[start : start + NAMES_PER_SEARCH] for start in range(0, len(names), NAMES_PER_SEARCH)
+    ]
+
+    def ask(chunk: list[str]) -> list[SearchHit]:
         people = " OR ".join(f'"{n}"' for n in chunk)
         query = (
             f'site:linkedin.com/in ({people}) "{employer}"'
             if len(chunk) > 1
             else (f'site:linkedin.com/in "{chunk[0]}" "{employer}"')
         )
-        try:
-            hits = search.search(query, max_results=min(20, 4 * len(chunk) + 1))
-        except ProviderError:
+        return search.search(query, max_results=min(20, 4 * len(chunk) + 1))
+
+    # The searches are independent, so they are made together; the hits are then read in order,
+    # so which name takes which profile is the same as asking one after another.
+    answers = together_tolerant([partial(ask, chunk) for chunk in chunks])
+    for chunk, hits in zip(chunks, answers, strict=True):
+        if isinstance(hits, ProviderError):
             continue
         for hit in hits:
             address = profile_address(hit.url)

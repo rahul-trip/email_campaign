@@ -26,6 +26,7 @@ from collections.abc import Collection, Hashable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
+from functools import partial
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -58,6 +59,7 @@ from outbound.stages.research.facts import (
     infer_country,
 )
 from outbound.stages.research.linkedin import find_linkedin_many
+from outbound.stages.together import together, together_tolerant
 
 log = get_logger(__name__)
 
@@ -406,10 +408,9 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
         name = _company(state)
         site = state.get("site_facts") or SiteFacts()
         asks = bool(inp.questions)
-        company_hits: list[SearchHit] = []
-        market_hits: list[SearchHit] = []
-        try:
-            company_hits = _dated(
+
+        def company_news() -> list[SearchHit]:
+            hits = _dated(
                 deps.search.search(
                     f'"{name}"', max_results=8, topic="news", days=COMPANY_NEWS_DAYS
                 ),
@@ -417,37 +418,47 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
             )
             # A news hit must use the company's whole name. The website's name alone is not enough
             # here: "Acme" matches every Acme in the news, and a wrong story is worse than none.
-            company_hits = [
-                h for h in company_hits if mentions_company(f"{h.title} {h.snippet}", name, "")
-            ]
-            market_hits = (
-                _dated(
-                    deps.search.search(
-                        f"{site.sector.strip()} {MARKET_TERMS}",
-                        max_results=6,
-                        topic="news",
-                        days=MARKET_NEWS_DAYS,
-                    ),
-                    MARKET_NEWS_DAYS,
-                )
-                if site.sector.strip()
-                else []
+            return [h for h in hits if mentions_company(f"{h.title} {h.snippet}", name, "")]
+
+        def market_news() -> list[SearchHit]:
+            if not site.sector.strip():
+                return []
+            return _dated(
+                deps.search.search(
+                    f"{site.sector.strip()} {MARKET_TERMS}",
+                    max_results=6,
+                    topic="news",
+                    days=MARKET_NEWS_DAYS,
+                ),
+                MARKET_NEWS_DAYS,
             )
-        except BudgetExceeded:
-            raise
-        except ProviderError as error:
+
+        def careers() -> list[SearchHit]:
+            return deps.search.search(
+                f"{name} {inp.domain} careers hiring technology", max_results=5
+            )
+
+        # The searches do not depend on each other, so they are made together.
+        found = together_tolerant([company_news, market_news, *([careers] if asks else [])])
+        company_hits: list[SearchHit] = []
+        market_hits: list[SearchHit] = []
+        if isinstance(found[0], ProviderError) or isinstance(found[1], ProviderError):
             # News makes the email better but is not worth failing the lead for.
-            log.warning("news_search_failed", reason=str(error)[:200])
-            company_hits, market_hits = [], []
+            failed = found[0] if isinstance(found[0], ProviderError) else found[1]
+            log.warning("news_search_failed", reason=str(failed)[:200])
+        else:
+            company_hits, market_hits = found[0], found[1]
+        careers_hits: list[SearchHit] = []
+        if asks:
+            if isinstance(found[2], ProviderError):
+                raise found[2]  # as before: the signals need this search
+            careers_hits = found[2]
         if not asks and not company_hits and not market_hits:
             return {"news_items": [], "triggers": []}
         company_list = _numbered(company_hits)
         market_list = _numbered(market_hits, start=len(company_hits) + 1)
         picked: NewsFacts
         if asks:
-            hits = deps.search.search(
-                f"{name} {inp.domain} careers hiring technology", max_results=5
-            )
             picked = ask(
                 deps.llm,
                 prompts.NEWS_SIGNALS_SYSTEM_PROMPT,
@@ -459,7 +470,7 @@ def build_research_graph(deps: ResearchDeps):  # type: ignore[no-untyped-def]
                     market_hits=market_list,
                     questions=inp.questions,
                     pages=_joined(state["page_text"]),
-                    search_snippets="\n".join(f"- {h.title}: {h.snippet}" for h in hits),
+                    search_snippets="\n".join(f"- {h.title}: {h.snippet}" for h in careers_hits),
                 ),
                 NewsSignalFacts,
                 temperature=EXTRACTION_TEMPERATURE,
@@ -664,11 +675,13 @@ def search_people(
     at the company. Nobody is dropped, so a rerun does not find them again as new.
     """
     roles = [t for t in target_titles if is_role(t)][:4]  # "BESS integrators" finds nobody
-    hits: list[SearchHit] = []
-    for start in range(0, len(roles), 2):  # two searches at most, two titles each
+    queries = []  # two searches at most, two titles each
+    for start in range(0, len(roles), 2):
         titles = " OR ".join(f'"{t}"' for t in roles[start : start + 2])
-        query = f'site:linkedin.com/in "{company_name}" ({titles})'
-        hits += search.search(query, max_results=10)
+        queries.append(f'site:linkedin.com/in "{company_name}" ({titles})')
+    hits: list[SearchHit] = []
+    for found in together([partial(search.search, q, max_results=10) for q in queries]):
+        hits += found
     people: list[Person] = []
     for hit in hits:
         if "linkedin.com/in/" not in hit.url:
