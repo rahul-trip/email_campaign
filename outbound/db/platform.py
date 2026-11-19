@@ -81,6 +81,17 @@ class SchedulerQueries:
         )
         return list(self._session.scalars(stmt))
 
+    def queue_lag(self, now: datetime | None = None) -> tuple[int, datetime | None]:
+        """How many runs wait for the worker, and since when the oldest has waited."""
+        stmt = (
+            select(func.count(RunRow.id), func.min(RunRow.created_at))
+            .join(WorkspaceRow, WorkspaceRow.id == RunRow.workspace_id)
+            .outerjoin(WorkspacePlanRow, WorkspacePlanRow.workspace_id == WorkspaceRow.id)
+            .where(RunRow.status == RunStatus.QUEUED, self._may_run(now or utcnow()))
+        )
+        count, oldest = self._session.execute(stmt).one()
+        return int(count or 0), oldest
+
     def with_stale_runs(self, cutoff: datetime) -> list[str]:
         """Workspaces with a running run and no heartbeat since ``cutoff``."""
         stmt = (

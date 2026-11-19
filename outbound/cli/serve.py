@@ -139,10 +139,21 @@ def register(app: typer.Typer) -> None:
     @app.command()
     def worker(
         poll_seconds: Annotated[float, typer.Option(help="Wait between checks when idle.")] = 2.0,
-        threads: Annotated[int, typer.Option(help="Workspaces worked on at the same time.")] = 4,
+        threads: Annotated[
+            int | None, typer.Option(help="Workspaces worked on at once (WORKER_THREADS).")
+        ] = None,
+        lead_concurrency: Annotated[
+            int | None,
+            typer.Option(
+                help="Leads in flight in one workspace's stage (WORKER_LEAD_CONCURRENCY)."
+            ),
+        ] = None,
         tick_minutes: Annotated[
             float, typer.Option(help="Retries, mailbox sync and due leads, this often (0: never).")
         ] = 15,
+        check_minutes: Annotated[
+            float, typer.Option(help="A light check for due leads, this often (0: only the tick).")
+        ] = 2,
         database_url: DatabaseUrl = None,
     ) -> None:
         """Execute queued runs and the periodic tick for every workspace, until stopped."""
@@ -153,7 +164,15 @@ def register(app: typer.Typer) -> None:
         from outbound.services.staff_alerts import StaffAlerts
         from outbound.worker import Worker, workspace_names
 
-        container = build_container(settings_for(database_url))
+        base = settings_for(database_url)
+        threads = base.worker_threads if threads is None else threads
+        lead_concurrency = (
+            base.worker_lead_concurrency if lead_concurrency is None else lead_concurrency
+        )
+        # The worker works on several workspaces and leads at once, so its pool is larger.
+        container = build_container(
+            base.model_copy(update={"database_pool_size": base.worker_database_pool_size})
+        )
         refuse_unsafe_database(container)
         from outbound.services.vendors import LiveProviders, VendorService
 
@@ -168,7 +187,10 @@ def register(app: typer.Typer) -> None:
             "service_started",
             role="worker",
             threads=threads,
+            lead_concurrency=lead_concurrency,
+            pool_size=container.settings.database_pool_size,
             tick_minutes=tick_minutes,
+            check_minutes=check_minutes,
             poll_seconds=poll_seconds,
             database=container.engine.url.render_as_string(hide_password=True),
         )
@@ -194,9 +216,16 @@ def register(app: typer.Typer) -> None:
         activity = ActivityNotifier(container.uow, container.identity, workspace_names(container))
         engine = Worker(
             container,
-            lambda workspace_id: assemble(container, workspace_id, live.get()),
+            lambda workspace_id: assemble(
+                container,
+                workspace_id,
+                live.get(),
+                lead_concurrency=lead_concurrency,
+                lead_flow=True,
+            ),
             threads=threads,
             tick_every=tick_every,
+            due_check_every=timedelta(minutes=check_minutes) if check_minutes > 0 else None,
             periodic=[
                 lambda: _enforce_caps(vendors, notices),
                 lambda: _credit_check(vendors, notices),

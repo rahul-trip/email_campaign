@@ -64,6 +64,7 @@ class PlatformSettings:
     models: dict[str, LlmModel] = field(default_factory=dict)
     default_model: str = ""
     writer_model: str = ""
+    extract_model: str = ""  # reads sites, news and people in research; "": the default model
 
     def charge(self, model_name: str) -> tuple[float, float] | None:
         """What a call to this provider model name uses: a catalog model's charge first."""
@@ -144,6 +145,7 @@ def to_json(settings: PlatformSettings) -> dict[str, Any]:
         "models": [asdict(m) for m in settings.models.values()],
         "default_model": settings.default_model,
         "writer_model": settings.writer_model,
+        "extract_model": settings.extract_model,
     }
 
 
@@ -175,6 +177,7 @@ def from_json(data: dict[str, Any]) -> PlatformSettings:
         models={m.code: m for m in (_model(d) for d in data.get("models") or []) if m},
         default_model=str(data.get("default_model") or ""),
         writer_model=str(data.get("writer_model") or ""),
+        extract_model=str(data.get("extract_model") or ""),
     )
 
 

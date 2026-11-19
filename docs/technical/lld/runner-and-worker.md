@@ -178,7 +178,10 @@ flowchart TB
 - **Periodic (platform-wide) jobs** (`run_periodic`, e.g. usage notices) run once per `tick_every` interval, independent of any one workspace's own tick; one failing job is logged (`periodic_failed`) and does not stop the others.
 - **Errors are contained** at every level: one job's exception is logged (`run_failed`/`tick_failed`) and finishes that run as `FAILED` without affecting any other workspace's jobs; a database hiccup inside the loop itself is logged as `worker_error` and the loop continues.
 - **Still no SIGTERM handler.** A stop or deploy kills the process after Docker's grace period; any run in flight is picked up by the *next* worker's `recover_stale` once its heartbeat goes stale, rather than being lost forever — this is the mechanism that replaced the earlier "no stale-run recovery" gap, not a graceful-shutdown path, so the run still briefly shows as `running` until the next recovery pass.
-- **`outbound worker`** takes `--threads` (default 4), `--tick-minutes` (default 15), `--stale-minutes` (default 30), `--tick-limit` (default 50); there is no `--workspace` flag any more — the worker always serves every active workspace, which also makes the earlier risk of the API and worker binding to different single workspaces moot ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces), now closed).
+- **The light check (`Task.PIPELINE`)** runs every `due_check_every` (default 2 minutes, `--check-minutes`) for each active workspace that has no job planned: one query (`CompanyRepository.any_due`), and the pipeline only if a lead is due. A pass that moved leads (`_continue`: advanced, held, failed or suppressed) clears the workspace's last check, so the next poll looks again at once; a pass that moved nothing waits for the interval, so a lead that cannot go on is not retried in a loop. The 15-minute tick keeps its own timer, and a tick more than two intervals late goes before its workspace's queued run.
+- **Leads in parallel.** `Runner(lead_concurrency, lead_flow)`: a stage's due leads run in a bounded thread pool, each in a copy of the context; with `lead_flow`, one task carries a lead through every stage that takes it before it takes the next (`_run_flow`, furthest-along leads first). `DeliverStage.parallel = False`. The worker CLI sets both from `WORKER_LEAD_CONCURRENCY`; `assemble` defaults to one lead, stage by stage, so tests and `outbound run` stay deterministic. Searches inside a lead's research run together (`stages/together.py`).
+- **Status.** Every minute `run_forever` calls `heartbeat()`: it logs `worker_status` (`threads`, `busy`, `queued`, `oldest_queued_seconds`, `overdue_ticks`) and writes the same to the `platform_settings` row `id = 'worker'` (`PlatformSettingsRepository.beat_worker`), which the admin Overview's Worker card reads (alive when the row is under three minutes old).
+- **`outbound worker`** takes `--threads` (default `WORKER_THREADS`, 6), `--lead-concurrency` (`WORKER_LEAD_CONCURRENCY`, 4), `--check-minutes` (2), `--tick-minutes` (default 15), `--stale-minutes` (default 30), `--tick-limit` (default 50); there is no `--workspace` flag any more — the worker always serves every active workspace, which also makes the earlier risk of the API and worker binding to different single workspaces moot ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces), now closed).
 
 ### Run statuses
 
@@ -212,7 +215,7 @@ Per lead: a read and guard transaction, an admin read, then one write transactio
 
 ## Configuration
 
-`--threads` (4), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 24 h for an outcome) and the tries (5 for a broken step, 3 for an outcome) are constructor defaults, not settings.
+`--threads` (6), `--lead-concurrency` (4), `--check-minutes` (2), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 24 h for an outcome) and the tries (5 for a broken step, 3 for an outcome) are constructor defaults, not settings.
 
 ## Observability
 
@@ -226,6 +229,9 @@ Per lead: a read and guard transaction, an admin read, then one write transactio
 | `tests/db/test_pipeline_e2e.py` | Targets to drafts with fake vendors, and a rerun at zero vendor cost |
 | `tests/db/test_robustness.py` | Every paid path metered; misconfiguration errors |
 | `tests/db/test_scheduler.py` | `SchedulerQueries` returns correctly filtered ids, scoped and unaffected by any one workspace's own data |
+| `tests/db/test_runner_parallel.py`, `tests/db/test_runner_flow.py` | Leads in parallel give the outcomes of one at a time, each ledger row has its own lead, delivery stays one at a time, a cancelled run stops submitting; a lead goes from new to a draft in one pass and stops where it is held or failed |
+| `tests/db/test_worker_due_check.py` | The light check plans only when a lead is due; progress is followed at once, no progress waits; a late tick goes before a queued run; `status` and `heartbeat` |
+| `tests/stages/test_together.py` | Calls made together keep their order and scope; a failure waits for the others; a vendor error can be tolerated, a budget stop never |
 | `tests/test_worker.py` | `plan()` fairness and busy/kill-switch exclusion; `recover_stale`; a job's exception does not affect another workspace's job; `tick_skipped` on `RunInProgress` |
 
 ## Known limitations

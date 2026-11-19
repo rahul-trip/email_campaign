@@ -24,7 +24,9 @@ def normalise_url(url: str) -> str:
     return url
 
 
-def make_engine(url: str, *, echo: bool = False, pool_size: int = 5) -> Engine:
+def make_engine(
+    url: str, *, echo: bool = False, pool_size: int = 5, pool_timeout: float = 30.0
+) -> Engine:
     url = normalise_url(url)
     if url.startswith("sqlite"):
         engine = create_engine(url, echo=echo, future=True)
@@ -38,6 +40,7 @@ def make_engine(url: str, *, echo: bool = False, pool_size: int = 5) -> Engine:
         future=True,
         pool_size=pool_size,
         max_overflow=0,
+        pool_timeout=pool_timeout,
         pool_pre_ping=True,
         pool_recycle=300,
     )

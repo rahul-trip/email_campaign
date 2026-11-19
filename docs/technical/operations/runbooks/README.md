@@ -26,6 +26,7 @@ SQL assumes the Supabase SQL editor, or `psql` through Doppler. Always filter by
 | `password authentication failed`; `Network is unreachable`; `could not translate host name`; `worker_error` lines; 500s with `unhandled_error` | [The database refuses the login, or cannot be reached](db-auth-or-unreachable.md) | SEV-2 |
 | `max clients reached` or `remaining connection slots are reserved` in the logs | [The database says too many clients](db-max-clients.md) | SEV-2 |
 | `oc ps` shows `worker` restarting; its logs repeat `not configured: …`; a deploy still succeeded (R-06) | [The worker keeps restarting](worker-crash-loop.md) | SEV-2 |
+| The admin Overview's Worker card says *Not responding* or *Behind*; `worker_status` lines stop, or `queued` and `overdue_ticks` grow | [Work is waiting and the worker is not picking it up](work-not-picked-up.md) | SEV-3 |
 | A run in `running` with no recent `stage_done` lines; it started before a deploy or a worker restart | [A run stays "running" for ever](run-stuck-running.md) | SEV-3 |
 | `provider_call_blocked` (WARNING); leads `failed` with "per-prospect budget used up"; Tavily `BudgetExceeded` (plan limit); the cost report | [Paid calls are being refused, or spend is higher than expected](budget-exceeded.md) | SEV-2 |
 | `provider_retry` WARNINGs; `provider_call` with `outcome: error`; leads `failed` with a provider name in `last_error`; `ProviderAuthError` (401/403) | [A vendor is failing or rate-limiting](vendor-429-or-outage.md) | SEV-3 |

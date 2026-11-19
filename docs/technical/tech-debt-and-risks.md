@@ -120,6 +120,7 @@ The scale is the one Phase 3b uses, so the two lists can be compared:
 
 - **What:** each process keeps up to `DATABASE_POOL_SIZE` connections (default 5, `max_overflow=0`). `api` + `worker` + `migrate` = 15, which is the whole small-plan pooler limit (about 15 clients), before any `oc run` one-off command. Encryption depends only on `?sslmode=require` being in `POSTGRES_URL`; the code does not enforce it.
 - **Read:** `outbound/db/session.py::make_engine`.
+- **2026-11-19:** the worker's pool is now `WORKER_DATABASE_POOL_SIZE` (8) because it writes for several leads at once ([R-55](#r-55--p2--capacity-one-worker-could-serve-only-four-workspaces-one-lead-at-a-time-and-nobody-could-see-it-fall-behind--closed-2026-11-19-two-parts-stay-open)); api 5 + worker 8 + migrate 5 is over a small plan's 15, so set `DATABASE_POOL_SIZE=3` there and count the clients after a deploy (see [deployment](operations/deployment.md)).
 - **Links:** [capacity and limits](operations/capacity-and-limits.md), [runbook: db max clients](operations/runbooks/db-max-clients.md).
 
 ### R-13 · P2 · Security: session and login hardening
@@ -275,6 +276,14 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Links:** [capacity and limits](operations/capacity-and-limits.md), [runbook: db max clients](operations/runbooks/db-max-clients.md).
 
 ## Closed entries
+
+### R-55 · P2 · Capacity: one worker could serve only four workspaces, one lead at a time, and nobody could see it fall behind — closed 2026-11-19 (two parts stay open)
+
+- **Was:** the worker had four threads (one workspace each) and a fixed pool of five connections; inside a run each lead went through each stage alone, so a 50-lead run took tens of minutes, held a thread all that time and gave its first draft near the end; new work waited for the 15-minute tick; nothing measured the lag. For 10–15 workspaces that meant long waits and slipping ticks.
+- **Fixed by:** [ADR 0037](adr/0037-one-worker-process-leads-in-parallel.md): leads in parallel and lead by lead, searches together inside a lead, a two-minute light check and an immediate look after progress, capacity settings with a matching pool, a late tick first, `worker_status` and the admin Worker card, an optional research model. `scripts/lead_timings.py` measures where a lead's time goes (read-only); `scripts/worker_load.py` checks 15 workspaces against fake vendors that wait as long as real ones.
+- **Evidence:** `tests/db/test_runner_parallel.py`, `test_runner_flow.py`, `test_worker_due_check.py`, `tests/stages/test_together.py`, `tests/api/test_admin.py` (the Worker block); the parallel and flow tests also run on Postgres.
+- **Still open:** (1) **vendor rate limits** — with up to 24 leads in flight the vendors (Tavily, the model, the finders) see more calls at once; the shared client honours `Retry-After`, but a vendor with a low limit needs `WORKER_LEAD_CONCURRENCY` lowered (the runbook says how). (2) **Credits can be passed by a little more** — each in-flight lead's current step finishes after the guard has let it start, so the balance can go further below nothing than with one lead at a time (at most one step per lead in flight). Neither needs a fix before the alpha. More than about 30 workspaces needs several processes and leases (ADR 0037, "when to go further").
+- **Read:** `outbound/runner/runner.py::Runner._run_flow`, `outbound/worker.py::Worker`.
 
 ### R-54 · P2 · The first page took 11 seconds to show its emails: the review queue read a few rows for every email — closed 2026-11-19
 

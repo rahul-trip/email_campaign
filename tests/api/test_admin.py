@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import event
 
 from outbound.api.deps import Services
-from outbound.domain.enums import CallOutcome, MembershipRole, PlatformRole
+from outbound.domain.enums import CallOutcome, MembershipRole, PlatformRole, RunKind
 from tests.api.conftest import ADMIN, Api, add_user, sign_in
 
 STAFF = "ops@platform.example"
@@ -600,3 +600,27 @@ def test_staff_can_make_a_customer_connect_a_mailbox_again(
         assert [m.status.value for m in uow.mailboxes.all()] == ["needs_reconnect"]
     assert audited(services, "mailbox_reconnect_forced", services.workspace_id)
     assert staff.post(url.replace(box.id, "missing")).status_code == 404
+
+
+def test_the_overview_says_whether_the_worker_is_alive_and_how_long_work_has_waited(
+    staff: Api, free: Services
+) -> None:
+    worker = staff.get("/api/admin/overview").json()["worker"]
+    assert worker["alive"] is False and worker["last_beat_at"] is None  # it never reported
+    assert (worker["queued"], worker["oldest_queued_seconds"]) == (0, None)
+    with free.container.platform() as p:  # what the worker writes every minute
+        p.settings.beat_worker({"threads": 6, "busy": 2, "overdue_ticks": 1})
+        p.commit()
+    with free.container.uow(free.workspace_id) as uow:
+        uow.runs.queue(RunKind.PIPELINE, {})
+        uow.commit()
+    worker = staff.get("/api/admin/overview").json()["worker"]
+    assert worker["alive"] is True and worker["last_beat_at"]
+    assert (worker["threads"], worker["busy"], worker["overdue_ticks"]) == (6, 2, 1)
+    assert worker["queued"] == 1 and worker["oldest_queued_seconds"] >= 0
+    # The heartbeat is its own row: it never changes the settings an admin edits.
+    version = staff.get("/api/admin/settings").json()["version"]
+    with free.container.platform() as p:
+        p.settings.beat_worker({"threads": 6, "busy": 0, "overdue_ticks": 0})
+        p.commit()
+    assert staff.get("/api/admin/settings").json()["version"] == version

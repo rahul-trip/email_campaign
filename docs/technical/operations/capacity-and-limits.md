@@ -15,14 +15,14 @@ The limits that apply to Outbound, and which gives way first. The design target 
 | Process | Pool | Notes |
 |---|---|---|
 | `api` | up to `DATABASE_POOL_SIZE` (5) | Pre-pinged, recycled every 300 s, no overflow |
-| `worker` | up to 5 | |
+| `worker` | up to `WORKER_DATABASE_POOL_SIZE` (8) | Works on up to `WORKER_THREADS` (6) workspaces and `WORKER_LEAD_CONCURRENCY` (4) leads at once; a request for a connection waits up to `DATABASE_POOL_TIMEOUT` (30 s) |
 | `migrate` (during a deploy) | up to 5 for `seed`; Alembic itself uses no pool | Exits when done |
 | Each `oc run … outbound <cmd>` | up to 5 | One-off containers |
 | **Supabase small-plan session pooler** | **about 15 clients in all** | |
 
-`api` + `worker` + `migrate` = 15. That is the whole limit before any one-off command ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)).
+`api` + `worker` + `migrate` = 5 + 8 + 5 = 18 at the defaults, over a small plan's limit while a deploy's `migrate` runs: on a small plan set `DATABASE_POOL_SIZE=3` (3 + 8 + 3 = 14). That is the whole limit before any one-off command ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)).
 
-Each process holds few connections in practice: transactions are milliseconds long, and the worker is single-threaded. So `DATABASE_POOL_SIZE=2` or `3` is a safe setting on a small plan. Set it in Doppler and restart. Symptom of exhaustion: `max clients reached` ([runbook](runbooks/db-max-clients.md)).
+Each process holds few connections in practice: transactions are milliseconds long, and the api is light. So `DATABASE_POOL_SIZE=2` or `3` is a safe setting on a small plan; the worker needs more than that, because several leads write at once. Set it in Doppler and restart. Symptom of exhaustion: `max clients reached` ([runbook](runbooks/db-max-clients.md)).
 
 ## Throughput
 

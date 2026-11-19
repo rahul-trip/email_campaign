@@ -37,6 +37,17 @@ class Settings(BaseSettings):
     # Connections each process keeps open to Postgres. Supabase's session pooler allows few
     # clients in all (15 on the small plans), and the api, worker and CLI each have a pool.
     database_pool_size: int = 5
+    # How long a request for a connection waits when all are in use. Transactions last
+    # milliseconds, so a wait is a queue, not a failure.
+    database_pool_timeout: float = 30.0
+    # The worker works on several workspaces and leads at once, so its pool is larger (the api
+    # keeps ``database_pool_size``). api + worker + a one-off command must stay under the pooler's
+    # client limit: see the connection budget in docs/technical/operations/deployment.md.
+    worker_database_pool_size: int = 8
+
+    # --- worker capacity (one process; sized for about 15 workspaces) ---
+    worker_threads: int = 6  # workspaces worked on at the same time
+    worker_lead_concurrency: int = 4  # leads in flight inside one stage of one workspace's run
 
     # --- logging ---
     log_level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR or CRITICAL
@@ -81,6 +92,9 @@ class Settings(BaseSettings):
     # Writer model for the first email; blank means LLM_MODEL (same provider, key and address).
     # Research can stay on a cheap model while the email is written by a stronger one.
     llm_copy_model: str = ""
+    # Model for the research steps (reading a site, news, judging people, fit): extraction, not
+    # writing, so a fast cheap model does it. Blank means LLM_MODEL (same provider, key, address).
+    llm_extract_model: str = ""
     # "low", "medium" or "high" for a reasoning model that accepts it (OpenRouter's
     # ``reasoning.effort``); blank sends nothing. Reasoning tokens count against LLM_MAX_TOKENS,
     # so a reasoning model with no limit can use the whole budget thinking and cut its answer.

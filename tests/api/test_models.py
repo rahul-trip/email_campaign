@@ -101,9 +101,17 @@ def test_the_default_model_drives_every_model_call_and_its_charge_counts(
     assert before.llm_model != DEEPSEEK["model"]  # nothing chosen: the environment's settings
     chosen = staff.put(
         "/api/admin/models/default",
-        json={"default_model": "deepseek-v3", "writer_model": "deepseek-r1"},
+        json={
+            "default_model": "deepseek-v3",
+            "writer_model": "deepseek-r1",
+            "extract_model": "deepseek-r1",
+        },
     ).json()
-    assert (chosen["default_model"], chosen["writer_model"]) == ("deepseek-v3", "deepseek-r1")
+    assert (chosen["default_model"], chosen["writer_model"], chosen["extract_model"]) == (
+        "deepseek-v3",
+        "deepseek-r1",
+        "deepseek-r1",
+    )
     live, _ = service(services).effective_settings()
     assert (live.llm_provider, live.llm_model, live.llm_base_url) == (
         "openai_compatible",
@@ -112,6 +120,7 @@ def test_the_default_model_drives_every_model_call_and_its_charge_counts(
     )
     assert (live.llm_temperature, live.llm_max_tokens) == (0.5, 6000)
     assert live.llm_copy_model == "deepseek-ai/DeepSeek-R1"
+    assert live.llm_extract_model == "deepseek-ai/DeepSeek-R1"
     assert live.llm_api_key.get_secret_value() == KEY
     with services.container.platform() as p:
         settings, _ = p.settings.get()
@@ -128,7 +137,10 @@ def test_a_chosen_model_cannot_be_removed_and_unknown_or_mismatched_choices_are_
     choose = "/api/admin/models/default"
     assert staff.put(choose, json={"default_model": "ghost"}).status_code == 422
     assert staff.put(choose, json={"writer_model": "gpt"}).status_code == 422  # no default
+    assert staff.put(choose, json={"extract_model": "gpt"}).status_code == 422  # no default
     mismatched = {"default_model": "deepseek-v3", "writer_model": "gpt"}
+    assert staff.put(choose, json=mismatched).status_code == 422  # another provider
+    mismatched = {"default_model": "deepseek-v3", "extract_model": "gpt"}
     assert staff.put(choose, json=mismatched).status_code == 422  # another provider
     staff.put(choose, json={"default_model": "deepseek-v3"})
     assert staff.delete("/api/admin/models/deepseek-v3").status_code == 422

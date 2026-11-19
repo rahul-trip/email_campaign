@@ -73,10 +73,16 @@ def container_for(
 
 def build_container(settings: Settings | None = None) -> Container:
     settings = settings or Settings()
-    engine = make_engine(settings.database_url, pool_size=settings.database_pool_size)
+    engine = make_engine(
+        settings.database_url,
+        pool_size=settings.database_pool_size,
+        pool_timeout=settings.database_pool_timeout,
+    )
     platform_engine = (
         engine
         if settings.platform_database_url == settings.database_url
-        else make_engine(settings.platform_database_url, pool_size=2)
+        else make_engine(
+            settings.platform_database_url, pool_size=2, pool_timeout=settings.database_pool_timeout
+        )
     )
     return container_for(settings, engine, platform_engine)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -814,3 +815,27 @@ def test_the_site_call_reads_the_team_pages_for_people_without_sending_them_twic
     assert "Jane Doe" in team and "Jane Doe" not in before  # its own block, once
     assert [p.name for p in out.people][:1] == ["Jane Doe"]
     assert "persona" not in llm.calls  # no second call for the people
+
+
+# ------------------------------------------------------------------ searches side by side
+
+
+class OverlappingSearch(FakeSearch):
+    """Answers a news search only once the company's and the market's are both under way."""
+
+    def __init__(self) -> None:
+        super().__init__(PAGES)
+        self._both = threading.Barrier(2, timeout=5)
+
+    def search(
+        self, query: str, *, max_results: int = 5, topic: str = "general", days: int | None = None
+    ) -> list[SearchHit]:
+        if topic == "news":
+            self._both.wait()
+        return super().search(query, max_results=max_results, topic=topic, days=days)
+
+
+def test_the_company_and_market_news_searches_are_made_together() -> None:
+    out, _, search = run(base(), search=OverlappingSearch())  # a timeout here means one at a time
+    assert len(search.news_searches) == 2
+    assert out.research["summary"].startswith("Acme builds")

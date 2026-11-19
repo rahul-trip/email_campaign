@@ -3,12 +3,49 @@ import { useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { client, ok, type Schemas } from "../api/client";
 import { Button, Card, Empty, Field, Input, PageHeader, Problem, QueryState, Stat } from "../ui/compat";
-import { credits, usd } from "../lib/format";
+import { ago, credits, usd } from "../lib/format";
 import { A } from "./nav";
-import { When } from "./bits";
+import { Pill, When } from "./bits";
 
 const KIND = { credit_request: "Asked for more credits", access_ending: "Access ending", mailbox: "Mailbox needs attention", deletion_due: "Waiting to be deleted", workspace_request: "New workspace" } as const;
 const FIX = { credit_request: "Grant", access_ending: "Extend", mailbox: "Open", deletion_due: "Open", workspace_request: "Open" } as const;
+
+/** How long, as people say it: "under a minute", "12 min", "2 h 5 min". */
+const wait = (seconds: number) => (seconds < 60 ? "under a minute" : seconds < 3600 ? `${Math.round(seconds / 60)} min` : `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`);
+
+function WorkerCard({ worker: w }: { worker: Schemas["WorkerOut"] }) {
+  const slow = w.oldest_queued_seconds !== null && w.oldest_queued_seconds > 600; // a run waited over ten minutes
+  const late = (w.overdue_ticks ?? 0) > 0;
+  const tone = !w.alive ? "error" : slow || late ? "attention" : "good";
+  return (
+    <Card
+      tour="admin-worker"
+      title="Worker"
+      subtitle="The one process that runs every customer's research and drafts."
+      actions={<Pill tone={tone}>{!w.alive ? (w.last_beat_at ? "Not responding" : "Never reported") : slow || late ? "Behind" : "Keeping up"}</Pill>}
+    >
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-body md:grid-cols-4">
+        <div>
+          <dt className="text-small text-muted">Last report</dt>
+          <dd className="font-medium">{w.last_beat_at ? ago(w.last_beat_at) : "never"}</dd>
+        </div>
+        <div>
+          <dt className="text-small text-muted">Working on</dt>
+          <dd className="font-medium">{w.busy === null || w.threads === null ? "—" : `${w.busy} of ${w.threads} workspaces`}</dd>
+        </div>
+        <div>
+          <dt className="text-small text-muted">Runs waiting</dt>
+          <dd className={slow ? "font-medium text-attention" : "font-medium"}>{w.queued === 0 ? "none" : `${w.queued}, the oldest ${wait(w.oldest_queued_seconds ?? 0)}`}</dd>
+        </div>
+        <div>
+          <dt className="text-small text-muted">Late 15-minute passes</dt>
+          <dd className={late ? "font-medium text-attention" : "font-medium"}>{w.overdue_ticks ?? "—"}</dd>
+        </div>
+      </dl>
+      {!w.alive && <p className="mt-3 text-small text-muted">Nothing is being worked on until it reports again. See the runbook "work is not being picked up".</p>}
+    </Card>
+  );
+}
 
 export function OverviewPage() {
   const overview = useQuery({ queryKey: ["admin", "overview"], queryFn: () => ok(client.GET("/api/admin/overview")), refetchInterval: 30_000 });
@@ -30,6 +67,7 @@ export function OverviewPage() {
                 <Stat label="Platform cost" value={usd(o.cost_micro_usd)} hint="what vendors and the model billed, this month" />
                 <Stat label="Waiting for credits" value={o.waiting} hint={o.waiting_customers ? `${o.waiting_customers} customer${o.waiting_customers === 1 ? "" : "s"}` : undefined} tone={o.waiting ? "attention" : undefined} />
               </div>
+              <WorkerCard worker={o.worker} />
               <WorkspaceRequests />
               <div className="grid gap-5 lg:grid-cols-2">
                 <Card tour="admin-attention" title="Needs attention">

@@ -6,6 +6,9 @@ test("a platform admin opens the console, finds a customer and grants credits", 
   await page.goto("/admin");
   await expect(page.getByText(/Admin console · platform staff/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  // The Worker card says whether the process that runs everyone's work is keeping up.
+  await expect(page.getByRole("heading", { name: "Worker" })).toBeVisible();
+  await expect(page.getByText(/Keeping up|Behind|Not responding|Never reported/)).toBeVisible();
 
   await page.getByRole("link", { name: "Customers" }).click();
   await expect(page.getByRole("heading", { name: "Customers" })).toBeVisible();

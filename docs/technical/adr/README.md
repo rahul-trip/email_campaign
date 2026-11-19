@@ -60,3 +60,4 @@ An ADR records one architecturally significant decision: the context, what was d
 | [0034](0034-one-ai-credit-balance-metered-per-call.md) | One balance of AI credits per workspace, used by every vendor and model call | Accepted | 2026-11-18 |
 | [0035](0035-verified-guesses-and-real-time-catch-all-answers.md) | Address formats are tried only when a verifier proves them, and real-time resolvers settle catch-alls first | Accepted | 2026-11-18 |
 | [0036](0036-outcomes-are-not-failures.md) | A company with nobody to write to is an outcome, not a failure | Accepted | 2026-11-19 |
+| [0037](0037-one-worker-process-leads-in-parallel.md) | One worker process, leads in parallel, sized for about 15 workspaces | Accepted | 2026-11-19 |

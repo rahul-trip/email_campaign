@@ -75,6 +75,7 @@ from outbound.api.schemas import (
     VendorOut,
     VendorPauseIn,
     VendorsOut,
+    WorkerOut,
     WorkspaceRequestOut,
 )
 from outbound.db.errors import NotFound
@@ -265,6 +266,7 @@ def overview(_: Reader, service: Admin) -> OverviewOut:
         cost_by_provider=found.cost_by_provider,
         waiting=found.waiting,
         waiting_customers=found.waiting_customers,
+        worker=WorkerOut(**found.worker.__dict__),
         attention=[
             AttentionOut(
                 kind=a.kind,
@@ -630,6 +632,7 @@ def _vendors(service: VendorService) -> VendorsOut:
         ],
         default_model=catalog.default_model,
         writer_model=catalog.writer_model,
+        extract_model=catalog.extract_model,
         providers=[
             LlmProviderOut(
                 code=code,
@@ -709,8 +712,10 @@ def update_llm(body: LlmSettingsIn, staff: KeyHolder, service: Vendors) -> Vendo
 
 @router.put("/models/default", response_model=VendorsOut)
 def choose_models(body: ChooseModelsIn, staff: KeyHolder, service: Vendors) -> VendorsOut:
-    """The model every call uses, and the one that writes emails."""
-    service.choose_models(body.default_model, body.writer_model, by=staff.user.id)
+    """The model every call uses, the one that writes emails and the one that reads sites."""
+    service.choose_models(
+        body.default_model, body.writer_model, body.extract_model, by=staff.user.id
+    )
     return _vendors(service)
 
 

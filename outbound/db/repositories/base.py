@@ -81,6 +81,26 @@ class EventRepository:
         )
         return [snapshot(row, Event) for row in self._session.scalars(stmt)]
 
+    def status_changes_since(
+        self, entity_type: EntityType, since: datetime
+    ) -> list[tuple[str, str, datetime]]:
+        """(entity id, new status, when) of every status change since ``since``, oldest first.
+        For timing reports: the gap between two changes of one lead is the time a stage took."""
+        stmt = (
+            select(EventRow.entity_id, EventRow.data, EventRow.created_at)
+            .where(
+                EventRow.workspace_id == self._workspace_id,
+                EventRow.entity_type == entity_type,
+                EventRow.type == "status_changed",
+                EventRow.created_at >= since,
+            )
+            .order_by(EventRow.created_at, EventRow.id)
+        )
+        return [
+            (entity_id, str(data.get("to", "")), at)
+            for entity_id, data, at in self._session.execute(stmt)
+        ]
+
     def for_run(self, run_id: str, types: Collection[str]) -> list[Event]:
         """Events a run recorded (their data carries its ``run_id``), oldest first."""
         stmt = (

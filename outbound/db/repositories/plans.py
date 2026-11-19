@@ -11,6 +11,7 @@ role may only read the first three tables.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +33,7 @@ from outbound.domain.enums import UsageStep
 from outbound.domain.platform_settings import PlatformSettings, from_json, to_json
 
 SETTINGS_ID = "platform"
+WORKER_ID = "worker"  # a second row: the worker's heartbeat, apart from the versioned settings
 
 
 def _assignment(row: WorkspacePlanRow) -> PlanAssignment:
@@ -93,6 +95,22 @@ class PlatformSettingsRepository:
         row.updated_at = utcnow()
         self._session.flush()
         return row.version
+
+    def beat_worker(self, status: dict[str, Any]) -> None:
+        """Record that the worker is alive, with what it is doing. Its own row, so it never
+        changes the settings' version (an admin's save would otherwise conflict with it)."""
+        row = self._session.get(PlatformSettingsRow, WORKER_ID)
+        if row is None:
+            self._session.add(PlatformSettingsRow(id=WORKER_ID, data=status, version=1))
+        else:
+            row.data = status
+            row.updated_at = utcnow()
+        self._session.flush()
+
+    def worker_beat(self) -> tuple[dict[str, Any], datetime] | None:
+        """The worker's last status and when it was written; None if it never reported."""
+        row = self._session.get(PlatformSettingsRow, WORKER_ID)
+        return (dict(row.data or {}), row.updated_at) if row else None
 
 
 class UsageRepository(ScopedRepository):

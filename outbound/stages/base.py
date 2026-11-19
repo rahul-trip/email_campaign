@@ -85,5 +85,8 @@ class Stage(Protocol):
     input_status: CompanyStatus
     guard_policy: bool  # re-check the country policy before running (every stage after the gate)
     spends: bool  # makes paid calls, so the per-prospect budget applies; free stages ignore it
+    # Optional: ``parallel = False`` makes the runner work on this stage's leads one at a time
+    # (a stage that shares an outside connection). Without it, leads are worked on side by side
+    # when the runner is given a ``lead_concurrency`` above 1.
 
     def handle(self, ctx: StageContext) -> StageResult: ...

@@ -99,6 +99,7 @@ class Providers:
     # uses the mailboxes it connected (``StoredMailboxes``).
     mailbox: Mailbox | None = None
     copy_llm: LlmClient | None = None  # the writer's model; None means ``llm``
+    extract_llm: LlmClient | None = None  # reads sites and news in research; None: ``llm``
     # Where discovery looks besides web search: directories such as Y Combinator's.
     company_sources: list[LeadSource] = field(default_factory=list)
     # Backups, tried in order when ``verifier`` or ``resolver`` fails (a refused key, an outage).
@@ -157,6 +158,9 @@ def real_providers(settings: Settings) -> Providers:
             copy_llm=build_llm(settings, model=settings.llm_copy_model)
             if settings.llm_copy_model
             else None,
+            extract_llm=build_llm(settings, model=settings.llm_extract_model)
+            if settings.llm_extract_model
+            else None,
             company_sources=build_company_sources(settings),
         )
     except ProviderError as error:
@@ -184,7 +188,16 @@ def build_meter(container: Container, workspace_id: str) -> Meter:
     )
 
 
-def assemble(container: Container, workspace_id: str, providers: Providers) -> Pipeline:
+def assemble(
+    container: Container,
+    workspace_id: str,
+    providers: Providers,
+    *,
+    lead_concurrency: int = 1,
+    lead_flow: bool = False,
+) -> Pipeline:
+    """The worker passes its capacity settings; tests and the command line keep one lead at a
+    time, stage by stage, so their order is the same every time."""
     settings = container.settings
     uow = container.uow
     _workspace(container, workspace_id)  # fail early, with a clear message, if it is missing
@@ -194,6 +207,11 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     search = MeteredSearch(providers.search, meter)
     llm = MeteredLlm(providers.llm, meter, prices=llm_prices)
     writer = MeteredLlm(providers.copy_llm, meter, prices=llm_prices) if providers.copy_llm else llm
+    reader = (
+        MeteredLlm(providers.extract_llm, meter, prices=llm_prices)
+        if providers.extract_llm
+        else llm
+    )
     registry = MeteredRegistry(providers.registry, meter) if providers.registry else None
     # The shared directory goes first and is never cached: every lookup is a ledger row, so the
     # hit rate and what it saved can be read back.
@@ -214,7 +232,7 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
             )
 
     stages: list[Stage] = [
-        ResearchStage(ResearchDeps(search, llm, registry)),
+        ResearchStage(ResearchDeps(search, reader, registry)),
         GateStage(),
         ContactsStage(writer),
         EmailStage(EmailDeps(finders, verifier, resolver)),
@@ -240,7 +258,14 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     # First in the tick: credits that appeared (a new period, a grant) release waiting work
     # before this tick's pipeline looks for it.
     jobs.insert(0, ResumeService(uow, workspace_id, intake))
-    runner = Runner(uow, workspace_id, stages, Guards(budget))
+    runner = Runner(
+        uow,
+        workspace_id,
+        stages,
+        Guards(budget),
+        lead_concurrency=lead_concurrency,
+        lead_flow=lead_flow,
+    )
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),

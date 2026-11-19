@@ -41,6 +41,10 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `DATABASE_URL` | str | — | (holds a password) | — | Overrides the switch (tests, `--database-url`) |
 | `PLATFORM_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_PLATFORM_URL`'s resolution |
 | `MIGRATE_DATABASE_URL` | str | — (falls back to `DATABASE_URL`) | (holds a password) | — | Overrides `POSTGRES_MIGRATE_URL`'s resolution |
+| `DATABASE_POOL_TIMEOUT` | float | 30 | | D if needed | Seconds a request for a database connection waits when all are in use (a queue, not a failure) |
+| `WORKER_DATABASE_POOL_SIZE` | int | 8 | | D if needed | Connections the worker keeps (it writes for several leads at once); count it in the pooler's client limit ([deployment](deployment.md)) |
+| `WORKER_THREADS` | int | 6 | | D if needed | Workspaces the worker works on at once (`outbound worker --threads`) |
+| `WORKER_LEAD_CONCURRENCY` | int | 4 | | D if needed | Leads in flight inside one stage of one workspace's run (`--lead-concurrency`); lower it if a vendor answers 429 ([ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)) |
 | `DATABASE_POOL_SIZE` | int | 5 | | D if needed | Connections per process, per engine; lower it for small Supabase plans ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
 
 ## Logging
@@ -87,6 +91,7 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `COPILOT_API_KEY` | str | — | yes | D | Key for `github_copilot` |
 | `LLM_API_KEY` | str | — | yes | D | Key for `openai_compatible`, and the fallback for any preset |
 | `LLM_COPY_MODEL` | str | — (falls back to `LLM_MODEL`) | | D if different | A separate, usually stronger, model for the copy stage; research can stay on a cheaper model |
+| `LLM_EXTRACT_MODEL` | str | — (falls back to `LLM_MODEL`) | | D if different | A separate, usually faster and cheaper, model for research (reading a site, news, judging people, fit). Same provider, key and address as `LLM_MODEL`. Staff choose it under Vendors → AI models ("Use for research"), which sets this at run time |
 | `LLM_REASONING_EFFORT` | `low` \| `medium` \| `high` \| `""` | `""` | | D if used | Sent as `reasoning.effort` to a model that accepts it (e.g. via OpenRouter); counts against `LLM_MAX_TOKENS` |
 
 ## Mailboxes and OAuth
