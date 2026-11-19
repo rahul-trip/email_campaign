@@ -421,6 +421,7 @@ What is different:
 - **Leads** has saved views (Hot, Waiting review, On hold…), filters for fit, source and country,
   sorting, and shows each lead's contact, address status and spend.
 - **A lead's Journey** is a tab on the lead's page, next to *Overview* and *Activity*.
+- **On a phone** the screens that are tables on a laptop change shape so nothing runs off the screen: Discovery runs are a list of cards (when, state, what it did, credits, *Open*), each country rule on Policies and privacy is a block with labelled fields, and Leads leaves out the extra *Journey* link (the company's name opens the lead).
 - **Discovery runs**: *Start a run now* opens a panel showing what will run, how many companies to
   find (10, 25 or 50), which sources suit your brief and how often their leads passed recently.
   While a run is going, a card at the top shows its six steps and how far it has got, what it has

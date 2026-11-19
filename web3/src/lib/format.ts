@@ -60,3 +60,6 @@ export const lines = (text: string): string[] =>
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+
+/** A stored failure message as a person should read it: a stage's own words, without the program's class name that older rows carry. */
+export const plainError = (text: string | null | undefined): string => (text ?? "").replace(/^StageFailure:\s*/, "");

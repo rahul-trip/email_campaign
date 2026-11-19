@@ -10,7 +10,7 @@ import { ArrowRight, CheckCircle2, ChevronDown, Clock, Flame, Globe2, RefreshCw,
 import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { cx } from "../lib/cx";
-import { ago, credits as aiCredits, words } from "../lib/format";
+import { ago, credits as aiCredits, plainError, words } from "../lib/format";
 import { HOLD_REASONS, describeHold } from "../lib/status";
 import { STEP_LABEL, day, useUsage } from "../lib/usage";
 import { Avatar, Button, buttonClass, Card, Chip, Empty, Input, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
@@ -210,7 +210,7 @@ export function AttentionPage() {
               id={`failed-${stage}`}
               tone="attention"
               title={`Stopped at ${STEP_NAMES[stage] ?? words(stage)}`}
-              summary={`${list.length} lead${list.length === 1 ? "" : "s"} · ${list[0]?.last_error ?? "a step failed"}`}
+              summary={`${list.length} lead${list.length === 1 ? "" : "s"} · ${plainError(list[0]?.last_error) || "a step failed"}`}
               chip={<Chip tone="error">{list.length} stopped</Chip>}
               actions={<BulkAction ids={list.map((c) => c.id)} kind="retry" label="Retry all" />}
             >
@@ -329,7 +329,7 @@ function Row({ company, detail, children }: { company: Company; detail: ReactNod
           {failed && company.last_error && (
             <p className="text-small text-ink-2">
               <span className="font-semibold">What went wrong: </span>
-              {company.last_error}
+              {plainError(company.last_error)}
             </p>
           )}
           {qualification ? <FitBreakdown data={qualification} compact /> : !company.fit_reason && <p className="text-small text-muted">No fit details were recorded for this lead.</p>}
@@ -353,7 +353,7 @@ function FailedRow({ company }: { company: Company }) {
       company={company}
       detail={
         <>
-          <span className="text-error">{company.last_error ?? "failed"}</span>
+          <span className="text-error">{plainError(company.last_error) || "failed"}</span>
           {company.next_action_at && <span> · automatic retry {new Date(company.next_action_at) > new Date() ? `at ${new Date(company.next_action_at).toLocaleTimeString()}` : "due"}</span>}
         </>
       }

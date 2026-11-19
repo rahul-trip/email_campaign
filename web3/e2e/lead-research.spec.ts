@@ -22,6 +22,8 @@ test("the lead page leads with Research: fit, criteria cards, what we learned, t
         criteria: [
           { id: "m1", kind: "must_have", criterion: "Builds developer tools", weight: 1, verdict: "met", evidence: "Sells a compiler" },
           { id: "m2", kind: "must_have", criterion: "Remote friendly", weight: 1, verdict: "not_met", evidence: "In person only" },
+          { id: "m3", kind: "must_have", criterion: "Has a technical founder", weight: 1, verdict: "unknown" },
+          { id: "s1", kind: "signal", criterion: "Open AI roles", weight: 1, verdict: "unknown" },
           { id: "d1", kind: "disqualifier", criterion: "Agency", weight: 1, verdict: "not_met" },
         ],
         why_now: "A fresh round.",
@@ -39,7 +41,11 @@ test("the lead page leads with Research: fit, criteria cards, what we learned, t
 
   // The first block is open; the short news block is open; the long one folds and says what is inside.
   await expect(fold("How well they fit")).toHaveAttribute("aria-expanded", "true");
-  await expect(research.getByText("1 of 2 met")).toBeVisible();
+  await expect(research.getByText("1 of 3 met")).toBeVisible();
+  // What was found is a card; what was not is one short list, not a card each.
+  await expect(research.getByText("Remote friendly")).toBeVisible();
+  await expect(research.getByText("Nothing found either way (1)")).toHaveCount(2); // must-haves and signs
+  await expect(research.getByText("Has a technical founder")).toBeVisible();
   await expect(research.getByText("none triggered")).toBeVisible();
   await expect(research.getByText("A fresh round.")).toBeVisible();
   await expect(research.getByText("Very small team")).toBeVisible();
@@ -55,7 +61,7 @@ test("the lead page leads with Research: fit, criteria cards, what we learned, t
   await expect(research.getByRole("link", { name: "Raises a Series A" })).toHaveCount(0); // folded: only the summary line is left
   await research.getByRole("button", { name: "Collapse all" }).click();
   await expect(fold("How well they fit")).toHaveAttribute("aria-expanded", "false");
-  await expect(fold("How well they fit")).toContainText("1 of 2 must-haves met");
+  await expect(fold("How well they fit")).toContainText("1 of 3 must-haves met");
   await research.getByRole("button", { name: "Expand all" }).click();
   await expect(research.getByText("Very small team")).toBeVisible();
 

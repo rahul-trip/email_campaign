@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, Globe2, Plus, UserX } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { Button, Callout, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, SaveNote, Select, Table, Tabs, Td, Textarea, Th } from "../ui/compat";
 import { cx } from "../lib/cx";
@@ -172,24 +172,27 @@ function Policies() {
           rows.length === 0 ? (
             <Empty title="No country rules yet">Countries without a rule are held until one is added. Add the first rule with the form above.</Empty>
           ) : (
-            <Table>
-              <thead>
-                <tr>
-                  <Th>Country</Th>
-                  <Th>Rule</Th>
-                  <Th>Footer template</Th>
-                  <Th>Reviewed by</Th>
-                  <Th>
-                    <span className="sr-only">Save</span>
-                  </Th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <PolicyRow key={`${p.country_code}-${p.version}`} policy={p} />
-                ))}
-              </tbody>
-            </Table>
+            <div className="relative md:overflow-x-auto">
+              {/* On a phone each country is a block: five columns would run off the screen. */}
+              <table className="block w-full border-collapse text-left text-body md:table">
+                <thead className="hidden md:table-header-group">
+                  <tr>
+                    <Th>Country</Th>
+                    <Th>Rule</Th>
+                    <Th>Footer template</Th>
+                    <Th>Reviewed by</Th>
+                    <Th>
+                      <span className="sr-only">Save</span>
+                    </Th>
+                  </tr>
+                </thead>
+                <tbody className="block divide-y divide-line md:table-row-group md:divide-y-0">
+                  {rows.map((p) => (
+                    <PolicyRow key={`${p.country_code}-${p.version}`} policy={p} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )
         }
       </QueryState>
@@ -237,9 +240,9 @@ function PolicyRow({ policy }: { policy: Policy }) {
     },
   });
   return (
-    <tr className="align-top">
-      <Td className="font-mono font-semibold">{policy.country_code}</Td>
-      <Td className="min-w-44">
+    <tr className="block space-y-4 p-4 align-top md:table-row md:space-y-0 md:p-0">
+      <Cell className="font-mono text-heading font-semibold md:text-body">{policy.country_code}</Cell>
+      <Cell label="Rule" className="md:min-w-44">
         <Select aria-label={`Rule for ${policy.country_code}`} value={rule} onChange={(e) => setRule(e.target.value as Policy["rule"])} className={cx("font-medium", RULE_TONE[rule])}>
           {RULES.map(([value, label]) => (
             <option key={value} value={value}>
@@ -247,48 +250,60 @@ function PolicyRow({ policy }: { policy: Policy }) {
             </option>
           ))}
         </Select>
-        <label className="mt-1.5 flex items-center gap-1.5 text-label text-muted">
-          <input type="checkbox" checked={corporate} onChange={(e) => setCorporate(e.target.checked)} className="accent-[var(--primary)]" /> Incorporated companies only
+        <label className="mt-2 flex items-center gap-2 text-small text-muted md:mt-1.5 md:gap-1.5 md:text-label">
+          <input type="checkbox" checked={corporate} onChange={(e) => setCorporate(e.target.checked)} className="size-5 accent-[var(--primary)] md:size-3.5" /> Incorporated companies only
         </label>
-        <fieldset className="mt-1.5">
-          <legend className="text-label text-muted">Only addresses from (none ticked: any)</legend>
+        <fieldset className="mt-2 md:mt-1.5">
+          <legend className="text-small text-muted md:text-label">Only addresses from (none ticked: any)</legend>
           {SOURCES.map(([value, label]) => (
-            <label key={value} className="flex items-center gap-1.5 text-label text-muted">
+            <label key={value} className="flex items-center gap-2 py-1 text-small text-muted md:gap-1.5 md:py-0 md:text-label">
               <input
                 type="checkbox"
                 checked={sources.includes(value)}
                 onChange={(e) => setSources(e.target.checked ? [...sources, value] : sources.filter((v) => v !== value))}
-                className="accent-[var(--primary)]"
+                className="size-5 accent-[var(--primary)] md:size-3.5"
               />
               {label}
             </label>
           ))}
         </fieldset>
-      </Td>
-      <Td className="min-w-64">
+      </Cell>
+      <Cell label="Footer template" className="md:min-w-64">
         <Textarea rows={3} aria-label={`Footer for ${policy.country_code}`} value={footer} onChange={(e) => setFooter(e.target.value)} className="font-mono text-label" placeholder={rule === "block" ? "Not used while blocked" : "Footer text with {fields}"} />
-      </Td>
-      <Td className="min-w-40">
+      </Cell>
+      <Cell label="Reviewed by" className="md:min-w-40">
         <Input aria-label={`Reviewer for ${policy.country_code}`} placeholder="Who checked this?" value={reviewer} onChange={(e) => setReviewer(e.target.value)} />
         <div className="mt-1 font-mono text-label text-muted">version {policy.version}</div>
-      </Td>
-      <Td className="whitespace-nowrap">
-        <Button size="sm" variant={changed ? "primary" : "secondary"} busy={save.isPending} disabled={!changed} onClick={() => save.mutate()}>
-          Save
-        </Button>
+      </Cell>
+      <Cell className="md:whitespace-nowrap">
+        <div className="flex flex-wrap items-center gap-2 md:block">
+          <Button size="sm" variant={changed ? "primary" : "secondary"} busy={save.isPending} disabled={!changed} onClick={() => save.mutate()}>
+            Save
+          </Button>
+          <Button size="sm" variant="danger-ghost" className="md:mt-2" onClick={() => setRemoving(true)}>
+            Remove
+          </Button>
+        </div>
         <div className="mt-1 max-w-48">
           <SaveNote mutation={save} done={savedAs} />
         </div>
-        <Button size="sm" variant="danger-ghost" className="mt-2" onClick={() => setRemoving(true)}>
-          Remove
-        </Button>
         {removing && (
           <Confirm title={`Remove the rule for ${policy.country_code}?`} confirmLabel="Remove" busy={remove.isPending} error={remove.error} onClose={() => setRemoving(false)} onConfirm={() => remove.mutate()}>
             <p>Leads in {policy.country_code} will then be held for you at their next step, because there is no rule to decide by. The change is recorded.</p>
           </Confirm>
         )}
-      </Td>
+      </Cell>
     </tr>
+  );
+}
+
+/** A cell that is a table cell from a tablet up and a labelled block on a phone. */
+function Cell({ label, className, children }: { label?: string; className?: string; children: ReactNode }) {
+  return (
+    <td className={cx("block md:table-cell md:border-b md:border-line md:px-4 md:py-3 md:align-top", className)}>
+      {label && <div className="mb-1 text-label font-semibold tracking-wide text-faint uppercase md:hidden">{label}</div>}
+      {children}
+    </td>
   );
 }
 

@@ -207,9 +207,9 @@ export function Facts({ facts }: { facts: { label: ReactNode; value: ReactNode }
   return (
     <dl className="divide-y divide-line rounded-lg border border-line">
       {facts.map((fact, index) => (
-        <div key={index} className="grid grid-cols-[minmax(7rem,40%)_1fr] gap-3 px-3 py-2 text-small">
+        <div key={index} className="grid grid-cols-[minmax(7rem,40%)_minmax(0,1fr)] gap-3 px-3 py-2 text-small">
           <dt className="text-muted">{fact.label}</dt>
-          <dd className="break-words text-ink">{fact.value}</dd>
+          <dd className="min-w-0 text-ink [overflow-wrap:anywhere]">{fact.value}</dd>
         </div>
       ))}
     </dl>

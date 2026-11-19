@@ -164,6 +164,10 @@ On a phone: Hot leads are swipeable snap cards; Emails ready gets a swipeable ro
 
 The app's mark is **The Infinite Vector** (Stitch board "'O' Monogram Exploration Board", variation 3D), chosen by the team from four concepts in the Stitch project. `web3/src/ui/Logo.tsx::LogoMark` replaces the lightning-bolt badge in the sidebar, the sign-in and public pages, the setup flow and the admin console; `web3/public/favicon.svg` is the first favicon the app has; `--teal` is a new colour token. See [docs/design.md](../design.md) "Logo". Browser test: `web3/e2e/brand.spec.ts`.
 
+## Live-site layout audit (2026-11-19, branch `phase-6/live-audit-fixes`, no migration)
+
+Signed in to the deployed app and went through every screen on a laptop (1440) and a phone (390) with Playwright, checking overflow, off-screen controls, console errors and tap targets. Fixed: the Leads page scrolled sideways as a whole (a hidden "Links" label inside the table's scroll frame, which was not a positioning boundary); a long link in a lead's note spilled out of its card and stretched the Journey tab (`Facts` and the Notes card now wrap such values); the setup header was too wide on a phone; Discovery runs and the country rules were tables that ran off a phone (cards and stacked blocks now); a wall of "Nothing found either way" cards on a lead is one short list per group; the people's `StageFailure:` class name showed in stored error text (the runner stops adding it for a stage's own messages, and the screens strip it from older rows). Left as they are: the Cloudflare Web Analytics script the tunnel injects is blocked by the app's content policy and logs a console error on every page (switch Web Analytics off for the hostname in Cloudflare; loosening the policy is not worth it); a few website icons from DuckDuckGo answer 404 and fall back to initials. Browser test: `web3/e2e/layout.spec.ts` (no screen scrolls sideways, and no positioned element escapes its scrolling frame).
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.
