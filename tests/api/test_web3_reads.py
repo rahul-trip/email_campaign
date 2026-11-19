@@ -169,3 +169,32 @@ def test_the_discovery_plan_lists_every_source_and_says_why_one_is_skipped(api: 
     assert house["suited"] is False and "SIC" in house["why_not"]
     # A plan never queues a run.
     assert api.get("/api/runs").json() == []
+
+
+def test_the_review_queue_can_be_limited_best_first_and_slim_and_status_counts_the_hot_ones(
+    api: Api, factory: UnitOfWorkFactory, ws: str
+) -> None:
+    from tests.db.test_review_queue import waiting
+
+    waiting(factory, ws, ["low.io", "top.io", "mid.io"], [40, 95, 85])
+
+    def domains(query: str = "") -> list[str]:
+        response = api.get(f"/api/review{query}")
+        assert response.status_code == 200, response.text
+        return [item["company"]["domain"] for item in response.json()]
+
+    assert domains() == ["low.io", "top.io", "mid.io"]  # oldest first, as before
+    assert domains("?best=true") == ["top.io", "mid.io", "low.io"]
+    assert domains("?best=true&limit=2") == ["top.io", "mid.io"]
+    assert api.get("/api/review?limit=0").status_code == 422  # a limit is from 1 to 100
+    assert api.get("/api/review?limit=101").status_code == 422
+
+    # The slim form leaves out each lead's research record and nothing else.
+    full = api.get("/api/review?best=true&limit=1").json()[0]
+    slim = api.get("/api/review?best=true&limit=1&slim=true").json()[0]
+    assert slim["company"]["research"] is None and slim["company"]["research_answers"] is None
+    assert slim["message"] == full["message"] and slim["company"]["fit_score"] == 95
+    assert slim["company"]["hot"] is True and slim["contact"] == full["contact"]
+
+    status = api.get("/api/status").json()
+    assert (status["waiting_for_review"], status["waiting_hot"]) == (3, 2)

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { useMe } from "../app/session";
-import { Button, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../ui/compat";
+import { Button, Card, Confirm, Empty, Field, Input, PageHeader, Problem, QueryState, Select, StackTable, Td, Th } from "../ui/compat";
 import { Pill, When } from "./bits";
 
 /** Invite someone to Outbound itself. They make a workspace or ask to join one after signing up. */
@@ -97,8 +97,7 @@ export function UsersPage() {
           all.length === 0 ? (
             <Empty title="No one matches" />
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-              <Table>
+            <StackTable>
                 <thead>
                   <tr>
                     <Th>Person</Th>
@@ -116,8 +115,8 @@ export function UsersPage() {
                         <span className="font-medium">{u.name || u.email}</span>
                         {u.name && <span className="block text-label text-muted">{u.email}</span>}
                       </Td>
-                      <Td className="text-small">{u.workspaces.join(", ") || <span className="text-muted">none</span>}</Td>
-                      <Td>
+                      <Td label="Workspaces" className="text-small">{u.workspaces.join(", ") || <span className="text-muted">none</span>}</Td>
+                      <Td label="Platform role">
                         {isSuper && u.id !== me.data?.user.id ? (
                           <Select aria-label={`Platform role of ${u.email}`} value={u.platform_role ?? ""} onChange={(e) => role.mutate({ id: u.id, role: (e.target.value || null) as "admin" | "superadmin" | null })}>
                             <option value="">None</option>
@@ -128,11 +127,11 @@ export function UsersPage() {
                           (u.platform_role ?? "—")
                         )}
                       </Td>
-                      <Td className="text-muted">
+                      <Td label="Last signed in" className="text-muted">
                         <When iso={u.last_login_at} time />
                       </Td>
-                      <Td>{u.status === "active" ? <Pill tone="good">active</Pill> : <Pill tone="error">disabled</Pill>}</Td>
-                      <Td className="space-x-1 text-right">
+                      <Td label="Status">{u.status === "active" ? <Pill tone="good">active</Pill> : <Pill tone="error">disabled</Pill>}</Td>
+                      <Td className="flex flex-wrap gap-1 md:table-cell md:space-x-1 md:text-right">
                         <Button size="sm" variant="ghost" busy={signOut.isPending && signOut.variables === u.id} onClick={() => signOut.mutate(u.id)}>
                           Sign out everywhere
                         </Button>
@@ -156,8 +155,7 @@ export function UsersPage() {
                     </tr>
                   ))}
                 </tbody>
-              </Table>
-            </div>
+            </StackTable>
           )
         }
       </QueryState>

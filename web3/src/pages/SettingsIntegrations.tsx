@@ -148,7 +148,7 @@ function BodyFormat() {
           <div className="mb-1 text-small font-medium">Several leads in one request</div>
           <CodeBlock label="several-targets body" text={MANY} />
         </div>
-        <div className="overflow-x-auto rounded-lg border border-line">
+        <div className="relative overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-small">
             <thead className="bg-surface-2 text-left text-muted">
               <tr>

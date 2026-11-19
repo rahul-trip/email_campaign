@@ -463,6 +463,8 @@ def test_nobody_to_write_to_waits_a_day_and_gets_three_tries(
     found = company(factory, ws, cid)
     assert found.failure_kind is FailureKind.NO_PERSON
     assert found.next_action_at == clock.moment + timedelta(hours=24)  # not minutes
+    # A stage's own message is stored as written, for a person to read; no class name in front.
+    assert found.last_error == "no decision-maker was found"
 
     for _ in range(2):  # tries two and three
         clock.advance(hours=25)
@@ -899,3 +901,12 @@ def test_every_log_line_in_a_run_carries_the_run_workspace_and_lead(
         "stage": "research",
     }
     assert get_contextvars() == {}  # and nothing leaks out after the run
+
+
+def test_an_unexpected_error_keeps_its_class_name_for_whoever_debugs_it(
+    factory: UnitOfWorkFactory, ws: str
+) -> None:
+    cid = add_company(factory, ws, "acme.com")
+    runner = make_runner(factory, ws, [FakeStage("research", C.NEW, C.RESEARCHED, action=boom)])
+    runner.run_pipeline()
+    assert (company(factory, ws, cid).last_error or "").startswith("RuntimeError: ")

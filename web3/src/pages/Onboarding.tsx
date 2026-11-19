@@ -239,20 +239,21 @@ export function OnboardingPage() {
 function Frame({ children, progress, stepLabel }: { children?: ReactNode; progress?: number; stepLabel?: string }) {
   return (
     <div className="min-h-screen bg-bg">
-      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-line px-4 sm:px-6">
-        <span className="flex items-center gap-2.5">
+      <header className="glass sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-line px-4 sm:gap-4 sm:px-6">
+        <span className="flex shrink-0 items-center gap-2.5">
           <LogoMark size={36} />
-          <span className="text-heading font-bold text-ink">Outbound</span>
+          <span className="hidden text-heading font-bold text-ink sm:inline">Outbound</span>
         </span>
         {progress !== undefined && (
-          <span className="mx-auto flex items-center gap-3 rounded-full border border-line bg-surface px-3 py-1">
+          <span className="mx-auto flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface px-2.5 py-1 sm:gap-3 sm:px-3">
             <Ring share={progress} size={28} stroke={4} tone="good" title={`${Math.round(progress * 100)}% set up`} />
-            <span className="text-small font-semibold text-ink">{stepLabel}</span>
-            <span className="tnum text-small text-muted">{Math.round(progress * 100)}% done</span>
+            <span className="truncate text-small font-semibold text-ink">{stepLabel}</span>
+            <span className="tnum hidden text-small text-muted sm:inline">{Math.round(progress * 100)}% done</span>
           </span>
         )}
-        <Link to="/" className={buttonClass("ghost", "sm", "ml-auto")}>
-          <LogOut className="size-4" aria-hidden /> Save and finish later
+        <Link to="/" aria-label="Save and finish later" className={buttonClass("ghost", "sm", "ml-auto shrink-0")}>
+          <LogOut className="size-4" aria-hidden /> <span className="hidden sm:inline">Save and finish later</span>
+          <span className="sm:hidden">Later</span>
         </Link>
       </header>
       {children}

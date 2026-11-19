@@ -167,6 +167,15 @@ class CompanyRepository(ScopedRepository):
     def get(self, company_id: str) -> Company:
         return snapshot(self._row(CompanyRow, company_id), Company)
 
+    def get_many(self, company_ids: Collection[str]) -> dict[str, Company]:
+        """Several companies in one query, by id (a missing one is simply not in the answer)."""
+        if not company_ids:
+            return {}
+        stmt = select(CompanyRow).where(
+            CompanyRow.workspace_id == self._workspace_id, CompanyRow.id.in_(list(company_ids))
+        )
+        return {row.id: snapshot(row, Company) for row in self._session.scalars(stmt)}
+
     def by_domain(self, domain: str) -> Company | None:
         stmt = select(CompanyRow).where(
             CompanyRow.workspace_id == self._workspace_id, CompanyRow.domain == domain.lower()

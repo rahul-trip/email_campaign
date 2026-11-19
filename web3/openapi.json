@@ -8310,12 +8310,17 @@
           "waiting_for_review": {
             "title": "Waiting For Review",
             "type": "integer"
+          },
+          "waiting_hot": {
+            "title": "Waiting Hot",
+            "type": "integer"
           }
         },
         "required": [
           "by_status",
           "held",
           "waiting_for_review",
+          "waiting_hot",
           "buckets"
         ],
         "title": "StatusOut",
@@ -16294,7 +16299,42 @@
     },
     "/api/review": {
       "get": {
+        "description": "The emails waiting for review. ``best`` puts the best-fitting lead's first instead of the\noldest; ``limit`` keeps only the first few; ``slim`` leaves out each lead's research record\n(for a page that only shows who and what, such as Today).",
         "operationId": "queue_api_review_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "best",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Best",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "slim",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Slim",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -16309,6 +16349,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Queue",

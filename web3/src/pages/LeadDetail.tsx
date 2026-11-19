@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
 import { Tabs } from "../ui/overlay";
 import { JourneyView } from "./LeadJourney";
-import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ExternalLink, Flame, GitFork, Globe2, HelpCircle, Mail, MessageCircleQuestion, Newspaper, RefreshCw, ShieldOff, Sparkles, Target, Trash2, Unlock, UserPlus, X } from "lucide-react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ExternalLink, Flame, GitFork, Globe2, Mail, MessageCircleQuestion, Newspaper, RefreshCw, ShieldOff, Sparkles, Target, Trash2, Unlock, UserPlus, X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { DirectoryCard } from "../components/DirectoryCard";
@@ -38,7 +38,7 @@ import {
 import { cx } from "../lib/cx";
 import { Chip } from "../ui/core";
 import { FitRing } from "../ui/viz";
-import { ago, credits, when, words } from "../lib/format";
+import { ago, credits, plainError, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
 import { isViewing, useCurrent } from "../app/session";
 import { LinkedInDraftCard } from "../components/LinkedInDraft";
@@ -215,7 +215,7 @@ export function LeadDetailPage() {
           <Problem error={retry.error ?? requalify.error} />
           {company.status === "failed" && (
             <Callout tone="error" title={`The ${company.failed_stage ? words(company.failed_stage) : ""} step failed`}>
-              {company.last_error}
+              {plainError(company.last_error)}
               {emailStepFailed &&
                 " Edit a person below to complete their name or give their work email, and the step is retried. If you know an address works even though the check could not prove it, press Skip the check next to it."}
             </Callout>
@@ -443,7 +443,7 @@ export function LeadDetailPage() {
               <Card title="Notes">
                 <ul className="space-y-2">
                   {notes.map((note) => (
-                    <li key={note.id} className="rounded-lg bg-surface-2 p-2.5 text-body">
+                    <li key={note.id} className="rounded-lg bg-surface-2 p-2.5 text-body [overflow-wrap:anywhere]">
                       {note.body}
                       <div className="mt-1 text-label text-muted">
                         {words(note.source)}
@@ -1098,6 +1098,9 @@ function Criteria({ data }: { data: QualificationData }) {
       {KIND_ORDER.map((kind) => {
         const items = criteria.filter((c) => c.kind === kind);
         if (!items.length) return null;
+        // A criterion with something found gets a card; the ones nothing was found for share one short list.
+        const found = items.filter((c) => outcomeOf(c) !== "unknown");
+        const unknown = items.filter((c) => outcomeOf(c) === "unknown");
         const good = items.filter((c) => outcomeOf(c) === "good").length;
         const triggered = items.filter((c) => kind === "disqualifier" && c.verdict === "met").length;
         const summary = kind === "disqualifier" ? (triggered ? `${triggered} triggered` : "none triggered") : `${good} of ${items.length} ${kind === "signal" ? "seen" : "met"}`;
@@ -1108,21 +1111,21 @@ function Criteria({ data }: { data: QualificationData }) {
               <Chip tone={triggered ? "error" : good === items.length ? "good" : "stopped"}>{summary}</Chip>
             </div>
             <ul className="grid gap-2 sm:grid-cols-2">
-              {items.map((c) => {
+              {found.map((c) => {
                 const outcome = outcomeOf(c);
-                const Icon = outcome === "good" ? Check : outcome === "bad" ? X : HelpCircle;
+                const Icon = outcome === "good" ? Check : X;
                 return (
-                  <li key={c.id} className={cx("min-w-0 rounded-xl border p-3", outcome === "good" ? "border-line bg-surface" : outcome === "bad" ? "border-error-dot/30 bg-error-soft" : "border-line bg-surface-2")}>
+                  <li key={c.id} className={cx("min-w-0 rounded-xl border p-3", outcome === "good" ? "border-line bg-surface" : "border-error-dot/30 bg-error-soft")}>
                     <div className="flex items-start gap-2.5">
-                      <span className={cx("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full", outcome === "good" ? "bg-good-soft text-good" : outcome === "bad" ? "bg-error-soft text-error" : "bg-surface-3 text-muted")}>
-                        <Icon className="size-3.5" aria-label={outcome === "good" ? "Good" : outcome === "bad" ? "Bad" : "Not known"} />
+                      <span className={cx("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full", outcome === "good" ? "bg-good-soft text-good" : "bg-error-soft text-error")}>
+                        <Icon className="size-3.5" aria-label={outcome === "good" ? "Good" : "Bad"} />
                       </span>
                       <div className="min-w-0">
                         <div className="break-words text-body font-medium text-ink">
                           {c.criterion}
                           {c.weight > 1 && kind === "must_have" && <span className="ml-1.5 text-label font-normal text-faint">counts ×{c.weight}</span>}
                         </div>
-                        {c.evidence ? (
+                        {c.evidence && (
                           <p className="mt-1 break-words text-small text-muted">
                             “{c.evidence}”
                             {c.source && (
@@ -1131,8 +1134,6 @@ function Criteria({ data }: { data: QualificationData }) {
                               </a>
                             )}
                           </p>
-                        ) : (
-                          outcome === "unknown" && <p className="mt-1 text-small text-muted">Nothing found either way.</p>
                         )}
                       </div>
                     </div>
@@ -1140,6 +1141,18 @@ function Criteria({ data }: { data: QualificationData }) {
                 );
               })}
             </ul>
+            {unknown.length > 0 && (
+              <div className={cx("rounded-xl border border-line bg-surface-2 p-3", found.length > 0 && "mt-2")}>
+                <div className="text-small font-medium text-ink-2">Nothing found either way ({unknown.length})</div>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-small text-muted">
+                  {unknown.map((c) => (
+                    <li key={c.id} className="break-words">
+                      {c.criterion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         );
       })}

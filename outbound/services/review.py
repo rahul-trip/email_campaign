@@ -119,11 +119,37 @@ class ReviewService:
         self._writer = writer  # the metered writer model, for revisions the operator asks for
         self._actor = actor
 
-    def queue(self, limit: int = 100) -> list[QueueItem]:
+    def queue(self, limit: int = 100, *, best_first: bool = False) -> list[QueueItem]:
+        """The emails waiting for review: oldest first, or the best-fitting lead's first.
+
+        Everything the items need is read in a fixed number of queries (the emails, then their
+        leads, people and addresses together), not a few for each email: the database is a
+        network away, and a long queue used to take ten seconds to open."""
         with self._uow(self._workspace_id) as uow:
-            return [
-                self._item(uow, m) for m in uow.messages.in_state(MessageState.GENERATED, limit)
-            ]
+            messages = uow.messages.in_state(MessageState.GENERATED, limit, best_first=best_first)
+            companies = uow.companies.get_many({m.company_id for m in messages})
+            contacts = uow.contacts.get_many({m.contact_id for m in messages})
+            addresses = uow.emails.get_many({m.contact_email_id for m in messages})
+            policy_on = bool(uow.workspace_settings().get("country_policy_enabled", True))
+            confirmed = _confirmed_by_hand(uow, list(contacts))
+            try:
+                return [
+                    QueueItem(
+                        m,
+                        companies[m.company_id],
+                        contacts[m.contact_id],
+                        addresses[m.contact_email_id],
+                        _skips(
+                            companies[m.company_id],
+                            addresses[m.contact_email_id],
+                            policy_on=policy_on,
+                            confirmed=m.contact_id in confirmed,
+                        ),
+                    )
+                    for m in messages
+                ]
+            except KeyError as missing:  # a row the message points at is gone
+                raise NotFound(f"waiting email refers to a missing row {missing}") from None
 
     def resolve(self, ref: str) -> str:
         """A full message id, or a unique start of one, from what the operator typed."""
@@ -331,15 +357,33 @@ class ReviewService:
         company = uow.companies.get(message.company_id)
         contact = uow.contacts.get(message.contact_id)
         address = uow.emails.get(message.contact_email_id)
-        return QueueItem(message, company, contact, address, _skips(uow, company, contact, address))
+        skips = _skips(
+            company,
+            address,
+            policy_on=bool(uow.workspace_settings().get("country_policy_enabled", True)),
+            confirmed=contact.id in _confirmed_by_hand(uow, [contact.id]),
+        )
+        return QueueItem(message, company, contact, address, skips)
+
+
+def _confirmed_by_hand(uow: UnitOfWork, contact_ids: list[str]) -> set[str]:
+    """Which of these people the operator confirmed after a search could not place them here."""
+    events = uow.events.for_entities([(EntityType.CONTACT, i) for i in contact_ids])
+    return {
+        e.entity_id
+        for e in events
+        if e.type == "status_changed"
+        and e.data.get("from") in (ContactStatus.UNCONFIRMED.value, ContactStatus.NOT_HERE.value)
+        and e.data.get("to") == ContactStatus.CANDIDATE.value
+    }
 
 
 def _skips(
-    uow: UnitOfWork, company: Company, contact: Contact, address: ContactEmail
+    company: Company, address: ContactEmail, *, policy_on: bool, confirmed: bool
 ) -> tuple[Skip, ...]:
     """The checks the operator skipped that an email to this address relies on."""
     skips: list[Skip] = []
-    if not uow.workspace_settings().get("country_policy_enabled", True):
+    if not policy_on:
         skips.append(Skip("country_policy", "country rules are switched off for this workspace"))
     elif company.policy_skip_from:
         skips.append(
@@ -356,12 +400,6 @@ def _skips(
             else f"the check said {address.status.value.replace('_', ' ')}"
         )
         skips.append(Skip("email_verification", f"the address is used without proof ({said})"))
-    confirmed = any(
-        e.type == "status_changed"
-        and e.data.get("from") in (ContactStatus.UNCONFIRMED.value, ContactStatus.NOT_HERE.value)
-        and e.data.get("to") == ContactStatus.CANDIDATE.value
-        for e in uow.events.for_entities([(EntityType.CONTACT, contact.id)])
-    )
     if confirmed:
         skips.append(
             Skip("works_here", "a search could not place this person here; you confirmed it")

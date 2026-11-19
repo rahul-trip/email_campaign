@@ -25,6 +25,8 @@ test("a company added by name waits for its website, and confirming it adds the 
   const name = `Harbor Light ${Date.now()}`;
   await addTarget(page, { company: name });
   await page.goto("/attention");
+  // Show only the websites to confirm: that section is then the first, so it starts open whatever else is waiting.
+  await page.getByRole("tab", { name: /^Websites to confirm/ }).click();
   const row = page.getByRole("listitem").filter({ hasText: name });
   const website = unique("harborlight");
   await row.getByLabel("Website for this row").fill(website);

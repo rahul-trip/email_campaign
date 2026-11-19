@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import type { LeadsSearch } from "../router";
 import { cx } from "../lib/cx";
-import { ago, credits, when } from "../lib/format";
+import { ago, credits, plainError, when } from "../lib/format";
 import { HOLD_REASONS, LEAD_STATUSES, STAGES, companyStatus, describe, describeHold, emailStatus, leadStatus, stagesDone } from "../lib/status";
 import { Button, buttonClass, Card, Chip, Empty, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
 import { LeadIcon } from "../ui/lead";
@@ -268,7 +268,7 @@ export function LeadsPage() {
             {filtered ? "Try another search or clear the filters." : "Add a company by website, name, email or LinkedIn profile, or let discovery find some."}
           </Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left">
               <thead className="text-label font-semibold tracking-wide text-faint uppercase">
                 <tr className="border-b border-line">
@@ -288,7 +288,7 @@ export function LeadsPage() {
                   <SortHead by="updated" className="hidden px-3 py-3 xl:table-cell">
                     Changed
                   </SortHead>
-                  <th className="px-4 py-3">
+                  <th className="hidden px-4 py-3 sm:table-cell">
                     <span className="sr-only">Links</span>
                   </th>
                 </tr>
@@ -323,8 +323,8 @@ export function LeadsPage() {
                         <Chip tone={info.family}>{info.label}</Chip>
                         {hold && <div className="mt-1 text-small text-attention">{hold.label}</div>}
                         {company.status === "failed" && company.last_error && (
-                          <div className={cx("mt-1 max-w-[16rem] truncate text-small", info.family === "error" ? "text-error" : "text-muted")} title={company.last_error}>
-                            {company.last_error}
+                          <div className={cx("mt-1 max-w-[16rem] truncate text-small", info.family === "error" ? "text-error" : "text-muted")} title={plainError(company.last_error)}>
+                            {plainError(company.last_error)}
                           </div>
                         )}
                       </td>
@@ -351,7 +351,7 @@ export function LeadsPage() {
                       <td className="hidden px-3 py-3.5 text-small whitespace-nowrap text-muted xl:table-cell">
                         <span title={`Added ${when(company.created_at)}`}>{ago(company.updated_at ?? company.created_at)}</span>
                       </td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="hidden px-4 py-3.5 text-right sm:table-cell">
                         <Link
                           to="/leads/$companyId"
                           params={{ companyId: company.id }}

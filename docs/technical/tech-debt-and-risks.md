@@ -276,6 +276,13 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-54 · P2 · The first page took 11 seconds to show its emails: the review queue read a few rows for every email — closed 2026-11-19
+
+- **Was:** `ReviewService.queue` read the lead, the person, the address and the event history one email at a time, plus the workspace settings again for each, about six queries per email. The database is a network away (about 30 ms from the VM), so 44 waiting emails took 11.7 s and sent 689 KB, most of it each lead's whole research record. Today asked for the entire queue every 15 s to show ten emails, and the other requests on the page queued behind it (each took about 3 s while it ran).
+- **Fixed by:** `ReviewService.queue` reads the emails, then their leads, people and addresses together (`get_many` on the three repositories, one events query, the settings once): six queries however long the queue is. `GET /api/review` takes `limit`, `best` and `slim`; `StatusOut.waiting_hot` replaces counting hot emails in the list; Today asks for its ten best, slim.
+- **Evidence:** `tests/db/test_review_queue.py` (a queue of 14 costs the same number of queries as a queue of 2; best first; the same items as read one at a time; the hot count), `tests/api/test_web3_reads.py` (the parameters and the status count); also run on Postgres.
+- **Still open:** other lists may read per row in the same way (the Needs a decision rows and the lead page were not measured); look for it by counting queries, as the new test does.
+
 ### R-53 · P2 · Normal drop-outs were shown as failures, so the few wins were buried — closed 2026-11-19
 
 - **Was:** "no decision-maker found" and "no valid email found" were `failed`, like a real error; they were retried three times in under an hour, counted in the amber *Needs attention* badge and the bell, and shown as a red *Failed* card first on Today. An operator saw mostly red and amber.

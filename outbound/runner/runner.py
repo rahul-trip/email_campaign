@@ -350,7 +350,10 @@ class Runner:
         return outcome
 
     def _record_failure(self, stage: Stage, company: Company, error: Exception) -> Outcome:
-        message = f"{type(error).__name__}: {error}"[:MAX_ERROR_LENGTH]
+        # A stage's own message is written for a person ("people were found, but none is a
+        # decision-maker"); only an unexpected error needs its class name, for whoever debugs it.
+        own = isinstance(error, StageFailure)
+        message = (str(error) if own else f"{type(error).__name__}: {error}")[:MAX_ERROR_LENGTH]
         log.exception("stage_failed", error=message)
         try:
             with self._uow(self._workspace_id) as uow:

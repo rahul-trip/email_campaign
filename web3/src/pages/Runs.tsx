@@ -92,57 +92,93 @@ export function RunsPage() {
             rows.length === 0 ? (
               <Empty title="No runs yet" action={<StartNow label="Start your first run" />}>A run researches your leads and writes the first drafts. Add leads first, then start one.</Empty>
             ) : (
-              <Table>
-                <thead>
-                  <tr>
-                    <Th>Started</Th>
-                    <Th>State</Th>
-                    <Th>What it did</Th>
-                    <Th className="hidden md:table-cell">Took</Th>
-                    <Th className="text-right">AI credits</Th>
-                    <Th>
-                      <span className="sr-only">Actions</span>
-                    </Th>
-                  </tr>
-                </thead>
-                <tbody>
+              <>
+                <div className="hidden md:block">
+                <Table>
+                  <thead>
+                    <tr>
+                      <Th>Started</Th>
+                      <Th>State</Th>
+                      <Th>What it did</Th>
+                      <Th className="hidden md:table-cell">Took</Th>
+                      <Th className="text-right">AI credits</Th>
+                      <Th>
+                        <span className="sr-only">Actions</span>
+                      </Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((run) => {
+                      const live = run.status === "queued" || run.status === "running";
+                      const params = (run.params ?? {}) as { mode?: string; campaign?: string; discover?: number; limit?: number };
+                      return (
+                        <tr key={run.id} className={cx("align-top hover:bg-surface-2", run.id === fresh && "bg-primary-soft outline outline-2 -outline-offset-2 outline-primary")}>
+                          <Td className="whitespace-nowrap">
+                            <Link to="/runs/$runId" params={{ runId: run.id }} className="text-body font-semibold text-primary hover:underline">
+                              {ago(run.started_at ?? run.created_at)}
+                            </Link>
+                            {run.id === fresh && <Chip tone="primary" className="ml-2 animate-pop">New</Chip>}
+                            <div className="text-label text-muted" title={when(run.created_at)}>
+                              {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
+                            </div>
+                          </Td>
+                          <Td>
+                            <StatusBadge status={describe(runStatus, run.status)} />
+                          </Td>
+                          <Td>
+                            <RunSummary run={run} />
+                          </Td>
+                          <Td className="hidden whitespace-nowrap text-small text-muted md:table-cell">{run.started_at ? duration(run.started_at, run.finished_at) : "not started"}</Td>
+                          <Td className="tnum text-right text-small">{credits(run.credits_milli)}</Td>
+                          <Td className="whitespace-nowrap text-right">
+                            {live && (
+                              <Button variant="danger-ghost" size="sm" busy={cancel.isPending && cancel.variables === run.id} onClick={() => cancel.mutate(run.id)}>
+                                <Square className="size-3" aria-hidden /> Cancel
+                              </Button>
+                            )}
+                            <Link to="/runs/$runId" params={{ runId: run.id }} className={buttonClass("ghost", "sm")}>
+                              Open
+                            </Link>
+                          </Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+                </div>
+                {/* On a phone each run is a card: the table's columns would run off the screen. */}
+                <ul className="divide-y divide-line md:hidden">
                   {rows.map((run) => {
                     const live = run.status === "queued" || run.status === "running";
-                    const params = (run.params ?? {}) as { mode?: string; campaign?: string; discover?: number; limit?: number };
+                    const params = (run.params ?? {}) as { mode?: string };
                     return (
-                      <tr key={run.id} className={cx("align-top hover:bg-surface-2", run.id === fresh && "bg-primary-soft outline outline-2 -outline-offset-2 outline-primary")}>
-                        <Td className="whitespace-nowrap">
-                          <Link to="/runs/$runId" params={{ runId: run.id }} className="text-body font-semibold text-primary hover:underline">
+                      <li key={run.id} className={cx("space-y-2 p-4", run.id === fresh && "bg-primary-soft")}>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <Link to="/runs/$runId" params={{ runId: run.id }} className="inline-flex min-h-11 items-center text-body font-semibold text-primary hover:underline">
                             {ago(run.started_at ?? run.created_at)}
                           </Link>
-                          {run.id === fresh && <Chip tone="primary" className="ml-2 animate-pop">New</Chip>}
-                          <div className="text-label text-muted" title={when(run.created_at)}>
-                            {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
-                          </div>
-                        </Td>
-                        <Td>
                           <StatusBadge status={describe(runStatus, run.status)} />
-                        </Td>
-                        <Td>
-                          <RunSummary run={run} />
-                        </Td>
-                        <Td className="hidden whitespace-nowrap text-small text-muted md:table-cell">{run.started_at ? duration(run.started_at, run.finished_at) : "not started"}</Td>
-                        <Td className="tnum text-right text-small">{credits(run.credits_milli)}</Td>
-                        <Td className="whitespace-nowrap text-right">
+                        </div>
+                        <div className="text-small text-muted" title={when(run.created_at)}>
+                          {MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}
+                          {run.started_at ? ` · took ${duration(run.started_at, run.finished_at)}` : ""} · {credits(run.credits_milli)}
+                        </div>
+                        <RunSummary run={run} />
+                        <div className="flex items-center gap-2 pt-1">
                           {live && (
                             <Button variant="danger-ghost" size="sm" busy={cancel.isPending && cancel.variables === run.id} onClick={() => cancel.mutate(run.id)}>
                               <Square className="size-3" aria-hidden /> Cancel
                             </Button>
                           )}
-                          <Link to="/runs/$runId" params={{ runId: run.id }} className={buttonClass("ghost", "sm")}>
+                          <Link to="/runs/$runId" params={{ runId: run.id }} className={cx(buttonClass("secondary", "sm"), "ml-auto")}>
                             Open
                           </Link>
-                        </Td>
-                      </tr>
+                        </div>
+                      </li>
                     );
                   })}
-                </tbody>
-              </Table>
+                </ul>
+              </>
             )
           }
         </QueryState>

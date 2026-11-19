@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -72,6 +72,15 @@ class ContactRepository(ScopedRepository):
 
     def get(self, contact_id: str) -> Contact:
         return snapshot(self._row(ContactRow, contact_id), Contact)
+
+    def get_many(self, contact_ids: Collection[str]) -> dict[str, Contact]:
+        """Several people in one query, by id."""
+        if not contact_ids:
+            return {}
+        stmt = select(ContactRow).where(
+            ContactRow.workspace_id == self._workspace_id, ContactRow.id.in_(list(contact_ids))
+        )
+        return {row.id: snapshot(row, Contact) for row in self._session.scalars(stmt)}
 
     def linkedin_taken(self, linkedin_url: str) -> bool:
         """Whether some contact in this workspace already holds that profile (it is unique)."""
@@ -194,6 +203,16 @@ class ContactEmailRepository(ScopedRepository):
 
     def get(self, email_id: str) -> ContactEmail:
         return snapshot(self._row(ContactEmailRow, email_id), ContactEmail)
+
+    def get_many(self, email_ids: Collection[str]) -> dict[str, ContactEmail]:
+        """Several addresses in one query, by id."""
+        if not email_ids:
+            return {}
+        stmt = select(ContactEmailRow).where(
+            ContactEmailRow.workspace_id == self._workspace_id,
+            ContactEmailRow.id.in_(list(email_ids)),
+        )
+        return {row.id: snapshot(row, ContactEmail) for row in self._session.scalars(stmt)}
 
     def by_address(self, email: str) -> ContactEmail | None:
         stmt = select(ContactEmailRow).where(
