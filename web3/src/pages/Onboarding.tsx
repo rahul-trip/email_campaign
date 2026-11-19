@@ -359,9 +359,8 @@ function Welcome({ name, goal, onGoal, onStart }: { name: string; goal: Goal; on
             <Chip tone="primary" dot pulse>
               Setup takes about 6 minutes
             </Chip>
-            <h1 className="mt-5 max-w-[20ch] text-display font-semibold text-ink">
-              {first ? `Welcome, ${first}. ` : ""}Outbound finds the companies, the right person and the first email. You just approve.
-            </h1>
+            <p className="mt-5 text-body font-semibold text-primary">Welcome{first ? `, ${first}` : ""}</p>
+            <h1 className="mt-1 max-w-[20ch] text-display font-semibold text-ink">Outbound finds the companies, the right person and the first email. You just approve.</h1>
             <p className="mt-4 max-w-[52ch] text-[1.0625rem] text-muted">We do most of the typing: your company is drafted from your website, and your campaign from your company.</p>
 
             <div className="mt-8">
