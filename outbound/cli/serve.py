@@ -143,6 +143,9 @@ def register(app: typer.Typer) -> None:
         tick_minutes: Annotated[
             float, typer.Option(help="Retries, mailbox sync and due leads, this often (0: never).")
         ] = 15,
+        check_minutes: Annotated[
+            float, typer.Option(help="A light check for due leads, this often (0: only the tick).")
+        ] = 2,
         database_url: DatabaseUrl = None,
     ) -> None:
         """Execute queued runs and the periodic tick for every workspace, until stopped."""
@@ -169,6 +172,7 @@ def register(app: typer.Typer) -> None:
             role="worker",
             threads=threads,
             tick_minutes=tick_minutes,
+            check_minutes=check_minutes,
             poll_seconds=poll_seconds,
             database=container.engine.url.render_as_string(hide_password=True),
         )
@@ -197,6 +201,7 @@ def register(app: typer.Typer) -> None:
             lambda workspace_id: assemble(container, workspace_id, live.get()),
             threads=threads,
             tick_every=tick_every,
+            due_check_every=timedelta(minutes=check_minutes) if check_minutes > 0 else None,
             periodic=[
                 lambda: _enforce_caps(vendors, notices),
                 lambda: _credit_check(vendors, notices),

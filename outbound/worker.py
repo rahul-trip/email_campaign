@@ -10,6 +10,10 @@ finds it, claims it and calls the same code the CLI uses. One worker serves ever
   first, and a thread pool runs several workspaces side by side;
 - every ``tick_every`` each active workspace gets a tick: retries, the catch-all poll, the Sent
   sync, and the pipeline if any lead is waiting;
+- every ``due_check_every`` (a few minutes) each active workspace gets a light check: one cheap
+  query, and the pipeline only if a lead is due, so work that appears between ticks (new leads,
+  a lead whose wait is over, what a long batch left over) does not wait for the next tick; a pass
+  that made progress is followed by another check at once;
 - a run whose worker died (no heartbeat for ``stale_after``) is failed so it frees the queue.
 """
 
@@ -28,8 +32,10 @@ from outbound.db.errors import RunInProgress
 from outbound.db.repositories.audit import RunView
 from outbound.db.types import utcnow
 from outbound.domain.enums import RunStatus
+from outbound.domain.state_machines import STAGE_INPUT_STATUS
 from outbound.logging import get_logger
 from outbound.pipeline import Pipeline, execute_run
+from outbound.runner.runner import Outcome, RunReport
 from outbound.services.activity_notices import ActivityNotifier
 from outbound.services.autodiscovery import REVIEW_FULL, AutoDiscovery
 from outbound.services.runs import RunRequest
@@ -43,6 +49,7 @@ Assemble = Callable[[str], Pipeline]  # workspace id -> a freshly assembled pipe
 class Task(StrEnum):
     RUN = "run"  # a run someone queued
     TICK = "tick"  # the periodic pass
+    PIPELINE = "pipeline"  # the light check: run the pipeline if a lead is due
 
 
 @dataclass(frozen=True)
@@ -70,6 +77,7 @@ class Worker:
         *,
         threads: int = 4,
         tick_every: timedelta | None = timedelta(minutes=15),
+        due_check_every: timedelta | None = None,
         stale_after: timedelta = timedelta(minutes=30),
         tick_limit: int = 50,
         periodic: Sequence[Callable[[], object]] = (),
@@ -81,6 +89,7 @@ class Worker:
         self._assemble = assemble
         self._threads = threads
         self._tick_every = tick_every
+        self._due_check_every = due_check_every  # None: only the tick starts unqueued work
         self._stale_after = stale_after
         self._tick_limit = tick_limit
         self._periodic = list(periodic)  # platform-wide jobs, once per tick interval
@@ -89,6 +98,7 @@ class Worker:
         self._now = now
         self._last_served: dict[str, datetime] = {}
         self._last_tick: dict[str, datetime] = {}
+        self._last_due_check: dict[str, datetime] = {}
         self._busy: set[str] = set()
 
     # ------------------------------------------------------------------ planning
@@ -114,6 +124,16 @@ class Worker:
                 and self._last_tick.get(ws, datetime.min.replace(tzinfo=due.tzinfo)) <= due
             ]
         never = datetime.min.replace(tzinfo=self._now().tzinfo)
+        if self._due_check_every is not None and self._tick_every is not None:
+            checked_before = self._now() - self._due_check_every
+            planned = {job.workspace_id for job in jobs}
+            jobs += [
+                Job(ws, Task.PIPELINE)
+                for ws in active
+                if ws not in planned
+                and ws not in self._busy
+                and self._last_due_check.get(ws, never) <= checked_before
+            ]
         return sorted(jobs, key=lambda job: self._last_served.get(job.workspace_id, never))
 
     def recover_stale(self) -> list[str]:
@@ -140,7 +160,11 @@ class Worker:
         self._last_served[job.workspace_id] = self._now()
         if job.task is Task.TICK:
             self._last_tick[job.workspace_id] = self._now()
+            self._last_due_check[job.workspace_id] = self._now()  # the tick looks at it too
             return self._tick(job.workspace_id)
+        if job.task is Task.PIPELINE:
+            self._last_due_check[job.workspace_id] = self._now()
+            return self._pipeline_if_due(job.workspace_id)
         with self._container.uow(job.workspace_id) as uow:
             claimed = uow.runs.claim_next()
             uow.commit()
@@ -168,6 +192,7 @@ class Worker:
                 workspace_id,
                 lambda n: n.after_run(workspace_id, report.run_id, by_person=not request.automatic),
             )
+            self._continue(workspace_id, report)
 
     def _tick(self, workspace_id: str) -> bool:
         try:
@@ -175,12 +200,48 @@ class Worker:
             self._queue_discovery(workspace_id, pipeline)
             report = pipeline.tick.run(limit=self._tick_limit, skip_idle=True)
             self._notify(workspace_id, lambda n: n.after_tick(workspace_id, report))
+            if report.pipeline is not None:
+                self._continue(workspace_id, report.pipeline)
         except RunInProgress:
             log.info("tick_skipped", workspace_id=workspace_id, reason="a run is in progress")
         except Exception as error:  # one workspace's broken tick must not stop the others
             log.exception("tick_failed", workspace_id=workspace_id, error_type=type(error).__name__)
             self._alert("the 15-minute pass", error, f"Workspace {workspace_id}.")
         return True
+
+    def _pipeline_if_due(self, workspace_id: str) -> bool:
+        """The light check: one cheap query, and a pipeline run only if a lead is due."""
+        with self._container.uow(workspace_id) as uow:
+            due = uow.companies.any_due(list(STAGE_INPUT_STATUS.values()), self._now())
+        if not due:
+            return False
+        try:
+            pipeline = self._assemble(workspace_id)
+            report = pipeline.runner.run_pipeline(limit=self._tick_limit)
+            self._notify(
+                workspace_id, lambda n: n.after_run(workspace_id, report.run_id, by_person=False)
+            )
+            self._continue(workspace_id, report)
+        except RunInProgress:
+            log.info("pipeline_skipped", workspace_id=workspace_id, reason="a run is in progress")
+        except Exception as error:  # one workspace's broken pass must not stop the others
+            log.exception(
+                "pipeline_failed", workspace_id=workspace_id, error_type=type(error).__name__
+            )
+            self._alert("a pipeline pass", error, f"Workspace {workspace_id}.")
+        return True
+
+    def _continue(self, workspace_id: str, report: RunReport) -> None:
+        """After a pass that moved leads, look again at once: a batch has a limit, so more may be
+        waiting, and a lead that just advanced may be due at its next step. A pass that moved
+        nothing waits for the usual interval, so a lead that cannot go on is not retried in a
+        loop."""
+        progress = {Outcome.ADVANCED, Outcome.HELD, Outcome.FAILED, Outcome.SUPPRESSED}
+        moved = sum(
+            n for c in report.counts.values() for o, n in c.items() if Outcome(o) in progress
+        )
+        if moved:
+            self._last_due_check.pop(workspace_id, None)
 
     def _queue_discovery(self, workspace_id: str, pipeline: Pipeline) -> None:
         """Queue the search for new companies a campaign is due; the run is picked up next."""
