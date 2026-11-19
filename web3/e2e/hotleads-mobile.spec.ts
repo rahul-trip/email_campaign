@@ -52,17 +52,53 @@ test("Hot leads rows fit a phone: nothing overlaps and nothing runs off the scre
   expect(f!.x + f!.width).toBeLessThanOrEqual(390);
   await expect(ring).toBeVisible();
 
+  // The cards are a row to swipe: the first fills most of the screen, the next waits to its right.
+  const strip = page.locator("[data-tour=linkedin-list]");
+  const sizes = await strip.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, first: (el.children[0] as HTMLElement).getBoundingClientRect().width }));
+  expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 100);
+  expect(sizes.first).toBeGreaterThan(390 * 0.8);
+  expect(sizes.first).toBeLessThan(390);
+  const second = strip.locator("> div").nth(1);
+  await strip.evaluate((el) => (el.children[1] as HTMLElement).scrollIntoView({ inline: "start", block: "nearest" }));
+  await expect.poll(async () => Math.round((await second.boundingBox())!.x)).toBeLessThan(40);
+  await strip.evaluate((el) => el.scrollTo({ left: 0 }));
+
   // Expanded: the draft card's buttons stay on the screen too.
   await page.getByRole("button", { name: "Expand all" }).click();
   await expect(page.getByText("Connection note").first()).toBeVisible();
   expect(await overflow()).toBeLessThanOrEqual(1);
   const past = await page.evaluate(() => {
     const out: string[] = [];
-    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-list] button, [data-tour=linkedin-list] a")) {
+    // Cards after the first are meant to sit off to the right until swiped to.
+    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-list] > div:first-child button, [data-tour=linkedin-list] > div:first-child a")) {
       const box = el.getBoundingClientRect();
       if (box.width > 1 && box.right > document.documentElement.clientWidth + 1) out.push((el.textContent ?? "").trim().slice(0, 30));
     }
     return out;
   });
   expect(past).toEqual([]);
+});
+
+// On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.
+test("Hot leads filters fold into one line on a phone and say how many are on", async ({ page }) => {
+  await signIn(page);
+  const rows = [row(1, "Luminal", 89), row(2, "Morph", 86)];
+  await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
+  await page.goto("/w/default/linkedin");
+  await expect(page.getByText("Luminal").first()).toBeVisible();
+
+  const filters = page.getByRole("button", { name: /^Filters/ });
+  const search = page.getByLabel("Search by company, website or person");
+  await expect(filters).toBeVisible();
+  await expect(filters).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "Hot only" })).toBeHidden();
+  const [s, f] = [await search.boundingBox(), await filters.boundingBox()];
+  expect(Math.abs(s!.y - f!.y), "search and Filters share a line").toBeLessThan(12);
+
+  await filters.click();
+  await expect(filters).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Hot only" }).click();
+  await expect(filters).toContainText("1"); // one filter on
+  await expect(page.getByRole("button", { name: "Hot only" })).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 });

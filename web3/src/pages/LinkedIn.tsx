@@ -15,7 +15,7 @@ import { cx } from "../lib/cx";
 import { ago } from "../lib/format";
 import type { LinkedInSearch } from "../router";
 import { Button, buttonClass, Card, Chip, Empty, PageHeader, Problem, Segmented, Select, Skeleton } from "../ui/core";
-import { FilterChip, SearchBox, SortControl, useDebounced } from "../ui/filters";
+import { FilterBar, FilterChip, SearchBox, SortControl, useDebounced } from "../ui/filters";
 import { LeadIcon } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 
@@ -97,44 +97,50 @@ export function LinkedInPage() {
       </div>
 
       <Card className="mb-4 overflow-hidden p-0">
-        <div className="flex flex-col gap-2 border-b border-line bg-surface-2 p-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={typed} onChange={setTyped} />
-          {/* On a phone the filters sit in one row that scrolls sideways, so they take one line, not five. */}
-          <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:shrink-0">
-            <FilterChip active={!!search.hot} onClick={() => set({ hot: search.hot ? undefined : true })}>
-              <Flame className="size-3.5" aria-hidden /> Hot only
-            </FilterChip>
-            <FilterChip active={search.email === "none"} onClick={() => set({ email: search.email === "none" ? undefined : "none" })}>
-              No email
-            </FilterChip>
-            <FilterChip active={search.email === "has"} onClick={() => set({ email: search.email === "has" ? undefined : "has" })}>
-              Has email
-            </FilterChip>
-            <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })}>
-              <option value="">Any fit</option>
-              {[60, 70, 80, 90].map((n) => (
-                <option key={n} value={n}>
-                  Fit {n}+
-                </option>
-              ))}
-            </Select>
-            <input
-              aria-label="Country code"
-              value={search.country ?? ""}
-              maxLength={2}
-              placeholder="Country"
-              onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
-              className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <SortControl value={sort} options={SORTS} direction={direction} onSort={(v) => set({ sort: v, dir: undefined })} onDirection={() => set({ dir: direction === "asc" ? "desc" : "asc" })} />
-            {filtered && (
-              <Button variant="ghost" size="sm" onClick={() => void navigate({ search: { state: search.state }, replace: true })}>
-                <X className="size-3.5" aria-hidden /> Clear
-              </Button>
-            )}
-          </div>
+        <div className="border-b border-line">
+          <FilterBar
+            active={[search.hot, search.email, search.fit, search.country].filter(Boolean).length}
+            search={<SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={typed} onChange={setTyped} />}
+            controls={
+              <>
+                <FilterChip active={!!search.hot} onClick={() => set({ hot: search.hot ? undefined : true })}>
+                  <Flame className="size-3.5" aria-hidden /> Hot only
+                </FilterChip>
+                <FilterChip active={search.email === "none"} onClick={() => set({ email: search.email === "none" ? undefined : "none" })}>
+                  No email
+                </FilterChip>
+                <FilterChip active={search.email === "has"} onClick={() => set({ email: search.email === "has" ? undefined : "has" })}>
+                  Has email
+                </FilterChip>
+                <Select aria-label="Minimum fit" value={search.fit ?? ""} onChange={(e) => set({ fit: e.target.value ? Number(e.target.value) : undefined })}>
+                  <option value="">Any fit</option>
+                  {[60, 70, 80, 90].map((n) => (
+                    <option key={n} value={n}>
+                      Fit {n}+
+                    </option>
+                  ))}
+                </Select>
+                <input
+                  aria-label="Country code"
+                  value={search.country ?? ""}
+                  maxLength={2}
+                  placeholder="Country"
+                  onChange={(e) => set({ country: e.target.value.length === 2 ? e.target.value.toUpperCase() : undefined })}
+                  className="h-10 w-24 rounded-[var(--radius-control)] border border-line-strong bg-surface px-3 text-body uppercase outline-none focus:border-primary"
+                />
+              </>
+            }
+            trailing={
+              <>
+                <SortControl value={sort} options={SORTS} direction={direction} onSort={(v) => set({ sort: v, dir: undefined })} onDirection={() => set({ dir: direction === "asc" ? "desc" : "asc" })} />
+                {filtered && (
+                  <Button variant="ghost" size="sm" onClick={() => void navigate({ search: { state: search.state }, replace: true })}>
+                    <X className="size-3.5" aria-hidden /> Clear
+                  </Button>
+                )}
+              </>
+            }
+          />
         </div>
         <div className="flex items-center justify-between px-4 py-2 text-small text-muted">
           <span>{list.isSuccess ? `${total} message${total === 1 ? "" : "s"}${filtered ? " match" : ""}` : "Loading…"}</span>
@@ -162,12 +168,19 @@ export function LinkedInPage() {
           </Empty>
         </Card>
       ) : (
-        <div className="space-y-3" data-tour="linkedin-list">
+        // On a phone the leads are cards to swipe through, one after another; from a tablet up they are a list.
+        <div
+          role="region"
+          aria-label="Hot leads, swipe sideways on a phone"
+          tabIndex={0}
+          className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto scroll-px-4 px-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-primary sm:mx-0 sm:block sm:space-y-3 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[88%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto"
+          data-tour="linkedin-list"
+        >
           {rows.map((row, index) => (
             <LeadRow key={row.item.id} row={row} open={isOpen(row.item.id, index)} onToggle={() => setOpen((o) => ({ ...o, [row.item.id]: !isOpen(row.item.id, index) }))} readOnly={isViewing(workspace)} onChanged={refresh} />
           ))}
           {total > rows.length && (
-            <div className="flex justify-center pt-1">
+            <div className="flex items-center justify-center self-stretch pt-1 sm:self-auto">
               <Button variant="secondary" onClick={() => setLimit(limit + PAGE)}>
                 Show more ({total - rows.length} left)
               </Button>

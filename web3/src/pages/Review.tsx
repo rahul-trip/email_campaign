@@ -8,7 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearch } from "@tanstack/react-router";
 import { diffWords } from "diff";
 import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flag, Flame, Keyboard, Newspaper, RotateCcw, Wand2, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
 import { cx } from "../lib/cx";
@@ -119,8 +119,9 @@ export function ReviewPage() {
         </Card>
       )}
 
+      {current && <QueueStrip items={items} current={current.message.id} onPick={setSelected} />}
       {current && (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)_360px]">
+        <div className="mt-4 grid grid-cols-1 gap-5 lg:mt-0 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[296px_minmax(0,1fr)_360px]">
           <Queue items={items} current={current.message.id} onPick={setSelected} />
           <Reader
             key={current.message.id}
@@ -186,46 +187,74 @@ function StartNow() {
   );
 }
 
+/** One waiting email, as a card the person can pick. The list and the phone's strip share it. */
+function QueueCard({ item, active, onPick, className }: { item: Item; active: boolean; onPick: (id: string) => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(item.message.id)}
+      aria-current={active ? "true" : undefined}
+      className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2", className)}
+    >
+      <div className="flex items-start gap-3">
+        <FitRing score={item.company.fit_score} size={34} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 truncate text-body font-semibold text-ink">
+            {item.company.hot && <Flame className="size-3.5 shrink-0 text-attention-dot" aria-label="Hot lead" />}
+            <span className="truncate">{item.company.name ?? item.company.domain}</span>
+          </div>
+          <div className="truncate text-small text-ink-2">
+            {item.contact.full_name ?? "Name unknown"}
+            {item.contact.title && <span className="text-muted"> · {item.contact.title}</span>}
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-label text-muted">
+            {item.message.created_at && <span title={when(item.message.created_at)}>waited {ago(item.message.created_at).replace(" ago", "")}</span>}
+            {item.flagged && (
+              <span className="inline-flex items-center gap-1 font-semibold text-attention">
+                <Flag className="size-3" aria-hidden /> Flagged
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 function Queue({ items, current, onPick }: { items: Item[]; current: string; onPick: (id: string) => void }) {
   return (
     <nav aria-label="Emails waiting" data-tour="review-queue" className="hidden flex-col gap-2 lg:flex">
       <Label className="px-1">Waiting ({items.length})</Label>
       <ul className="flex max-h-[calc(100vh-190px)] flex-col gap-2 overflow-y-auto pr-1 pb-2">
-        {items.map((item) => {
-          const active = item.message.id === current;
-          return (
-            <li key={item.message.id}>
-              <button
-                type="button"
-                onClick={() => onPick(item.message.id)}
-                aria-current={active ? "true" : undefined}
-                className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2")}
-              >
-                <div className="flex items-start gap-3">
-                  <FitRing score={item.company.fit_score} size={34} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 truncate text-body font-semibold text-ink">
-                      {item.company.hot && <Flame className="size-3.5 shrink-0 text-attention-dot" aria-label="Hot lead" />}
-                      <span className="truncate">{item.company.name ?? item.company.domain}</span>
-                    </div>
-                    <div className="truncate text-small text-ink-2">
-                      {item.contact.full_name ?? "Name unknown"}
-                      {item.contact.title && <span className="text-muted"> · {item.contact.title}</span>}
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-label text-muted">
-                      {item.message.created_at && <span title={when(item.message.created_at)}>waited {ago(item.message.created_at).replace(" ago", "")}</span>}
-                      {item.flagged && (
-                        <span className="inline-flex items-center gap-1 font-semibold text-attention">
-                          <Flag className="size-3" aria-hidden /> Flagged
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </li>
-          );
-        })}
+        {items.map((item) => (
+          <li key={item.message.id}>
+            <QueueCard item={item} active={item.message.id === current} onPick={onPick} />
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** On a phone and a tablet the waiting emails are a row to swipe through, with the chosen one kept in view. */
+function QueueStrip({ items, current, onPick }: { items: Item[]; current: string; onPick: (id: string) => void }) {
+  const ref = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const card = ref.current?.querySelector<HTMLElement>('[aria-current="true"]')?.parentElement;
+    const strip = ref.current;
+    if (!card || !strip) return;
+    // Scroll the strip itself, not the page: the person is reading the email below.
+    strip.scrollTo({ left: card.offsetLeft - strip.offsetLeft - 16, behavior: "smooth" });
+  }, [current]);
+  return (
+    <nav aria-label="Emails waiting" data-tour="review-strip" className="min-w-0 lg:hidden">
+      <Label className="px-1">Waiting ({items.length}) · swipe to pick</Label>
+      <ul ref={ref} className="-mx-4 mt-2 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-4 px-4 pb-2 sm:-mx-6 sm:px-6 sm:scroll-px-6 [&>li]:w-64 [&>li]:shrink-0 [&>li]:snap-start">
+        {items.map((item) => (
+          <li key={item.message.id}>
+            <QueueCard item={item} active={item.message.id === current} onPick={onPick} className="h-full" />
+          </li>
+        ))}
       </ul>
     </nav>
   );
