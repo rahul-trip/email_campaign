@@ -4,7 +4,8 @@
  * by the workspace router, and each one leaves with a full page load.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Building2, Eye, EyeOff, Zap } from "lucide-react";
+import { Building2, Eye, EyeOff } from "lucide-react";
+import { LogoMark } from "../ui/Logo";
 import { useEffect, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok } from "../api/client";
 import { Button, Callout, Checkbox, Field, Input, Problem } from "../ui/core";
@@ -38,9 +39,7 @@ function Frame({ title, subtitle, children }: { title: string; subtitle?: ReactN
       <main className="flex items-center justify-center px-5 py-12">
         <div className="w-full max-w-[420px] animate-rise">
           <div className="mb-8 flex items-center gap-2.5">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet text-white shadow-2">
-              <Zap className="size-5" aria-hidden />
-            </span>
+            <LogoMark size={40} />
             <span className="text-title font-bold tracking-tight text-ink">Outbound</span>
           </div>
           <h1 className="text-title font-semibold text-ink">{title}</h1>

@@ -35,6 +35,7 @@
   --primary-soft: rgb(79 70 229 / 0.08);
   --primary-line: rgb(79 70 229 / 0.24);
   --violet: #7c3aed;
+  --teal: #0d9488;
 
   --good: #047857;
   --good-dot: #10b981;
@@ -82,6 +83,7 @@
     --primary-soft: rgb(129 140 248 / 0.12);
     --primary-line: rgb(129 140 248 / 0.32);
     --violet: #a78bfa;
+    --teal: #2dd4bf;
     --good: #34d399;
     --good-dot: #34d399;
     --good-soft: rgb(52 211 153 / 0.12);
@@ -127,6 +129,7 @@
   --primary-soft: rgb(129 140 248 / 0.12);
   --primary-line: rgb(129 140 248 / 0.32);
   --violet: #a78bfa;
+  --teal: #2dd4bf;
   --good: #34d399;
   --good-dot: #34d399;
   --good-soft: rgb(52 211 153 / 0.12);

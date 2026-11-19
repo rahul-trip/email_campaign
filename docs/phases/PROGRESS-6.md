@@ -160,6 +160,10 @@ Followed the newest screens in Stitch project `538951827606035367` (`01 - Onboar
 
 On a phone: Hot leads are swipeable snap cards; Emails ready gets a swipeable row of the waiting emails above the one being read; Today's ready emails are a swipeable row of up to ten (the wide layout still shows the best three), as the Hot leads strip there already was. The shared filter bar (Hot leads, Needs a decision) is one line on a phone, the search and a Filters button with a count, and opens the chips, menus and sort underneath. The lead page is reordered: Research first, then Emails, People and addresses, Add a person, LinkedIn, Shared directory, Vendor calls, Activity. Research is rebuilt as a header (fit ring, reason, chips) and four blocks (how well they fit as criteria cards grouped by kind, with Why now and Risks; what we learned; in the news; your questions), following the lead screen in the Stitch project. Browser tests: `hotleads-mobile`, `review-mobile`, `lead-research`.
 
+## Logo (2026-11-19, branch `phase-6/logo`, no migration, web only)
+
+The app's mark is **The Infinite Vector** (Stitch board "'O' Monogram Exploration Board", variation 3D), chosen by the team from four concepts in the Stitch project. `web3/src/ui/Logo.tsx::LogoMark` replaces the lightning-bolt badge in the sidebar, the sign-in and public pages, the setup flow and the admin console; `web3/public/favicon.svg` is the first favicon the app has; `--teal` is a new colour token. See [docs/design.md](../design.md) "Logo". Browser test: `web3/e2e/brand.spec.ts`.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

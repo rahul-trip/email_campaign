@@ -5,7 +5,8 @@
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Shield, Sun, X, Zap } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Compass, Eye, KeyRound, LogOut, Menu as MenuIcon, Monitor, Moon, Plus, Search, Shield, Sun, X } from "lucide-react";
+import { LogoMark } from "../ui/Logo";
 import { useEffect, useState, type ReactNode } from "react";
 import { client, ok } from "../api/client";
 import { cx } from "../lib/cx";
@@ -116,9 +117,7 @@ function Frame({ children }: { children: ReactNode }) {
       {menuOpen && <div className="fixed inset-0 z-30 bg-[var(--scrim)] lg:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col border-r border-line bg-surface transition-transform duration-300 lg:translate-x-0", menuOpen ? "translate-x-0" : "-translate-x-full")}>
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-3">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-violet text-white shadow-2">
-            <Zap className="size-5" aria-hidden />
-          </span>
+          <LogoMark size={36} />
           <WorkspaceSwitcher />
         </div>
         <div className="px-4 pb-2">
