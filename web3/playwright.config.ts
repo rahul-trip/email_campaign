@@ -11,7 +11,10 @@ export default defineConfig({
   // One engine run at a time per workspace, and one shared database: run the tests in order.
   workers: 1,
   fullyParallel: false,
-  use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure" },
+  // CI sets PLAYWRIGHT_CHANNEL=chrome to use the Google Chrome already on the runner, so it neither
+  // downloads a browser nor runs apt (whose mirror made a shard wait over three minutes at times).
+  // Locally it stays the browser Playwright installed.
+  use: { baseURL: `http://127.0.0.1:${PORT}`, trace: "retain-on-failure", channel: process.env.PLAYWRIGHT_CHANNEL || undefined },
   webServer: {
     command: `cd .. && E2E_PORT=${PORT} uv run python -m scripts.e2e_server`,
     url: `http://127.0.0.1:${PORT}/api/health`,

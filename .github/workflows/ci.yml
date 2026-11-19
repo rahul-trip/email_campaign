@@ -123,6 +123,8 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
+    env:
+      PLAYWRIGHT_CHANNEL: chrome  # the runner's own Chrome: no browser download, no apt
     steps:
       - uses: actions/checkout@v4
         with:
@@ -139,8 +141,6 @@ jobs:
       - run: npm ci
         working-directory: web3
       - run: npm run build
-        working-directory: web3
-      - run: npx playwright install --with-deps chromium
         working-directory: web3
       - run: npx playwright test --reporter=list --shard=${{ matrix.shard }}/4  # list: each test's time shows in the log
         working-directory: web3
