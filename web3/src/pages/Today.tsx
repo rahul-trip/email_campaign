@@ -19,7 +19,7 @@ import { useSetup } from "../lib/setup";
 import { CopyNoteButton } from "../components/LinkedInDraft";
 import { LeadIcon } from "../ui/lead";
 import { isViewing } from "../app/session";
-import { Avatar, Button, buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
+import { Button, buttonClass, Card, Chip, Empty, Skeleton } from "../ui/core";
 import { useToast } from "../ui/overlay";
 import { Section, SectionGroup } from "../ui/sections";
 import { CountUp, Delta, FitRing, Ring, Sparkline } from "../ui/viz";
@@ -557,7 +557,7 @@ function DraftPreview({ item, readOnly }: { item: Schemas["ReviewItemOut"]; read
   return (
     <Card className="flex flex-col gap-2 p-4">
       <div className="flex items-center gap-2.5">
-        <Avatar name={name} />
+        <LeadIcon domain={item.company.domain} name={name} />
         <div className="min-w-0 flex-1">
           <div className="truncate font-semibold text-ink">{name}</div>
           <div className="truncate text-small text-muted">{item.contact.title ?? "Decision-maker"}</div>

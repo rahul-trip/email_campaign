@@ -13,8 +13,8 @@ import { client, ok, type Schemas } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
 import { cx } from "../lib/cx";
 import { ago, when, words } from "../lib/format";
-import { Avatar, Button, Callout, Card, Checkbox, Chip, Empty, Field, Input, Kbd, Label, Mono, PageHeader, Problem, Skeleton, Textarea } from "../ui/core";
-import { EmailChip, FitBreakdown, qualificationOf } from "../ui/lead";
+import { Button, Callout, Card, Checkbox, Chip, Empty, Field, Input, Kbd, Label, Mono, PageHeader, Problem, Skeleton, Textarea } from "../ui/core";
+import { EmailChip, FitBreakdown, LeadIcon, qualificationOf } from "../ui/lead";
 import { Dialog, useToast } from "../ui/overlay";
 import { Section, SectionGroup } from "../ui/sections";
 import { FitRing } from "../ui/viz";
@@ -197,7 +197,7 @@ function QueueCard({ item, active, onPick, className }: { item: Item; active: bo
       className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2", className)}
     >
       <div className="flex items-start gap-3">
-        <FitRing score={item.company.fit_score} size={34} />
+        <LeadIcon domain={item.company.domain} name={item.company.name ?? item.company.domain} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate text-body font-semibold text-ink">
             {item.company.hot && <Flame className="size-3.5 shrink-0 text-attention-dot" aria-label="Hot lead" />}
@@ -216,6 +216,7 @@ function QueueCard({ item, active, onPick, className }: { item: Item; active: bo
             )}
           </div>
         </div>
+        <FitRing score={item.company.fit_score} size={34} />
       </div>
     </button>
   );
@@ -305,7 +306,7 @@ function Reader({ item, onDone }: { item: Item; onDone: (company: string) => str
         <Card className="overflow-hidden" data-tour="review-editor">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-2 px-6 py-4">
             <div className="flex min-w-0 items-start gap-3">
-              <Avatar name={name} />
+              <LeadIcon domain={item.company.domain} name={name} />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="truncate text-heading font-semibold text-ink">{item.contact.full_name ?? "Name unknown"}</span>
