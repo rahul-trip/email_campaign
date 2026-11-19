@@ -31,9 +31,12 @@ const row = (n: number, name: string, fit: number) => ({
   fit_reason: "Meets 5 of 6 must-haves; missing: remote-friendly with US Eastern/Pacific overlap; signs they may buy now: recent seed, Series A or Series B funding round, open roles for AI, LLM or agent engineers",
 });
 
-test("LinkedIn ready rows fit a phone: nothing overlaps and nothing runs off the screen", async ({ page }) => {
+// A second person at the same company: they sit together under it.
+const second = (n: number, name: string) => ({ ...row(n, name, 89), item: { ...row(n, name, 89).item, id: `li-${n}b`, contact_id: `ct-${n}b` }, person: "Priya Rao", title: "Head of Talent" });
+
+test("LinkedIn ready fits a phone: companies are a row to swipe, the people at one are together, nothing runs off the screen", async ({ page }) => {
   await signIn(page);
-  const rows = [row(1, "Luminal", 89), row(2, "Morph", 86), row(3, "Lightning", 91)];
+  const rows = [row(1, "Luminal", 89), second(1, "Luminal"), row(2, "Morph", 86), row(3, "Lightning", 91)];
   await page.route("**/api/linkedin?**", (route) => route.fulfill({ json: { items: rows, total: rows.length } }));
   await page.goto("/w/default/linkedin");
   await expect(page.getByText("Luminal").first()).toBeVisible();
@@ -41,42 +44,40 @@ test("LinkedIn ready rows fit a phone: nothing overlaps and nothing runs off the
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(await overflow()).toBeLessThanOrEqual(1);
 
-  // Collapsed: the flags sit above the one-tap button, not under the fit ring or the button.
-  const first = page.locator("[data-tour=linkedin-list] > div").first();
-  const flag = first.getByText("No email we could prove");
-  const copy = first.getByRole("button", { name: /Copy note/ });
-  const ring = first.locator("svg").first();
-  const [f, c] = [await flag.boundingBox(), await copy.boundingBox()];
-  expect({ flag: f, copy: c }).toBeTruthy();
-  expect(c!.y, `flag ${JSON.stringify(f)} copy ${JSON.stringify(c)}`).toBeGreaterThanOrEqual(f!.y + f!.height - 1);
-  expect(f!.x + f!.width).toBeLessThanOrEqual(390);
-  await expect(ring).toBeVisible();
+  // Three companies, not four messages: Luminal's two people share one card.
+  const strip = page.locator("[data-tour=linkedin-strip] > ul");
+  await expect(strip.locator(":scope > li")).toHaveCount(3);
+  const luminal = strip.locator(":scope > li").first();
+  await expect(luminal).toContainText("2 people");
+  await expect(luminal).toContainText("Justin Burke");
+  await expect(luminal).toContainText("Priya Rao");
 
-  // The cards are a row to swipe: the first fills most of the screen, the next waits to its right.
-  const strip = page.locator("[data-tour=linkedin-list]");
+  // The cards are a row to swipe: more than fits the screen, the first one narrower than it.
   const sizes = await strip.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth, first: (el.children[0] as HTMLElement).getBoundingClientRect().width }));
-  expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 100);
-  expect(sizes.first).toBeGreaterThan(390 * 0.8);
+  expect(sizes.scroll, "the row scrolls sideways").toBeGreaterThan(sizes.client + 50);
   expect(sizes.first).toBeLessThan(390);
-  const second = strip.locator("> div").nth(1);
-  await strip.evaluate((el) => (el.children[1] as HTMLElement).scrollIntoView({ inline: "start", block: "nearest" }));
-  await expect.poll(async () => Math.round((await second.boundingBox())!.x)).toBeLessThan(40);
-  await strip.evaluate((el) => el.scrollTo({ left: 0 }));
 
-  // Expanded: the draft card's buttons stay on the screen too.
-  await page.getByRole("button", { name: "Expand all" }).click();
-  await expect(page.getByText("Connection note").first()).toBeVisible();
+  // The chosen company reads below with both people, and its buttons stay on the screen.
+  const reader = page.locator("[data-tour=linkedin-reader]");
+  await expect(reader.getByText("People at Luminal (2)")).toBeVisible();
+  await expect(reader.getByText("Justin Burke")).toBeVisible();
+  await expect(reader.getByText("Priya Rao")).toBeVisible();
+  await expect(reader.getByText("Connection note").first()).toBeVisible();
   expect(await overflow()).toBeLessThanOrEqual(1);
   const past = await page.evaluate(() => {
     const out: string[] = [];
-    // Cards after the first are meant to sit off to the right until swiped to.
-    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-list] > div:first-child button, [data-tour=linkedin-list] > div:first-child a")) {
+    for (const el of document.querySelectorAll<HTMLElement>("[data-tour=linkedin-reader] button, [data-tour=linkedin-reader] a")) {
       const box = el.getBoundingClientRect();
       if (box.width > 1 && box.right > document.documentElement.clientWidth + 1) out.push((el.textContent ?? "").trim().slice(0, 30));
     }
     return out;
   });
   expect(past).toEqual([]);
+
+  // Picking another company shows its people instead.
+  await strip.locator(":scope > li").nth(1).getByRole("button").click();
+  await expect(reader.getByText("People at Morph (1)")).toBeVisible();
+  await expect(reader.getByText("Priya Rao")).toBeHidden();
 });
 
 // On a phone the filters are one line (search and a Filters button) that opens, not four rows of controls.

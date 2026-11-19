@@ -84,12 +84,14 @@ export function CopyNoteButton({ note, profile, size = "sm", variant = "primary"
 export function LinkedInDraftCard({
   draft,
   person,
+  title,
   profile,
   readOnly,
   onChanged,
 }: {
   draft: Draft;
   person?: string | null;
+  title?: string | null;
   profile?: string | null;
   readOnly?: boolean;
   onChanged: () => void;
@@ -127,6 +129,7 @@ export function LinkedInDraftCard({
     <div className={cx("min-w-0 space-y-3 rounded-lg border border-line p-3", skipped && "opacity-70")}>
       <div className="flex flex-wrap items-center gap-2">
         {person && <span className="font-semibold">{person}</span>}
+        {title && <span className="text-small text-muted">{title}</span>}
         {safeLink(profile) && (
           <a href={safeLink(profile)!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-label font-medium text-primary hover:underline">
             Open their LinkedIn <ExternalLink className="size-3" aria-hidden />

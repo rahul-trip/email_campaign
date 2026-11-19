@@ -1,26 +1,28 @@
 /**
- * LinkedIn ready: every LinkedIn message written for a confirmed decision-maker, best fit first. Filter
- * by state, hot, whether an email could be proven, fit, country and text; sort any way; each row
- * folds (the first is open) and has a one-click "copy the note and open their profile".
- * Nothing is sent from here: the messages are pasted into LinkedIn by hand.
+ * LinkedIn ready, laid out like Emails ready: the companies waiting on the left (on a phone, a row to
+ * swipe), and on the right the one you picked, with every person written to there, one under another.
+ * All the people at a company are together, so a company is worked through in one visit.
+ * Filter by state, hot, whether an email could be proven, fit, country and text; sort any way.
+ * J and K move between companies. Nothing is sent from here: the messages are pasted into LinkedIn
+ * by hand.
  */
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { ChevronDown, ExternalLink, Flame, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle2, ChevronLeft, ChevronRight, ExternalLink, Flame, Keyboard, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
 import { isViewing, useCurrent } from "../app/session";
-import { CopyNoteButton, LinkedInDraftCard } from "../components/LinkedInDraft";
+import { LinkedInDraftCard } from "../components/LinkedInDraft";
 import { cx } from "../lib/cx";
-import { ago } from "../lib/format";
 import type { LinkedInSearch } from "../router";
-import { Button, buttonClass, Card, Chip, Empty, PageHeader, Problem, Segmented, Select, Skeleton } from "../ui/core";
+import { Button, buttonClass, Card, Chip, Empty, Kbd, Label, PageHeader, Problem, Segmented, Select, Skeleton } from "../ui/core";
 import { FilterBar, FilterChip, SearchBox, SortControl, useDebounced } from "../ui/filters";
 import { LeadIcon } from "../ui/lead";
+import { Dialog } from "../ui/overlay";
 import { FitRing } from "../ui/viz";
 
 type Row = Schemas["LinkedInDraftRowOut"];
-const PAGE = 50;
+const PAGE = 200; // messages, the most the server gives at once; companies are kept whole within them
 const SORTS = [
   ["fit", "Best fit"],
   ["newest", "Newest"],
@@ -30,6 +32,21 @@ const NATURAL = { fit: "desc", newest: "desc", company: "asc" } as const;
 
 /** A lead nobody could find a provable address for: LinkedIn is the way in. */
 export const hasNoEmail = (row: Pick<Row, "company_status" | "failure_kind">) => row.company_status === "failed" && (row.failure_kind === "no_person" || row.failure_kind === "no_email");
+
+/** A company and everyone written to there. The company's own facts (fit, hot, why) are the first row's. */
+export type Group = { id: string; rows: Row[] };
+
+/** The messages grouped by company, in the order each company first appears, so the chosen sort holds. */
+export function groupByCompany(rows: readonly Row[]): Group[] {
+  const groups = new Map<string, Group>();
+  for (const row of rows) {
+    const id = row.item.company_id;
+    const group = groups.get(id);
+    if (group) group.rows.push(row);
+    else groups.set(id, { id, rows: [row] });
+  }
+  return [...groups.values()];
+}
 
 export function LinkedInPage() {
   const { workspace } = useCurrent();
@@ -59,26 +76,65 @@ export function LinkedInPage() {
 
   const rows = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const isOpen = (id: string, index: number) => (id in open ? open[id]! : index === 0);
-  const all = (value: boolean) => setOpen(Object.fromEntries(rows.map((r) => [r.item.id, value])));
+  const groups = groupByCompany(rows);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [showKeys, setShowKeys] = useState(false);
+  // When the chosen company leaves the list (all its messages are sent), the next one takes its place.
+  const index = Math.max(0, groups.findIndex((g) => g.id === selected));
+  const current = groups[index] as Group | undefined;
   const filtered = Boolean(search.q || search.hot || search.email || search.fit || search.country);
+  const readOnly = isViewing(workspace);
   const refresh = () => {
     for (const key of ["linkedin", "companies", "status"]) void queryClient.invalidateQueries({ queryKey: [key] });
   };
+
+  const go = useCallback(
+    (step: number) => {
+      if (groups.length === 0) return;
+      setSelected(groups[(index + step + groups.length) % groups.length]!.id);
+    },
+    [groups, index],
+  );
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest("input, textarea, select, [contenteditable]") || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key === "j") go(1);
+      if (event.key === "k") go(-1);
+      if (event.key === "?") setShowKeys(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go]);
 
   return (
     <>
       <PageHeader
         title="LinkedIn ready"
-        subtitle="Hot leads first. A connection note and a first message for each confirmed decision-maker, written before their email is found, so a lead with no email we could prove still has a way in. Copy them into LinkedIn yourself: nothing is sent from here."
+        subtitle="Hot leads first. A connection note and a first message for each confirmed decision-maker, written before their email is found, so a lead with no email we could prove still has a way in. Everyone at a company is together. Copy the messages into LinkedIn yourself: nothing is sent from here."
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Chip tone="primary">{toSend ?? "–"} to send</Chip>
             <Chip tone="attention">
               <Flame className="size-3.5" aria-hidden /> {hot ?? "–"} hot
             </Chip>
             <Chip>{noEmail ?? "–"} with no email we could prove</Chip>
+            {groups.length > 0 && (
+              <>
+                <span className="tnum text-small text-muted">
+                  {index + 1} of {groups.length}
+                </span>
+                <Button variant="secondary" size="sm" aria-label="Previous company (K)" onClick={() => go(-1)}>
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <Button variant="secondary" size="sm" aria-label="Next company (J)" onClick={() => go(1)}>
+                  <ChevronRight className="size-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowKeys(true)}>
+                  <Keyboard className="size-4" aria-hidden /> Shortcuts
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -143,24 +199,17 @@ export function LinkedInPage() {
           />
         </div>
         <div className="flex items-center justify-between px-4 py-2 text-small text-muted">
-          <span>{list.isSuccess ? `${total} message${total === 1 ? "" : "s"}${filtered ? " match" : ""}` : "Loading…"}</span>
-          <span className="flex gap-3">
-            <button type="button" className="font-semibold text-primary hover:underline" onClick={() => all(true)}>
-              Expand all
-            </button>
-            <button type="button" className="font-semibold text-primary hover:underline" onClick={() => all(false)}>
-              Collapse all
-            </button>
-          </span>
+          <span>{list.isSuccess ? `${total} message${total === 1 ? "" : "s"} for ${groups.length} ${groups.length === 1 ? "company" : "companies"}${filtered ? " match" : ""}${total > rows.length ? ` · showing ${rows.length}` : ""}` : "Loading…"}</span>
         </div>
       </Card>
 
       <Problem error={list.error} className="mb-3" />
       {list.isPending ? (
         <Skeleton rows={4} />
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <Card>
           <Empty
+            art={!filtered && state === "drafted" ? <CheckCircle2 className="size-12 text-good-dot" /> : undefined}
             title={filtered ? "No message matches" : state === "drafted" ? "Nothing to send yet" : "Nothing here"}
             action={filtered ? <Button variant="secondary" size="sm" onClick={() => void navigate({ search: { state: search.state }, replace: true })}>Clear filters</Button> : <Link to="/leads" className={buttonClass("secondary", "sm")}>Browse leads</Link>}
           >
@@ -168,81 +217,182 @@ export function LinkedInPage() {
           </Empty>
         </Card>
       ) : (
-        // On a phone the leads are cards to swipe through, one after another; from a tablet up they are a list.
-        <div
-          role="region"
-          aria-label="LinkedIn messages, swipe sideways on a phone"
-          tabIndex={0}
-          className="-mx-4 flex snap-x snap-mandatory items-start gap-3 overflow-x-auto scroll-px-4 px-4 pb-3 outline-none focus-visible:ring-2 focus-visible:ring-primary sm:mx-0 sm:block sm:space-y-3 sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:w-[88%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto"
-          data-tour="linkedin-list"
-        >
-          {rows.map((row, index) => (
-            <LeadRow key={row.item.id} row={row} open={isOpen(row.item.id, index)} onToggle={() => setOpen((o) => ({ ...o, [row.item.id]: !isOpen(row.item.id, index) }))} readOnly={isViewing(workspace)} onChanged={refresh} />
-          ))}
+        <>
+          {current && <QueueStrip groups={groups} current={current.id} onPick={setSelected} />}
+          {current && (
+            <div className="mt-4 grid grid-cols-1 gap-5 lg:mt-0 lg:grid-cols-[296px_minmax(0,1fr)]">
+              <Queue groups={groups} current={current.id} onPick={setSelected} />
+              <Reader key={current.id} group={current} readOnly={readOnly} onChanged={refresh} />
+            </div>
+          )}
           {total > rows.length && (
-            <div className="flex items-center justify-center self-stretch pt-1 sm:self-auto">
+            <div className="mt-4 flex justify-center">
               <Button variant="secondary" onClick={() => setLimit(limit + PAGE)}>
-                Show more ({total - rows.length} left)
+                Show more ({total - rows.length} messages left)
               </Button>
             </div>
           )}
-        </div>
+        </>
+      )}
+
+      {showKeys && (
+        <Dialog title="Keyboard shortcuts" onClose={() => setShowKeys(false)}>
+          <dl className="grid grid-cols-[7rem_1fr] gap-y-3 text-body">
+            {[
+              ["J", "Next company"],
+              ["K", "Previous company"],
+              ["?", "This list"],
+            ].map(([key, text]) => (
+              <div key={key} className="contents">
+                <dt>
+                  <Kbd>{key}</Kbd>
+                </dt>
+                <dd className="text-ink-2">{text}</dd>
+              </div>
+            ))}
+          </dl>
+        </Dialog>
       )}
     </>
   );
 }
 
-function LeadRow({ row, open, onToggle, readOnly, onChanged }: { row: Row; open: boolean; onToggle: () => void; readOnly: boolean; onChanged: () => void }) {
-  const name = row.company_name ?? row.domain;
-  const noEmail = hasNoEmail(row);
-  const id = `lead-row-${row.item.id}`;
-  const quick = row.item.state === "drafted" && !readOnly;
+const sentCount = (group: Group) => group.rows.filter((r) => r.item.state === "sent").length;
+
+/** One company as a card the person can pick, with the people written to there under its name. */
+function QueueCard({ group, active, onPick, className }: { group: Group; active: boolean; onPick: (id: string) => void; className?: string }) {
+  const head = group.rows[0]!;
+  const name = head.company_name ?? head.domain;
+  const shown = group.rows.slice(0, 3);
+  const sent = sentCount(group);
   return (
-    <Card className="min-w-0 overflow-hidden p-0">
-      {/* On a phone the pieces stack: who and what on top, the one-tap button underneath. */}
-      <div className="flex flex-col sm:flex-row sm:items-center">
-        <button type="button" aria-expanded={open} aria-controls={id} onClick={onToggle} className="flex min-w-0 flex-1 items-start gap-3 p-3 text-left sm:p-4">
-          <ChevronDown className={cx("mt-2.5 size-4 shrink-0 text-muted transition-transform", !open && "-rotate-90")} aria-hidden />
-          <LeadIcon domain={row.domain} name={name} />
-          <span className="min-w-0 flex-1">
-            <span className="block break-words font-semibold text-ink">{name}</span>
-            <span className="block break-words text-small text-muted">{[row.person, row.title].filter(Boolean).join(" · ") || "Decision-maker"}</span>
-            <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              {row.hot && (
-                <Chip tone="attention" title="A fit score above 80">
-                  <Flame className="size-3.5" aria-hidden /> Hot
-                </Chip>
-              )}
-              {noEmail && <Chip title="No email address could be proven, so LinkedIn is the way in">No email we could prove</Chip>}
-              {row.country_code && <Chip>{row.country_code}</Chip>}
-              {row.item.state === "sent" && <Chip tone="good">Sent {ago(row.item.sent_at)}</Chip>}
-            </span>
-            {!open && <span className="mt-1.5 line-clamp-2 block break-words text-small text-ink-2">“{row.item.note}”</span>}
-          </span>
-          <span className="shrink-0">
-            <FitRing score={row.fit_score} size={40} />
-          </span>
-        </button>
-        {quick && (
-          <div className="px-3 pb-3 sm:shrink-0 sm:p-4 sm:pl-0">
-            <CopyNoteButton note={row.item.note} profile={row.profile} className="w-full justify-center sm:w-auto" />
+    <button
+      type="button"
+      onClick={() => onPick(group.id)}
+      aria-current={active ? "true" : undefined}
+      className={cx("press w-full rounded-2xl border p-3.5 text-left transition", active ? "border-primary bg-primary-soft" : "border-line bg-surface hover:border-line-strong hover:bg-surface-2", className)}
+    >
+      <div className="flex items-start gap-3">
+        <LeadIcon domain={head.domain} name={name} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 truncate text-body font-semibold text-ink">
+            {head.hot && <Flame className="size-3.5 shrink-0 text-attention-dot" aria-label="Hot lead" />}
+            <span className="truncate">{name}</span>
           </div>
-        )}
-      </div>
-      {open && (
-        <div id={id} className="min-w-0 space-y-3 border-t border-line p-3 sm:p-4">
-          {row.fit_reason && (
-            <p className="text-small text-muted">
-              <span className="font-semibold text-ink-2">Why it fits: </span>
-              {row.fit_reason}
-            </p>
-          )}
-          <LinkedInDraftCard draft={row.item} person={row.person} profile={row.profile} readOnly={readOnly} onChanged={onChanged} />
-          <Link to="/leads/$companyId" params={{ companyId: row.item.company_id }} className="inline-flex items-center gap-1 text-small font-semibold text-primary hover:underline">
-            Open lead <ExternalLink className="size-3" aria-hidden />
-          </Link>
+          <ul className="mt-0.5 space-y-0.5">
+            {shown.map((row) => (
+              <li key={row.item.id} className="truncate text-small text-ink-2">
+                {row.person ?? "Decision-maker"}
+                {row.title && <span className="text-muted"> · {row.title}</span>}
+              </li>
+            ))}
+            {group.rows.length > shown.length && <li className="text-small text-muted">and {group.rows.length - shown.length} more</li>}
+          </ul>
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-label text-muted">
+            <span>
+              {group.rows.length} {group.rows.length === 1 ? "person" : "people"}
+            </span>
+            {hasNoEmail(head) && <span title="No email address could be proven, so LinkedIn is the way in">no email</span>}
+            {head.country_code && <span>{head.country_code}</span>}
+            {sent > 0 && <span className="font-semibold text-good">{sent} sent</span>}
+          </div>
         </div>
-      )}
-    </Card>
+        <FitRing score={head.fit_score} size={34} />
+      </div>
+    </button>
+  );
+}
+
+function Queue({ groups, current, onPick }: { groups: Group[]; current: string; onPick: (id: string) => void }) {
+  return (
+    <nav aria-label="Companies waiting" data-tour="linkedin-queue" className="hidden flex-col gap-2 lg:flex">
+      <Label className="px-1">Companies ({groups.length})</Label>
+      <ul className="flex max-h-[calc(100vh-190px)] flex-col gap-2 overflow-y-auto pr-1 pb-2">
+        {groups.map((group) => (
+          <li key={group.id}>
+            <QueueCard group={group} active={group.id === current} onPick={onPick} />
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** On a phone and a tablet the companies are a row to swipe through, with the chosen one kept in view. */
+function QueueStrip({ groups, current, onPick }: { groups: Group[]; current: string; onPick: (id: string) => void }) {
+  const ref = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const card = ref.current?.querySelector<HTMLElement>('[aria-current="true"]')?.parentElement;
+    const strip = ref.current;
+    if (!card || !strip) return;
+    // Scroll the strip itself, not the page: the person is reading the messages below.
+    strip.scrollTo({ left: card.offsetLeft - strip.offsetLeft - 16, behavior: "smooth" });
+  }, [current]);
+  return (
+    <nav aria-label="Companies waiting" data-tour="linkedin-strip" className="min-w-0 lg:hidden">
+      <Label className="px-1">Companies ({groups.length}) · swipe to pick</Label>
+      <ul ref={ref} className="-mx-4 mt-2 flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-px-4 px-4 pb-2 sm:-mx-6 sm:px-6 sm:scroll-px-6 [&>li]:w-64 [&>li]:shrink-0 [&>li]:snap-start">
+        {groups.map((group) => (
+          <li key={group.id}>
+            <QueueCard group={group} active={group.id === current} onPick={onPick} className="h-full" />
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+/** The company, why it fits, and a message card for each person written to there. */
+function Reader({ group, readOnly, onChanged }: { group: Group; readOnly: boolean; onChanged: () => void }) {
+  const head = group.rows[0]!;
+  const name = head.company_name ?? head.domain;
+  return (
+    <div className="flex min-w-0 flex-col gap-4" data-tour="linkedin-reader">
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line bg-surface-2 px-4 py-4 sm:px-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <LeadIcon domain={head.domain} name={name} />
+            <div className="min-w-0">
+              <div className="break-words text-heading font-semibold text-ink">{name}</div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {head.hot && (
+                  <Chip tone="attention" title="A fit score above 80">
+                    <Flame className="size-3.5" aria-hidden /> Hot
+                  </Chip>
+                )}
+                {hasNoEmail(head) && <Chip title="No email address could be proven, so LinkedIn is the way in">No email we could prove</Chip>}
+                {head.country_code && <Chip>{head.country_code}</Chip>}
+                <Chip>
+                  {group.rows.length} {group.rows.length === 1 ? "person" : "people"}
+                </Chip>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <FitRing score={head.fit_score} size={44} />
+            <Link to="/leads/$companyId" params={{ companyId: head.item.company_id }} className="inline-flex items-center gap-1 text-small font-semibold text-primary hover:underline">
+              Open lead <ExternalLink className="size-3.5" aria-hidden />
+            </Link>
+          </div>
+        </div>
+        {head.fit_reason && (
+          <p className="px-4 py-3 text-small text-muted sm:px-6">
+            <span className="font-semibold text-ink-2">Why it fits: </span>
+            {head.fit_reason}
+          </p>
+        )}
+      </Card>
+
+      <section aria-label={`Messages for ${name}`} className="flex min-w-0 flex-col gap-3">
+        <Label className="px-1">
+          People at {name} ({group.rows.length})
+        </Label>
+        {group.rows.map((row) => (
+          <div key={row.item.id} className="min-w-0">
+            <LinkedInDraftCard draft={row.item} person={row.person} title={row.title} profile={row.profile} readOnly={readOnly} onChanged={onChanged} />
+          </div>
+        ))}
+      </section>
+    </div>
   );
 }
