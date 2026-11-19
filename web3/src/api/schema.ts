@@ -2393,7 +2393,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Queue */
+        /**
+         * Queue
+         * @description The emails waiting for review. ``best`` puts the best-fitting lead's first instead of the
+         *     oldest; ``limit`` keeps only the first few; ``slim`` leaves out each lead's research record
+         *     (for a page that only shows who and what, such as Today).
+         */
         get: operations["queue_api_review_get"];
         put?: never;
         post?: never;
@@ -5879,6 +5884,8 @@ export interface components {
             };
             /** Waiting For Review */
             waiting_for_review: number;
+            /** Waiting Hot */
+            waiting_hot: number;
         };
         /** SuppressionIn */
         SuppressionIn: {
@@ -10816,7 +10823,11 @@ export interface operations {
     };
     queue_api_review_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                best?: boolean;
+                slim?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10830,6 +10841,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReviewItemOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

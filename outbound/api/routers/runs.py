@@ -166,6 +166,7 @@ def status(svc: Annotated[Services, Depends(services)]) -> StatusOut:
         by_status={s.value: n for s, n in report.by_status.items()},
         held={r.value: n for r, n in report.held.items()},
         waiting_for_review=report.waiting_for_review,
+        waiting_hot=report.waiting_hot,
         buckets={b.value: n for b, n in report.buckets.items()},
     )
 

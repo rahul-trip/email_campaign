@@ -764,6 +764,7 @@ class StatusOut(Out):
     by_status: dict[str, int]
     held: dict[str, int]
     waiting_for_review: int
+    waiting_hot: int  # of those, the ones whose lead scores above 80
     buckets: dict[str, int]  # ready, working, decision, screened_out, done
 
 

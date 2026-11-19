@@ -85,6 +85,7 @@ class StatusReport:
     by_status: dict[CompanyStatus, int]
     held: dict[HoldReason, int]
     waiting_for_review: int
+    waiting_hot: int  # of those, the ones whose lead scores above 80
     buckets: dict[Bucket, int]
 
 
@@ -197,6 +198,7 @@ class ReportService:
                 by_status=uow.companies.count_by_status(),
                 held=uow.reports.company_counts()[1],
                 waiting_for_review=uow.messages.count_in_state(MessageState.GENERATED),
+                waiting_hot=uow.messages.count_waiting_hot(),
                 buckets=uow.companies.count_buckets(),
             )
 

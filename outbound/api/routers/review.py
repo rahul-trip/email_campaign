@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from outbound.api.deps import Services, require, services
 from outbound.api.schemas import (
@@ -25,13 +25,16 @@ from outbound.services.review import QueueItem
 router = APIRouter(prefix="/api/review", tags=["review"])
 
 
-def _item(item: QueueItem) -> ReviewItemOut:
+def _item(item: QueueItem, *, slim: bool = False) -> ReviewItemOut:
     contact = ContactOut.model_validate(
         {**item.contact.__dict__, "emails": [EmailOut.model_validate(item.address)]}
     )
+    company = CompanyOut.model_validate(item.company)
+    if slim:  # the lead's whole research record is most of an item's size
+        company = company.model_copy(update={"research": None, "research_answers": None})
     return ReviewItemOut(
         message=MessageOut.model_validate(item.message),
-        company=CompanyOut.model_validate(item.company),
+        company=company,
         contact=contact,
         flagged=item.flagged,
         skips=[SkipOut.model_validate(s) for s in item.skips],
@@ -39,8 +42,16 @@ def _item(item: QueueItem) -> ReviewItemOut:
 
 
 @router.get("", response_model=list[ReviewItemOut], dependencies=[Depends(require(P.REVIEW_READ))])
-def queue(svc: Annotated[Services, Depends(services)]) -> list[ReviewItemOut]:
-    return [_item(i) for i in svc.review.queue()]
+def queue(
+    svc: Annotated[Services, Depends(services)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    best: bool = False,
+    slim: bool = False,
+) -> list[ReviewItemOut]:
+    """The emails waiting for review. ``best`` puts the best-fitting lead's first instead of the
+    oldest; ``limit`` keeps only the first few; ``slim`` leaves out each lead's research record
+    (for a page that only shows who and what, such as Today)."""
+    return [_item(i, slim=slim) for i in svc.review.queue(limit, best_first=best)]
 
 
 @router.get(

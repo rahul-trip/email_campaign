@@ -6,13 +6,14 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 
 from outbound.db.models import CompanyRow, InboundMessageRow, MessageRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.domain.actors import SYSTEM
 from outbound.domain.entities import Message
 from outbound.domain.enums import EntityType, InboundCategory, MessageState
+from outbound.domain.qualification import HOT_ABOVE
 from outbound.domain.state_machines import MESSAGE
 
 # Columns a transition may set alongside the new state.
@@ -163,14 +164,47 @@ class MessageRepository(ScopedRepository):
         )
         return [snapshot(row, Message) for row in self._session.scalars(stmt)]
 
-    def in_state(self, state: MessageState, limit: int = 100) -> list[Message]:
-        stmt = (
-            select(MessageRow)
-            .where(MessageRow.workspace_id == self._workspace_id, MessageRow.state == state)
-            .order_by(MessageRow.created_at, MessageRow.id)
-            .limit(limit)
+    def in_state(
+        self, state: MessageState, limit: int = 100, *, best_first: bool = False
+    ) -> list[Message]:
+        """Messages in a state, oldest first; or, with ``best_first``, the best-fitting lead's
+        first (hot leads are the top of that), the oldest first among equals. A lead with no
+        score comes last."""
+        stmt = select(MessageRow).where(
+            MessageRow.workspace_id == self._workspace_id, MessageRow.state == state
         )
+        if best_first:
+            stmt = stmt.join(
+                CompanyRow,
+                and_(
+                    CompanyRow.id == MessageRow.company_id,
+                    CompanyRow.workspace_id == self._workspace_id,
+                ),
+            ).order_by(CompanyRow.fit_score.desc().nulls_last(), MessageRow.created_at)
+        else:
+            stmt = stmt.order_by(MessageRow.created_at)
+        stmt = stmt.order_by(MessageRow.id).limit(limit)
         return [snapshot(row, Message) for row in self._session.scalars(stmt)]
+
+    def count_waiting_hot(self) -> int:
+        """Emails waiting for review whose lead scores above 80."""
+        stmt = (
+            select(func.count())
+            .select_from(MessageRow)
+            .join(
+                CompanyRow,
+                and_(
+                    CompanyRow.id == MessageRow.company_id,
+                    CompanyRow.workspace_id == self._workspace_id,
+                ),
+            )
+            .where(
+                MessageRow.workspace_id == self._workspace_id,
+                MessageRow.state == MessageState.GENERATED,
+                CompanyRow.fit_score > HOT_ABOVE,
+            )
+        )
+        return int(self._session.scalar(stmt) or 0)
 
     def transition(
         self,
