@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { client, ok } from "../api/client";
-import { Button, Checkbox, Dialog, Empty, Field, Input, PageHeader, Problem, QueryState, Select, Table, Td, Th } from "../ui/compat";
+import { Button, Checkbox, Dialog, Empty, Field, Input, PageHeader, Problem, QueryState, Select, StackTable, Td, Th } from "../ui/compat";
 import { ago, credits, usd } from "../lib/format";
 import { AccessPill, Pill, UseBar, type Row } from "./bits";
 import { A } from "./nav";
@@ -61,8 +61,7 @@ export function CustomersPage() {
           all.length === 0 ? (
             <Empty title="No customer matches">Change the filters, or invite the first one.</Empty>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-              <Table>
+            <StackTable>
                 <thead>
                   <tr>
                     <Th>Customer</Th>
@@ -80,8 +79,7 @@ export function CustomersPage() {
                     <CustomerLine key={row.id} row={row} />
                   ))}
                 </tbody>
-              </Table>
-            </div>
+            </StackTable>
           )
         }
       </QueryState>
@@ -99,23 +97,23 @@ function CustomerLine({ row }: { row: Row }) {
         </A>
         <span className="block font-mono text-label text-muted">{row.slug}</span>
       </Td>
-      <Td>{row.plan_name}</Td>
-      <Td>
+      <Td label="Plan">{row.plan_name}</Td>
+      <Td label="Access">
         <AccessPill row={row} />
       </Td>
-      <Td>
+      <Td label="AI credits this period">
         <div className="flex items-center gap-1.5">
           <UseBar used={Math.round(row.credits.used_milli / 1000)} total={row.credits.allowance} />
           {row.waiting > 0 && <Pill tone="attention">{row.waiting} waiting</Pill>}
         </div>
       </Td>
-      <Td className="font-mono">
+      <Td label="Used this month" className="font-mono">
         {credits(row.credits_milli)}
         <span className="block text-label text-muted">{usd(row.cost_micro_usd)} cost</span>
       </Td>
-      <Td>{row.mailboxes === 0 ? <span className="text-muted">none</span> : row.mailbox_problems ? <Pill tone="error">{row.mailbox_problems} need care</Pill> : <Pill tone="good">{row.mailboxes} ok</Pill>}</Td>
-      <Td>{row.features.includes("directory_bypass") ? "allowed" : "off"}</Td>
-      <Td className="text-muted">{row.last_active ? ago(row.last_active) : "never"}</Td>
+      <Td label="Mailboxes">{row.mailboxes === 0 ? <span className="text-muted">none</span> : row.mailbox_problems ? <Pill tone="error">{row.mailbox_problems} need care</Pill> : <Pill tone="good">{row.mailboxes} ok</Pill>}</Td>
+      <Td label="Skips directory">{row.features.includes("directory_bypass") ? "allowed" : "off"}</Td>
+      <Td label="Active" className="text-muted">{row.last_active ? ago(row.last_active) : "never"}</Td>
     </tr>
   );
 }

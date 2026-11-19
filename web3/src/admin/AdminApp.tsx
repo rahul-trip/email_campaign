@@ -31,7 +31,7 @@ function Layout() {
       <div className="fixed inset-x-0 top-0 z-40">
         <div className="flex h-7 items-center justify-center gap-2 bg-gradient-to-r from-[#3b0764] via-[#5b21b6] to-[#3b0764] text-label font-bold uppercase tracking-widest text-white" role="status">
           <ShieldCheck size={13} aria-hidden /> Admin console · platform staff
-          <span className="font-normal normal-case tracking-normal opacity-90">— you are changing other companies' accounts</span>
+          <span className="hidden font-normal normal-case tracking-normal opacity-90 sm:inline">— you are changing other companies' accounts</span>
         </div>
         <header className="glass flex h-12 items-center gap-3 border-b border-line px-4">
           <Link to="/" className="flex items-center gap-2">
@@ -69,12 +69,12 @@ function Layout() {
       </aside>
       <nav aria-label="Admin sections" className="fixed inset-x-0 top-[76px] z-30 flex gap-1 overflow-x-auto border-b border-line bg-surface px-2 py-1 lg:hidden">
         {NAV.map(({ to, label }) => (
-          <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="shrink-0 rounded-lg px-3 py-1 text-body text-muted" activeProps={{ className: "bg-primary-soft font-semibold !text-primary" }}>
+          <Link key={to} to={to} activeOptions={{ exact: to === "/" }} className="inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-body text-muted" activeProps={{ className: "bg-primary-soft font-semibold !text-primary" }}>
             {label}
           </Link>
         ))}
       </nav>
-      <main id="main" className="px-4 pb-12 pt-[124px] sm:px-6 lg:ml-52 lg:pt-[92px]">
+      <main id="main" className="px-4 pb-12 pt-[144px] sm:px-6 lg:ml-52 lg:pt-[92px]">
         <div className="mx-auto max-w-[1280px]">
           <Outlet />
         </div>

@@ -404,13 +404,38 @@ export const Table = ({ children, className }: { children: ReactNode; className?
     <table className="w-full border-collapse text-left text-body">{children}</table>
   </div>
 );
+/**
+ * A table that, below a tablet, shows each row as a block and each cell under its column's name
+ * (give the cells a ``label``), because five or six columns do not fit a phone. Tablets and up
+ * get the ordinary table. Wrap the thead, tbody and rows as in a Table.
+ */
+export const StackTable = ({ children, className, tour }: { children: ReactNode; className?: string; tour?: string }) => (
+  <div data-tour={tour} className={cx("rounded-xl border border-line bg-surface md:relative md:overflow-x-auto", className)}>
+    <table
+      className={cx(
+        "block w-full border-collapse text-left text-body md:table",
+        "[&_thead]:hidden md:[&_thead]:table-header-group",
+        "[&_tbody]:block md:[&_tbody]:table-row-group",
+        "[&_tr]:block [&_tr]:border-b [&_tr]:border-line [&_tr]:p-4 md:[&_tr]:table-row md:[&_tr]:border-0 md:[&_tr]:p-0",
+        "[&_td]:block [&_td]:border-0 [&_td]:px-0 [&_td]:py-1.5 md:[&_td]:table-cell md:[&_td]:border-b md:[&_td]:px-4 md:[&_td]:py-3",
+      )}
+    >
+      {children}
+    </table>
+  </div>
+);
 export const Th = ({ children, className }: { children?: ReactNode; className?: string }) => (
   <th scope="col" className={cx("border-b border-line px-4 py-3 text-label font-semibold tracking-wide text-faint uppercase", className)}>
     {children}
   </th>
 );
-export const Td = ({ children, className, colSpan }: { children?: ReactNode; className?: string; colSpan?: number }) => (
-  <td colSpan={colSpan} className={cx("border-b border-line px-4 py-3 align-middle", className)}>
+/** A cell. ``label`` names its column: a StackTable shows it above the value on a phone, where the header row is gone. */
+export const Td = ({ children, className, colSpan, label }: { children?: ReactNode; className?: string; colSpan?: number; label?: string }) => (
+  <td
+    colSpan={colSpan}
+    data-label={label}
+    className={cx("border-b border-line px-4 py-3 align-middle", label && "before:mb-0.5 before:block before:text-label before:font-semibold before:tracking-wide before:text-faint before:uppercase before:content-[attr(data-label)] md:before:hidden", className)}
+  >
     {children}
   </td>
 );

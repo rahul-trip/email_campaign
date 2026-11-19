@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, QueryState, Table, Td, Th } from "../ui/compat";
+import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, QueryState, StackTable, Table, Td, Th } from "../ui/compat";
 import { credits, usd, wholeCredits } from "../lib/format";
 import { Pill, When } from "./bits";
 import { ModelsCard } from "./Models";
@@ -60,8 +60,7 @@ export function VendorsPage() {
       <QueryState query={vendors} rows={6} shape="table">
         {(data) => (
           <div className="space-y-4">
-            <div className="overflow-x-auto rounded-xl border border-line bg-surface" data-tour="admin-vendors">
-              <Table>
+            <StackTable tour="admin-vendors">
                 <thead>
                   <tr>
                     <Th>Vendor</Th>
@@ -76,8 +75,8 @@ export function VendorsPage() {
                   {data.vendors.map((v) => (
                     <tr key={v.code} className="align-top">
                       <Td className="font-medium">{v.name}</Td>
-                      <Td className="text-muted">{v.role}</Td>
-                      <Td className="text-small">
+                      <Td label="Does" className="text-muted">{v.role}</Td>
+                      <Td label="Keys" className="text-small">
                         {v.keys.length === 0 ? (
                           <div>
                             <span className="font-mono">{v.key}</span>
@@ -124,7 +123,7 @@ export function VendorsPage() {
                           </ul>
                         )}
                       </Td>
-                      <Td className="whitespace-nowrap text-small">
+                      <Td label="AI credits this month" className="text-small md:whitespace-nowrap">
                         {credits(v.credits_milli)}
                         {v.cap_credits != null ? ` of ${wholeCredits(v.cap_credits)}` : ""}
                         <span className="block text-label text-muted">{usd(v.cost_micro_usd)} billed</span>
@@ -137,12 +136,12 @@ export function VendorsPage() {
                           {v.cap_credits != null ? "Change cap" : "Set cap"}
                         </button>
                       </Td>
-                      <Td>
+                      <Td label="Status">
                         {v.paused_for_credit ? <Pill tone="error">out of credit</Pill> : v.paused ? <Pill tone="error">paused</Pill> : v.source === "none" ? <Pill tone="muted">off</Pill> : v.key_refusals >= 3 ? <Pill tone="error">key refused</Pill> : <Pill tone="good">live</Pill>}
                         {v.key_refusals > 0 && <div className="mt-1 text-label text-error">refused {v.key_refusals}× in the last day</div>}
                         {v.paused_for_credit && <div className="mt-1 text-label text-muted">paused by itself; resumes when it has credit</div>}
                       </Td>
-                      <Td className="space-x-1 text-right whitespace-nowrap">
+                      <Td className="flex flex-wrap gap-1 md:table-cell md:space-x-1 md:text-right md:whitespace-nowrap">
                         {v.keys.length < MAX_KEYS && (
                           <Button size="sm" variant="secondary" onClick={() => setReplacing({ vendor: v, slot: freeSlot(v) })}>
                             Add key
@@ -157,8 +156,7 @@ export function VendorsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </Table>
-            </div>
+            </StackTable>
             <ModelsCard data={data} onSaved={refresh} />
             <LlmCard llm={data.llm} charges={data.llm_charges} onSaved={refresh} />
           </div>
