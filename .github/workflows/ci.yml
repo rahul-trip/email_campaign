@@ -18,7 +18,7 @@ jobs:
     name: Python lint, types and import layers
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
@@ -41,7 +41,7 @@ jobs:
     env:
       TEST_SHARD: ${{ matrix.shard }}/4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
@@ -75,7 +75,7 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://outbound:outbound@localhost:5432/outbound_test
       TEST_SHARD: ${{ matrix.shard }}/4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
@@ -88,7 +88,7 @@ jobs:
     name: Web types, build, API client and route parity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - uses: astral-sh/setup-uv@v5
@@ -149,7 +149,7 @@ jobs:
     name: Docker image builds and starts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
       - name: Build the image the VM builds (deploy/compose.yml)
@@ -161,7 +161,7 @@ jobs:
     name: Security scan (secrets, dependencies)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-depth: 0  # gitleaks reads the whole history
