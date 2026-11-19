@@ -2,8 +2,8 @@
  * The small controls every filterable list uses: a search box, toggle chips and a sort menu.
  * Leads, Hot leads and Needs a decision share them so they look and behave the same.
  */
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ChevronDown, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { cx } from "../lib/cx";
 import { Button, Select } from "./core";
 
@@ -61,6 +61,38 @@ export function SortControl<T extends string>({ value, options, direction, onSor
       <Button variant="secondary" aria-label={`Sort direction: ${direction === "asc" ? "ascending" : "descending"}`} title="Reverse the order" onClick={onDirection} className="h-10 px-3">
         {direction === "asc" ? <ArrowUp className="size-4" aria-hidden /> : <ArrowDown className="size-4" aria-hidden />}
       </Button>
+    </div>
+  );
+}
+
+/**
+ * The bar above a filterable list. From a tablet up everything sits in the open, as it always did.
+ * On a phone it is one line, the search and a Filters button that says how many are on; the
+ * chips, menus and sort fold open underneath. ``active`` counts the filters that are on (not the search).
+ */
+export function FilterBar({ search, active, controls, trailing }: { search: ReactNode; active: number; controls: ReactNode; trailing: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const panel = useId();
+  return (
+    <div className="flex flex-col gap-2 bg-surface-2 p-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex items-center gap-2 sm:contents">
+        {search}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={panel}
+          onClick={() => setOpen(!open)}
+          className={cx("press inline-flex h-10 shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border px-3 text-small font-semibold sm:hidden", active > 0 ? "border-primary bg-primary-soft text-primary" : "border-line-strong bg-surface text-ink-2")}
+        >
+          <SlidersHorizontal className="size-4" aria-hidden /> Filters
+          {active > 0 && <span className="tnum flex size-5 items-center justify-center rounded-full bg-primary text-label text-primary-ink">{active}</span>}
+          <ChevronDown className={cx("size-4 transition-transform", open && "rotate-180")} aria-hidden />
+        </button>
+      </div>
+      <div id={panel} className={cx("flex-wrap items-center gap-2 sm:flex [&>select]:w-auto [&>select]:min-w-[8rem] [&>select]:flex-1 sm:[&>select]:flex-none", open ? "flex" : "hidden")}>
+        {controls}
+      </div>
+      <div className={cx("flex-wrap items-center gap-2 sm:ml-auto sm:flex", open ? "flex" : "hidden")}>{trailing}</div>
     </div>
   );
 }

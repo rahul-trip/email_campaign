@@ -14,7 +14,7 @@ import { ago, credits as aiCredits, words } from "../lib/format";
 import { HOLD_REASONS, describeHold } from "../lib/status";
 import { STEP_LABEL, day, useUsage } from "../lib/usage";
 import { Avatar, Button, buttonClass, Card, Chip, Empty, Input, Mono, PageHeader, Problem, Select, Skeleton } from "../ui/core";
-import { FilterChip, SearchBox, SortControl } from "../ui/filters";
+import { FilterBar, FilterChip, SearchBox, SortControl } from "../ui/filters";
 import { FitBreakdown, qualificationOf } from "../ui/lead";
 import { FitRing } from "../ui/viz";
 import { Confirm, Tabs, useToast } from "../ui/overlay";
@@ -129,57 +129,61 @@ export function AttentionPage() {
 
       {everyone.length > 0 && (
         <Card className="mb-5 overflow-hidden p-0" data-tour="attention-facets">
-          <div className="flex flex-col gap-2 bg-surface-2 p-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={facets.q} onChange={(q) => setFacets({ ...facets, q })} />
-            {/* On a phone these sit in one row that scrolls sideways. */}
-            <div className="-mx-3 flex items-center gap-2 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0 [&>*]:shrink-0">
-              <FilterChip active={facets.hot} onClick={() => setFacets({ ...facets, hot: !facets.hot })}>
-                <Flame className="size-3.5" aria-hidden /> Hot only
-              </FilterChip>
-              <Select aria-label="Minimum fit" value={facets.fit ?? ""} onChange={(e) => setFacets({ ...facets, fit: e.target.value ? Number(e.target.value) : null })}>
-                <option value="">Any fit</option>
-                {[40, 60, 70, 80, 90].map((n) => (
-                  <option key={n} value={n}>
-                    Fit {n}+
-                  </option>
-                ))}
-              </Select>
-              <Select aria-label="Step that stopped" value={facets.step} onChange={(e) => setFacets({ ...facets, step: e.target.value })}>
-                <option value="">Any step</option>
-                {STEP_ORDER.map((st) => (
-                  <option key={st} value={st}>
-                    Stopped at {STEP_NAMES[st]}
-                  </option>
-                ))}
-              </Select>
-              <Select aria-label="Source" value={facets.source} onChange={(e) => setFacets({ ...facets, source: e.target.value })}>
-                <option value="">Any source</option>
-                {SOURCES.map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-              {countries.length > 1 && (
-                <Select aria-label="Country" value={facets.country} onChange={(e) => setFacets({ ...facets, country: e.target.value })}>
-                  <option value="">Any country</option>
-                  {countries.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+          <FilterBar
+            active={[facets.hot, facets.fit, facets.step, facets.source, facets.country].filter(Boolean).length}
+            search={<SearchBox label="Search by company, website or person" placeholder="Search company, website or person" value={facets.q} onChange={(q) => setFacets({ ...facets, q })} />}
+            controls={
+              <>
+                <FilterChip active={facets.hot} onClick={() => setFacets({ ...facets, hot: !facets.hot })}>
+                  <Flame className="size-3.5" aria-hidden /> Hot only
+                </FilterChip>
+                <Select aria-label="Minimum fit" value={facets.fit ?? ""} onChange={(e) => setFacets({ ...facets, fit: e.target.value ? Number(e.target.value) : null })}>
+                  <option value="">Any fit</option>
+                  {[40, 60, 70, 80, 90].map((n) => (
+                    <option key={n} value={n}>
+                      Fit {n}+
                     </option>
                   ))}
                 </Select>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-              <SortControl value={facets.sort} options={SORTS} direction={facets.dir} onSort={(sort) => setFacets({ ...facets, sort, dir: NATURAL[sort] })} onDirection={() => setFacets({ ...facets, dir: facets.dir === "asc" ? "desc" : "asc" })} />
-              {narrowed && (
-                <Button variant="ghost" size="sm" onClick={() => setFacets(NO_FACETS)}>
-                  <X className="size-3.5" aria-hidden /> Clear
-                </Button>
-              )}
-            </div>
-          </div>
+                <Select aria-label="Step that stopped" value={facets.step} onChange={(e) => setFacets({ ...facets, step: e.target.value })}>
+                  <option value="">Any step</option>
+                  {STEP_ORDER.map((st) => (
+                    <option key={st} value={st}>
+                      Stopped at {STEP_NAMES[st]}
+                    </option>
+                  ))}
+                </Select>
+                <Select aria-label="Source" value={facets.source} onChange={(e) => setFacets({ ...facets, source: e.target.value })}>
+                  <option value="">Any source</option>
+                  {SOURCES.map(([v, label]) => (
+                    <option key={v} value={v}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+                {countries.length > 1 && (
+                  <Select aria-label="Country" value={facets.country} onChange={(e) => setFacets({ ...facets, country: e.target.value })}>
+                    <option value="">Any country</option>
+                    {countries.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </>
+            }
+            trailing={
+              <>
+                <SortControl value={facets.sort} options={SORTS} direction={facets.dir} onSort={(sort) => setFacets({ ...facets, sort, dir: NATURAL[sort] })} onDirection={() => setFacets({ ...facets, dir: facets.dir === "asc" ? "desc" : "asc" })} />
+                {narrowed && (
+                  <Button variant="ghost" size="sm" onClick={() => setFacets(NO_FACETS)}>
+                    <X className="size-3.5" aria-hidden /> Clear
+                  </Button>
+                )}
+              </>
+            }
+          />
           {narrowed && (
             <p className="px-4 py-2 text-small text-muted">
               Showing {held.length + failed.length + parked.length} of {everyone.length + (credits.data?.items.length ?? 0)} leads.

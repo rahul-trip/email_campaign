@@ -54,8 +54,8 @@ export function TodayPage() {
   const reviewedToday = days.at(-1)?.reviewed ?? 0;
   const waiting = review.data ?? [];
   const hot = waiting.filter((i) => i.company.hot).length;
-  // The best three first: hot leads, then by fit. Anything with a skipped check is approved in Review.
-  const top = [...waiting].sort((a, b) => Number(b.company.hot) - Number(a.company.hot) || (b.company.fit_score ?? 0) - (a.company.fit_score ?? 0)).slice(0, 3);
+  // The best first: hot leads, then by fit. Anything with a skipped check is approved in Review.
+  const top = [...waiting].sort((a, b) => Number(b.company.hot) - Number(a.company.hot) || (b.company.fit_score ?? 0) - (a.company.fit_score ?? 0)).slice(0, 10);
 
   return (
     <div className="space-y-6">
@@ -106,7 +106,14 @@ export function TodayPage() {
               )}
             </p>
             {top.length > 0 && (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3" data-tour="ready-drafts">
+              // On a phone the emails are a row to swipe (up to ten); from a tablet up, the best three side by side.
+              <div
+                role="region"
+                aria-label="Emails ready, swipe sideways on a phone"
+                tabIndex={0}
+                className="-mx-5 mt-5 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto scroll-px-5 px-5 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-primary sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3 [&>*]:w-[85%] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-auto sm:[&>*:nth-child(n+4)]:hidden"
+                data-tour="ready-drafts"
+              >
                 {top.map((item) => (
                   <DraftPreview key={item.message.id} item={item} readOnly={viewing} />
                 ))}
