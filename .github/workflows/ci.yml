@@ -154,7 +154,7 @@ jobs:
         if: steps.browsers.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
         working-directory: web3
-      - run: npx playwright test --shard=${{ matrix.shard }}/4
+      - run: npx playwright test --reporter=list --shard=${{ matrix.shard }}/4  # list: each test's time shows in the log
         working-directory: web3
 
   image:
