@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
 import { Tabs } from "../ui/overlay";
 import { JourneyView } from "./LeadJourney";
-import { ExternalLink, GitFork, Globe2, Mail, RefreshCw, ShieldOff, Trash2, Unlock, UserPlus } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronsDownUp, ChevronsUpDown, ExternalLink, Flame, GitFork, Globe2, HelpCircle, Mail, MessageCircleQuestion, Newspaper, RefreshCw, ShieldOff, Sparkles, Target, Trash2, Unlock, UserPlus, X } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { ApiProblem, client, ok, type Schemas } from "../api/client";
 import { DirectoryCard } from "../components/DirectoryCard";
 import { FitBadge } from "../components/FitBadge";
@@ -36,6 +36,8 @@ import {
   Th,
 } from "../ui/compat";
 import { cx } from "../lib/cx";
+import { Chip } from "../ui/core";
+import { FitRing } from "../ui/viz";
 import { ago, credits, when, words } from "../lib/format";
 import { activityDays } from "../lib/activity";
 import { isViewing, useCurrent } from "../app/session";
@@ -260,6 +262,52 @@ export function LeadDetailPage() {
         )}
         <div hidden={tab !== "overview"} className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="flex min-w-0 flex-col gap-5">
+            <Research company={company} />
+
+            {/* Open when an email waits for the person; otherwise it folds to a line that says where the email stands. */}
+            <Card
+              collapsible
+              defaultOpen={messages.some((m) => m.state === "generated")}
+              tour="lead-emails"
+              title={`Emails (${messages.length})`}
+              subtitle={messages.length === 0 ? "Nothing written yet." : `Latest: ${describe(messageState, messages[messages.length - 1]!.state).label}${messages[messages.length - 1]!.created_at ? `, written ${ago(messages[messages.length - 1]!.created_at)}` : ""}.`}
+            >
+              {messages.length === 0 ? (
+                <p className="text-small text-muted">Nothing written yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {messages.map((m) => (
+                    <details key={m.id} className="group rounded-lg border border-line">
+                      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2.5 hover:bg-surface-2">
+                        <span className="font-mono text-small font-semibold">Email {m.step + 1}</span>
+                        <span className="min-w-0 flex-1 truncate text-body">{m.subject}</span>
+                        <StatusBadge status={describe(messageState, m.state)} />
+                        {m.edit_distance != null && <span className="text-label text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
+                        {m.created_at && (
+                          <span className="text-label text-muted" title={when(m.created_at)}>
+                            written {ago(m.created_at)}
+                          </span>
+                        )}
+                        {m.sent_at && <span className="text-label text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
+                        {m.state === "generated" && (
+                          <Link
+                            data-tour="lead-open-review"
+                            to="/review"
+                            search={{ message: m.id }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={buttonClass("primary", "sm")}
+                          >
+                            Open in Review
+                          </Link>
+                        )}
+                      </summary>
+                      <pre className="whitespace-pre-wrap border-t border-line bg-surface-2 p-3 font-sans text-body leading-relaxed">{m.final_body ?? m.generated_body}</pre>
+                    </details>
+                  ))}
+                </div>
+              )}
+            </Card>
+
             <Card
               collapsible
               forceOpen={peopleNeeded}
@@ -301,50 +349,11 @@ export function LeadDetailPage() {
               <CheckPeople company={company} contacts={contacts} onDone={refresh} />
             </Card>
 
+            <AddPerson company={company} onAdded={refresh} />
+
             <LinkedInCard company={company} contacts={contacts} onChanged={refresh} />
 
             <DirectoryCard companyId={company.id} />
-
-            <AddPerson company={company} onAdded={refresh} />
-
-            <Card title={`Emails (${messages.length})`}>
-              {messages.length === 0 ? (
-                <p className="text-small text-muted">Nothing written yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {messages.map((m) => (
-                    <details key={m.id} className="group rounded-lg border border-line">
-                      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2.5 hover:bg-surface-2">
-                        <span className="font-mono text-small font-semibold">Email {m.step + 1}</span>
-                        <span className="min-w-0 flex-1 truncate text-body">{m.subject}</span>
-                        <StatusBadge status={describe(messageState, m.state)} />
-                        {m.edit_distance != null && <span className="text-label text-muted">edited {Math.round(m.edit_distance * 100)}%</span>}
-                        {m.created_at && (
-                          <span className="text-label text-muted" title={when(m.created_at)}>
-                            written {ago(m.created_at)}
-                          </span>
-                        )}
-                        {m.sent_at && <span className="text-label text-muted" title={when(m.sent_at)}>sent {ago(m.sent_at)}</span>}
-                        {m.state === "generated" && (
-                          <Link
-                            data-tour="lead-open-review"
-                            to="/review"
-                            search={{ message: m.id }}
-                            onClick={(e) => e.stopPropagation()}
-                            className={buttonClass("primary", "sm")}
-                          >
-                            Open in Review
-                          </Link>
-                        )}
-                      </summary>
-                      <pre className="whitespace-pre-wrap border-t border-line bg-surface-2 p-3 font-sans text-body leading-relaxed">{m.final_body ?? m.generated_body}</pre>
-                    </details>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Research company={company} />
 
             <Card collapsible title="Vendor and model calls" subtitle={`${calls.length} call${calls.length === 1 ? "" : "s"}, ${credits(spent)} in all. Every call made for this lead, in order; a cache hit reused a stored answer and used no credits.`}>
               <QueryState query={waterfall}>
@@ -543,11 +552,21 @@ function LinkedInCard({ company, contacts, onChanged }: { company: Company; cont
   const unwritten = contacts.filter((c) => WORKABLE.has(c.status) && c.linkedin_url && !byContact.has(c.id));
   const viewing = isViewing(workspace);
   const held = company.hold_reason === "linkedin_contacted";
+  // A lead nobody could find a provable address for: LinkedIn is the way in, so this card opens.
+  const noEmail = company.status === "failed" && (company.failure_kind === "no_person" || company.failure_kind === "no_email");
   return (
     <Card
+      collapsible
+      forceOpen={noEmail && (drafts.data?.length ?? 0) > 0}
       tour="lead-linkedin"
       title={`LinkedIn (${drafts.data?.length ?? 0})`}
-      subtitle="A connection note and a first message for each confirmed person, written before their email is found. Copy them into LinkedIn yourself: nothing is sent from here."
+      subtitle={
+        noEmail && (drafts.data?.length ?? 0) > 0
+          ? "No email we could prove, so LinkedIn is the way in. Copy the messages into LinkedIn yourself: nothing is sent from here."
+          : (drafts.data?.length ?? 0) > 0
+            ? "Messages are written. Copy them into LinkedIn yourself: nothing is sent from here."
+            : "Nothing written yet. A message is written for a confirmed decision-maker who has a LinkedIn profile."
+      }
     >
       {held && (
         <Callout tone="attention" title="The email waits for you">
@@ -1058,75 +1077,110 @@ function NewsList({ title, items }: { title: string; items: NewsItem[] }) {
 }
 
 type Criterion = { id: string; kind: string; criterion: string; weight: number; verdict: string; evidence?: string; source?: string };
-type QualificationData = { criteria?: Criterion[]; why_now?: string; risks?: string[] };
+type QualificationData = { score?: number; reason?: string; ruled_out?: boolean; criteria?: Criterion[]; why_now?: string; risks?: string[] };
 
-const KIND = { must_have: "Must have", signal: "Sign they may buy now", disqualifier: "Rules them out" } as Record<string, string>;
-const VERDICT = {
-  met: { text: "Yes", tone: "text-good" },
-  not_met: { text: "No", tone: "text-error" },
-  unknown: { text: "Not known", tone: "text-muted" },
-} as Record<string, { text: string; tone: string }>;
+const KIND_LABEL: Record<string, string> = { must_have: "Must-haves", signal: "Signs they may buy now", disqualifier: "Rule-outs" };
+const KIND_ORDER = ["must_have", "signal", "disqualifier"];
 
-/** The brief's criteria one by one: what research found for each, and where. */
-function Qualification({ data }: { data: QualificationData }) {
+/** For a rule-out, "met" is the bad outcome; for the others it is the good one. */
+const outcomeOf = (c: Criterion): "good" | "bad" | "unknown" => {
+  const hit = c.verdict === "met";
+  const miss = c.verdict === "not_met";
+  if (!hit && !miss) return "unknown";
+  return (c.kind === "disqualifier" ? miss : hit) ? "good" : "bad";
+};
+
+/** The brief's criteria as cards, grouped by kind: what research found for each, and where. */
+function Criteria({ data }: { data: QualificationData }) {
   const criteria = data.criteria ?? [];
-  const risks = (data.risks ?? []).filter(Boolean);
   return (
-    <div className="mt-2 space-y-2">
-      {criteria.length > 0 && (
-        <ul className="space-y-1.5 text-body">
-          {criteria.map((c) => {
-            const verdict = VERDICT[c.verdict] ?? VERDICT.unknown;
-            return (
-              <li key={c.id} className="flex gap-2">
-                <span className={`w-16 shrink-0 text-small font-medium ${verdict.tone}`}>{verdict.text}</span>
-                <div className="min-w-0">
-                  <div>
-                    {c.criterion}
-                    <span className="ml-1.5 text-label text-muted">
-                      {KIND[c.kind] ?? c.kind}
-                      {c.weight > 1 ? ` · counts ${c.weight}` : ""}
-                    </span>
-                  </div>
-                  {c.evidence && (
-                    <div className="text-small text-muted">
-                      {c.evidence}
-                      {c.source && (
-                        <a href={c.source} target="_blank" rel="noreferrer" className="ml-1 text-primary hover:underline">
-                          source
-                        </a>
-                      )}
+    <div className="space-y-5">
+      {KIND_ORDER.map((kind) => {
+        const items = criteria.filter((c) => c.kind === kind);
+        if (!items.length) return null;
+        const good = items.filter((c) => outcomeOf(c) === "good").length;
+        const triggered = items.filter((c) => kind === "disqualifier" && c.verdict === "met").length;
+        const summary = kind === "disqualifier" ? (triggered ? `${triggered} triggered` : "none triggered") : `${good} of ${items.length} ${kind === "signal" ? "seen" : "met"}`;
+        return (
+          <div key={kind}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-label font-semibold tracking-wide text-faint uppercase">{KIND_LABEL[kind]}</h3>
+              <Chip tone={triggered ? "error" : good === items.length ? "good" : "stopped"}>{summary}</Chip>
+            </div>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {items.map((c) => {
+                const outcome = outcomeOf(c);
+                const Icon = outcome === "good" ? Check : outcome === "bad" ? X : HelpCircle;
+                return (
+                  <li key={c.id} className={cx("min-w-0 rounded-xl border p-3", outcome === "good" ? "border-line bg-surface" : outcome === "bad" ? "border-error-dot/30 bg-error-soft" : "border-line bg-surface-2")}>
+                    <div className="flex items-start gap-2.5">
+                      <span className={cx("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full", outcome === "good" ? "bg-good-soft text-good" : outcome === "bad" ? "bg-error-soft text-error" : "bg-surface-3 text-muted")}>
+                        <Icon className="size-3.5" aria-label={outcome === "good" ? "Good" : outcome === "bad" ? "Bad" : "Not known"} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="break-words text-body font-medium text-ink">
+                          {c.criterion}
+                          {c.weight > 1 && kind === "must_have" && <span className="ml-1.5 text-label font-normal text-faint">counts ×{c.weight}</span>}
+                        </div>
+                        {c.evidence ? (
+                          <p className="mt-1 break-words text-small text-muted">
+                            “{c.evidence}”
+                            {c.source && (
+                              <a href={c.source} target="_blank" rel="noreferrer" className="ml-1 font-medium text-primary hover:underline">
+                                source
+                              </a>
+                            )}
+                          </p>
+                        ) : (
+                          outcome === "unknown" && <p className="mt-1 text-small text-muted">Nothing found either way.</p>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      {data.why_now && (
-        <p className="text-body">
-          <span className="font-medium">Why now: </span>
-          {data.why_now}
-        </p>
-      )}
-      {risks.length > 0 && (
-        <div className="text-body">
-          <span className="font-medium">Risks: </span>
-          {risks.join("; ")}
-        </div>
-      )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-/** A titled block of the research, with a rule above it so the card reads as sections. */
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** One titled box of what research found. */
+function Panel({ title, count, tone, children, className }: { title: string; count?: number; tone?: "primary"; children: ReactNode; className?: string }) {
   return (
-    <section className="border-t border-line pt-3 first:border-0 first:pt-0">
-      <Label className="mb-1.5">{title}</Label>
+    <section className={cx("min-w-0 rounded-xl border p-4", tone === "primary" ? "border-primary-line bg-primary-soft" : "border-line bg-surface", className)}>
+      <h3 className="mb-2 flex items-center gap-2 text-label font-semibold tracking-wide text-faint uppercase">
+        {title}
+        {count != null && <span className="tnum rounded-full bg-surface-3 px-1.5 text-label font-semibold text-muted normal-case">{count}</span>}
+      </h3>
       {children}
     </section>
+  );
+}
+
+/** A block of the research that folds: closed it shows a one-line summary of what is inside. */
+function Fold({ icon, title, summary, open, onToggle, children }: { icon: ReactNode; title: string; summary?: ReactNode; open: boolean; onToggle: () => void; children: ReactNode }) {
+  const body = useId();
+  return (
+    <div className="border-t border-line pt-4 first:border-0 first:pt-0">
+      <h2>
+        <button type="button" aria-expanded={open} aria-controls={body} onClick={onToggle} className="group flex w-full min-w-0 items-center gap-2.5 text-left">
+          <ChevronDown aria-hidden className={cx("size-4 shrink-0 text-faint transition-transform group-hover:text-ink", !open && "-rotate-90")} />
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">{icon}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-heading font-semibold text-ink">{title}</span>
+            {!open && summary && <span className="block truncate text-small font-normal text-muted">{summary}</span>}
+          </span>
+        </button>
+      </h2>
+      {open && (
+        <div id={body} className="mt-3 animate-fade">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1140,7 +1194,7 @@ function Bullets({ items }: { items: string[] }) {
   );
 }
 
-/** Everything research found, grouped under headings; nothing is cut short. */
+/** Everything research found, at the top of the page and in four blocks: how well they fit, what we learned, the news, and your own questions. */
 function Research({ company }: { company: Company }) {
   const research = (company.research ?? {}) as Record<string, unknown>;
   const list = (key: string) => ((research[key] as string[] | undefined) ?? []).filter(Boolean);
@@ -1153,96 +1207,198 @@ function Research({ company }: { company: Company }) {
   const answers = Object.entries(company.research_answers ?? {});
   const hiring = String(research.hiring ?? "").trim();
   const sector = String(research.sector ?? "").trim();
+  const summary = String(research.summary ?? "").trim();
   const qualification = research.qualification as QualificationData | undefined;
+  const criteria = qualification?.criteria ?? [];
+  const risks = (qualification?.risks ?? []).filter(Boolean);
   const decision = (company.policy_decision ?? {}) as { outcome?: string; rule?: string; policy_version?: number; reasons?: string[] };
-  const empty = !research.summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
+  const empty = !summary && !hooks.length && !products.length && !answers.length && !company.fit_reason && !newsItems.length && !triggers.length;
   if (empty) return null;
+
+  const must = criteria.filter((c) => c.kind === "must_have");
+  const mustMet = must.filter((c) => c.verdict === "met").length;
+  const signals = criteria.filter((c) => c.kind === "signal" && c.verdict === "met").length;
+  const news = newsItems.length + triggers.length;
+  const learned = summary || hooks.length || products.length || hiring || tech.length || siteNews.length;
+
+  // What opens by itself depends on how much there is: the first block always, and any other only
+  // when it is short (about five items or fewer). A long one stays folded with a summary line;
+  // the reader's own choice wins from then on.
+  const weight = {
+    fit: criteria.length + (qualification?.why_now ? 2 : 0) + risks.length,
+    learned: (summary ? 2 : 0) + hooks.length + products.length + siteNews.length + (hiring ? 2 : 0) + (tech.length ? 1 : 0),
+    news: news * 2,
+    questions: answers.length * 2,
+  };
+  const present = (["fit", "learned", "news", "questions"] as const).filter((id) => (id === "fit" ? criteria.length > 0 : id === "learned" ? Boolean(learned) : id === "news" ? news > 0 : answers.length > 0));
+  const [chosen, setChosen] = useState<Record<string, boolean>>({});
+  const isOpen = (id: (typeof present)[number]) => (id in chosen ? chosen[id]! : id === present[0] || weight[id] <= 5);
+  const flip = (id: (typeof present)[number]) => setChosen((c) => ({ ...c, [id]: !isOpen(id) }));
+  const setAll = (open: boolean) => setChosen(Object.fromEntries(present.map((id) => [id, open])));
+  const brief = (text: string, n = 110) => (text.length > n ? `${text.slice(0, n).trimEnd()}…` : text);
+  const headline = newsItems[0]?.headline ?? triggers[0]?.headline;
+
   return (
-    <Card
-      collapsible
-      tour="lead-research"
-      title="Research"
-      subtitle={`${company.fit_score != null ? `Fit ${company.fit_score}/100. ` : ""}${hooks.length + newsItems.length} thing${hooks.length + newsItems.length === 1 ? "" : "s"} worth mentioning${company.updated_at ? `. Last updated ${ago(company.updated_at)}` : ""}`}
-    >
-      <div className="space-y-3">
-        {(Boolean(research.summary) || sector) && (
-          <Section title="What they do">
-            {sector && <span className="mb-1.5 inline-block rounded-full bg-primary-soft px-2 py-0.5 text-label font-medium text-primary">{sector}</span>}
-            {Boolean(research.summary) && <p className="whitespace-pre-line text-body leading-relaxed">{String(research.summary)}</p>}
-          </Section>
-        )}
-        {company.fit_reason && (
-          <Section title="How well they fit">
-            <p className="text-body leading-relaxed">
-              <strong>{company.fit_score}/100.</strong> {company.fit_reason}
-            </p>
-            {qualification && <Qualification data={qualification} />}
-          </Section>
-        )}
-        {products.length > 0 && (
-          <Section title={`Products and services (${products.length})`}>
-            <Bullets items={products} />
-          </Section>
-        )}
-        {hooks.length > 0 && (
-          <Section title={`Worth mentioning in an email (${hooks.length})`}>
-            <Bullets items={hooks} />
-          </Section>
-        )}
-        {siteNews.length > 0 && (
-          <Section title={`From their own site (${siteNews.length})`}>
-            <Bullets items={siteNews} />
-          </Section>
-        )}
-        {newsItems.length > 0 && (
-          <Section title={`Recent news about them (${newsItems.length})`}>
-            <NewsList title="" items={newsItems} />
-          </Section>
-        )}
-        {triggers.length > 0 && (
-          <Section title={`Market news that may matter to them (${triggers.length})`}>
-            <NewsList title="" items={triggers} />
-          </Section>
-        )}
-        {hiring && (
-          <Section title="Hiring">
-            <p className="whitespace-pre-line text-body leading-relaxed">{hiring}</p>
-          </Section>
-        )}
-        {tech.length > 0 && (
-          <Section title="Technology they use">
-            <ul className="flex flex-wrap gap-1.5">
-              {tech.map((t, i) => (
-                <li key={i} className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-small">
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </Section>
-        )}
-        {answers.length > 0 && (
-          <Section title="Your research questions">
-            <dl className="space-y-2.5 text-body">
-              {answers.map(([q, a]) => (
-                <div key={q}>
-                  <dt className="text-small font-medium text-muted">{q}</dt>
-                  <dd className="mt-0.5 whitespace-pre-line leading-relaxed">{String(a) || <span className="text-muted">No answer found.</span>}</dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-        )}
-        {decision.outcome && (
-          <Section title="Country rule">
-            <p className="text-small text-muted">
-              {words(decision.rule ?? decision.outcome)}
-              {decision.policy_version != null && ` (version ${decision.policy_version})`}
-              {decision.reasons && decision.reasons.length > 0 && ` · ${decision.reasons.join("; ")}`}
-            </p>
-          </Section>
-        )}
-      </div>
-    </Card>
+    <section data-tour="lead-research" className="card min-w-0 space-y-5 p-5">
+      <header className="flex flex-wrap items-start gap-4">
+        <FitRing score={company.fit_score} size={64} />
+        <div className="min-w-[min(100%,14rem)] flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-title font-semibold text-ink">Research</h2>
+            {company.hot && (
+              <Chip tone="attention" title="A fit score above 80">
+                <Flame className="size-3.5" aria-hidden /> Hot
+              </Chip>
+            )}
+            {sector && <Chip tone="primary">{sector}</Chip>}
+          </div>
+          {company.fit_reason && <p className="mt-1 max-w-[80ch] text-body leading-relaxed text-ink-2">{company.fit_reason}</p>}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {must.length > 0 && <Chip tone={mustMet === must.length ? "good" : "stopped"}>{mustMet} of {must.length} must-haves</Chip>}
+            {signals > 0 && <Chip tone="good">{signals} {signals === 1 ? "sign" : "signs"} they may buy</Chip>}
+            {hooks.length > 0 && <Chip tone="primary">{hooks.length} worth mentioning</Chip>}
+            {news > 0 && <Chip>{news} in the news</Chip>}
+            {company.updated_at && <span className="self-center text-small text-muted">Updated {ago(company.updated_at)}</span>}
+          </div>
+        </div>
+      </header>
+
+      {present.length > 1 && (
+        <div className="-mb-2 flex justify-end gap-1 text-label">
+          <button type="button" onClick={() => setAll(true)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-muted hover:bg-surface-2 hover:text-ink">
+            <ChevronsUpDown className="size-3.5" aria-hidden /> Expand all
+          </button>
+          <button type="button" onClick={() => setAll(false)} className="press inline-flex items-center gap-1 rounded-lg px-2 py-1 font-medium text-muted hover:bg-surface-2 hover:text-ink">
+            <ChevronsDownUp className="size-3.5" aria-hidden /> Collapse all
+          </button>
+        </div>
+      )}
+
+      {criteria.length > 0 && (
+        <Fold
+          icon={<Target className="size-4" aria-hidden />}
+          title="How well they fit"
+          open={isOpen("fit")}
+          onToggle={() => flip("fit")}
+          summary={`${must.length ? `${mustMet} of ${must.length} must-haves met · ` : ""}${signals} ${signals === 1 ? "sign" : "signs"} seen${risks.length ? ` · ${risks.length} ${risks.length === 1 ? "risk" : "risks"}` : ""}`}
+        >
+          <Criteria data={qualification!} />
+          {(qualification?.why_now || risks.length > 0) && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {qualification?.why_now && (
+                <Panel title="Why now" tone="primary">
+                  <p className="text-body leading-relaxed">{qualification.why_now}</p>
+                </Panel>
+              )}
+              {risks.length > 0 && (
+                <Panel title="Risks" count={risks.length}>
+                  <Bullets items={risks} />
+                </Panel>
+              )}
+            </div>
+          )}
+        </Fold>
+      )}
+
+      {Boolean(learned) && (
+        <Fold
+          icon={<Sparkles className="size-4" aria-hidden />}
+          title="What we learned"
+          open={isOpen("learned")}
+          onToggle={() => flip("learned")}
+          summary={summary ? brief(summary) : [hooks.length && `${hooks.length} worth mentioning`, products.length && `${products.length} products`, hiring && "hiring", tech.length && `${tech.length} technologies`].filter(Boolean).join(" · ")}
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            {summary && (
+              <Panel title="What they do" className="lg:col-span-2">
+                <p className="whitespace-pre-line text-body leading-relaxed">{summary}</p>
+              </Panel>
+            )}
+            {hooks.length > 0 && (
+              <Panel title="Worth mentioning in an email" count={hooks.length} tone="primary">
+                <Bullets items={hooks} />
+              </Panel>
+            )}
+            {products.length > 0 && (
+              <Panel title="Products and services" count={products.length}>
+                <Bullets items={products} />
+              </Panel>
+            )}
+            {hiring && (
+              <Panel title="Hiring">
+                <p className="whitespace-pre-line text-body leading-relaxed">{hiring}</p>
+              </Panel>
+            )}
+            {tech.length > 0 && (
+              <Panel title="Technology they use" count={tech.length}>
+                <ul className="flex flex-wrap gap-1.5">
+                  {tech.map((t, i) => (
+                    <li key={i} className="rounded-md border border-line bg-surface-2 px-2 py-0.5 text-small">
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </Panel>
+            )}
+            {siteNews.length > 0 && (
+              <Panel title="From their own site" count={siteNews.length}>
+                <Bullets items={siteNews} />
+              </Panel>
+            )}
+          </div>
+        </Fold>
+      )}
+
+      {news > 0 && (
+        <Fold
+          icon={<Newspaper className="size-4" aria-hidden />}
+          title="In the news"
+          open={isOpen("news")}
+          onToggle={() => flip("news")}
+          summary={`${headline ? `${brief(headline, 80)}${news > 1 ? ` · +${news - 1} more` : ""}` : `${news} items`}`}
+        >
+          <div className="grid gap-3 lg:grid-cols-2">
+            {newsItems.length > 0 && (
+              <Panel title="Recent news about them" count={newsItems.length}>
+                <NewsList title="" items={newsItems} />
+              </Panel>
+            )}
+            {triggers.length > 0 && (
+              <Panel title="Market news that may matter to them" count={triggers.length}>
+                <NewsList title="" items={triggers} />
+              </Panel>
+            )}
+          </div>
+        </Fold>
+      )}
+
+      {answers.length > 0 && (
+        <Fold
+          icon={<MessageCircleQuestion className="size-4" aria-hidden />}
+          title="Your research questions"
+          open={isOpen("questions")}
+          onToggle={() => flip("questions")}
+          summary={`${answers.length} answered`}
+        >
+          <dl className="grid gap-3 lg:grid-cols-2">
+            {answers.map(([q, a]) => (
+              <Panel key={q} title={q}>
+                <dd className="whitespace-pre-line text-body leading-relaxed">{String(a) || <span className="text-muted">No answer found.</span>}</dd>
+              </Panel>
+            ))}
+          </dl>
+        </Fold>
+      )}
+
+      {decision.outcome && (
+        <p className="border-t border-line pt-3 text-small text-muted">
+          <span className="font-semibold text-ink-2">Country rule: </span>
+          {words(decision.rule ?? decision.outcome)}
+          {decision.policy_version != null && ` (version ${decision.policy_version})`}
+          {decision.reasons && decision.reasons.length > 0 && ` · ${decision.reasons.join("; ")}`}
+        </p>
+      )}
+    </section>
   );
 }
 
