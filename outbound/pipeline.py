@@ -188,7 +188,16 @@ def build_meter(container: Container, workspace_id: str) -> Meter:
     )
 
 
-def assemble(container: Container, workspace_id: str, providers: Providers) -> Pipeline:
+def assemble(
+    container: Container,
+    workspace_id: str,
+    providers: Providers,
+    *,
+    lead_concurrency: int = 1,
+    lead_flow: bool = False,
+) -> Pipeline:
+    """The worker passes its capacity settings; tests and the command line keep one lead at a
+    time, stage by stage, so their order is the same every time."""
     settings = container.settings
     uow = container.uow
     _workspace(container, workspace_id)  # fail early, with a clear message, if it is missing
@@ -249,7 +258,14 @@ def assemble(container: Container, workspace_id: str, providers: Providers) -> P
     # First in the tick: credits that appeared (a new period, a grant) release waiting work
     # before this tick's pipeline looks for it.
     jobs.insert(0, ResumeService(uow, workspace_id, intake))
-    runner = Runner(uow, workspace_id, stages, Guards(budget))
+    runner = Runner(
+        uow,
+        workspace_id,
+        stages,
+        Guards(budget),
+        lead_concurrency=lead_concurrency,
+        lead_flow=lead_flow,
+    )
     return Pipeline(
         runner=runner,
         tick=Tick(uow, workspace_id, runner, jobs),

@@ -112,7 +112,16 @@ class Worker:
                 return []  # the platform's kill switch: nothing runs for anyone
             queued = platform.scheduler.with_queued_runs(now)
             active = platform.scheduler.active_workspaces(now) if self._tick_every else []
-        jobs = [Job(ws, Task.RUN) for ws in queued if ws not in self._busy]
+        # A workspace whose tick is more than a whole interval late gets the tick before its
+        # queued run, so a workspace that always has a run waiting still has its mailboxes synced.
+        late = (
+            {ws for ws, at in self._last_tick.items() if at <= now - 2 * self._tick_every}
+            if self._tick_every is not None
+            else set()
+        ) & set(active)
+        jobs = [
+            Job(ws, Task.TICK if ws in late else Task.RUN) for ws in queued if ws not in self._busy
+        ]
         planned = {job.workspace_id for job in jobs}
         if self._tick_every is not None:
             due = self._now() - self._tick_every

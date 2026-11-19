@@ -14,7 +14,7 @@ from outbound.db.models import RunRow
 from outbound.db.uow import UnitOfWorkFactory
 from outbound.worker import Job, Task, Worker
 from tests.db.test_pipeline_e2e import ROWS, build
-from tests.db.test_scheduler import Clock, no_pipeline
+from tests.db.test_scheduler import Clock, no_pipeline, queue
 from tests.stages.world import World
 
 
@@ -113,3 +113,16 @@ def test_without_a_due_check_interval_only_the_tick_starts_work(
     worker._last_tick[ws] = clock.at
     clock.at += timedelta(minutes=10)
     assert worker.plan() == []
+
+
+def test_a_tick_more_than_an_interval_late_comes_before_the_queued_run(
+    worker_container: Container, factory: UnitOfWorkFactory, ws: str, other_ws: str
+) -> None:
+    queue(factory, ws)
+    queue(factory, other_ws)
+    clock = Clock()
+    worker = Worker(worker_container, no_pipeline, tick_every=EVERY_TICK, now=clock)
+    worker._last_tick[ws] = clock.at - 3 * EVERY_TICK  # long overdue, though it has a run waiting
+    worker._last_tick[other_ws] = clock.at - EVERY_TICK  # merely due: its run goes first
+    jobs = {job.workspace_id: job.task for job in worker.plan()}
+    assert jobs == {ws: Task.TICK, other_ws: Task.RUN}
