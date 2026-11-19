@@ -423,8 +423,16 @@ What is different:
 - **A lead's Journey** is a tab on the lead's page, next to *Overview* and *Activity*.
 - **Discovery runs**: *Start a run now* opens a panel showing what will run, how many companies to
   find (10, 25 or 50), which sources suit your brief and how often their leads passed recently.
-- **Setting up** opens with a short welcome, then five steps with your progress at the top, and
-  ends with what happens next.
+  While a run is going, a card at the top shows its six steps and how far it has got, what it has
+  found and the AI credits it has used so far, with *Cancel run*. Beside it, *While it runs* says
+  how many emails already wait in Emails ready, with a button to start reviewing them.
+- **Setting up** opens with a short welcome: pick what you want first (book meetings in a new
+  market, work through your own list, or both) and see an example of the finished draft you will
+  review, clearly marked as an example. Then come five steps with your progress at the top, and a
+  last page with what happens next.
+- **A new workspace** starts on a page that says the engine is ready and asks who to look for.
+  *Create your campaign* goes to the form; each starter campaign shows who it reaches, where, the
+  signal it looks for and who it rules out, and *Use this* fills the form from it.
 - **Light, dark or system** theme, from your account menu.
 
 ## 6. What happens to a company, step by step

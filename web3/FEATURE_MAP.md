@@ -70,7 +70,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Add one company | `targets` | Add leads → Single |
 | Upload a list | `targets/upload` | Add leads → Upload (drag-drop, column mapping preview) |
 | Intake webhook info / rotate secret | `integrations/webhook*` | Add leads → Webhook · Settings → Integrations |
-| Runs list, start run, cancel | `runs` GET/POST, `runs/{id}/cancel` | Discovery runs |
+| Runs list, start run, cancel | `runs` GET/POST, `runs/{id}/cancel` | Discovery runs (live-run card with steps; *While it runs* shows `runs/auto-discovery` `waiting_for_review`) |
 | Auto-discovery state (paused at 50 drafts) | `runs/auto-discovery` | Discovery runs header · Today engine strip |
 | Run detail: leads, calls, searches, candidates | `runs/{id}/*` | Run detail tabs |
 | Promote candidate ("Make a lead") | `candidates/{id}/promote` | Run detail Candidates tab |

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Play, Square } from "lucide-react";
+import { ArrowRight, Check, Play, Square } from "lucide-react";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { client, ok } from "../api/client";
@@ -76,6 +76,7 @@ export function RunsPage() {
       )}
       <Problem error={cancel.error} className="mb-3" />
 
+      <LiveRun runs={runs.data ?? []} cancelling={cancel.isPending ? cancel.variables : undefined} onCancel={(id) => cancel.mutate(id)} />
       <RunStats runs={runs.data ?? []} />
       <AutoDiscoveryLine />
 
@@ -150,6 +151,76 @@ export function RunsPage() {
   );
 }
 
+
+/** The run that is going now, with how far it has got, and beside it what already waits for the person. */
+function LiveRun({ runs, cancelling, onCancel }: { runs: Run[]; cancelling?: string; onCancel: (id: string) => void }) {
+  const auto = useQuery({ queryKey: ["auto-discovery"], queryFn: () => ok(client.GET("/api/runs/auto-discovery")), refetchInterval: 30000 });
+  const run = runs.find((r) => r.status === "running") ?? runs.find((r) => r.status === "queued");
+  if (!run) return null;
+  const done = stagesDone(run.counts);
+  const reported = countsOf(run.counts);
+  const totals = totalsOf(run.counts);
+  const line = discoveryLine(totals);
+  const params = (run.params ?? {}) as { mode?: string };
+  const queued = run.status === "queued";
+  const waiting = auto.data?.waiting_for_review ?? 0;
+  const next = Math.min(done, STAGES.length - 1);
+  return (
+    <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <section className="card min-w-0 border-primary-line p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={describe(runStatus, run.status)} />
+              <span className="text-label text-muted">{MODES.find(([m]) => m === params.mode)?.[1] ?? run.kind}</span>
+            </div>
+            <h2 className="mt-2 text-heading font-semibold text-ink">{queued ? "Waiting for the worker to pick this run up" : "A run is working right now"}</h2>
+            <p className="text-small text-muted">Started {ago(run.started_at ?? run.created_at)}</p>
+          </div>
+          <Button variant="danger-ghost" size="sm" busy={cancelling === run.id} onClick={() => onCancel(run.id)}>
+            <Square className="size-3" aria-hidden /> Cancel run
+          </Button>
+        </div>
+        <div className="mt-4 rounded-xl border border-line bg-surface-2 p-4">
+          <div className="flex items-baseline justify-between gap-3 text-small">
+            <span className="font-medium text-ink">{queued ? "Not started yet" : `Step ${Math.min(done + 1, STAGES.length)} of ${STAGES.length}: ${STAGE_LABEL[STAGES[next]!]}`}</span>
+            <span className="tnum font-semibold text-primary">{Math.round((done / STAGES.length) * 100)}%</span>
+          </div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-label="Run progress" aria-valuenow={done} aria-valuemin={0} aria-valuemax={STAGES.length}>
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(done / STAGES.length) * 100}%` }} />
+          </div>
+          <ol className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Steps of a run">
+            {STAGES.map((stage) => {
+              const finished = stage in reported;
+              return (
+                <li key={stage} className={cx("flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-label", finished ? "bg-good-soft text-good" : "bg-surface text-muted")}>
+                  {finished ? <Check className="size-3.5 shrink-0" aria-hidden /> : <span className="size-1.5 shrink-0 rounded-full bg-stopped-dot" aria-hidden />}
+                  <span className="truncate">{STAGE_LABEL[stage]}</span>
+                </li>
+              );
+            })}
+          </ol>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-small text-muted">
+            <span>{line ?? (totals.moved ? `${totals.moved} step${totals.moved === 1 ? "" : "s"} completed so far` : "Nothing has finished yet")}</span>
+            <span className="tnum">AI credits so far: {credits(run.credits_milli)}</span>
+          </div>
+        </div>
+      </section>
+      <aside className="card min-w-0 bg-primary-soft p-5">
+        <Chip tone="primary">While it runs</Chip>
+        <h2 className="mt-3 text-heading font-semibold text-ink">{waiting > 0 ? `${waiting} ${waiting === 1 ? "email is" : "emails are"} waiting for you` : "Nothing is waiting for you yet"}</h2>
+        <p className="mt-1 text-small text-ink-2">
+          {waiting > 0 ? "Approving them now keeps the queue short while this run finds more." : "New drafts appear in Emails ready as this run finishes each lead."}
+        </p>
+        {waiting > 0 && (
+          <Link to="/review" className={cx(buttonClass("primary", "md"), "mt-4 w-full justify-center")}>
+            Start reviewing <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        )}
+      </aside>
+    </div>
+  );
+}
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -265,7 +336,7 @@ function StartRunDrawer({ canSkip, campaign, ceiling, busy, onClose, onStarted }
   const rate = rated.length ? rated.reduce((a, s) => a + (s.rate ?? 0), 0) / rated.length : null;
   return (
     <Drawer
-      title="Start a run"
+      title="Start a discovery run"
       subtitle={campaign ? `Looks for companies that fit “${campaign}”` : "No campaign is active: only the leads you added can move."}
       onClose={onClose}
       footer={

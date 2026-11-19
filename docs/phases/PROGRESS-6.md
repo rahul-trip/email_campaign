@@ -152,6 +152,10 @@ Normal drop-outs ("no decision-maker found", "no email we could prove") are no l
 
 Hot leads page revamped (search, hot, no/has email, fit, country, sort; folding rows; `GET /api/linkedin` gained the filters); Hot leads sit above Needs a decision in the sidebar; Needs a decision rows show fit, why it fits, tries, person, source and credits, with a retry hint, Details, filters and sort; Today's Hot leads are a compact sideways strip. Shared controls in `web3/src/ui/filters.tsx`. Open: a Stitch mockup of the Hot leads page was requested and had not appeared; look at the page with the live workspace's data.
 
+## Latest Stitch screens (2026-11-19, branch `phase-6/stitch-light-screens`, no migration, web only)
+
+Followed the newest screens in Stitch project `538951827606035367` (`01 - Onboarding`, `02 - Empty Workspace`, `03 - Action Modal`, `04 - Active Feedback`). The app already used the Airborne Engine tokens, so this is layout only. Welcome: goal cards on the left, a labelled example draft with the five-step pipeline on the right. Empty Today: a *Create your campaign* button, placeholder tiles, starter cards with who, where, size, signal and rule-out. Discovery runs: a live-run card (six steps, progress, what it found, credits so far, cancel) and *While it runs* (drafts waiting, start reviewing). The run drawer already matched (count, sources with 90-day pass rate, estimate); only its title changed. Not copied, because the product does not do them: choosing sources by switch, 25/50/100 companies (the API takes 1 to 50), a smart suggestion row, a live "ingestion feed", invented numbers, sample-data mode, a two-step onboarding. Browser test: `web3/e2e/runs-live.spec.ts`. The Hot leads, mobile Hot leads and Needs a decision mockups were never produced by Stitch; those pages were built from the tokens.
+
 ## After the alpha
 
 6e billing, 6f launch readiness, and the rest of Phase 4 and Phase 5.

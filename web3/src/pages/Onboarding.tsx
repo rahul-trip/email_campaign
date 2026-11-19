@@ -15,7 +15,7 @@ import { useTour } from "../app/tour";
 import { cx } from "../lib/cx";
 import { useSetup } from "../lib/setup";
 import { Button, buttonClass, Callout, Chip } from "../ui/core";
-import { Ring } from "../ui/viz";
+import { FitRing, Ring } from "../ui/viz";
 import { Mailboxes } from "./Mailboxes";
 import { Audience } from "./onboarding/Audience";
 import { Company } from "./onboarding/Company";
@@ -286,76 +286,126 @@ function Promise({ lines }: { lines: string[] }) {
   );
 }
 
+const PIPELINE = [
+  { icon: <Radar className="size-4" />, label: "Found" },
+  { icon: <Sparkles className="size-4" />, label: "Researched" },
+  { icon: <Users className="size-4" />, label: "Verified" },
+  { icon: <Mail className="size-4" />, label: "Written" },
+  { icon: <Inbox className="size-4" />, label: "Approved" },
+];
+
+/** A made-up example of what lands in Emails ready, labelled as one: it shows the result before anything is set up. */
+function ExampleDraft() {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-line bg-surface-2 p-4 shadow-2 sm:p-6" aria-label="An example of a finished draft">
+      <div className="aurora" aria-hidden />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <Chip tone="primary">Example · what you will review</Chip>
+          <span className="text-label text-muted">Not real data</span>
+        </div>
+        <div className="mt-4 rounded-2xl border border-line bg-surface p-4 sm:p-5">
+          <Chip tone="good" dot>
+            Ready to approve
+          </Chip>
+          <dl className="mt-4 space-y-1 rounded-xl bg-surface-2 p-3 text-small">
+            <div className="flex gap-3">
+              <dt className="w-10 text-muted">From</dt>
+              <dd className="min-w-0 truncate text-ink">you@your-company.com</dd>
+            </div>
+            <div className="flex items-center gap-3">
+              <dt className="w-10 text-muted">To</dt>
+              <dd className="min-w-0 truncate text-ink">a decision-maker, address verified</dd>
+            </div>
+          </dl>
+          <div className="mt-4 text-label text-muted">Subject</div>
+          <div className="text-heading font-semibold text-ink">A quick question about how you handle inbound</div>
+          <p className="mt-3 border-l-2 border-primary-line pl-3 text-body text-ink-2">
+            Short and specific: it opens with something true about their company, taken from the research, and asks one easy question.
+          </p>
+          <div className="mt-5 flex items-center gap-3 border-t border-line pt-4">
+            <FitRing score={86} size={44} />
+            <div className="min-w-0 flex-1">
+              <div className="text-body font-semibold text-ink">Hot fit</div>
+              <div className="truncate text-small text-muted">Judged against your brief</div>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-small font-semibold text-primary-ink">
+              <Check className="size-4" aria-hidden /> Approve
+            </span>
+          </div>
+        </div>
+        <ol className="mt-5 grid grid-cols-5 gap-1 text-center" aria-label="What happens before you see a draft">
+          {PIPELINE.map((step, i) => (
+            <li key={step.label} className="flex flex-col items-center gap-1.5">
+              <span className={cx("flex size-8 items-center justify-center rounded-full", i === PIPELINE.length - 1 ? "bg-primary text-primary-ink" : "bg-good-soft text-good")}>{step.icon}</span>
+              <span className={cx("text-label", i === PIPELINE.length - 1 ? "font-semibold text-primary" : "text-muted")}>{step.label}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function Welcome({ name, goal, onGoal, onStart }: { name: string; goal: Goal; onGoal: (g: Goal) => void; onStart: () => void }) {
   const first = name ? name.split(" ")[0] : "";
-  const loop = [
-    { icon: <Radar className="size-5" />, title: "Find companies that fit", body: "Discovery searches several sources and keeps only those that pass your brief." },
-    { icon: <Sparkles className="size-5" />, title: "Research each one", body: "Their site and recent news, judged against your must-haves." },
-    { icon: <Users className="size-5" />, title: "Find and check the right person", body: "Every address is verified before it is used." },
-    { icon: <Mail className="size-5" />, title: "Write a short, personal email", body: "Grounded in the research, checked against 14 rules." },
-    { icon: <Inbox className="size-5" />, title: "You approve; it lands in Drafts", body: "Nothing is sent without you." },
-  ];
+  const icons: Record<Goal, ReactNode> = { market: <Radar className="size-5" />, list: <Inbox className="size-5" />, both: <Compass className="size-5" /> };
   return (
     <Frame>
       <div className="relative overflow-hidden">
         <div className="aurora" aria-hidden />
-        <div className="relative mx-auto max-w-5xl px-4 py-14 text-center sm:px-6">
-          <Chip tone="primary" dot pulse className="mx-auto">
-            Setup takes about 6 minutes
-          </Chip>
-          <h1 className="mx-auto mt-5 max-w-[22ch] text-display font-semibold text-ink">
-            Welcome{first ? `, ${first}` : ""}. Your outbound, on autopilot — with you in control.
-          </h1>
-          <p className="mx-auto mt-4 max-w-[60ch] text-[1.0625rem] text-muted">We do most of the typing: your company is drafted from your website, and your campaign from your company.</p>
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-14 lg:py-16">
+          <div className="min-w-0">
+            <Chip tone="primary" dot pulse>
+              Setup takes about 6 minutes
+            </Chip>
+            <h1 className="mt-5 max-w-[20ch] text-display font-semibold text-ink">
+              {first ? `Welcome, ${first}. ` : ""}Outbound finds the companies, the right person and the first email. You just approve.
+            </h1>
+            <p className="mt-4 max-w-[52ch] text-[1.0625rem] text-muted">We do most of the typing: your company is drafted from your website, and your campaign from your company.</p>
 
-          <div className="mx-auto mt-10 grid max-w-5xl gap-3 sm:grid-cols-5">
-            {loop.map((s, i) => (
-              <div key={s.title} className="glass card-hover animate-rise rounded-2xl border border-line p-4 text-left" style={{ animationDelay: `${i * 90}ms` }}>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-primary-soft text-primary">{s.icon}</span>
-                <div className="mt-3 text-body font-semibold text-ink">{s.title}</div>
-                <div className="mt-1 text-small text-muted">{s.body}</div>
+            <div className="mt-8">
+              <div className="text-body font-semibold text-ink">What do you want first?</div>
+              <div role="radiogroup" aria-label="Your main goal" className="mt-3 space-y-2.5">
+                {GOALS.map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    role="radio"
+                    aria-checked={goal === g.key}
+                    onClick={() => onGoal(g.key)}
+                    className={cx("press flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition", goal === g.key ? "border-primary bg-primary-soft ring-2 ring-primary-line" : "border-line bg-surface hover:border-line-strong")}
+                  >
+                    <span className={cx("flex size-10 shrink-0 items-center justify-center rounded-xl", goal === g.key ? "bg-primary text-primary-ink" : "bg-surface-3 text-ink-2")}>{icons[g.key]}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-heading font-semibold text-ink">{g.label}</span>
+                        {g.key === "market" && <Chip tone="primary">Recommended</Chip>}
+                      </span>
+                      <span className="mt-0.5 block text-small text-muted">{g.line}</span>
+                    </span>
+                    <span className={cx("mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border", goal === g.key ? "border-primary bg-primary text-primary-ink" : "border-line-strong")} aria-hidden>
+                      {goal === g.key && <Check className="size-3" />}
+                    </span>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-
-          <div className="mt-10">
-            <div className="text-body font-semibold text-ink">What do you want first?</div>
-            <div role="radiogroup" aria-label="Your main goal" className="mt-3 flex flex-wrap justify-center gap-2">
-              {GOALS.map((g) => (
-                <button
-                  key={g.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={goal === g.key}
-                  onClick={() => onGoal(g.key)}
-                  className={cx("press rounded-full border px-4 py-2 text-body font-semibold transition", goal === g.key ? "border-primary bg-primary text-primary-ink shadow-2" : "border-line-strong bg-surface text-ink-2 hover:border-primary")}
-                >
-                  {goal === g.key && <Check className="mr-1 inline size-4" aria-hidden />}
-                  {g.label}
-                </button>
-              ))}
             </div>
-            <p key={goal} className="mx-auto mt-3 max-w-[56ch] animate-fade text-small text-muted">
-              {GOALS.find((g) => g.key === goal)!.line}
-            </p>
-          </div>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button size="lg" onClick={onStart}>
-              Let's set up my engine <ArrowRight className="size-4" aria-hidden />
-            </Button>
+            <div className="mt-7">
+              <Button size="lg" onClick={onStart}>
+                Let's set up my engine <ArrowRight className="size-4" aria-hidden />
+              </Button>
+            </div>
+            <ul className="mt-6 space-y-1.5 text-small text-muted">
+              {["Nothing is sent without your approval: approved emails land in your Drafts.", "Country rules are applied for you.", "Opt-outs and bounces are handled automatically."].map((line) => (
+                <li key={line} className="flex items-start gap-1.5">
+                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-good-dot" aria-hidden /> {line}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-small text-muted">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-good-dot" aria-hidden /> Country rules applied for you
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-good-dot" aria-hidden /> Opt-outs and bounces handled automatically
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="size-4 text-good-dot" aria-hidden /> You approve every email
-            </span>
-          </div>
+          <ExampleDraft />
         </div>
       </div>
     </Frame>
