@@ -277,6 +277,12 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 
 ## Closed entries
 
+### R-56 · P3 · The first section on a page was the first whose data arrived, so a filter could leave the only section closed — closed 2026-11-19
+
+- **Was:** `SectionGroup` opened "the first section" by the order sections mounted. On Needs a decision the held, failed and confirm sections appear as their own queries answer, so with a held lead the confirm section could be the second to arrive. Choosing the *Websites to confirm* tab hid the others but left it closed, and its fields were hidden. The browser test "a company added by name waits for its website" passed or failed with the machine's speed and the leads other tests had left, and it failed the deploy checks twice.
+- **Fixed by:** the group reads the order from the page after each render (`data-section-id`, `SectionGroup` in `web3/src/ui/sections.tsx`), so the first section on screen is the open one whatever the arrival order.
+- **Evidence:** `web3/e2e/attention-confirm.spec.ts` (a held lead arrives first, then the tab is chosen; it fails without the fix), and the whole browser suite.
+
 ### R-55 · P2 · Capacity: one worker could serve only four workspaces, one lead at a time, and nobody could see it fall behind — closed 2026-11-19 (two parts stay open)
 
 - **Was:** the worker had four threads (one workspace each) and a fixed pool of five connections; inside a run each lead went through each stage alone, so a 50-lead run took tens of minutes, held a thread all that time and gave its first draft near the end; new work waited for the 15-minute tick; nothing measured the lag. For 10–15 workspaces that meant long waits and slipping ticks.
