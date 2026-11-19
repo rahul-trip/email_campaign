@@ -9,9 +9,12 @@ answer is already in the ledger.
 
 from __future__ import annotations
 
+import contextvars
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -50,6 +53,12 @@ from outbound.stages.base import (
 log = get_logger(__name__)
 
 MAX_ERROR_LENGTH = 300
+
+# The run whose lead this task is processing, for the events it writes. Per task, not per runner,
+# so several leads can be worked on at once (a ContextVar is private to each copied context).
+_current_run: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "runner_run", default=None
+)
 
 
 class Outcome(StrEnum):
@@ -90,6 +99,7 @@ class Runner:
         outcome_delay: timedelta = timedelta(hours=24),
         max_attempts: int = ERROR_TRIES,
         max_outcome_attempts: int = OUTCOME_TRIES,
+        lead_concurrency: int = 1,
         now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._uow = uow_factory
@@ -102,9 +112,9 @@ class Runner:
         self._outcome_delay = outcome_delay
         self._max_attempts = max_attempts
         self._max_outcome_attempts = max_outcome_attempts
+        self._lead_concurrency = max(1, lead_concurrency)  # leads of one stage worked on at once
         self._read = Reader(uow_factory, workspace_id)
         self._now = now
-        self._run_id: str | None = None  # the run whose lead is being processed, for its events
 
     # ------------------------------------------------------------------ pipeline
 
@@ -175,10 +185,34 @@ class Runner:
         counts: Counter[str] = Counter()
         with self._uow(self._workspace_id) as uow:
             waiting = uow.companies.due(stage.input_status, limit, self._now())
-        for company in waiting:
-            if self._cancelled(run_id):
-                break
-            counts[self._process(stage, company.id, run_id).value] += 1
+        # A stage that shares one outside connection (delivery) says ``parallel = False``.
+        workers = self._lead_concurrency if getattr(stage, "parallel", True) else 1
+        if workers <= 1 or len(waiting) <= 1:
+            for company in waiting:
+                if self._cancelled(run_id):
+                    break
+                counts[self._process(stage, company.id, run_id).value] += 1
+            return counts
+
+        # Several leads at once: each is slow (a site, a search, a model), and they are
+        # independent. Each task has its own copy of the logging and call context, so a lead's
+        # calls and events carry its own ids; a cancelled run stops starting new leads.
+        stop = threading.Event()
+
+        def one(company_id: str) -> Outcome | None:
+            if stop.is_set() or self._cancelled(run_id):
+                stop.set()
+                return None
+            return self._process(stage, company_id, run_id)
+
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="lead") as pool:
+            futures = [
+                pool.submit(contextvars.copy_context().run, one, company.id) for company in waiting
+            ]
+            for future in futures:
+                outcome = future.result()
+                if outcome is not None:
+                    counts[outcome.value] += 1
         return counts
 
     def _finish(self, run_id: str, status: RunStatus, report: RunReport) -> None:
@@ -204,7 +238,7 @@ class Runner:
         company: Company | None = None
         result: StageResult | None = None
         bind(company_id=company_id, stage=stage.name)
-        self._run_id = run_id
+        run_token = _current_run.set(run_id)
         try:
             with self._uow(self._workspace_id) as uow:
                 company = uow.companies.get(company_id)
@@ -236,7 +270,7 @@ class Runner:
                 return Outcome.SKIPPED
             return self._record_failure(stage, company, error)
         finally:
-            self._run_id = None
+            _current_run.reset(run_token)
             unbind("company_id", "stage")
 
     def _exists(self, company_id: str) -> bool:
@@ -276,7 +310,7 @@ class Runner:
                 reason=result.reason,
                 hold_reason=result.hold_reason,
                 next_action_at=result.next_action_at,
-                run_id=self._run_id,
+                run_id=_current_run.get(),
             )
             # The step succeeded, so it is counted for reports, in the same transaction as its
             # result, once per lead. (Its calls already used their AI credits.)
@@ -304,7 +338,7 @@ class Runner:
                         CompanyStatus.SUPPRESSED,
                         expected_version=company.row_version,
                         reason=refusal.reason,
-                        run_id=self._run_id,
+                        run_id=_current_run.get(),
                     )
                     outcome = Outcome.SUPPRESSED
                 elif refusal.kind is RefusalKind.HOLD:
@@ -318,7 +352,7 @@ class Runner:
                         expected_version=company.row_version,
                         reason=refusal.reason,
                         hold_reason=refusal.hold_reason or HoldReason.NEEDS_OPERATOR,
-                        run_id=self._run_id,
+                        run_id=_current_run.get(),
                     )
                     outcome = Outcome.HELD
                 elif refusal.kind is RefusalKind.ACCESS:
@@ -406,7 +440,7 @@ class Runner:
             last_error=message,
             failure_kind=kind,
             next_action_at=self._now() + wait,
-            run_id=self._run_id,
+            run_id=_current_run.get(),
             vendor_wait=vendor,
         )
 
@@ -440,8 +474,8 @@ class Runner:
         ]
         if not previous or previous[-1].data.get("reason") != reason:
             detail: dict[str, Any] = {"reason": reason}
-            if self._run_id:
-                detail["run_id"] = self._run_id
+            if run_id := _current_run.get():
+                detail["run_id"] = run_id
             uow.events.append(EntityType.COMPANY, company.id, "deferred", SYSTEM, detail)
 
     def has_due_work(self) -> bool:

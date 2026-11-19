@@ -34,6 +34,7 @@ class DeliverStage:
     input_status = CompanyStatus.APPROVED
     guard_policy = True
     spends = False
+    parallel = False  # one mailbox connection is shared: drafts are saved one at a time
 
     def __init__(self, mailboxes: Mailboxes) -> None:
         self._mailboxes = mailboxes
