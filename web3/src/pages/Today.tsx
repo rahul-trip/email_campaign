@@ -38,7 +38,12 @@ export function TodayPage() {
   const { me } = useCurrent();
   const counts = useCounts();
   const status = counts.status.data;
-  const review = useQuery({ queryKey: ["review"], queryFn: () => ok(client.GET("/api/review")), refetchInterval: 15000 });
+  // Only the ten best emails, without their leads' research: the whole queue is for the Emails ready page.
+  const review = useQuery({
+    queryKey: ["review", "top"],
+    queryFn: () => ok(client.GET("/api/review", { params: { query: { limit: 10, best: true, slim: true } } })),
+    refetchInterval: 30000,
+  });
   const daily = useQuery({ queryKey: ["daily", 14], queryFn: () => ok(client.GET("/api/reports/daily", { params: { query: { days: 14 } } })), refetchInterval: 60000 });
   const quality = useQuery({ queryKey: ["quality"], queryFn: () => ok(client.GET("/api/reports/quality")) });
   const auto = useQuery({ queryKey: ["auto-discovery"], queryFn: () => ok(client.GET("/api/runs/auto-discovery")), refetchInterval: 30000 });
@@ -52,10 +57,9 @@ export function TodayPage() {
   const lastWeek = days.slice(-14, -7);
   const pick = (k: keyof Schemas["DayOut"]) => (rows: Schemas["DayOut"][]) => rows.map((r) => Number(r[k]));
   const reviewedToday = days.at(-1)?.reviewed ?? 0;
-  const waiting = review.data ?? [];
-  const hot = waiting.filter((i) => i.company.hot).length;
-  // The best first: hot leads, then by fit. Anything with a skipped check is approved in Review.
-  const top = [...waiting].sort((a, b) => Number(b.company.hot) - Number(a.company.hot) || (b.company.fit_score ?? 0) - (a.company.fit_score ?? 0)).slice(0, 10);
+  // The server sends them best first (hot leads, then by fit). One with a skipped check is approved in Review.
+  const top = review.data ?? [];
+  const hot = status?.waiting_hot ?? 0;
 
   return (
     <div className="space-y-6">
@@ -105,6 +109,13 @@ export function TodayPage() {
                 <>New emails appear here as the engine writes them. {auto.data?.next_search ? `Next discovery ${relative(auto.data.next_search)}.` : ""}</>
               )}
             </p>
+            {top.length === 0 && review.isPending && counts.review > 0 && (
+              <div className="-mx-5 mt-5 flex gap-3 overflow-hidden px-5 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 xl:grid-cols-3" role="status" aria-label="Loading the emails" data-tour="ready-drafts-loading">
+                {[0, 1, 2].map((n) => (
+                  <div key={n} className="h-44 w-[85%] shrink-0 animate-pulse rounded-xl border border-line bg-surface-2 sm:w-auto" />
+                ))}
+              </div>
+            )}
             {top.length > 0 && (
               // On a phone the emails are a row to swipe (up to ten); from a tablet up, the best three side by side.
               <div
