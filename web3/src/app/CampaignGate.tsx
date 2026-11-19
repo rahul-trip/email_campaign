@@ -5,7 +5,7 @@
  * workspace's existing campaign or creates one, exactly as web2 did.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Target } from "lucide-react";
+import { Ban, Building2, MapPin, Rocket, Sparkles, Target, UserRound, Zap } from "lucide-react";
 import { useState } from "react";
 import { client, ok } from "../api/client";
 import { cx } from "../lib/cx";
@@ -22,6 +22,7 @@ export const STARTERS = [
     who: "CFO, VP Finance, Head of FP&A",
     where: "UK & Ireland · 25–250 staff",
     signal: "Raised money in the last 12 months",
+    ruleOut: "Banks, agencies, companies on an enterprise ERP",
     titles: ["CFO", "VP Finance", "Head of FP&A", "Finance Director"],
     icp: "Venture-backed fintech and B2B SaaS companies in the UK and Ireland with 25 to 250 staff, a finance team of at least three, and a funding round in the last twelve months. Not banks, not agencies, not companies already using an enterprise ERP.",
   },
@@ -31,6 +32,7 @@ export const STARTERS = [
     who: "Founder, CEO, Co-founder",
     where: "Netherlands · 10–80 staff",
     signal: "Hiring their first sales role",
+    ruleOut: "Agencies and consultancies",
     titles: ["Founder", "CEO", "Co-founder"],
     icp: "Software-as-a-service start-ups headquartered in the Netherlands with 10 to 80 staff, selling to businesses, that are hiring their first account executive or sales lead. Not agencies or consultancies.",
   },
@@ -40,6 +42,7 @@ export const STARTERS = [
     who: "Managing Director, Operations Director",
     where: "England · 5–50 staff",
     signal: "Opened a new desk or office",
+    ruleOut: "Umbrella and payroll companies, franchise networks",
     titles: ["Managing Director", "Operations Director", "Director"],
     icp: "Independent recruitment agencies in the English Midlands with 5 to 50 staff that place permanent and contract candidates. Rule out umbrella and payroll companies and franchise networks.",
   },
@@ -49,14 +52,28 @@ export function CampaignGate() {
   const admin = useIsAdmin();
   return (
     <div data-tour="campaign-gate" className="animate-rise">
-      <section className="relative mb-6 overflow-hidden rounded-2xl border border-line bg-surface px-6 py-10 text-center sm:px-10">
+      <div className="mb-3 hidden gap-3 sm:grid sm:grid-cols-4" aria-hidden>
+        {[0, 1, 2, 3].map((n) => (
+          <div key={n} className="h-12 rounded-t-2xl border border-b-0 border-dashed border-line bg-surface-2/60 px-4 pt-3">
+            <div className="h-2 w-16 rounded-full bg-surface-3" />
+          </div>
+        ))}
+      </div>
+      <section className="relative -mt-3 mb-8 overflow-hidden rounded-2xl border border-line bg-surface px-6 py-10 text-center shadow-1 sm:px-10">
         <div className="aurora" aria-hidden />
         <div className="relative">
           <EmptyTrayArt />
-          <h1 className="mx-auto mt-5 max-w-[22ch] text-display font-semibold text-ink">Your engine is ready. Tell it who to look for.</h1>
+          <h1 className="mx-auto mt-5 max-w-[24ch] text-display font-semibold text-ink">Your engine is ready. Tell it who to look for.</h1>
           <p className="mx-auto mt-3 max-w-[60ch] text-[1.0625rem] text-muted">
             Pick a starting campaign or describe your own. Outbound then finds companies that fit, researches them, and drafts first emails for you to review. Nothing is sent without your approval.
           </p>
+          {admin && (
+            <div className="mt-6">
+              <Button size="lg" onClick={() => document.getElementById("campaign-form")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+                <Rocket className="size-4" aria-hidden /> Create your campaign
+              </Button>
+            </div>
+          )}
         </div>
       </section>
       {admin ? (
@@ -126,28 +143,42 @@ export function FirstCampaign({ onSaved }: { onSaved?: () => void }) {
               key={s.key}
               type="button"
               onClick={() => use(s.key)}
-              className={cx("card card-hover press group p-5 text-left", picked === s.key && "border-primary ring-2 ring-primary-line")}
+              className={cx("card card-hover press group flex flex-col p-5 text-left", picked === s.key && "border-primary ring-2 ring-primary-line")}
             >
-              <div className="flex items-center gap-2 text-primary">
-                <Target className="size-4" aria-hidden />
-                <span className="text-label font-semibold tracking-wide uppercase">Starter</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-heading font-semibold text-ink">{s.title}</div>
+                <Target className="size-4 shrink-0 text-primary" aria-hidden />
               </div>
-              <div className="mt-2 text-heading font-semibold text-ink">{s.title}</div>
-              <dl className="mt-3 space-y-1 text-small text-muted">
-                <div>
+              <dl className="mt-3 space-y-1.5 text-small text-muted">
+                <div className="flex items-start gap-2">
                   <dt className="sr-only">Who</dt>
+                  <UserRound className="mt-0.5 size-4 shrink-0" aria-hidden />
                   <dd className="text-ink-2">{s.who}</dd>
                 </div>
-                <div>
+                <div className="flex items-start gap-2">
                   <dt className="sr-only">Where</dt>
-                  <dd>{s.where}</dd>
+                  <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <dd>{s.where.split(" · ")[0]}</dd>
                 </div>
-                <div>
-                  <dt className="sr-only">Signal</dt>
-                  <dd>Signal: {s.signal}</dd>
+                <div className="flex items-start gap-2">
+                  <dt className="sr-only">Size</dt>
+                  <Building2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <dd>{s.where.split(" · ")[1]}</dd>
                 </div>
               </dl>
-              <span className="mt-4 inline-flex text-small font-semibold text-primary group-hover:underline">{picked === s.key ? "Filled in below ✓" : "Use this →"}</span>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-lg bg-attention-soft px-2 py-1 text-label font-medium text-attention">
+                  <Zap className="size-3.5" aria-hidden /> Signal: {s.signal}
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-lg bg-surface-3 px-2 py-1 text-label font-medium text-muted">
+                  <Ban className="size-3.5" aria-hidden /> Rule-out: {s.ruleOut}
+                </span>
+              </div>
+              <div className="mt-auto pt-4">
+                <span className="flex w-full justify-center rounded-lg border border-line-strong bg-surface px-3 py-2 text-small font-semibold text-ink group-hover:border-primary group-hover:text-primary">
+                  {picked === s.key ? "Filled in below ✓" : "Use this"}
+                </span>
+              </div>
             </button>
           ))}
         </div>
