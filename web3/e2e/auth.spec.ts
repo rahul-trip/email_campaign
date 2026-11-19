@@ -106,7 +106,7 @@ test("a new customer's admin is taken to the guided setup, which starts empty", 
   await boss.getByRole("button", { name: "Create my account" }).click();
 
   await expect(boss).toHaveURL(/\/w\/globex-ltd\/onboarding$/);
-  await expect(boss.getByRole("heading", { name: /Welcome/ })).toBeVisible();
+  await expect(boss.getByRole("heading", { name: /Outbound finds the companies/ })).toBeVisible();
   await boss.getByRole("button", { name: "Let's set up my engine" }).click();
   await expect(boss.getByRole("heading", { name: "What you sell" })).toBeVisible();
   await expect(boss.getByRole("button", { name: /What you sell/ })).toHaveAttribute("aria-current", "step");
