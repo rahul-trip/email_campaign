@@ -3609,6 +3609,11 @@ export interface components {
             fit_reason: string | null;
             /** Fit Score */
             fit_score: number | null;
+            /**
+             * Has Linkedin
+             * @default false
+             */
+            has_linkedin?: boolean;
             hold_reason: components["schemas"]["HoldReason"] | null;
             /**
              * Hot
@@ -3702,6 +3707,11 @@ export interface components {
             fit_reason: string | null;
             /** Fit Score */
             fit_score: number | null;
+            /**
+             * Has Linkedin
+             * @default false
+             */
+            has_linkedin?: boolean;
             hold_reason: components["schemas"]["HoldReason"] | null;
             /**
              * Hot

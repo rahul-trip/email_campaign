@@ -48,9 +48,11 @@ from outbound.services.runs import RunRequest
 router = APIRouter(prefix="/api", tags=["leads"])
 
 
-def _lead(detail: LeadDetail) -> LeadOut:
+def _lead(detail: LeadDetail, *, has_linkedin: bool = False) -> LeadOut:
+    company = CompanyOut.model_validate(detail.company)
+    company.has_linkedin = has_linkedin
     return LeadOut(
-        company=CompanyOut.model_validate(detail.company),
+        company=company,
         contacts=[
             ContactOut.model_validate(
                 {**c.contact.__dict__, "emails": [EmailOut.model_validate(e) for e in c.emails]}
@@ -101,9 +103,11 @@ def companies(
         offset=offset,
     )
     summaries = svc.reports.lead_summaries([c.id for c in items]) if include == "summary" else {}
+    reachable = svc.leads.with_linkedin([c.id for c in items])
     rows = []
     for company in items:
         row = CompanyRowOut.model_validate(company)
+        row.has_linkedin = company.id in reachable
         found = summaries.get(company.id)
         if found is not None:
             row.summary = LeadSummaryOut.model_validate(found)
@@ -115,7 +119,8 @@ def companies(
     "/companies/{company_id}", response_model=LeadOut, dependencies=[Depends(require(P.LEADS_READ))]
 )
 def company(company_id: str, svc: Annotated[Services, Depends(services)]) -> LeadOut:
-    return _lead(svc.leads.detail(company_id))
+    detail = svc.leads.detail(company_id)
+    return _lead(detail, has_linkedin=company_id in svc.leads.with_linkedin([company_id]))
 
 
 @router.get(

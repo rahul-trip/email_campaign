@@ -262,6 +262,9 @@ class CompanyOut(Out):
     row_version: int
     created_at: datetime | None
     updated_at: datetime | None
+    # A LinkedIn message is written (or sent) for someone here, so a stopped lead still has a way
+    # in. Filled by the routes that list leads and open one; false elsewhere.
+    has_linkedin: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -286,6 +289,7 @@ class CompanyOut(Out):
             attempts=self.attempts,
             fit_score=self.fit_score,
             waiting_for_credit=self.credit_wait_step is not None,
+            has_linkedin=self.has_linkedin,
         )
 
 

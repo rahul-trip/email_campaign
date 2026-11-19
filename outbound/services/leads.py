@@ -244,6 +244,11 @@ class LeadService:
                 notes=uow.notes.for_company(company_id),
             )
 
+    def with_linkedin(self, company_ids: list[str]) -> set[str]:
+        """Which of these leads have a LinkedIn message written or sent for someone there."""
+        with self._uow(self._workspace_id) as uow:
+            return uow.companies.with_linkedin_messages(company_ids)
+
     def timeline(self, company_id: str) -> list[TimelineEntry]:
         """Everything that happened to the lead, its people, addresses and messages."""
         with self._uow(self._workspace_id) as uow:

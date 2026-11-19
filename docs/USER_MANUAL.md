@@ -217,6 +217,8 @@ Every lead is in one of five groups, and the app words them calmly:
 
 *(Called Needs a decision until 2026-11-20. Retrying a lead costs AI credits, so the page is named for what it holds and the engine retries by itself, with longer waits each time.)*
 
+A lead that stopped for want of an address, or whose last step broke, but has a LinkedIn message written for someone there, is **not** listed here: it counts as a success (*Message on LinkedIn*) and is on **LinkedIn ready**, whatever its fit.
+
 **Filters and sort.** Under the tabs: search by company, website or person; **Hot only**; minimum fit; the step a lead stopped at; its source (found by discovery, added by you, imported, referral); country (when leads are in more than one); and **Sort** by best fit, waiting longest, newest or company, with a button to reverse it. *Showing N of M leads* says how many are left; **Clear** removes every filter.
 
 **What each row tells you, so you can decide whether to retry.** The fit ring and a *Worth checking* flag on hot leads (fit above 80), which are the ones to look at first; the person who would be written to; *Try 3 of 5* and the step that stopped; where the lead came from; the AI credits spent on it so far; and a hint: *Fit 34 is below your minimum (60): probably not worth retrying*, or *A hot lead (fit above 80): worth a look before the others*. **Details** opens why it fits, the full error and the criterion-by-criterion qualification.

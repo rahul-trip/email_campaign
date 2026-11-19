@@ -1191,6 +1191,11 @@
             ],
             "title": "Fit Score"
           },
+          "has_linkedin": {
+            "default": false,
+            "title": "Has Linkedin",
+            "type": "boolean"
+          },
           "hold_reason": {
             "anyOf": [
               {
@@ -1564,6 +1569,11 @@
               }
             ],
             "title": "Fit Score"
+          },
+          "has_linkedin": {
+            "default": false,
+            "title": "Has Linkedin",
+            "type": "boolean"
           },
           "hold_reason": {
             "anyOf": [

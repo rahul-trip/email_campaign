@@ -6,9 +6,9 @@ from collections.abc import Collection, Mapping
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, and_, exists, func, or_, select
 
-from outbound.db.models import CampaignRow, CompanyRow
+from outbound.db.models import CampaignRow, CompanyRow, LinkedInMessageRow
 from outbound.db.repositories.base import ScopedRepository, snapshot
 from outbound.db.types import utcnow
 from outbound.domain.actors import SYSTEM
@@ -21,6 +21,7 @@ from outbound.domain.enums import (
     EntityType,
     FailureKind,
     HoldReason,
+    LinkedInState,
     UsageStep,
 )
 from outbound.domain.outcomes import (
@@ -68,7 +69,16 @@ def _bucket_filter(bucket: Bucket) -> ColumnElement[bool]:
     outcome = CompanyRow.failure_kind.in_((FailureKind.NO_PERSON, FailureKind.NO_EMAIL))
     gave_up = and_(failed, ~parked, outcome, CompanyRow.attempts >= OUTCOME_TRIES)
     hot = CompanyRow.fit_score > HOT_ABOVE
-    ready = or_(CompanyRow.status == CompanyStatus.COPY_READY, and_(gave_up, hot))
+    # A LinkedIn message is written (or sent) for someone here: a way in, so not a failure.
+    reachable = and_(
+        failed,
+        ~parked,
+        exists().where(
+            LinkedInMessageRow.company_id == CompanyRow.id,
+            LinkedInMessageRow.state.in_((LinkedInState.DRAFTED, LinkedInState.SENT)),
+        ),
+    )
+    ready = or_(CompanyRow.status == CompanyStatus.COPY_READY, reachable, and_(gave_up, hot))
     done = CompanyRow.status.in_(
         (
             CompanyStatus.APPROVED,
@@ -81,7 +91,11 @@ def _bucket_filter(bucket: Bucket) -> ColumnElement[bool]:
         CompanyRow.status.in_(
             (CompanyStatus.DISQUALIFIED, CompanyStatus.REJECTED, CompanyStatus.SUPPRESSED)
         ),
-        and_(gave_up, or_(CompanyRow.fit_score.is_(None), CompanyRow.fit_score <= HOT_ABOVE)),
+        and_(
+            gave_up,
+            ~reachable,
+            or_(CompanyRow.fit_score.is_(None), CompanyRow.fit_score <= HOT_ABOVE),
+        ),
     )
     stuck = and_(
         failed,
@@ -339,6 +353,7 @@ class CompanyRepository(ScopedRepository):
     def count_buckets(self) -> dict[Bucket, int]:
         """How many leads are in each bucket (``domain.outcomes``)."""
         stmt = select(
+            CompanyRow.id,
             CompanyRow.status,
             CompanyRow.hold_reason,
             CompanyRow.failure_kind,
@@ -347,7 +362,8 @@ class CompanyRepository(ScopedRepository):
             CompanyRow.credit_wait_step,
         ).where(CompanyRow.workspace_id == self._workspace_id)
         counts = dict.fromkeys(Bucket, 0)
-        for status, hold, kind, attempts, fit, parked in self._session.execute(stmt):
+        reachable = self.with_linkedin_messages(None)
+        for company_id, status, hold, kind, attempts, fit, parked in self._session.execute(stmt):
             bucket = bucket_of(
                 status,
                 hold_reason=hold,
@@ -355,9 +371,25 @@ class CompanyRepository(ScopedRepository):
                 attempts=attempts,
                 fit_score=fit,
                 waiting_for_credit=parked is not None,
+                has_linkedin=company_id in reachable,
             )
             counts[bucket] += 1
         return counts
+
+    def with_linkedin_messages(self, company_ids: Collection[str] | None) -> set[str]:
+        """Which of these leads (all of them for ``None``) have a LinkedIn message written or
+        sent for someone there."""
+        stmt = (
+            select(LinkedInMessageRow.company_id)
+            .where(
+                LinkedInMessageRow.workspace_id == self._workspace_id,
+                LinkedInMessageRow.state.in_((LinkedInState.DRAFTED, LinkedInState.SENT)),
+            )
+            .distinct()
+        )
+        if company_ids is not None:
+            stmt = stmt.where(LinkedInMessageRow.company_id.in_(list(company_ids)))
+        return set(self._session.scalars(stmt))
 
     def transition(
         self,

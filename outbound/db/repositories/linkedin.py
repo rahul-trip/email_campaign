@@ -209,6 +209,7 @@ class LinkedInRepository(ScopedRepository):
                     attempts=company.attempts,
                     fit_score=company.fit_score,
                     waiting_for_credit=company.credit_wait_step is not None,
+                    has_linkedin=message.state is not LinkedInState.SKIPPED,
                 ),
                 company.status,
                 company.failure_kind,
