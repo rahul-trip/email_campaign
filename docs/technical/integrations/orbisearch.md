@@ -10,12 +10,12 @@ applies_to: Phase 3b
 
 | | |
 |---|---|
-| **Role** | Email verifier only. OrbiSearch has no finder API |
+| **Role** | Email verifier and catch-all resolver. It has had a finder API since 2026 (`POST /v1/email-lookup`), which charges a credit for every search, found or not; we do not use it |
 | **Port** | `EmailVerifier` |
 | **Adapter** | `outbound/providers/adapters/orbisearch.py::OrbiSearchVerifier` |
 | **Registry** | `orbisearch` |
 | **Settings** | `ORBISEARCH_API_KEY` |
-| **Price** | `orbisearch:verify` 200 micro-USD |
+| **Price** | `orbisearch:verify` and `orbisearch:resolve` 3,000 micro-USD: 0.2 credit, every answer charged, at the $30 pack of 2,000 credits |
 | **Cache** | `verify`, 90 days |
 | **Status** | Live-checked 2026-10-19 |
 

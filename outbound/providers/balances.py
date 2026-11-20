@@ -1,8 +1,9 @@
 """What a vendor's account has left, from the vendor's own free balance call.
 
-Only the vendors that have one: Hunter (searches left this period), ZeroBounce, MyEmailVerifier
-and OrbiSearch (credits). None of these calls spends a credit. Any failure answers ``None``,
-which means *unknown*, never zero: a vendor is not treated as empty because a call failed.
+Only the vendors that have one: Hunter (searches left this period), and ZeroBounce,
+MyEmailVerifier, OrbiSearch, MillionVerifier and BounceBan (credits). None of these calls
+spends a credit. Any failure answers ``None``, which means *unknown*, never zero: a vendor is
+not treated as empty because a call failed.
 """
 
 from __future__ import annotations
@@ -73,11 +74,28 @@ def _orbisearch(key: str, client: httpx.Client) -> Balance | None:
     return None if left is None else Balance(left, "credits")
 
 
+def _millionverifier(key: str, client: httpx.Client) -> Balance | None:
+    # The answer's shape is not documented beyond a refused key ({"result": "error", ...}):
+    # anything without a number in ``credits`` is "unknown", never zero.
+    answer = client.get("https://api.millionverifier.com/api/v3/credits", params={"api": key})
+    left = _number(answer.json().get("credits"))
+    return None if left is None else Balance(left, "credits")
+
+
+def _bounceban(key: str, client: httpx.Client) -> Balance | None:
+    answer = client.get("https://api.bounceban.com/v1/account", headers={"Authorization": key})
+    left = _number(answer.json().get("available_credits"))
+    # -1 is how BounceBan says "unlimited" (custom plans): that is not a balance to show.
+    return None if left is None or left < 0 else Balance(left, "credits")
+
+
 _VENDORS = {
     "hunter": _hunter,
     "zerobounce": _zerobounce,
     "myemailverifier": _myemailverifier,
     "orbisearch": _orbisearch,
+    "millionverifier": _millionverifier,
+    "bounceban": _bounceban,
 }
 HAS_BALANCE = frozenset(_VENDORS)
 

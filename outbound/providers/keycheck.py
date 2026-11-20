@@ -22,7 +22,7 @@ from outbound.providers.registry import (
     build_verifier_named,
 )
 
-VERIFIERS = ("hunter", "zerobounce", "orbisearch", "myemailverifier")
+VERIFIERS = ("hunter", "zerobounce", "orbisearch", "myemailverifier", "millionverifier")
 # Finders with no verifier of their own: tested by asking for a person who cannot be found,
 # which none of them charges for.
 FINDERS = ("anymailfinder", "prospeo", "icypeas", "generect")

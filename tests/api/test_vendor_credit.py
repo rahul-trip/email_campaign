@@ -143,6 +143,13 @@ def test_other_vendors_and_failures_are_unknown_never_zero() -> None:
         100, "credits"
     )
     assert balance("orbisearch", KEY, answering({"credits": 99.8})) == Balance(99.8, "credits")
+    assert balance("millionverifier", KEY, answering({"credits": 9990})) == Balance(9990, "credits")
+    refused = {"result": "error", "error": "apikey_not_found"}
+    assert balance("millionverifier", KEY, answering(refused)) is None
+    assert balance("bounceban", KEY, answering({"available_credits": 42.5})) == Balance(
+        42.5, "credits"
+    )
+    assert balance("bounceban", KEY, answering({"available_credits": -1})) is None  # unlimited
     assert balance("tavily", KEY, answering({})) is None  # no balance call
     assert balance("hunter", "", answering({})) is None  # no key
     assert balance("hunter", KEY, answering({"data": {}})) is None  # nothing readable

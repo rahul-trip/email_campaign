@@ -18,3 +18,8 @@ Fixtures added in Phase 2, also hand-built from documentation:
 - `companies_house/search.json`: a Companies House company search.
 
 The IMAP adapter has no fixtures: its tests use an in-memory IMAP server (`tests/providers/test_imap_mailbox.py`). Like Scrubby and Companies House, it needs one live check against the real mailbox.
+
+Fixtures added on 2026-11-20, hand-built from documentation:
+
+- `millionverifier/`: the `ok` and bad-key answers are the vendor's own replies to its public test key; the other results follow the documented result codes. The "no credits" wording is a guess.
+- `bounceban/`: built from the field lists in the vendor's API docs, which give no full example answers.

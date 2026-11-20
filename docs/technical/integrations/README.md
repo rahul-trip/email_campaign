@@ -24,7 +24,9 @@ Every outside system Outbound depends on: what it is for, how it is reached, wha
 | Icypeas | Finder (pay per address found) | `EmailFinder` | `icypeas` | `ICYPEAS_API_KEY` | `find` (90 days) | Built from docs; not checked live | [icypeas](icypeas.md) |
 | Generect | Finder (pay per valid address) | `EmailFinder` | `generect` | `GENERECT_API_KEY` | `find` (90 days) | Built from docs; not checked live | [generect](generect.md) |
 | MyEmailVerifier | Verifier (the default) | `EmailVerifier` | `myemailverifier` | `MYEMAILVERIFIER_API_KEY` | `verify` (90 days) | Works | [myemailverifier](myemailverifier.md) |
-| OrbiSearch | Verifier only (no finder API) | `EmailVerifier` | `orbisearch` | `ORBISEARCH_API_KEY` | `verify` (90 days) | Works | [orbisearch](orbisearch.md) |
+| MillionVerifier | Verifier, paid by the pack (credits do not expire) | `EmailVerifier` | `millionverifier` | `MILLIONVERIFIER_API_KEY` | `verify` (90 days) | Built from docs 2026-11-20; not checked live | [millionverifier](millionverifier.md) |
+| OrbiSearch | Verifier and catch-all resolver. It has had a finder API since 2026 (`POST /v1/email-lookup`, charged for every search, found or not); we do not use it | `EmailVerifier` | `orbisearch` | `ORBISEARCH_API_KEY` | `verify` (90 days) | Works | [orbisearch](orbisearch.md) |
+| BounceBan | Catch-all resolver, answers within the call | `CatchAllResolver` | `bounceban` | `BOUNCEBAN_API_KEY` | `resolve` (90 days) | Built from docs 2026-11-20; not checked live. **Needs the vendor's written approval before customer use** | [bounceban](bounceban.md) |
 | Enrichley | Catch-all resolver, answers at once | `CatchAllResolver` | `enrichley` | `ENRICHLEY_API_KEY` | `resolve` (90 days) | Not checked | [enrichley](enrichley.md) |
 | Scrubby | Catch-all resolver, asynchronous (deep verification, up to 24 h); the default | `CatchAllResolver` | `scrubby` | `SCRUBBY_API_KEY` (`SCRUBBY_BASE_URL` optional) | `resolve` (90 days) | Live-checked 2026-11-16 (accepts and polls); a finished batch not yet seen | [scrubby](scrubby.md) |
 | Companies House | UK company register (free); also finds UK companies by industry code for discovery | `CompanyRegistry`, `LeadSource` | — | `COMPANIES_HOUSE_API_KEY` (optional) | `lookup` (30 days) | Works | [companies-house](companies-house.md) |
@@ -41,21 +43,23 @@ Every outside system Outbound depends on: what it is for, how it is reached, wha
 
 ## Prices
 
-The meter records each paid call at these prices: `outbound/providers/pricing.py::DEFAULT_PRICES`, merged with `PROVIDER_PRICES` from settings. They are in micro-USD (1,000,000 = $1). The source of each price is the comment next to it in the code; **check them against your vendor plan before relying on reports**.
+The meter records each paid call at these prices: `outbound/providers/pricing.py::DEFAULT_PRICES`, merged with `PROVIDER_PRICES` from settings. They are in micro-USD (1,000,000 = $1), at the smallest pack or plan each vendor sells (checked 2026-11-20), which is what a small install pays. The source of each price is the comment next to it in the code; **check them against your vendor plan before relying on reports**.
 
 | Key | micro-USD | USD | Note |
 |---|---|---|---|
 | `hunter:find` | 24,500 | $0.0245 | Starter plan, 1 credit per address found; nothing found is not billed |
 | `hunter:verify` | 12,250 | $0.01225 | Assumed half a credit; the docs do not state it |
-| `zerobounce:find` | 160,000 | $0.16 | 20 credits per address found |
+| `zerobounce:find` | 390,000 | $0.39 | 20 credits per address found, at the $39 pack of 2,000; about $0.16 only on the annual plan |
 | `zerobounce:verify` | 8,000 | $0.008 | `unknown` results are free |
-| `anymailfinder:find` | 29,000 | $0.029 | Estimate; charged only for a valid address |
+| `anymailfinder:find` | 72,500 | $0.0725 | $29 a month for 400 credits ($49 for 1,000 is $0.049); charged only for a valid address |
 | `prospeo:find` | 39,000 | $0.039 | Estimate; charged only for an address found |
-| `icypeas:find` | 19,000 | $0.019 | Estimate; charged only for an address found |
+| `icypeas:find` | 19,000 | $0.019 | $19 for 1,000 credits that do not expire; charged only for an address found |
 | `generect:find` | 20,000 | $0.02 | Its documented example; charged only for a valid address |
-| `orbisearch:resolve` | 200 | $0.0002 | The same check as its verifier, asked of a catch-all |
-| `myemailverifier:verify` | 2,500 | $0.0025 | After 100 free requests a day (the free ones are still recorded at this price) |
-| `orbisearch:verify` | 200 | $0.0002 | 0.2 credit |
+| `orbisearch:resolve` | 3,000 | $0.003 | The same check as its verifier, asked of a catch-all |
+| `myemailverifier:verify` | 3,800 | $0.0038 | $4 for 1,050 after 100 free requests a day (the free ones are still recorded at this price) |
+| `millionverifier:verify` | 3,900 | $0.0039 | $39 for 10,000; catch-all and unknown are not charged |
+| `orbisearch:verify` | 3,000 | $0.003 | 0.2 credit, every answer charged, at the $30 pack of 2,000 credits ($0.0002 only at the 10-million pack) |
+| `bounceban:resolve` | 5,000 | $0.005 | **Unconfirmed**: the pricing page shows no figure without a login |
 | `enrichley:resolve` | 11,800 | $0.0118 | One credit; not billed when the vendor says so |
 | `scrubby:resolve` | unknown (`None`, recorded as 0) | — | Pricing is not public |
 | `tavily:search` | 8,000 | $0.008 | One basic search |

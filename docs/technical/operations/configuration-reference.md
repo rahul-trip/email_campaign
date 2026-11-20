@@ -65,6 +65,8 @@ Three roles, three URLs — see [tenancy and isolation](../lld/tenancy-and-isola
 | `ANYMAILFINDER_API_KEY`, `PROSPEO_API_KEY`, `ICYPEAS_API_KEY`, `GENERECT_API_KEY` | str | — | yes | D | The pay-as-you-go finders (charged only for an address found); name them in `FINDER_CHAIN` (`anymailfinder`, `prospeo`, `icypeas`, `generect`) once the bake-off has chosen. Also manageable in the admin console |
 | `MYEMAILVERIFIER_API_KEY` | str | — | yes | D | `VERIFIER=myemailverifier` (default) |
 | `ORBISEARCH_API_KEY` | str | — | yes | D | `VERIFIER=orbisearch` |
+| `MILLIONVERIFIER_API_KEY` | str | — | yes | D | `VERIFIER=millionverifier` |
+| `BOUNCEBAN_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=bounceban` |
 | `ENRICHLEY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=enrichley` |
 | `SCRUBBY_API_KEY` | str | — | yes | D | `CATCH_ALL_RESOLVER=scrubby` (default) |
 | `VENDOR_BALANCE_CHECKS` | bool | `true` | no | D | Ask each vendor that has a free balance call what its account has left: the admin console shows it, and a finder with none is paused by the worker (and resumed when it has credit). The tests set it `false` |

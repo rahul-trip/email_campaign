@@ -1,0 +1,14 @@
+{
+  "email": "jane@acme.com",
+  "quality": "risky",
+  "result": "unknown",
+  "resultcode": 3,
+  "subresult": "",
+  "free": false,
+  "role": false,
+  "didyoumean": "",
+  "credits": 9999,
+  "executiontime": 1,
+  "error": "",
+  "livemode": true
+}

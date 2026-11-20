@@ -67,6 +67,19 @@ def test_single_verifier_and_resolver_builders_follow_settings() -> None:
     assert build_resolver(s).name == "enrichley"
 
 
+def test_the_pay_per_pack_verifier_and_resolver_are_built_by_name() -> None:
+    s = settings(
+        millionverifier_api_key="m",
+        bounceban_api_key="b",
+        verifier="millionverifier",
+        catch_all_resolver="bounceban",
+    )
+    assert build_verifier(s).name == "millionverifier"
+    resolver = build_resolver(s)
+    assert resolver.name == "bounceban"
+    assert getattr(resolver, "realtime", False)
+
+
 def test_secrets_do_not_appear_in_the_settings_repr() -> None:
     assert "super-secret" not in repr(settings(hunter_api_key="super-secret"))
 

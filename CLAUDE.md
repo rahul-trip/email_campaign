@@ -85,9 +85,9 @@ Later phases add follow-ups, reply handling and automatic sending. Phase 6 turns
   - It is managed in Doppler (`outbound/dev` config) and mirrored in the root `.env`.
   - Its prices must be set in `LLM_PRICES` (3b B5).
   - From 6d, vendor keys and model settings live in the database and are managed in the admin console.
-- **Provider chain** in `outbound/config.py` is **provisional** until the bake-off picks one.
+- **Provider chain** in `outbound/config.py` is **provisional** until the bake-off picks one. A vendor review on 2026-11-20 (`docs/PLAN.md` §12) proposes a chain with no subscriptions: Icypeas, Anymail Finder, MillionVerifier and BounceBan. The MillionVerifier and BounceBan adapters are built from docs and not checked live; BounceBan needs its written approval before customer use.
 - **Two facts from reading the vendors' docs:**
-  - OrbiSearch has no finder API, so it can only verify.
+  - OrbiSearch is used only to verify. It has had a finder API since 2026, but it charges for every search, found or not.
   - Scrubby's public docs are partial, so its adapter must be confirmed with a live key.
 
 ## Architecture rules (binding)

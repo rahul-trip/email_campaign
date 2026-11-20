@@ -1,0 +1,13 @@
+{
+  "email": "jane@acme.com",
+  "result": "error",
+  "resultcode": 4,
+  "subresult": "",
+  "free": false,
+  "role": false,
+  "didyoumean": "",
+  "credits": 0,
+  "executiontime": 0,
+  "error": "Insufficient credits",
+  "livemode": true
+}
