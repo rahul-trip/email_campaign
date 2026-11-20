@@ -805,6 +805,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/vendors/{vendor}/keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Vendor Keys
+         * @description Add any number of keys, each in a new slot.
+         */
+        post: operations["add_vendor_keys_api_admin_vendors__vendor__keys_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/vendors/{vendor}/paused": {
         parameters: {
             query?: never;
@@ -4667,6 +4687,31 @@ export interface components {
             /** Ok */
             ok: boolean | null;
         };
+        /** KeysAddedOut */
+        KeysAddedOut: {
+            /** Added */
+            added: number;
+            /** Already There */
+            already_there: number;
+            /** Default Model */
+            default_model: string;
+            /** Extract Model */
+            extract_model: string;
+            /** Llm */
+            llm: {
+                [key: string]: string | number;
+            };
+            /** Llm Charges */
+            llm_charges: components["schemas"]["LlmChargeOut"][];
+            /** Models */
+            models: components["schemas"]["LlmModelOut"][];
+            /** Providers */
+            providers: components["schemas"]["LlmProviderOut"][];
+            /** Vendors */
+            vendors: components["schemas"]["VendorOut"][];
+            /** Writer Model */
+            writer_model: string;
+        };
         /** LeadOut */
         LeadOut: {
             company: components["schemas"]["CompanyOut"];
@@ -6197,6 +6242,14 @@ export interface components {
             slot: number;
             /** Version */
             version: number;
+        };
+        /**
+         * VendorKeysIn
+         * @description Keys to add to a vendor, each in a new slot (pasted one per line in the console).
+         */
+        VendorKeysIn: {
+            /** Keys */
+            keys: string[];
         };
         /** VendorOut */
         VendorOut: {
@@ -8110,6 +8163,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VendorsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_vendor_keys_api_admin_vendors__vendor__keys_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                vendor: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VendorKeysIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeysAddedOut"];
                 };
             };
             /** @description Validation Error */

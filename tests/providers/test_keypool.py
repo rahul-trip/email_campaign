@@ -93,9 +93,9 @@ class Queue:
 
 def test_a_queued_check_is_polled_with_the_key_that_queued_it() -> None:
     first, second = Queue("a"), Queue("b")
-    pool = ResolverKeyPool([first, second], shuffle=reversed_order)
+    pool = ResolverKeyPool([first, second], labels=["ha", "hb"], shuffle=reversed_order)
     ticket = pool.submit("ada@example.com")
-    assert ticket.ref == "k2:b-id"
+    assert ticket.ref == "hb:b-id"
     pool.poll(ticket)
     assert second.polled == ["b-id"] and first.polled == []
 
@@ -128,3 +128,30 @@ def test_a_resolver_with_several_keys_gets_the_resolver_pool() -> None:
         update={"catch_all_resolver": "scrubby"}
     )
     assert isinstance(build_resolver(settings), ResolverKeyPool)
+
+
+def test_a_queued_check_finds_its_key_after_other_keys_were_removed() -> None:
+    a, b, c = Queue("a"), Queue("b"), Queue("c")
+    ticket = ResolverKeyPool([a, b, c], labels=["ha", "hb", "hc"], shuffle=reversed_order).submit(
+        "ada@example.com"
+    )
+    assert ticket.ref == "hc:c-id"
+    later = ResolverKeyPool([b, c], labels=["hb", "hc"])  # key a was removed meanwhile
+    later.poll(ticket)
+    assert c.polled == ["c-id"] and b.polled == []
+
+
+def test_a_key_label_is_stable_and_does_not_show_the_key() -> None:
+    from outbound.providers.keypool import key_label
+
+    assert key_label("secret-key-123") == key_label("secret-key-123")
+    assert "secret" not in key_label("secret-key-123")
+
+
+def test_one_call_tries_at_most_five_keys_then_gives_up() -> None:
+    from outbound.providers.keypool import TRIES_PER_CALL
+
+    dead = [Member(str(n), ProviderAuthError("tavily", "401")) for n in range(20)]
+    with pytest.raises(ProviderAuthError):
+        KeyPool(dead).search("q")
+    assert sum(m.calls for m in dead) == TRIES_PER_CALL == 5

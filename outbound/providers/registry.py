@@ -35,7 +35,7 @@ from outbound.providers.adapters.tavily import TavilySearch
 from outbound.providers.adapters.yc_directory import YcDirectory
 from outbound.providers.adapters.zerobounce import ZeroBounceFinder, ZeroBounceVerifier
 from outbound.providers.errors import ProviderAuthError
-from outbound.providers.keypool import KeyPool, ResolverKeyPool
+from outbound.providers.keypool import KeyPool, ResolverKeyPool, key_label
 from outbound.providers.oauth import OAuthApp
 from outbound.providers.ports import (
     CatchAllResolver,
@@ -132,7 +132,10 @@ def _pooled[T](
         return build_one(settings)
     setting = BY_CODE[code].setting
     members = [build_one(settings.model_copy(update={setting: key})) for key in keys]
-    return cast(T, ResolverKeyPool(members) if resolver else KeyPool(members))
+    if resolver:
+        labels = [key_label(key.get_secret_value()) for key in keys]
+        return cast(T, ResolverKeyPool(members, labels=labels))
+    return cast(T, KeyPool(members))
 
 
 def _from_table[T](

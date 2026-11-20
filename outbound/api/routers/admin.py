@@ -50,6 +50,7 @@ from outbound.api.schemas import (
     GrantIn,
     GrantOut,
     KeyCheckOut,
+    KeysAddedOut,
     LlmChargeOut,
     LlmModelIn,
     LlmModelOut,
@@ -72,6 +73,7 @@ from outbound.api.schemas import (
     StatusChangeIn,
     VendorCapIn,
     VendorKeyIn,
+    VendorKeysIn,
     VendorOut,
     VendorPauseIn,
     VendorsOut,
@@ -89,7 +91,6 @@ from outbound.domain.enums import (
 from outbound.domain.permissions import PLATFORM_PERMISSIONS
 from outbound.domain.permissions import Permission as P
 from outbound.domain.platform_settings import LLM_PROVIDERS, LlmModel, PlatformSettings
-from outbound.domain.vendors import MAX_KEYS
 from outbound.providers.adapters.llm import PRESETS
 from outbound.services.admin import (
     AdminError,
@@ -656,8 +657,8 @@ def vendors(_: Reader, service: Vendors) -> VendorsOut:
     return _vendors(service)
 
 
-# Which of a vendor's keys (1 to MAX_KEYS); each call to the vendor uses one at random.
-Slot = Annotated[int, Query(ge=1, le=MAX_KEYS)]
+# Which of a vendor's keys (1 or more); each call to the vendor uses one of them at random.
+Slot = Annotated[int, Query(ge=1)]
 
 
 @router.put("/vendors/{vendor}/key", response_model=VendorsOut)
@@ -666,6 +667,17 @@ def replace_vendor_key(
 ) -> VendorsOut:
     service.replace_key(vendor, body.key, by=staff.user.id, slot=slot)
     return _vendors(service)
+
+
+@router.post("/vendors/{vendor}/keys", response_model=KeysAddedOut)
+def add_vendor_keys(
+    vendor: str, body: VendorKeysIn, staff: KeyHolder, service: Vendors
+) -> KeysAddedOut:
+    """Add any number of keys, each in a new slot."""
+    added = service.add_keys(vendor, body.keys, by=staff.user.id)
+    return KeysAddedOut(
+        **_vendors(service).model_dump(), added=added.added, already_there=added.already_there
+    )
 
 
 @router.delete("/vendors/{vendor}/key", response_model=VendorsOut)

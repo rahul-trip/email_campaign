@@ -2,8 +2,8 @@
 
 A platform table, reached only through the platform unit of work. Replacing a key retires the
 current version instead of overwriting it; a retired version can be restored for 30 days. A
-vendor has up to ``MAX_KEYS`` live keys, one per slot; each slot is replaced, rolled back and
-removed on its own."""
+vendor has any number of live keys, one per slot; each slot is replaced, rolled back and removed
+on its own."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from outbound.db.crypto import Keyring, Sealed
 from outbound.db.models import PlatformCredentialRow
 from outbound.db.types import utcnow
 from outbound.domain.errors import InvalidInput
-from outbound.domain.vendors import MAX_KEYS, RETIRED_KEPT_DAYS
+from outbound.domain.vendors import RETIRED_KEPT_DAYS
 
 
 @dataclass(frozen=True)
@@ -34,8 +34,8 @@ class KeySummary:
 
 
 def _check_slot(slot: int) -> None:
-    if not 1 <= slot <= MAX_KEYS:
-        raise InvalidInput(f"a vendor has key slots 1 to {MAX_KEYS}")
+    if slot < 1:
+        raise InvalidInput("key slots start at 1")
 
 
 def _aad(vendor: str, version: int) -> bytes:
@@ -126,6 +126,27 @@ class VendorKeyRepository:
         )
         self._session.flush()
         return version
+
+    def add(self, vendor: str, keys: list[str], *, by: str | None) -> list[int]:
+        """Add each key in a slot of its own, after every slot the vendor has used (retired
+        ones too, so a key in its 30 days can still be rolled back into its own slot). A key
+        the vendor already has live is skipped. Returns the slots filled."""
+        live = {self._open(r) for r in self._active() if r.vendor == vendor}
+        used = self._session.scalar(
+            select(func.max(PlatformCredentialRow.slot)).where(
+                PlatformCredentialRow.vendor == vendor
+            )
+        )
+        slot = used or 0
+        filled: list[int] = []
+        for key in keys:
+            if key in live:
+                continue
+            slot += 1
+            self.put(vendor, key, by=by, slot=slot)
+            live.add(key)
+            filled.append(slot)
+        return filled
 
     def roll_back(self, vendor: str, slot: int = 1) -> int:
         """Make the slot's most recently retired key live again, retiring the current one."""

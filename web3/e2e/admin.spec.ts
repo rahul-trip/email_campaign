@@ -34,18 +34,22 @@ test("the other console pages load", async ({ page }) => {
   }
 });
 
-test("a platform admin adds a vendor key, sees it masked, reveals it and the audit log shows both", async ({ page }) => {
+test("a platform admin adds vendor keys, sees them masked, reveals it and the audit log shows both", async ({ page }) => {
   await signIn(page, STAFF, false);
   await expect(page.getByRole("heading", { name: "Choose a workspace" })).toBeVisible();
   await page.goto("/admin");
   await page.getByRole("link", { name: "Vendors & keys" }).click();
   const row = page.getByRole("row", { name: /Tavily/ });
-  await row.getByRole("button", { name: /Add key|Replace/ }).click();
-  await page.getByLabel("New key").fill("e2e-secret-value-wxyz");
-  await page.getByRole("button", { name: "Save key" }).click();
+  await row.getByRole("button", { name: /Add keys?/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Keys, one per line").fill("e2e-secret-value-wxyz\ne2e-second-value-abcd");
+  await dialog.getByRole("button", { name: "Add 2 keys" }).click();
+  await expect(page.getByText("Tavily: 2 keys added.")).toBeVisible();
   await expect(row).toContainText("••••wxyz");
+  await expect(row).toContainText("••••abcd");
+  await expect(row).toContainText("2 keys · each call uses one at random");
   await expect(page.getByText("e2e-secret-value-wxyz")).toHaveCount(0);
-  await row.getByRole("button", { name: "Reveal" }).click();
+  await row.getByRole("button", { name: "Reveal" }).first().click();
   await expect(page.getByText("e2e-secret-value-wxyz")).toBeVisible();
   await page.getByRole("button", { name: "Done" }).click();
   await page.getByRole("link", { name: "Audit log" }).click();
