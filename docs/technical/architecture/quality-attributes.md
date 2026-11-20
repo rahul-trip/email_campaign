@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-11-19 (25cc02f)
+applies_to: Phase 6 (sections 1–3 re-verified; the rest as of Phase 3b)
 ---
 
 # Quality attributes
@@ -33,10 +33,10 @@ Status key: **Proven** (a test or check runs in CI), **Partly** (proven in part;
 |---|---|---|---|---|
 | C1 | The same pipeline is run twice over the same targets | The second run makes no paid vendor lookup; every repeated lookup is a `cache_hit` at cost 0. Model calls are not cached by design, so only a stage that runs again repeats them | `tests/db/test_pipeline_e2e.py::test_a_targets_list_becomes_drafts_and_a_rerun_costs_nothing` | Proven |
 | C2 | A provider's monthly cap would be passed | The call is refused, recorded as `blocked_by_cap`, and `BudgetExceeded` is raised; a cached answer is still served | `tests/db/test_metered.py::test_a_call_that_would_pass_the_monthly_cap_is_refused_and_recorded`, `…::test_a_cached_answer_is_served_even_when_the_cap_is_reached` | Proven for finders, verifiers and search; **Gap** for resolver submits ([R-04](../tech-debt-and-risks.md#r-04--p1--cost-the-budget-cap-prices-a-catch-all-submit-at-0)) |
-| C3 | A lead has used its per-prospect ceiling ($0.50 by default) | No more paid work; free stages still run | `tests/db/test_runner.py::test_a_lead_over_its_budget_gets_no_more_paid_work`, `…::test_a_free_stage_still_runs_for_a_lead_that_has_used_its_budget` | Partly: model spend is not counted ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5)); a running worker does not see a changed ceiling ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)) |
+| C3 | A lead has used its per-prospect ceiling ($0.50 by default) | No more paid work; free stages still run | `tests/db/test_runner.py::test_a_lead_over_its_budget_gets_no_more_paid_work`, `…::test_a_free_stage_still_runs_for_a_lead_that_has_used_its_budget` | Partly: model spend is not counted ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5--ai-credits-fixed-2026-11-18-dollars-still-open)); a running worker does not see a changed ceiling ([R-10](../tech-debt-and-risks.md#r-10--p1--budget-a-running-worker-does-not-see-budget-changes-b4)) |
 | C4 | Every vendor call is attributable | Each ledger row carries run, company and contact | `tests/db/test_pipeline_e2e.py::test_the_ledger_records_every_vendor_call_with_its_attribution` | Proven |
 | C5 | Every path to a paid vendor, including intake's search, is metered | Same caps on every path | `tests/db/test_robustness.py::test_a_meter_applies_the_monthly_cap_to_every_path`, `…::test_the_search_used_by_intake_is_metered_with_the_same_caps` | Proven |
-| C6 | Cost per prospect is reported | Spend per company and per vendor from the ledger | `GET /api/reports/cost`, `outbound report cost` | Partly: under-counts model spend ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5)) |
+| C6 | Cost per prospect is reported | Spend per company and per vendor from the ledger | `GET /api/reports/cost`, `outbound report cost` | Partly: under-counts model spend ([R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5--ai-credits-fixed-2026-11-18-dollars-still-open)) |
 
 ## 3. Correct and recoverable
 
@@ -46,8 +46,10 @@ Status key: **Proven** (a test or check runs in CI), **Partly** (proven in part;
 | R2 | The operator edits a lead while a stage is working on it | The operator's edit wins; the stage's result is dropped and the lead is tried again | `tests/db/test_runner.py::test_an_operator_edit_during_the_stage_wins_and_the_lead_is_tried_again` | Proven |
 | R3 | The engine tries to overwrite a field the operator set | Not applied; recorded as an event | `tests/db/test_companies_repo.py::test_the_engine_cannot_overwrite_an_operator_value_but_the_attempt_is_recorded`, `tests/db/test_people_repo.py::test_the_engine_cannot_overwrite_an_operator_given_contact_field` | Proven |
 | R4 | A draft is saved but the database write then fails | The draft is deleted again (undo) | `tests/db/test_runner.py::test_a_saved_draft_is_taken_back_when_the_database_write_cannot_happen` | Proven |
-| R5 | A failed lead is retried | It waits 15 min × attempts; automatic retries stop after 3 | `tests/db/test_runner.py::test_the_wait_grows_with_each_failure_and_attempts_run_out` | Proven in code; **Gap** in production, because nothing runs `tick` ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7)) |
-| R6 | The worker is killed mid-run | Leads lose nothing (C1 holds); the run is marked failed or recoverable | Leads: as C1. Run: **Gap**, it stays `running` ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3)) | Partly |
+| R5 | A step breaks for a lead | The engine retries it by itself after 15 min, 30, 1 h, 2 h, 4 h (five tries); an outcome (`no_person`, `no_email`) waits 24 h, three tries; the worker's tick does this for every workspace | `tests/db/test_runner.py::test_the_wait_grows_with_each_failure_and_attempts_run_out`, `…::test_a_broken_step_keeps_five_tries`, `…::test_nobody_to_write_to_waits_a_day_and_gets_three_tries` | Proven |
+| R5b | No vendor can answer for hours | The lead is asked less and less often (2 h doubling to a day) and no try is used up | `tests/db/test_email_stage.py::test_a_vendor_that_stays_unavailable_is_asked_less_and_less_often` | Proven |
+| R6 | The worker is killed mid-run | Leads lose nothing (C1 holds); after 30 minutes without a heartbeat the run is failed and the workspace is scheduled again | Leads: as C1. Run: `tests/db/test_scheduler.py::test_a_run_whose_worker_died_is_failed_in_whichever_workspace` | Proven |
+| R6b | Several leads are worked on at once | Each ends where it would have one at a time; each lead's calls and events carry its own run and lead; a cancelled run stops starting leads; delivery stays one at a time | `tests/db/test_runner_parallel.py`, `tests/db/test_runner_flow.py::test_it_ends_where_a_stage_by_stage_run_ends`, `tests/stages/test_together.py` | Proven |
 | R7 | A deploy fails after its migration ran | The previous release serves again | **Gap**: the rollback fails ([R-01](../tech-debt-and-risks.md#r-01--p0--operations-a-rollback-after-a-migration-leaves-the-app-down)) | Gap |
 | R8 | An illegal status change is attempted | Refused with `IllegalTransition`; nothing written | `tests/domain/test_state_machines.py`, `tests/db/test_runner.py::test_an_illegal_result_from_a_stage_fails_that_lead_not_the_run` | Proven (except runs: [R-15](../tech-debt-and-risks.md#r-15--p2--correctness-runs-and-three-tables-bypass-the-usual-guards)) |
 | R9 | The same database runs on SQLite and Postgres | The whole suite passes on both | CI jobs `tests (SQLite)` and `tests (Postgres 16)` | Proven |

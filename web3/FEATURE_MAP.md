@@ -41,7 +41,7 @@ Admin console  /admin — Overview · Customers · Users · Plans · Settings ·
 | Pipeline counts | `status`, `companies` | Today pipeline flow (each stage links to filtered Leads) |
 | Review queue, show one | `review`, `review/{id}` | Review (3-pane, keyboard J/K/A/E/R) |
 | Approve / reject / revise / AI rewrite | `review/{id}/approve|reject|revise|rewrite` | Review action bar + editor with diff |
-| Failed leads: holds, stopped steps, websites, with fit, tries, person and credits per row | `companies` (`bucket=decision`, `include=summary`), `targets/waiting` | Needs a decision (tabs by reason, filters and sort, row details, bulk bar) |
+| Failed leads: holds, stopped steps, websites, with fit, tries, person and credits per row | `companies` (`bucket=decision`, `include=summary`), `targets/waiting` | Failed leads (tabs by reason, filters and sort, row details, bulk bar) |
 | Retry one / many failed (by step) | `companies/{id}/retry`, `companies/retry` | Failed leads · Lead detail |
 | Release one / many holds, policy holds | `release-hold`, `release-holds`, `release-policy-holds` | Failed leads · Policies |
 | Find email again (one / all catch-all) | `companies/find-email-again`, `contacts/{id}/retry-email` | Failed leads · Lead detail |

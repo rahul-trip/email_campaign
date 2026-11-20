@@ -33,7 +33,7 @@ Services are the operator's use cases: add targets, review an email, edit a lead
 | `intake.py` | `IntakeService` (`run`, `needing_confirmation`, `confirm`), `DomainResolver`, `match_confidence`, `load_rows`, `parse_target` | CLI `targets`, `run --mode discovery\|mixed`; API targets router; webhook; `pipeline.discover_companies` |
 | `review.py` | `ReviewService` (`queue`, `resolve`, `show`, `approve`, `reject`), `ReviewError`, `footer_of` | CLI `review`; API review router |
 | `leads.py` | `LeadService` (below), `LeadError` | API leads, targets and privacy routers; data-fix scripts |
-| `people.py` | `PeopleSearch` (`find`, `find_many`), `Reach` | API leads router: finds people by role and does what the person chose for each (their email through `LeadService.retry_email`, a LinkedIn message through `LinkedInService.write`); bulk is at most 20 leads, five at a time |
+| `people.py` | `PeopleSearch` (`find`, `find_many`), `Reach` | API leads router: finds people by role and does what the person chose for each (their email through `LeadService.retry_email`, a LinkedIn message through `LinkedInService.write`); bulk is at most 20 leads, five at a time. If two leads searched at the same moment take the same profile, the second insert fails on a unique key (`IntegrityError`); `find` then looks again, once, and finds that person already placed, instead of reporting a failure |
 | `privacy.py` | `PrivacyService` (`forget`, `suppress_contact`, `suppress_company`, `suppress_value`, `delete_lead`) | CLI `forget`, `suppress`, `delete-lead`; API privacy router |
 | `forget.py` | `forget_email`, `stop_contact`, `suppress_if_nobody_left` | `PrivacyService` (runs inside the caller's unit of work) |
 | `autoapprove.py` | `AutoApprover` (a tick job: approves the emails of cold leads, fit 80 or lower, through `ReviewService.approve` as the actor `auto`, when `auto_approve_cold` is on) | `pipeline.assemble` |
@@ -119,6 +119,7 @@ Every write goes through `LeadService` and writes events. Refusals raise `LeadEr
 | Operation | What it does | Refused when |
 |---|---|---|
 | `search`, `detail`, `timeline`, `journey`, `waterfall` | Read models for the screens | — |
+| `with_linkedin(company_ids)` | Which of these leads have a LinkedIn message written or sent for someone there (a skipped message does not count). The companies routes put it in `CompanyOut.has_linkedin`, and `domain/outcomes.py::bucket_of` reads it: a stopped lead with one is in the `ready` bucket (*Message on LinkedIn*), not `decision`, whatever its fit ([ADR 0036](../adr/0036-outcomes-are-not-failures.md)) | — |
 | `update(company_id, changes, expected_version)` | Operator edit of the lead's fields (into `manual_fields`) | Stale version |
 | `retry` | `failed` → the failed stage's input status, ignoring the back-off and the attempt limit | Not failed |
 | `release_hold(resume_to=None)` | `held` → the hold reason's resume point, or `resume_to` | Not held; `needs_operator` with no `resume_to`; **a country-rule hold whose cause has not changed**, which would only hold it again. The message says how to fix it |

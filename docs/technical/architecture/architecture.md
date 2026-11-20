@@ -2,8 +2,8 @@
 type: explanation
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-27 (5f6dee4)
-applies_to: Phase 6d
+last_verified: 2026-11-19 (25cc02f)
+applies_to: Phase 6
 ---
 
 # Architecture
@@ -124,7 +124,7 @@ flowchart TB
     subgraph outbound["Outbound [system]"]
         spa["Web app<br/>[React 19, TypeScript, Vite]<br/>web2/ — tenant screens at /w/{slug},<br/>admin console at /admin, public auth pages"]
         api["API<br/>[FastAPI, uvicorn]<br/>outbound serve — /api/*, serves web2/dist,<br/>sessions, permissions, admin routes"]
-        worker["Worker<br/>[Python, thread pool]<br/>outbound worker — serves every workspace:<br/>queued runs and per-workspace ticks"]
+        worker["Worker<br/>[Python, thread pools]<br/>outbound worker — serves every workspace:<br/>queued runs, ticks and light checks;<br/>several workspaces and leads at once"]
         cli["CLI<br/>[Typer]<br/>outbound … — every operation, db, seed,<br/>users, vendors, secrets"]
         db[("Database<br/>[Postgres 16 (Supabase) / SQLite]<br/>35 tables, row-level security on Postgres")]
     end
@@ -153,7 +153,7 @@ flowchart TB
 |---|---|---|
 | Web app | `web2/` | Tenant screens under `/w/{slug}`, the admin console under `/admin`, and public auth/onboarding pages; talks only to the API through a client generated from its OpenAPI document ([LLD](../lld/web-frontend.md)) |
 | API | `outbound/api/` | Sessions, permissions, CSRF, problem-details errors, tenant and admin use cases through services; queues runs; never runs the pipeline in a request ([LLD](../lld/api.md)) |
-| Worker | `outbound/worker.py` | Serves every active workspace: claims its queued runs, ticks it on a timer, recovers stale runs, runs platform-wide periodic jobs ([LLD](../lld/runner-and-worker.md)) |
+| Worker | `outbound/worker.py` | Serves every active workspace: claims its queued runs, ticks it every 15 minutes, checks for due leads every 2, recovers stale runs, runs platform-wide periodic jobs and reports its own status; up to `WORKER_THREADS` (6) workspaces and `WORKER_LEAD_CONCURRENCY` (4) leads each at once ([LLD](../lld/runner-and-worker.md), [ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)) |
 | CLI | `outbound/cli/` | The same use cases for the terminal, plus `db`, `seed`, `serve`, `worker`, `users create`, `vendors …`, `secrets …` ([LLD](../lld/cli.md)) |
 | Database | `outbound/db/` | All state: leads, people, messages, the event log, the cost ledger, runs, identity, plans and usage, the lead directory ([schema](../data/schema.md)) |
 
@@ -185,15 +185,17 @@ flowchart TB
 
 ## 6. Runtime view
 
-Four scenarios show how the blocks cooperate. Every stage is shown in [pipeline flow](../hld/pipeline-flow.md); the tenancy mechanics in [tenancy and isolation](../lld/tenancy-and-isolation.md).
+Five scenarios show how the blocks cooperate. Every stage is shown in [pipeline flow](../hld/pipeline-flow.md); the tenancy mechanics in [tenancy and isolation](../lld/tenancy-and-isolation.md).
 
-**A run from the web app.** A workspace member starts a run. The API inserts a `queued` run in that workspace's own unit of work and returns 202. The worker's scheduler, reading only workspace ids from the platform connection, picks that workspace up (least-recently-served first), opens its tenant connection, claims the run, and executes it: discovery if asked, then each stage over the due leads, now gated by credits as well as budget. It records counts and cost on the run, and the web app polls until it finishes. See [HLD §3](../hld/hld.md#3-how-work-is-queued).
+**A run from the web app.** A workspace member starts a run. The API inserts a `queued` run in that workspace's own unit of work and returns 202. The worker's scheduler, reading only workspace ids from the platform connection, picks that workspace up (least-recently-served first), opens its tenant connection, claims the run, and executes it: discovery if asked, then the due leads, several at a time, each carried through as many stages as it can go in one go (research, gate, contacts, email, copy), gated by credits as well as budget; delivery follows as a pass of its own. It records counts and cost on the run, and the web app polls until it finishes. See [HLD §3](../hld/hld.md#3-how-work-is-queued) and [pipeline flow](../hld/pipeline-flow.md#order-and-selection).
+
+**Work nobody asked for.** No one needs to start a run for work to happen. Every 2 minutes the worker asks each active workspace, in one query, whether any lead is due, and starts a pipeline pass only if one is. Every 15 minutes it ticks the workspace: due failed leads go back to their stage, the jobs run (released credits, the catch-all poll, Sent and inbox sync, mailbox health, cold-draft approval), then a pipeline pass.
 
 **Signing in and choosing a workspace.** A person signs in with email and password; the API creates a server-side session (`sessions` table) and returns their memberships. The SPA picks a workspace (or asks, if there is more than one), builds a router with that workspace's slug as its basepath, and sends `X-Workspace-Id` on every request from then on. See [identity and access](../lld/identity-and-access.md).
 
 **Review to draft.** A workspace member approves a `copy_ready` email, acknowledging any skipped check. That one transaction moves the message and the company to `approved`. The next run's deliver stage checks everything again — including whether that workspace's mailbox is still connected — and saves the draft with an idempotent `Message-ID` through whichever gateway (IMAP, Graph, Gmail) that mailbox uses. The Sent sync later records it as `sent`; the inbox reader classifies opt-outs and hard bounces as they arrive.
 
-**Crash and rerun.** The worker is killed during the email stage of one workspace's run. That lead's status is unchanged, because the stage's write never happened, and every vendor call already made is in the ledger with its answer. The run's heartbeat stops; after 30 minutes `Worker.recover_stale` fails it, freeing that workspace to be scheduled again. The next run selects the lead again, and the meter answers the repeated vendor lookups from cache at zero cost (model calls are not cached by design).
+**Crash and rerun.** The worker is killed during the email stage of one workspace's run. That lead's status is unchanged, because the stage's write never happened, and every vendor call already made is in the ledger with its answer. The run's heartbeat stops; after 30 minutes `Worker.recover_stale` fails it, freeing that workspace to be scheduled again. The next run selects the lead again, and the meter answers the repeated vendor lookups from cache at zero cost (model calls are not cached by design). A stage that fails a lead outright is retried by the engine itself, after a wait that doubles from 15 minutes; when no vendor can answer at all, the lead waits from 2 hours up to a day without using up a try ([HLD §7](../hld/hld.md#7-errors-and-retries)).
 
 ## 7. Deployment view
 
@@ -280,7 +282,8 @@ See [quality attributes](quality-attributes.md): each goal in §1 is broken into
 The full list is in the [register](../tech-debt-and-risks.md). The ones that matter most to this architecture are:
 
 - **[R-01](../tech-debt-and-risks.md#r-01--p0--operations-a-rollback-after-a-migration-leaves-the-app-down):** the rollback path still fails after a migration, so the deployment view's recovery promise does not hold yet.
-- **[R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5):** the cost goal's caps still do not count model spend by default.
+- **[R-03](../tech-debt-and-risks.md#r-03--p1--cost-model-calls-are-recorded-at-0-b5--ai-credits-fixed-2026-11-18-dollars-still-open):** model calls now use AI credits by their tokens, but their dollar cost, and so the dollar caps, still need `LLM_PRICES`.
+- **[R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler):** the worker's larger pool for parallel leads leaves little room under a small Supabase plan's client limit.
 - **[R-08](../tech-debt-and-risks.md#r-08--p1--security-web-text-can-close-the-prompt-fence):** the prompt fence can be closed early; human approval remains the control.
 - **New with Phase 6:** no MFA and an alpha-only superadmin who can read every workspace read-only (accepted for the alpha, audited, removed in 6f); vendor credentials, mailbox tokens and the platform's own vendor keys are only as safe as `SECRETS_KEYS`; Google and Microsoft OAuth app verification is outstanding.
 

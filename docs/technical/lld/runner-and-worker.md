@@ -2,8 +2,8 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-27 (5f6dee4)
-applies_to: Phase 6a
+last_verified: 2026-11-19 (25cc02f)
+applies_to: Phase 6
 ---
 
 # Runner and worker
@@ -81,6 +81,8 @@ A `StageResult` carries:
 2. Each lead goes through `_process`.
 3. After each stage, and before each lead, the run's status is re-read; if it is `cancelled`, the run stops.
 
+With `lead_concurrency` above one, step 2 works that many leads side by side (`_run_stage`), except for a stage that says `parallel = False` (delivery). With `lead_flow` (the worker), and no `only`, the stages up to the first one-at-a-time stage are not visited one by one: `_run_flow` lists every due lead at the stage its status waits for, furthest along first, and one task carries each lead through stage after stage while each step advances it. The remaining stages (delivery) then run as passes of their own. Each step is still one `_process` call, so its transactions, events and counts are the same; a lead is counted only at the stages it reached.
+
 At the end, `RunRepository.finish` stores the status, counts, `finished_at` and cost (the sum of the run's ledger rows), and the runner logs `run_finished`. An exception outside the per-lead handling finishes the run as `failed` and re-raises.
 
 ### One lead (`_process`)
@@ -128,7 +130,7 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 | The lead could not even be loaded | Logged as `lead_unreadable`; skipped |
 | Anything else | `undo()`; logged as `stage_failed` with the error (≤ 300 characters). If the lead's status has moved meanwhile: skipped. Otherwise a stage in `STAGE_INPUT_STATUS` (research, gate, contacts, email, copy) → **failed**; deliver → **deferred** |
 
-- **Failed:** `failed_stage`, `last_error` and `failure_kind` are set, `attempts` is incremented, and `next_action_at = now + 15 min × (attempts + 1)` for a broken step (`StageFailure.kind = error`, the default) or `now + 24 h` when the stage said `no_person` or `no_email` (`outcome_delay`).
+- **Failed:** `failed_stage`, `last_error` and `failure_kind` are set, `attempts` is incremented, and `next_action_at` is `now + 15 min × 2^attempts` (15 min, 30, 1 h, 2 h, 4 h; a day at most) for a broken step (`StageFailure.kind = error`, the default), `now + 24 h` when the stage said `no_person` or `no_email` (`outcome_delay`), or the growing vendor wait below when no vendor could answer (`vendor_wait`, no attempt counted).
 - **Deferred:** the status is unchanged, `next_action_at = now + 1 h`, and a `deferred` event is written only when the reason differs from the last one, so an hourly retry does not fill the timeline.
 - **Undo errors** are logged (`undo_failed`) and do not hide the original error.
 
@@ -136,7 +138,11 @@ A refusal on a stage that cannot fail a lead is deferred instead.
 
 A broken step is retried by the engine on its own, waiting 15 minutes, 30, 1 hour, 2 and 4 (doubling, a day at most) between its five tries; nobody has to press Retry, and it is not looked at again in between.
 
-`retry_failed(limit)` moves due `failed` leads with fewer attempts than their kind allows (`domain/outcomes.py::tries_allowed`: 5 for a broken step, 3 for `no_person` and `no_email`) (a lead that failed because no vendor could answer, `VendorUnavailable`, is not counted and waits two hours, then four, eight, sixteen and a day at most, for as long as no vendor answers: the count comes from the lead's own `status_changed` events carrying `vendor_wait` in the last two days (`EventRepository.vendor_waits_since`), so no column is needed; see [the email stage](stage-email.md)) back to their failed stage's input status (`retry_status_for`). It is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
+`retry_failed(limit)` moves due `failed` leads with fewer attempts than their kind allows (`domain/outcomes.py::tries_allowed`: 5 for a broken step, 3 for `no_person` and `no_email`) back to their failed stage's input status (`retry_status_for`).
+
+A lead that failed because no vendor could answer (`VendorUnavailable`) is not counted against its tries. It waits two hours, then four, eight, sixteen and a day at most, for as long as no vendor answers. The count comes from the lead's own `status_changed` events carrying `vendor_wait` in the last two days (`EventRepository.vendor_waits_since`), so no column is needed; see [the email stage](stage-email.md).
+
+`retry_failed` is called by every workspace's own tick, which the worker now runs for every active workspace on a timer ([below](#the-worker-one-process-every-workspace)) — so retries happen in production by default, closing what was once a gap ([R-02](../tech-debt-and-risks.md#r-02--pipeline-scheduled-work-never-runs-in-production-b7--closed-2026-10-23), now closed). `outbound retry` still calls it by hand. The operator's **Retry** on the lead page (`LeadService.retry`) ignores both the limit and the back-off.
 
 ### The tick
 
@@ -162,28 +168,32 @@ flowchart TB
         direction LR
         K{"platform kill switch?"} -->|on| Z["no jobs"]
         K -->|off| Q["queued runs (platform read)"] --> J1["Job(ws, RUN)"]
-        K --> A["active workspaces due a tick"] --> J2["Job(ws, TICK): skip any<br/>workspace already planned or busy"]
+        K --> A["active workspaces due a tick"] --> J2["Job(ws, TICK): skip any<br/>workspace already planned or busy;<br/>a late tick replaces its RUN"]
+        K --> C["active workspaces not checked<br/>for check_every (2 min)"] --> J3["Job(ws, PIPELINE): light check"]
         J1 --> Sort["sort: least-recently-served first"]
         J2 --> Sort
+        J3 --> Sort
     end
-    Sort --> Pool["ThreadPoolExecutor<br/>(threads, default 4)"]
+    Sort --> Pool["ThreadPoolExecutor<br/>(WORKER_THREADS, default 6)"]
     Pool -->|RUN| Claim["claim_next (FOR UPDATE SKIP LOCKED),<br/>then execute_run"]
     Pool -->|TICK| TickRun["Tick.run(limit, skip_idle=True)"]
+    Pool -->|PIPELINE| Due["any_due? then run_pipeline(limit)"]
     Claim -->|exception| Fail["runs.finish(FAILED, counts)"]
     Loop["every ~60s"] --> Stale["recover_stale(): fail runs idle<br/>past stale_after (30 min)"]
+    Loop --> Beat["heartbeat(): worker_status"]
 ```
 
 - **Planning (`Worker.plan`)** reads two cheap, cross-workspace facts through the **platform** unit of work ([tenancy and isolation](tenancy-and-isolation.md)) — which workspaces have a queued run, and which active workspaces are due a tick (`tick_every`, default 15 minutes) — and nothing else; it never reads a workspace's own rows. A platform-wide kill switch (`PlatformSettingsRow.kill_runs`) short-circuits planning to nothing for anyone. At most one job per workspace is planned per pass, a run always outranks a tick for the same workspace, and a workspace already executing a job is skipped (`self._busy`). Jobs are sorted so the workspace that has waited longest is served first — simple least-recently-served fairness, not a priority queue.
 - **Executing a job** (`Worker.execute` → `_execute`) runs in a fresh `contextvars.Context`, so one job's logging/request-scoped state cannot leak into the next. A `RUN` job claims the next queued run in that workspace's own unit of work (`uow.runs.claim_next`, `FOR UPDATE SKIP LOCKED` — safe with several workers on Postgres, a no-op on SQLite, which ignores `SKIP LOCKED`) and, if one was claimed, assembles a fresh `Pipeline` for that workspace and calls `execute_run`. A `TICK` job calls that workspace's `Tick.run(limit=tick_limit, skip_idle=True)` directly, with no run claimed first — a tick running into a `RunInProgress` for that workspace is logged as `tick_skipped`, not an error.
-- **Stale-run recovery (`Worker.recover_stale`)**, run about every 60 seconds in `run_forever`, asks the platform unit of work which workspaces have a run whose heartbeat has gone quiet past `stale_after` (30 minutes), then fails each such run (`uow.runs.fail_stale`) in that workspace's own unit of work — closing what was once an open gap for a worker killed mid-run ([R-05](../tech-debt-and-risks.md#r-05--p1--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3), now closed by this mechanism).
+- **Stale-run recovery (`Worker.recover_stale`)**, run about every 60 seconds in `run_forever`, asks the platform unit of work which workspaces have a run whose heartbeat has gone quiet past `stale_after` (30 minutes), then fails each such run (`uow.runs.fail_stale`) in that workspace's own unit of work — closing what was once an open gap for a worker killed mid-run ([R-05](../tech-debt-and-risks.md#r-05--runs-a-stopped-worker-leaves-its-run-running-runs-can-overlap-b2-b3--closed-2026-10-23), now closed by this mechanism).
 - **A fresh pipeline per job**, not one built once at process start, because the runner keeps per-run state and a long-lived worker now serves many workspaces, each needing its own metered providers scoped to its own workspace id.
 - **Periodic (platform-wide) jobs** (`run_periodic`, e.g. usage notices) run once per `tick_every` interval, independent of any one workspace's own tick; one failing job is logged (`periodic_failed`) and does not stop the others.
-- **Errors are contained** at every level: one job's exception is logged (`run_failed`/`tick_failed`) and finishes that run as `FAILED` without affecting any other workspace's jobs; a database hiccup inside the loop itself is logged as `worker_error` and the loop continues.
+- **Errors are contained** at every level: one job's exception is logged (`run_failed`/`tick_failed`/`pipeline_failed`) and reported to staff (`StaffAlerts`) and finishes that run as `FAILED` without affecting any other workspace's jobs; a database hiccup inside the loop itself is logged as `worker_error` and the loop continues.
 - **Still no SIGTERM handler.** A stop or deploy kills the process after Docker's grace period; any run in flight is picked up by the *next* worker's `recover_stale` once its heartbeat goes stale, rather than being lost forever — this is the mechanism that replaced the earlier "no stale-run recovery" gap, not a graceful-shutdown path, so the run still briefly shows as `running` until the next recovery pass.
 - **The light check (`Task.PIPELINE`)** runs every `due_check_every` (default 2 minutes, `--check-minutes`) for each active workspace that has no job planned: one query (`CompanyRepository.any_due`), and the pipeline only if a lead is due. A pass that moved leads (`_continue`: advanced, held, failed or suppressed) clears the workspace's last check, so the next poll looks again at once; a pass that moved nothing waits for the interval, so a lead that cannot go on is not retried in a loop. The 15-minute tick keeps its own timer, and a tick more than two intervals late goes before its workspace's queued run.
 - **Leads in parallel.** `Runner(lead_concurrency, lead_flow)`: a stage's due leads run in a bounded thread pool, each in a copy of the context; with `lead_flow`, one task carries a lead through every stage that takes it before it takes the next (`_run_flow`, furthest-along leads first). `DeliverStage.parallel = False`. The worker CLI sets both from `WORKER_LEAD_CONCURRENCY`; `assemble` defaults to one lead, stage by stage, so tests and `outbound run` stay deterministic. Searches inside a lead's research run together (`stages/together.py`).
 - **Status.** Every minute `run_forever` calls `heartbeat()`: it logs `worker_status` (`threads`, `busy`, `queued`, `oldest_queued_seconds`, `overdue_ticks`) and writes the same to the `platform_settings` row `id = 'worker'` (`PlatformSettingsRepository.beat_worker`), which the admin Overview's Worker card reads (alive when the row is under three minutes old).
-- **`outbound worker`** takes `--threads` (default `WORKER_THREADS`, 6), `--lead-concurrency` (`WORKER_LEAD_CONCURRENCY`, 4), `--check-minutes` (2), `--tick-minutes` (default 15), `--stale-minutes` (default 30), `--tick-limit` (default 50); there is no `--workspace` flag any more — the worker always serves every active workspace, which also makes the earlier risk of the API and worker binding to different single workspaces moot ([R-22](../tech-debt-and-risks.md#r-22--p3--configuration-the-api-and-the-worker-can-bind-to-different-workspaces), now closed).
+- **`outbound worker`** takes `--threads` (default `WORKER_THREADS`, 6), `--lead-concurrency` (`WORKER_LEAD_CONCURRENCY`, 4), `--check-minutes` (2), `--tick-minutes` (default 15), `--stale-minutes` (default 30), `--tick-limit` (default 50); there is no `--workspace` flag any more — the worker always serves every active workspace, which also makes the earlier risk of the API and worker binding to different single workspaces moot ([R-22](../tech-debt-and-risks.md#r-22--configuration-the-api-and-the-worker-can-bind-to-different-workspaces--closed-2026-10-23), now closed).
 
 ### Run statuses
 
@@ -217,11 +227,11 @@ Per lead: a read and guard transaction, an admin read, then one write transactio
 
 ## Configuration
 
-`--threads` (6), `--lead-concurrency` (4), `--check-minutes` (2), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). The per-lead delays (15 min, 1 h, 24 h for an outcome) and the tries (5 for a broken step, 3 for an outcome) are constructor defaults, not settings.
+`--threads` (6), `--lead-concurrency` (4), `--check-minutes` (2), `--tick-minutes` (15), `--stale-minutes` (30), `--tick-limit` (50) on `outbound worker`; `--limit` on `run`, `tick` and `retry` (50). `WORKER_THREADS`, `WORKER_LEAD_CONCURRENCY` and `WORKER_DATABASE_POOL_SIZE` (8) set the worker's capacity; check the connection budget before raising them ([capacity](../operations/capacity-and-limits.md)). The per-lead delays (15 min doubling to a day for a broken step, 1 h for a deferral, 24 h for an outcome, 2 h doubling to a day while no vendor answers) and the tries (5 for a broken step, 3 for an outcome) are constructor defaults of `Runner`, not settings.
 
 ## Observability
 
-`notify_failed` (the bell could not be written; the run or tick is unaffected), `auto_approved` and `auto_approve_left` (cold drafts approved, or one left for a person), `auto_discovery_queued` and `auto_discovery_skipped` (DEBUG, with the reason), `run_started`, `run_finished`, `stage_done`, `guard_refused`, `stage_failed`, `lead_gone_during_run`, `lead_unreadable`, `undo_failed`, `job_failed`, `tick_skipped`, `run_claimed`, `run_failed`, `tick_failed`, `run_stale_failed`, `periodic_failed`, `worker_error`. Context (`run_id`, `workspace_id`, `company_id`, `stage`) is bound once and rides on every line. See [observability](../operations/observability.md).
+`notify_failed` (the bell could not be written; the run or tick is unaffected), `auto_approved` and `auto_approve_left` (cold drafts approved, or one left for a person), `auto_discovery_queued` and `auto_discovery_skipped` (DEBUG, with the reason), `run_started`, `run_finished`, `stage_done`, `guard_refused`, `stage_failed`, `lead_gone_during_run`, `lead_unreadable`, `undo_failed`, `job_failed`, `tick_skipped`, `pipeline_skipped`, `pipeline_failed`, `run_claimed`, `run_failed`, `tick_failed`, `worker_status`, `run_stale_failed`, `periodic_failed`, `worker_error`. Context (`run_id`, `workspace_id`, `company_id`, `stage`) is bound once and rides on every line. See [observability](../operations/observability.md).
 
 ## Tests
 

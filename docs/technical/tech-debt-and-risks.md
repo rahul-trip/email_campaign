@@ -153,10 +153,10 @@ Read in `outbound/api/auth.py` and `deploy/`:
 ### R-16 · P2 · Supply chain: gaps in update and pinning coverage
 
 - **What:**
-  - Dependabot covers `uv`, `npm` in `/web` and GitHub Actions. It does not cover `/web2`, the app that is actually served, or the Docker base images.
+  - Dependabot covers `uv`, `npm` in `/web` and GitHub Actions. It does not cover `/web3`, the app that is actually served, or the Docker base images. (Version-update PRs are paused anyway: [R-34](#r-34--p2--dependencies-advisory-checks-and-update-prs-are-switched-off-during-development).)
   - Actions are pinned by tag, not by commit SHA. Base images are pinned by tag, not digest. The Doppler apt channel is `any-version`.
   - No container image scan runs.
-  - CI still builds, tests and audits the legacy `web/`, which is no longer served.
+  - ~~CI still builds, tests and audits the legacy `web/`, which is no longer served.~~ Fixed 2026-11-19: commit `621c6f5` removed those jobs; CI now builds, tests and audits `web3` only (jobs `web3`, `web3-browser`, `security`).
 - **Read:** `.github/dependabot.yml`, `.github/workflows/ci.yml`, `Dockerfile`.
 - **Links:** [supply chain](security/supply-chain.md).
 
@@ -296,12 +296,12 @@ These stay tracked in [phase-3b-hardening.md](../phases/phase-3b-hardening.md) �
 - **Was:** `ReviewService.queue` read the lead, the person, the address and the event history one email at a time, plus the workspace settings again for each, about six queries per email. The database is a network away (about 30 ms from the VM), so 44 waiting emails took 11.7 s and sent 689 KB, most of it each lead's whole research record. Today asked for the entire queue every 15 s to show ten emails, and the other requests on the page queued behind it (each took about 3 s while it ran).
 - **Fixed by:** `ReviewService.queue` reads the emails, then their leads, people and addresses together (`get_many` on the three repositories, one events query, the settings once): six queries however long the queue is. `GET /api/review` takes `limit`, `best` and `slim`; `StatusOut.waiting_hot` replaces counting hot emails in the list; Today asks for its ten best, slim.
 - **Evidence:** `tests/db/test_review_queue.py` (a queue of 14 costs the same number of queries as a queue of 2; best first; the same items as read one at a time; the hot count), `tests/api/test_web3_reads.py` (the parameters and the status count); also run on Postgres.
-- **Still open:** other lists may read per row in the same way (the Needs a decision rows and the lead page were not measured); look for it by counting queries, as the new test does.
+- **Still open:** other lists may read per row in the same way (the Failed leads rows and the lead page were not measured); look for it by counting queries, as the new test does.
 
 ### R-53 · P2 · Normal drop-outs were shown as failures, so the few wins were buried — closed 2026-11-19
 
 - **Was:** "no decision-maker found" and "no valid email found" were `failed`, like a real error; they were retried three times in under an hour, counted in the amber *Needs attention* badge and the bell, and shown as a red *Failed* card first on Today. An operator saw mostly red and amber.
-- **Fixed by:** `FailureKind`, `domain/outcomes.py` and [ADR 0036](adr/0036-outcomes-are-not-failures.md); the web app's Today, Emails ready, Hot leads and Needs a decision.
+- **Fixed by:** `FailureKind`, `domain/outcomes.py` and [ADR 0036](adr/0036-outcomes-are-not-failures.md); the web app's Today, Emails ready, LinkedIn ready and Failed leads.
 - **Evidence:** `tests/domain/test_outcomes.py`, `tests/db/test_buckets.py`, `tests/db/test_runner.py` (a day's wait and three tries; five tries for a break), `tests/db/test_linkedin.py` (hot first).
 - **Still open:** leads that failed before migration 0030 are classified from their error text, so an unusual wording reads as a broken step; the limits (5 and 3) are constants, not settings.
 

@@ -133,7 +133,8 @@ The ideal-customer text is the campaign's `icp_description`, else the sender pro
 
 | Failure | What happens |
 |---|---|
-| A vendor error after retries, or a model reply that does not fit its schema (`ask_json`) | The exception escapes the graph, and the runner fails the lead at `research` (retry after 15 min × attempts) |
+| A vendor error after retries, or a model reply that does not fit its schema (`ask_json`) | The exception escapes the graph, and the runner fails the lead at `research`; the engine retries it by itself, after 15 minutes, then 30, 1 hour, 2 and 4 ([runner](runner-and-worker.md#retries)) |
+| One of several side-by-side searches fails (`together_tolerant`) | That search is skipped, as it was when the searches were made in turn; the others' hits are used. A `BudgetExceeded` or any non-vendor error is still raised |
 | `BudgetExceeded` | Same: the lead fails with the reason |
 | The site cannot be read | Not an error: `thin` is set and search snippets stand in |
 | No people found | Not an error here. The contacts stage fails the lead if nobody is workable |
@@ -141,6 +142,14 @@ The ideal-customer text is the campaign's `icp_description`, else the sender pro
 ## Transactions and concurrency
 
 There is one read (contacts and notes), then the graph with no transaction open. The runner writes the result, checking `row_version`; if the operator edited the lead meanwhile, the result is dropped and the lead runs again later.
+
+Inside one lead, calls that do not depend on each other are made side by side by `outbound/stages/together.py` (`together`, and `together_tolerant`, which hands back a vendor's `ProviderError` in place of that call's result):
+
+- the `news` node's searches: the company's news, its market's news, and the careers search when the campaign has questions;
+- `search_people`'s two searches (two titles each);
+- `find_linkedin_many`'s profile searches, five names each. The hits are then read in the original order, so which name takes which profile is the same as asking one after another.
+
+At most `MAX_TOGETHER` (4) calls of one lead are in flight, so the worker's lead concurrency (`WORKER_LEAD_CONCURRENCY`, 4) times this stays small ([ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)). Each call runs in a copy of the caller's `contextvars` context, so its ledger row and log lines still carry the right run and lead. A lead's research takes about as long as its longest search, not the sum of them.
 
 ## Configuration
 
