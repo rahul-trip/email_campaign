@@ -2,8 +2,9 @@
 
 Docs: https://github.com/00al/orbisearch-api
 
-OrbiSearch's public API has no email-finder endpoint (only verify, bulk and credits), so this
-module has a verifier and a catch-all resolver, not a finder. Its ``risky`` status means an
+This module has a verifier and a catch-all resolver, not a finder. OrbiSearch has had a finder
+since 2026 (``POST /v1/email-lookup``), but it charges a credit for every search, found or not,
+so it is not used here. Its ``risky`` status means an
 unresolved catch-all. Repeat checks of one address within 24 hours are free at the vendor.
 """
 

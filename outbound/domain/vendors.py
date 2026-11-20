@@ -26,6 +26,8 @@ VENDORS: tuple[Vendor, ...] = (
     Vendor("generect", "Generect", "generect_api_key", "finder"),
     Vendor("orbisearch", "OrbiSearch", "orbisearch_api_key", "verifier"),
     Vendor("myemailverifier", "MyEmailVerifier", "myemailverifier_api_key", "verifier"),
+    Vendor("millionverifier", "MillionVerifier", "millionverifier_api_key", "verifier"),
+    Vendor("bounceban", "BounceBan", "bounceban_api_key", "resolver"),
     Vendor("scrubby", "Scrubby", "scrubby_api_key", "resolver"),
     Vendor("enrichley", "Enrichley", "enrichley_api_key", "resolver"),
     Vendor("companies_house", "Companies House", "companies_house_api_key", "registry"),

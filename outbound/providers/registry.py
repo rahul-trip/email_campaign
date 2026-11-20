@@ -20,6 +20,7 @@ from outbound.domain.errors import ConfigurationError
 from outbound.domain.vendors import BY_CODE
 from outbound.providers import oauth
 from outbound.providers.adapters.anymailfinder import AnymailFinder
+from outbound.providers.adapters.bounceban import BounceBanResolver
 from outbound.providers.adapters.companies_house import CompaniesHouse
 from outbound.providers.adapters.enrichley import EnrichleyResolver
 from outbound.providers.adapters.exa import ExaSearch
@@ -27,6 +28,7 @@ from outbound.providers.adapters.generect import GenerectFinder
 from outbound.providers.adapters.hunter import HunterFinder, HunterVerifier
 from outbound.providers.adapters.icypeas import IcypeasFinder
 from outbound.providers.adapters.llm import OpenAiCompatibleLlm
+from outbound.providers.adapters.millionverifier import MillionVerifierVerifier
 from outbound.providers.adapters.myemailverifier import MyEmailVerifierVerifier
 from outbound.providers.adapters.orbisearch import OrbiSearchResolver, OrbiSearchVerifier
 from outbound.providers.adapters.prospeo import ProspeoFinder
@@ -88,6 +90,10 @@ _FINDERS: dict[str, _Entry[EmailFinder]] = {
 
 _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
     # Order matters: backups are tried in it, the vendors that only verify before the finders.
+    "millionverifier": _Entry(
+        lambda s, c: MillionVerifierVerifier(_key(s.millionverifier_api_key), client=c),
+        lambda s: bool(_key(s.millionverifier_api_key)),
+    ),
     "orbisearch": _Entry(
         lambda s, c: OrbiSearchVerifier(_key(s.orbisearch_api_key), client=c),
         lambda s: bool(_key(s.orbisearch_api_key)),
@@ -107,6 +113,10 @@ _VERIFIERS: dict[str, _Entry[EmailVerifier]] = {
 }
 
 _RESOLVERS: dict[str, _Entry[CatchAllResolver]] = {
+    "bounceban": _Entry(
+        lambda s, c: BounceBanResolver(_key(s.bounceban_api_key), client=c),
+        lambda s: bool(_key(s.bounceban_api_key)),
+    ),
     "scrubby": _Entry(
         lambda s, c: ScrubbyResolver(_key(s.scrubby_api_key), s.scrubby_base_url, client=c),
         lambda s: bool(_key(s.scrubby_api_key)),

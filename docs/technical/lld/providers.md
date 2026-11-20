@@ -54,7 +54,9 @@ All result models extend `_Model`: Pydantic, `frozen=True`, `extra="forbid"`. Mo
 | Hunter | `outbound/providers/adapters/hunter.py::HunterFinder`, `HunterVerifier` | `EmailFinder`, `EmailVerifier` | [hunter](../integrations/hunter.md) |
 | ZeroBounce | `outbound/providers/adapters/zerobounce.py::ZeroBounceFinder`, `ZeroBounceVerifier` | `EmailFinder`, `EmailVerifier` | [zerobounce](../integrations/zerobounce.md) |
 | MyEmailVerifier | `outbound/providers/adapters/myemailverifier.py::MyEmailVerifierVerifier` | `EmailVerifier` | [myemailverifier](../integrations/myemailverifier.md) |
-| OrbiSearch | `outbound/providers/adapters/orbisearch.py::OrbiSearchVerifier` | `EmailVerifier` (no finder API) | [orbisearch](../integrations/orbisearch.md) |
+| OrbiSearch | `outbound/providers/adapters/orbisearch.py::OrbiSearchVerifier` | `EmailVerifier` (its finder API is not used) | [orbisearch](../integrations/orbisearch.md) |
+| MillionVerifier | `outbound/providers/adapters/millionverifier.py::MillionVerifierVerifier` | `EmailVerifier` | [millionverifier](../integrations/millionverifier.md) |
+| BounceBan | `outbound/providers/adapters/bounceban.py::BounceBanResolver` | `CatchAllResolver` (answers within the call) | [bounceban](../integrations/bounceban.md) |
 | Enrichley | `outbound/providers/adapters/enrichley.py::EnrichleyResolver` | `CatchAllResolver` (answers at once) | [enrichley](../integrations/enrichley.md) |
 | Scrubby | `outbound/providers/adapters/scrubby.py::ScrubbyResolver` | `CatchAllResolver` (asynchronous) | [scrubby](../integrations/scrubby.md) |
 | Companies House | `outbound/providers/adapters/companies_house.py::CompaniesHouse` | `CompanyRegistry` | [companies-house](../integrations/companies-house.md) |
@@ -85,7 +87,7 @@ The pay-as-you-go finders (`anymailfinder.py`, `prospeo.py`, `icypeas.py`, `gene
 
 `providers/balances.py::balance` asks Hunter, ZeroBounce, MyEmailVerifier or OrbiSearch what the account has left (free calls; `None` = unknown, never zero). `HttpClient` reads a 402, or a 429 whose text says the plan or credit limit is reached (Hunter: "searches per billing period included in your plan"), as `BudgetExceeded`, which is not retried; any other 429 is a `RateLimited` that is. ZeroBounce answers an empty account with HTTP 200 and a `Message` field: the adapter settles key or credit with `/getcredits`.
 
-Registry names: finders `hunter`, `zerobounce`; verifiers `hunter`, `zerobounce`, `orbisearch`, `myemailverifier`; resolvers `scrubby` and `enrichley`.
+Registry names: finders `hunter`, `zerobounce`; verifiers `millionverifier`, `orbisearch`, `myemailverifier`, `hunter`, `zerobounce`; resolvers `bounceban`, `scrubby`, `enrichley` and `orbisearch`.
 
 ### Errors (`outbound/providers/errors.py`)
 

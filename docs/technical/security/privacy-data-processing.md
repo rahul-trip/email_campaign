@@ -69,6 +69,8 @@ Every row below receives personal data from Outbound. The operator must hold app
 | ZeroBounce | Names with domains; addresses | [zerobounce](../integrations/zerobounce.md) |
 | MyEmailVerifier | Addresses | [myemailverifier](../integrations/myemailverifier.md) |
 | OrbiSearch | Addresses | [orbisearch](../integrations/orbisearch.md) |
+| MillionVerifier (when its key is set) | Addresses | [millionverifier](../integrations/millionverifier.md) |
+| BounceBan (when its key is set) | Addresses at catch-all domains | [bounceban](../integrations/bounceban.md) |
 | Enrichley or Scrubby (catch-all resolver) | Addresses | [enrichley](../integrations/enrichley.md), [scrubby](../integrations/scrubby.md) |
 | The LLM provider (Anthropic by default) | Page text, people's names and titles, notes, drafts and edits | [llm](../integrations/llm.md) |
 | Companies House | Company names | [companies-house](../integrations/companies-house.md) |
