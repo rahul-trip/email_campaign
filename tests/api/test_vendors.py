@@ -268,7 +268,7 @@ def test_refusals_of_a_replaced_key_no_longer_count(
     assert vendor(staff.get("/api/admin/vendors").json(), "scrubby")["key_refusals"] == 1
 
 
-def test_a_vendor_takes_up_to_three_keys_and_each_slot_is_managed_on_its_own(
+def test_each_key_slot_is_managed_on_its_own(
     staff: Api, app_and_services: tuple[FastAPI, Services]
 ) -> None:
     _, services = app_and_services
@@ -289,7 +289,7 @@ def test_a_vendor_takes_up_to_three_keys_and_each_slot_is_managed_on_its_own(
     )
 
     assert (
-        staff.put("/api/admin/vendors/tavily/key?slot=4", json={"key": keys[1]}).status_code == 422
+        staff.put("/api/admin/vendors/tavily/key?slot=0", json={"key": keys[1]}).status_code == 422
     )
     assert staff.post("/api/admin/vendors/tavily/reveal?slot=2").json()["key"] == keys[2]
 
@@ -396,3 +396,34 @@ def test_an_unexpected_server_error_reaches_staff_in_the_admin_bell(
         if n["kind"] == "platform_alert"
     ]  # fmt: skip
     assert len(crash) == 1 and "KeyError in the server (GET /api/boom)" in crash[0]["data"]["text"]
+
+
+def test_a_vendor_takes_any_number_of_keys_pasted_at_once(
+    staff: Api, app_and_services: tuple[FastAPI, Services]
+) -> None:
+    _, services = app_and_services
+    service = VendorService(services.container.platform, services.container.settings)
+    keys = [f"placeholder-bulk-key-{n:03d}" for n in range(40)]
+    out = staff.post("/api/admin/vendors/tavily/keys", json={"keys": [*keys, keys[0], "  "]})
+    assert out.status_code == 200
+    body = out.json()
+    assert (body["added"], body["already_there"]) == (40, 0)
+    assert [k["slot"] for k in vendor(body, "tavily")["keys"]] == list(range(1, 41))
+
+    again = staff.post(
+        "/api/admin/vendors/tavily/keys", json={"keys": [keys[5], "placeholder-new-41"]}
+    )
+    assert (again.json()["added"], again.json()["already_there"]) == (1, 1)
+    settings, _ = service.effective_settings()
+    assert len(settings.vendor_key_pools["tavily"]) == 41
+    assert audited(services, "vendor_keys_added")
+
+    # A removed key's slot is not reused, so it can still be rolled back into its own slot.
+    staff.delete("/api/admin/vendors/tavily/key?slot=41")
+    added = staff.post("/api/admin/vendors/tavily/keys", json={"keys": ["placeholder-new-42"]})
+    assert vendor(added.json(), "tavily")["keys"][-1]["slot"] == 42
+
+    short = staff.post(
+        "/api/admin/vendors/tavily/keys", json={"keys": ["placeholder-ok-1", "short"]}
+    )
+    assert short.status_code == 422

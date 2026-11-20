@@ -28,7 +28,7 @@ from outbound.domain.platform_settings import (
     LlmModel,
     PlatformSettings,
 )
-from outbound.domain.vendors import BY_CODE, LLM_FIELDS, VENDORS, mask
+from outbound.domain.vendors import BY_CODE, LLM_FIELDS, MAX_KEYS_PER_ADD, VENDORS, mask
 from outbound.logging import get_logger
 from outbound.providers.adapters.llm import PRESETS
 from outbound.providers.balances import HAS_BALANCE, Balance, balance
@@ -38,6 +38,12 @@ log = get_logger(__name__)
 
 Stamp = tuple[int, tuple[tuple[str, int], ...]]
 BALANCE_TTL = timedelta(minutes=10)
+
+
+@dataclass(frozen=True)
+class AddedKeys:
+    added: int
+    already_there: int  # live already, or given twice: not added again
 
 
 @dataclass(frozen=True)
@@ -348,8 +354,8 @@ class VendorService:
         return {name: getattr(self._base, name) for name in LLM_FIELDS} | overrides.llm
 
     def replace_key(self, vendor: str, key: str, *, by: str | None, slot: int = 1) -> int:
-        """Set the key in ``slot`` (1 to ``MAX_KEYS``); a vendor with several keys uses one at
-        random for each call."""
+        """Set the key in ``slot`` (1 or more); a vendor with several keys uses one at random
+        for each call."""
         _known(vendor)
         key = key.strip()
         if len(key) < 8:
@@ -363,6 +369,29 @@ class VendorService:
             p.commit()
         log.info("vendor_key_replaced", vendor=vendor, version=version, slot=slot)
         return version
+
+    def add_keys(self, vendor: str, keys: list[str], *, by: str | None) -> AddedKeys:
+        """Add every key, each in a new slot; there is no limit on how many a vendor has. Blank
+        lines are ignored, and a key given twice or already live is added once."""
+        _known(vendor)
+        wanted = list(dict.fromkeys(k.strip() for k in keys if k.strip()))
+        if not wanted:
+            raise InvalidInput("paste at least one key")
+        if len(wanted) > MAX_KEYS_PER_ADD:
+            raise InvalidInput(f"add at most {MAX_KEYS_PER_ADD} keys at a time")
+        short = [n for n, k in enumerate(wanted, start=1) if len(k) < 8]
+        if short:
+            raise InvalidInput(f"key {short[0]} does not look like an API key")
+        with self._platform() as p:
+            slots = p.vendor_keys.add(vendor, wanted, by=by)
+            if slots:
+                p.audit.record(
+                    "vendor_keys_added", actor_user_id=by, target_type="vendor",
+                    target_id=vendor, data={"slots": slots},
+                )  # fmt: skip
+            p.commit()
+        log.info("vendor_keys_added", vendor=vendor, added=len(slots))
+        return AddedKeys(added=len(slots), already_there=len(wanted) - len(slots))
 
     def remove_key(self, vendor: str, slot: int, *, by: str | None) -> None:
         """Stop using the slot's key. It is retired, so it can be rolled back for 30 days."""

@@ -21,6 +21,7 @@ from outbound.domain.enums import (
 )
 from outbound.domain.outcomes import Bucket, bucket_of, tries_allowed
 from outbound.domain.qualification import is_hot
+from outbound.domain.vendors import MAX_KEYS_PER_ADD
 from outbound.services.journey import StageState
 from outbound.services.runs import RunMode
 
@@ -1397,6 +1398,17 @@ class VendorsOut(Out):
 
 class VendorKeyIn(In):
     key: str
+
+
+class VendorKeysIn(In):
+    """Keys to add to a vendor, each in a new slot (pasted one per line in the console)."""
+
+    keys: list[str] = Field(min_length=1, max_length=MAX_KEYS_PER_ADD)
+
+
+class KeysAddedOut(VendorsOut):
+    added: int
+    already_there: int  # live already, or given twice: not added again
 
 
 class VendorPauseIn(In):

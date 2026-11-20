@@ -4395,6 +4395,89 @@
         "title": "KeyCheckOut",
         "type": "object"
       },
+      "KeysAddedOut": {
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "integer"
+          },
+          "already_there": {
+            "title": "Already There",
+            "type": "integer"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "extract_model": {
+            "title": "Extract Model",
+            "type": "string"
+          },
+          "llm": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "title": "Llm",
+            "type": "object"
+          },
+          "llm_charges": {
+            "items": {
+              "$ref": "#/components/schemas/LlmChargeOut"
+            },
+            "title": "Llm Charges",
+            "type": "array"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/LlmModelOut"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/LlmProviderOut"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "vendors": {
+            "items": {
+              "$ref": "#/components/schemas/VendorOut"
+            },
+            "title": "Vendors",
+            "type": "array"
+          },
+          "writer_model": {
+            "title": "Writer Model",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vendors",
+          "llm",
+          "llm_charges",
+          "models",
+          "default_model",
+          "writer_model",
+          "extract_model",
+          "providers",
+          "added",
+          "already_there"
+        ],
+        "title": "KeysAddedOut",
+        "type": "object"
+      },
       "LeadOut": {
         "properties": {
           "company": {
@@ -9174,6 +9257,27 @@
         "title": "VendorKeyOut",
         "type": "object"
       },
+      "VendorKeysIn": {
+        "additionalProperties": false,
+        "description": "Keys to add to a vendor, each in a new slot (pasted one per line in the console).",
+        "properties": {
+          "keys": {
+            "items": {
+              "maxLength": 10000,
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "keys"
+        ],
+        "title": "VendorKeysIn",
+        "type": "object"
+      },
       "VendorOut": {
         "properties": {
           "balance": {
@@ -12367,7 +12471,6 @@
             "name": "slot",
             "required": true,
             "schema": {
-              "maximum": 3,
               "minimum": 1,
               "title": "Slot",
               "type": "integer"
@@ -12419,7 +12522,6 @@
             "required": false,
             "schema": {
               "default": 1,
-              "maximum": 3,
               "minimum": 1,
               "title": "Slot",
               "type": "integer"
@@ -12459,6 +12561,59 @@
           }
         },
         "summary": "Replace Vendor Key",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/api/admin/vendors/{vendor}/keys": {
+      "post": {
+        "description": "Add any number of keys, each in a new slot.",
+        "operationId": "add_vendor_keys_api_admin_vendors__vendor__keys_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "vendor",
+            "required": true,
+            "schema": {
+              "title": "Vendor",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VendorKeysIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeysAddedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Vendor Keys",
         "tags": [
           "admin"
         ]
@@ -12535,7 +12690,6 @@
             "required": false,
             "schema": {
               "default": 1,
-              "maximum": 3,
               "minimum": 1,
               "title": "Slot",
               "type": "integer"
@@ -12589,7 +12743,6 @@
             "required": false,
             "schema": {
               "default": 1,
-              "maximum": 3,
               "minimum": 1,
               "title": "Slot",
               "type": "integer"
@@ -12644,7 +12797,6 @@
             "required": false,
             "schema": {
               "default": 1,
-              "maximum": 3,
               "minimum": 1,
               "title": "Slot",
               "type": "integer"

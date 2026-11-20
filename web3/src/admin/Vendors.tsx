@@ -1,22 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { client, ok, type Schemas } from "../api/client";
-import { Button, Callout, Card, Dialog, Field, Input, PageHeader, Problem, QueryState, StackTable, Table, Td, Th } from "../ui/compat";
+import { Button, Callout, Card, Dialog, Field, Input, Textarea, PageHeader, Problem, QueryState, StackTable, Table, Td, Th } from "../ui/compat";
 import { credits, usd, wholeCredits } from "../lib/format";
 import { Pill, When } from "./bits";
 import { ModelsCard } from "./Models";
 
 type Vendor = Schemas["VendorOut"];
 type Slot = { vendor: Vendor; slot: number };
-const MAX_KEYS = 3;
+const SHOWN_KEYS = 5; // a long list of keys folds after this many
 const path = (vendor: string) => ({ params: { path: { vendor } } });
 const inSlot = (vendor: string, slot: number) => ({ params: { path: { vendor }, query: { slot } } });
-const freeSlot = (v: Vendor) => [1, 2, 3].find((n) => !v.keys.some((k) => k.slot === n)) ?? 1;
+const lines = (text: string) => text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
 export function VendorsPage() {
   const queryClient = useQueryClient();
   const vendors = useQuery({ queryKey: ["admin", "vendors"], queryFn: () => ok(client.GET("/api/admin/vendors")) });
   const [replacing, setReplacing] = useState<Slot | null>(null);
+  const [adding, setAdding] = useState<Vendor | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+  const [unfolded, setUnfolded] = useState<Record<string, boolean>>({});
   const [tested, setTested] = useState<Record<string, { ok: boolean | null; message: string }>>({});
   const test = useMutation({
     mutationFn: async ({ vendor, slot }: Slot) => ({
@@ -54,8 +57,13 @@ export function VendorsPage() {
     <>
       <PageHeader
         title="Vendors and keys"
-        subtitle="The third-party services the platform pays for. A vendor can have up to three keys: each call uses one at random and skips a key that is refused or out of credit. A new key reaches the worker on its next run; no restart."
+        subtitle="The third-party services the platform pays for. A vendor can have as many keys as you add: each call uses one at random and skips a key that is refused, rate limited or out of credit. A new key reaches the worker on its next run; no restart."
       />
+      {added && (
+        <Callout tone="good" className="mb-3">
+          {added}
+        </Callout>
+      )}
       <Problem error={rollback.error ?? remove.error ?? pause.error ?? reveal.error ?? test.error} className="mb-3" />
       <QueryState query={vendors} rows={6} shape="table">
         {(data) => (
@@ -90,7 +98,12 @@ export function VendorsPage() {
                           </div>
                         ) : (
                           <ul className="space-y-1">
-                            {v.keys.map((k) => (
+                            {v.keys.length > 1 && (
+                              <li className="text-label text-muted">
+                                {v.keys.length} keys · each call uses one at random
+                              </li>
+                            )}
+                            {(unfolded[v.code] ? v.keys : v.keys.slice(0, SHOWN_KEYS)).map((k) => (
                               <li key={k.slot}>
                                 <div className="flex flex-wrap items-center gap-1 whitespace-nowrap">
                                   <span className="font-mono">{k.key}</span>
@@ -120,6 +133,13 @@ export function VendorsPage() {
                                 {result(v, k.slot)}
                               </li>
                             ))}
+                            {v.keys.length > SHOWN_KEYS && (
+                              <li>
+                                <button type="button" className="text-label text-primary hover:underline" onClick={() => setUnfolded((all) => ({ ...all, [v.code]: !all[v.code] }))}>
+                                  {unfolded[v.code] ? "Show fewer" : `Show all ${v.keys.length} keys`}
+                                </button>
+                              </li>
+                            )}
                           </ul>
                         )}
                       </Td>
@@ -142,11 +162,9 @@ export function VendorsPage() {
                         {v.paused_for_credit && <div className="mt-1 text-label text-muted">paused by itself; resumes when it has credit</div>}
                       </Td>
                       <Td className="flex flex-wrap gap-1 md:table-cell md:space-x-1 md:text-right md:whitespace-nowrap">
-                        {v.keys.length < MAX_KEYS && (
-                          <Button size="sm" variant="secondary" onClick={() => setReplacing({ vendor: v, slot: freeSlot(v) })}>
-                            Add key
-                          </Button>
-                        )}
+                        <Button size="sm" variant="secondary" onClick={() => setAdding(v)}>
+                          {v.keys.length ? "Add keys" : "Add key"}
+                        </Button>
                         {v.source !== "none" && (
                           <Button size="sm" variant="ghost" onClick={() => pause.mutate(v)}>
                             {v.paused ? "Resume" : "Pause"}
@@ -162,6 +180,21 @@ export function VendorsPage() {
           </div>
         )}
       </QueryState>
+      {adding && (
+        <AddKeys
+          vendor={adding}
+          onClose={() => setAdding(null)}
+          onDone={(data) => {
+            refresh(data);
+            setAdding(null);
+            setAdded(
+              `${adding.name}: ${data.added} key${data.added === 1 ? "" : "s"} added` +
+                (data.already_there ? `; ${data.already_there} ${data.already_there === 1 ? "was" : "were"} already there` : "") +
+                ".",
+            );
+          }}
+        />
+      )}
       {replacing && <ReplaceKey target={replacing} onClose={() => setReplacing(null)} onDone={(data) => { refresh(data); setReplacing(null); }} />}
       {capping && <CapDialog vendor={capping} onClose={() => setCapping(null)} onDone={(data) => { refresh(data); setCapping(null); }} />}
       {revealed && (
@@ -171,6 +204,36 @@ export function VendorsPage() {
         </Dialog>
       )}
     </>
+  );
+}
+
+function AddKeys({ vendor, onClose, onDone }: { vendor: Vendor; onClose: () => void; onDone: (data: Schemas["KeysAddedOut"]) => void }) {
+  const [text, setText] = useState("");
+  const keys = lines(text);
+  const save = useMutation({
+    mutationFn: () => ok(client.POST("/api/admin/vendors/{vendor}/keys", { ...path(vendor.code), body: { keys } })),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog
+      title={`Add ${vendor.name} keys`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button busy={save.isPending} disabled={keys.length === 0} onClick={() => save.mutate()}>
+            {keys.length > 1 ? `Add ${keys.length} keys` : "Add key"}
+          </Button>
+        </>
+      }
+    >
+      <Field label="Keys, one per line" hint="Each key gets its own slot, stored encrypted. There is no limit; a key the vendor already has is skipped. Each call uses one key at random.">
+        <Textarea rows={8} autoComplete="off" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} className="w-full font-mono text-small" />
+      </Field>
+      <Problem error={save.error} />
+    </Dialog>
   );
 }
 
