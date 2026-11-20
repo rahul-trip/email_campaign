@@ -2,7 +2,7 @@
 type: reference
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
+last_verified: 2026-11-19 (25cc02f)
 applies_to: Phase 3b
 ---
 
@@ -49,15 +49,13 @@ Install once with `uv run pre-commit install`. All hooks are local and run throu
 | Job | Steps | Fails when |
 |---|---|---|
 | **Python lint, types and import layers** (`checks`) | `uv sync --frozen`; `ruff check .`; `ruff format --check .`; `mypy`; `lint-imports` | Lint, format, type or layer violations; a lockfile out of date |
-| **Python tests on SQLite** (4 shards) | `uv run pytest` (`tests/` and `agent/`) with `TEST_SHARD=n/4`: `conftest.py` gives whole test files to a shard, the biggest first to the lightest, so each runner takes about a quarter (plain `pytest` runs everything) | Any test fails |
-| **Python tests on Postgres 16** (4 shards) | A `postgres:16` service per shard, `TEST_SHARD=n/4`; `TEST_DATABASE_URL=postgresql+psycopg://…`; `uv run pytest tests` | Any test fails on Postgres |
-| **web** (legacy) | Node 22; `npm ci`; `gen:api` then `git diff --exit-code`; build; Playwright | The legacy app breaks, or its client is stale ([R-16](../tech-debt-and-risks.md#r-16--p2--supply-chain-gaps-in-update-and-pinning-coverage): to be removed) |
-| **web2** | Node 22; `npm ci`; `gen:api` then `git diff --exit-code openapi.json src/api/schema.ts`; build; Playwright against `scripts/e2e_server.py` | Type or build errors; **a stale API client**; any browser test, including **every tour step pointing at a real element** |
+| **Python tests on SQLite** (4 shards) | `uv run pytest` (`tests/` and `agent/`) with `TEST_SHARD=n/4`: `conftest.py` gives whole test files to a shard, the slowest first to the shard with the least work so far, so the shards finish together. A file's seconds come from `tests/shard_weights.json` (measured with `pytest --durations=0`; refresh it when the suite changes a lot), and a file not listed counts as 0.02 s a test. Plain `pytest` runs everything | Any test fails |
+| **Python tests on Postgres 16** (4 shards) | A `postgres:16` service per shard, `TEST_SHARD=n/4` (the same split); `TEST_DATABASE_URL=postgresql+psycopg://…`; `uv run pytest tests` | Any test fails on Postgres |
 | **Web types, build, client, parity** and **Web browser tests and tour** (**web3**, **web3-browser**) | Node 22; `npm ci`; `gen:api` then `git diff --exit-code`; build; route parity with web2. The browser tests are a separate job, **web3-browser**, in four shards (`playwright test --shard=n/4`), each on its own runner with its own `scripts/e2e_server.py` and database, using the runner's own Google Chrome (`PLAYWRIGHT_CHANNEL=chrome`, so no browser download and no apt, whose mirror once held a shard for over three minutes), so the slowest shard sets the time (about two minutes, down from about four). | Type or build errors; a stale API client; any browser test, including every tour step pointing at a real element. If the tests grow, raise the shard count in `ci.yml` (matrix and `--shard`) |
 | **Docker image builds and starts** (`image`) | `docker build --pull -t outbound:ci .`; `docker run --entrypoint outbound outbound:ci --help` | The image does not build, or the CLI does not start in it |
-| **Security scan** (`security`) | `gitleaks-action` over the whole history; `uv export --frozen` then `uvx pip-audit`; `npm audit --audit-level=high` for `web` and `web2` | A secret anywhere in history; a known vulnerability (high or above for npm) |
+| **Security scan** (`security`) | `gitleaks-action` over the whole history; `uv export --frozen` then `uvx pip-audit`; `npm audit --audit-level=high` for `web3` (the audits do not stop a deploy for now: R-34) | A secret anywhere in history; a known vulnerability (high or above for npm) |
 
-**Triggers:** push to `main`, every pull request, and `workflow_call` (the deploy workflow reuses it).
+**Triggers:** push to `main`, every pull request, a weekly schedule (Monday 06:00 UTC, so a new advisory shows before deploy day) and `workflow_call` (the deploy workflow reuses it).
 
 **Required checks:** configure branch protection on `main` to require all seven jobs. The repository's settings, not this file, decide that; confirm it there.
 

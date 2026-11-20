@@ -2,8 +2,8 @@
 type: explanation
 status: draft
 owner: "@rahul-trip"
-last_verified: 2026-10-21 (6deda34)
-applies_to: Phase 3b
+last_verified: 2026-11-19 (25cc02f)
+applies_to: Phase 6
 ---
 
 # Pipeline flow
@@ -62,7 +62,12 @@ What this gives:
 | 8 | Deliver (only if a mailbox is configured) | `approved` → `in_sequence` / `held` | yes / no | — (IMAP) |
 | 9 | Sent sync (a tick job) | message `drafted` → `sent` | — | — (IMAP) |
 
-Each stage makes its list when it starts, after the previous stage has finished, so one run can carry a new lead all the way from research to `copy_ready`. It stops there, because review needs the operator. A lead that is held, deferred (`next_action_at` in the future) or failed waits for a later run.
+One run can carry a new lead all the way from research to `copy_ready`. It stops there, because review needs the operator. A lead that is held, deferred (`next_action_at` in the future) or failed waits for a later run. There are two ways to visit the leads, with the same per-lead step (`Runner._process`) and so the same transactions and events:
+
+- **Stage by stage** (tests, the CLI, and any run limited to some stages with `only`): each stage makes its list when it starts, after the previous stage has finished, and works its leads one at a time, or up to `lead_concurrency` side by side.
+- **Lead by lead** (the worker: `Runner(lead_concurrency=4, lead_flow=True)`, [ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)): `Runner._run_flow` lists every due lead at the stage it is waiting for, furthest along first, and carries each through the stages back to back while each step advances it; up to `WORKER_LEAD_CONCURRENCY` (4) leads are in flight. It stops a lead where it is held, failed, deferred, refused or finished. A stage that shares one outside connection says `parallel = False` (delivery, one mailbox connection) and runs afterwards as a pass of its own, one lead at a time.
+
+Inside one lead, research makes its independent searches side by side ([research LLD](../lld/stage-research.md#transactions-and-concurrency)).
 
 ## 1. Intake
 
@@ -218,9 +223,9 @@ A mailbox error defers the lead by an hour; it never fails it.
 
 LLD: [deliver and sync](../lld/stage-deliver-and-sync.md).
 
-## 9. Sent sync and the catch-all poller (tick jobs)
+## 9. Tick jobs: Sent sync, the catch-all poller and others
 
-These are `Job`s run by `outbound tick`, not by the worker ([R-02](../tech-debt-and-risks.md#r-02--p1--pipeline-scheduled-work-never-runs-in-production-b7)).
+These are `Job`s in each workspace's `Tick` (`outbound/runner/tick.py`), which the worker runs for every active workspace every 15 minutes ([runner and worker](../lld/runner-and-worker.md)); `outbound tick` runs one by hand. A tick retries due failed leads, runs the jobs, then a pipeline pass. The jobs, in order (`outbound/pipeline.py::assemble`): `ResumeService` (credits that appeared release waiting leads), `CatchAllPoller` (when a resolver is configured), `SentSync`, `InboxSync` and `MailboxHealth` (when the workspace has a mailbox), and `AutoApprover` (cold drafts, when the workspace allows it, [ADR 0033](../adr/0033-cold-drafts-may-be-approved-without-a-person.md)).
 
 - **Sent sync** reads the Sent folder from shortly before the earliest open draft. A sent mail matches a draft on recipient, normalised subject and time. A match that is unique in both directions moves the message to `sent` and stores the body that actually went out and its edit distance. Anything ambiguous writes one `sync_ambiguous` event and waits for the operator.
 - **Catch-all poller** asks the resolver about every `catch_all_resolving` lead that is due. An answer updates the address and sends the lead back to the email step. No answer moves `next_action_at` on by 6 hours.

@@ -51,11 +51,11 @@ flowchart LR
 | Process | Started by | Does | Concurrency |
 |---|---|---|---|
 | `api` | compose, `outbound serve` | The JSON API under `/api`, auth and the admin console, and the built web app. It never runs the pipeline in a request: it inserts a `queued` run | One uvicorn process, synchronous handlers in its thread pool |
-| `worker` | compose, `outbound worker` | **Serves every active workspace.** Plans the next job (a queued run, or a due tick) per workspace, least-recently-served first, up to `--threads` (4) at once in a thread pool; recovers stale runs; runs platform-wide periodic jobs (notices, vendor spend caps) | One process, several threads; one piece of work per workspace at a time |
+| `worker` | compose, `outbound worker` | **Serves every active workspace.** Plans the next job per workspace (a queued run, a due tick, or a light check for due leads), least-recently-served first, up to `WORKER_THREADS` (6) workspaces at once; inside a workspace's run, works up to `WORKER_LEAD_CONCURRENCY` (4) leads side by side and carries each lead through the stages back to back; recovers stale runs; runs platform-wide periodic jobs (notices, vendor spend caps); reports `worker_status` each minute | One process, several threads; one piece of work per workspace at a time, several leads within it ([ADR 0037](../adr/0037-one-worker-process-leads-in-parallel.md)) |
 | `migrate` | compose, before `api` and `worker` | `outbound db upgrade && outbound seed`, both idempotent. Connects as the table **owner**, the only process that does | One-shot |
 | CLI | the operator or platform staff | Any command, including `run` for one workspace in the foreground; `outbound users create`, `outbound vendors …`, `outbound secrets …` | As above |
 
-There is no longer a separate `outbound tick` CLI loop or a `--workspace` flag on `worker`: the worker ticks every active workspace itself, on a timer (`--tick-minutes`, default 15), so no cron job is needed. `outbound tick` still exists for one workspace, used by tests and by hand.
+There is no longer a separate `outbound tick` CLI loop or a `--workspace` flag on `worker`: the worker ticks every active workspace itself, on a timer (`--tick-minutes`, default 15), so no cron job is needed. Between ticks, a **light check** (`--check-minutes`, default 2; `Worker._pipeline_if_due`) makes one cheap query per workspace and starts a pipeline pass only when a lead is due, so new work does not wait for the next tick. `outbound tick` still exists for one workspace, used by tests and by hand.
 
 ## 3. How work is queued
 
@@ -78,7 +78,7 @@ sequenceDiagram
     loop every poll_seconds while idle
         Sched->>PlatUoW: with_queued_runs(now), active_workspaces(now), with_stale_runs(cutoff)
         PlatUoW-->>Sched: workspace ids only, no rows
-        Sched->>Sched: plan(): one Job per idle workspace, least-recently-served first
+        Sched->>Sched: plan(): one Job per idle workspace (run, tick, or light check), least-recently-served first
         Sched->>TenUoW: claim_next() in that workspace's own unit of work
         Sched->>Sched: assemble a fresh Pipeline for that workspace, execute_run(...)
     end
@@ -86,10 +86,13 @@ sequenceDiagram
 
 | Delay | Value | Set by |
 |---|---|---|
-| Retry after a failure | 15 min × (attempts + 1); automatic retries stop at 3 attempts | `Runner._fail`, `Runner.retry_failed` (a tick) |
+| Retry after a broken step | 15 min, then 30, 1 h, 2 h and 4 h (doubling, a day at most); five tries, nobody has to press Retry | `Runner._fail`, `Runner.retry_failed` (a tick), `domain/outcomes.py::tries_allowed` |
+| Retry after an outcome (`no_person`, `no_email`) | 24 hours; three tries | `Runner._fail` (`outcome_delay`) |
+| No vendor could answer (`VendorUnavailable`) | 2 h, then 4, 8, 16, a day at most, for as long as no vendor answers; no attempt is counted (the count comes from the lead's recent `vendor_wait` events) | `Runner._fail`, `EventRepository.vendor_waits_since` |
 | Deferral (deliver or sync error, a guard that cannot hold) | 1 hour | `Runner._defer` |
 | Catch-all resolving | 6 hours between polls | `EmailStage`, `CatchAllPoller` |
-| A tick for one active workspace | Every 15 minutes (`--tick-minutes`); skipped while that workspace already has a run in progress | `Worker.plan` |
+| A tick for one active workspace | Every 15 minutes (`--tick-minutes`); skipped while that workspace already has a run in progress. A tick more than a whole interval late goes before that workspace's queued run, so its mailboxes are still synced | `Worker.plan` |
+| Light check for due leads | Every 2 minutes (`--check-minutes`); one query, a pipeline pass only if a lead is due | `Worker.plan`, `Worker._pipeline_if_due` |
 | A run whose worker died | Failed after 30 minutes with no heartbeat (`--stale-after`), freeing the queue | `Worker.recover_stale`, `runs.heartbeat_at` |
 
 A platform **kill switch** (`platform_settings.data.kill_runs`) stops every workspace's work at once; `Worker.plan` checks it first and returns no jobs while it is set.
@@ -187,7 +190,7 @@ flowchart TD
     T -->|ConcurrencyConflict| SK[undo; lead skipped this run]
     T -->|NotFound and lead deleted| SK
     T -->|StageFailure / ProviderError / any other| F{stage can fail a lead?}
-    F -->|research, gate, contacts, email, copy| FA["failed (failed_stage, last_error ≤ 300 chars)<br/>retry after 15 min × attempts"]
+    F -->|research, gate, contacts, email, copy| FA["failed (failed_stage, last_error ≤ 300 chars, failure_kind)<br/>retried by the engine: 15 min doubling, 5 tries;<br/>an outcome waits 24 h, 3 tries;<br/>no vendor answering waits 2 h doubling, uncounted"]
     F -->|deliver| DF["deferred 1 hour<br/>(one 'deferred' event per distinct reason)"]
 ```
 
@@ -197,7 +200,8 @@ flowchart TD
   - Three attempts with exponential back-off from 1 s to 8 s, and a 30 s timeout per call.
 - **Budget and credit refusals** (`BudgetExceeded`, and the new `RefusalKind.CREDITS` / `RefusalKind.ACCESS`) are refused before the stage runs. A lead out of credits for a step waits **in place**, not failed, and the next credit grant or period rollover resumes it automatically ([plans, credits and admin](../lld/plans-credits-and-admin.md)).
 - **A whole run fails** only on an error outside the per-lead handling. The worker records it on the run and keeps serving other workspaces.
-- **A workspace's tick failing never stops another workspace's tick:** `Worker._tick` catches and logs, per the module's own design rule ("one workspace's broken tick must not stop the others").
+- **A workspace's tick or light-check pass failing never stops another workspace's:** `Worker._tick` and `Worker._pipeline_if_due` catch, log and alert staff, per the module's own design rule ("one workspace's broken tick must not stop the others").
+- **Leads worked side by side fail on their own.** Each lead's step is the same `Runner._process` with its own short transaction and its own copy of the logging context, so one lead's exception fails only that lead.
 - **API errors** are RFC 9457 problem details with stable codes ([API conventions](../api/api-conventions.md)). A 500 carries a reference (the request id) and no detail.
 
 ## 8. Composition
@@ -212,8 +216,8 @@ The design target is **5–50 new prospects a week at no more than $0.50 each**,
 
 | Limit | Today | What gives first |
 |---|---|---|
-| Throughput | One worker, several threads, one piece of work per workspace at a time; research and copy spend seconds per lead on model calls | More workspaces active at once than `--threads` allow queue behind each other; raise `--threads`, or run a second worker process (claiming is safe across workers on Postgres) |
-| Database connections | 3 roles × pool size (default 5) against the Supabase pooler's ~15-client limit on small plans | A busy alpha with several one-off `oc run` commands can hit `max clients reached` ([R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
+| Throughput | One worker sized for 10–15 workspaces: `WORKER_THREADS` (6) workspaces at once, `WORKER_LEAD_CONCURRENCY` (4) leads each, up to `MAX_TOGETHER` (4) independent searches per lead; research and copy spend seconds per lead on model calls | More workspaces active at once than `WORKER_THREADS` allow queue behind each other (the admin Overview's Worker card shows the wait); raise the settings within the connection budget, or run a second worker process (claiming is safe across workers on Postgres) |
+| Database connections | `api` `DATABASE_POOL_SIZE` (5) + `worker` `WORKER_DATABASE_POOL_SIZE` (8) + `migrate` during a deploy, against the Supabase pooler's ~15-client limit on small plans; a request for a connection waits up to `DATABASE_POOL_TIMEOUT` (30 s) | A deploy or a one-off command on a small plan can hit `max clients reached` unless `DATABASE_POOL_SIZE` is lowered ([capacity](../operations/capacity-and-limits.md), [R-12](../tech-debt-and-risks.md#r-12--p2--capacity-the-connection-pool-fills-the-supabase-pooler)) |
 | Event table growth | One row per transition and per operator action, per workspace; no retention | Not a concern below hundreds of thousands of rows |
 | Mailbox tokens | Refreshed inline when used; no background refresh job | A mailbox idle for a long time may need a reconnect on first use after its long-lived refresh token itself expires |
 | Lead directory | Platform-wide tables, no per-workspace partitioning | Fine at alpha scale; a very large directory would need indexing attention, not a redesign |
