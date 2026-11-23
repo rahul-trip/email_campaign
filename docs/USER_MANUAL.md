@@ -29,6 +29,7 @@ It is built for about 5–50 new companies a week. Everything it buys (searches,
 - It does **not read replies** or react to bounces.
 - It does **not send**. Drafts only.
 - Accounts are **invitation only**. There is no sign-up page, no two-step sign-in and no sign-in with Google or Microsoft yet.
+- On the sign-in page, **Ask for an invitation** opens the contact form at <https://thehumanfriend.com/#contact>.
 
 See also [section 13](#13-known-limits-in-this-version).
 
