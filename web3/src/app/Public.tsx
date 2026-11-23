@@ -119,7 +119,12 @@ function SignIn({ next, email: given }: { next: string | null; email: string }) 
           <a href="/forgot-password" className="font-semibold text-primary hover:underline">
             Forgot your password?
           </a>
-          <span className="text-muted">No account? Ask for an invitation.</span>
+          <span className="text-muted">
+            No account?{" "}
+            <a href="https://thehumanfriend.com/#contact" className="font-semibold text-primary hover:underline">
+              Ask for an invitation
+            </a>
+          </span>
         </div>
       </form>
     </Frame>
